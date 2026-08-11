@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How NDA signing works at Hushh</title>
+
+<style>
+  /* minimal reset */
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, p, figure, figcaption, ul, table { margin: 0; padding: 0; }
+  img, svg { max-width: 100%; }
+
+  :root {
+    --paper:    #FAFAF7;
+    --surface:  #FFFFFF;
+    --ink:      #16191D;
+    --ink-2:    #4A5259;
+    --ink-3:    #7C858B;
+    --rule:     #D9DDD8;
+    --rule-2:   #E9ECE7;
+
+    --mint:     #DCEFE9;
+    --mint-line:#0E7A67;
+    --mint-ink: #0A5647;
+
+    --gold:     #F6E9BE;
+    --gold-line:#A8801B;
+    --gold-ink: #6B5010;
+
+    --slate:    #ECEFF2;
+    --slate-line:#66727E;
+    --slate-ink:#3E4952;
+
+    --edge:     #7C858B;
+    --edge-soft:#A9B1B6;
+
+    --lane:     #F2F3F0;
+    --lane-alt: #F6F7F4;
+
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:    #101315;
+      --surface:  #171B1E;
+      --ink:      #E9ECEA;
+      --ink-2:    #A6B0AD;
+      --ink-3:    #78837F;
+      --rule:     #2B3231;
+      --rule-2:   #212725;
+
+      --mint:     #13332E;
+      --mint-line:#47B39C;
+      --mint-ink: #93DEC9;
+
+      --gold:     #322810;
+      --gold-line:#C6A03B;
+      --gold-ink: #E4C258;
+
+      --slate:    #1D2226;
+      --slate-line:#7C8894;
+      --slate-ink:#AEB9C2;
+
+      --edge:     #8A938F;
+      --edge-soft:#5A6461;
+
+      --lane:     #171B1D;
+      --lane-alt: #14181A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:    #101315;
+    --surface:  #171B1E;
+    --ink:      #E9ECEA;
+    --ink-2:    #A6B0AD;
+    --ink-3:    #78837F;
+    --rule:     #2B3231;
+    --rule-2:   #212725;
+
+    --mint:     #13332E;
+    --mint-line:#47B39C;
+    --mint-ink: #93DEC9;
+
+    --gold:     #322810;
+    --gold-line:#C6A03B;
+    --gold-ink: #E4C258;
+
+    --slate:    #1D2226;
+    --slate-line:#7C8894;
+    --slate-ink:#AEB9C2;
+
+    --edge:     #8A938F;
+    --edge-soft:#5A6461;
+
+    --lane:     #171B1D;
+    --lane-alt: #14181A;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 0 5rem;
+  }
+
+  .wrap {
+    max-width: 68ch;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  /* ---------- header ---------- */
+
+  header.masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 3.5rem 0 2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin-bottom: 0.9rem;
+  }
+
+  .deck {
+    font-size: 1.1rem;
+    color: var(--ink-2);
+    text-wrap: pretty;
+    max-width: 58ch;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-top: 1.75rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+  }
+
+  .meta-row span { white-space: nowrap; }
+
+  /* ---------- callout ---------- */
+
+  .callout {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--mint-line);
+    background: var(--surface);
+    border-radius: 3px;
+    padding: 1.1rem 1.3rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .callout p { margin: 0; font-size: 0.95rem; color: var(--ink-2); }
+  .callout p + p { margin-top: 0.6rem; }
+  .callout strong { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 3rem 0 0.5rem;
+    text-wrap: balance;
+  }
+
+  h2:first-of-type { margin-top: 0; }
+
+  .sub {
+    color: var(--ink-3);
+    font-size: 0.92rem;
+    margin-bottom: 1.5rem;
+  }
+
+  p { margin-bottom: 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--rule-2);
+    padding: 0.12em 0.4em;
+    border-radius: 3px;
+  }
+
+  /* ---------- figure (full bleed) ---------- */
+
+  .figure-bleed {
+    margin: 2.5rem 0 1rem;
+    border-block: 1px solid var(--rule);
+    background: var(--lane-alt);
+  }
+
+  .scroller {
+    overflow-x: auto;
+    padding: 1.5rem 1.5rem 0.75rem;
+  }
+
+  .scroller svg {
+    display: block;
+    width: 100%;
+    min-width: 1800px;
+    max-width: 2250px;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  figcaption {
+    max-width: 68ch;
+    margin: 0 auto;
+    padding: 0 1.5rem 1.4rem;
+    font-size: 0.85rem;
+    color: var(--ink-3);
+    text-wrap: pretty;
+  }
+
+  .scroll-hint {
+    max-width: 68ch;
+    margin: 0 auto;
+    padding: 0 1.5rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---------- svg element styling ---------- */
+
+  .lane-band  { fill: var(--lane); }
+  .lane-band-b{ fill: var(--lane-alt); }
+  .lane-edge  { fill: none; stroke: var(--rule); stroke-width: 1; }
+
+  .lane-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    fill: var(--ink-2);
+  }
+
+  .lane-sub {
+    font-family: var(--sans);
+    font-size: 10.5px;
+    fill: var(--ink-3);
+  }
+
+  .n      { fill: var(--surface); stroke: var(--rule); stroke-width: 1.2; }
+  .n-sys  { fill: var(--mint);  stroke: var(--mint-line);  stroke-width: 1.2; }
+  .n-evi  { fill: var(--gold);  stroke: var(--gold-line);  stroke-width: 1.4; }
+  .n-bld  { fill: var(--slate); stroke: var(--slate-line); stroke-width: 1.2; }
+  .n-soft { fill: none; stroke: var(--edge-soft); stroke-width: 1.2; stroke-dasharray: 4 3; }
+
+  .n-title {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 650;
+    fill: var(--ink);
+  }
+  .n-title.on-evi { fill: var(--gold-ink); }
+  .n-title.on-sys { fill: var(--mint-ink); }
+  .n-title.on-bld { fill: var(--slate-ink); }
+  .n-title.on-soft { fill: var(--ink-2); }
+
+  .n-body {
+    font-family: var(--sans);
+    font-size: 12px;
+    fill: var(--ink-2);
+  }
+
+  .n-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--ink-3);
+  }
+  .n-meta.on-evi { fill: var(--gold-line); }
+
+  .n-num {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    fill: var(--surface);
+  }
+  .num-dot     { fill: var(--edge); }
+  .num-dot-sys { fill: var(--mint-line); }
+  .num-dot-evi { fill: var(--gold-line); }
+  .num-dot-bld { fill: var(--slate-line); }
+
+  .edge      { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+  .edge-dash { fill: none; stroke: var(--edge-soft); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .edge-bld  { fill: none; stroke: var(--slate-line); stroke-width: 1.6; }
+
+  .e-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--ink-2);
+  }
+  .e-label-soft {
+    font-family: var(--sans);
+    font-size: 10.5px;
+    fill: var(--ink-3);
+  }
+
+  #ah-main polygon { fill: var(--edge); }
+  #ah-soft polygon { fill: var(--edge-soft); }
+  #ah-bld  polygon { fill: var(--slate-line); }
+
+  /* ---------- legend ---------- */
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.9rem 1.5rem;
+    margin: 1.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend li {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    font-size: 0.86rem;
+    color: var(--ink-2);
+    line-height: 1.45;
+  }
+
+  .swatch {
+    flex: none;
+    width: 22px;
+    height: 15px;
+    border-radius: 2px;
+    margin-top: 3px;
+    border: 1.2px solid var(--rule);
+    background: var(--surface);
+  }
+  .swatch.sys { background: var(--mint);  border-color: var(--mint-line); }
+  .swatch.evi { background: var(--gold);  border-color: var(--gold-line); }
+  .swatch.bld { background: var(--slate); border-color: var(--slate-line); }
+  .swatch.dash{ background: none; border-style: dashed; border-color: var(--edge-soft); }
+
+  .legend b { color: var(--ink); font-weight: 600; display: block; }
+
+  /* ---------- evidence table ---------- */
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    min-width: 520px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+    padding: 0 1rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  td {
+    padding: 0.7rem 1rem 0.7rem 0;
+    border-bottom: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+
+  td:first-child { color: var(--ink); font-weight: 550; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---------- closing note ---------- */
+
+  .note {
+    margin-top: 3rem;
+    padding: 1.6rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+  }
+
+  .note h3 {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+
+  .note p { font-size: 0.94rem; color: var(--ink-2); }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Hushh Technologies · Investor onboarding</div>
+    <h1>How NDA signing actually works</h1>
+    <p class="deck">The agreement packet is signed, stamped with evidence, and delivered entirely on Hushh's own stack. No e-signature vendor is involved at any point.</p>
+    <div class="meta-row">
+      <span>4 fund documents</span>
+      <span>13 tokens per document</span>
+      <span>ESIGN Act / UETA</span>
+      <span>No DocuSign</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="callout">
+    <p><strong>On the DocuSign question.</strong> There is no DocuSign integration, and no other e-signature vendor either. Signing is built in-house on the stack we already run: the website, one Supabase Edge Function, one Cloud Run service, and Gmail.</p>
+    <p>The diagram below reads in three lanes — what the <strong>investor</strong> does, what the <strong>server</strong> does, and what was <strong>built once, offline</strong>, long before any investor arrives.</p>
+  </div>
+</div>
+
+<figure class="figure-bleed">
+  <p class="scroll-hint">Scroll sideways to follow the flow →</p>
+  <div class="scroller">
+    <svg viewBox="0 0 2250 730" role="img"
+         aria-label="Swimlane diagram of Hushh NDA signing. Lane one, the investor in the browser: sign in, a decision on whether an NDA is already on file, review the packet, consent and adopt a signature, a decision on whether all three conditions are met, and finally access granted. Lane two, the Hushh server: record the signature, capture evidence server-side, fill thirteen tokens across four templates, and deliver by email, with a parallel Cloud Run PDF, an audit row, and a fail-soft path. Lane three, build time: four blank documents are tokenised, certified, verified and committed, then feed upward into the token-filling step at runtime.">
+
+      <defs>
+        <marker id="ah-main" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="ah-soft" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="ah-bld" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 10,5 0,9" />
+        </marker>
+      </defs>
+
+      <!-- ============ LANE BANDS ============ -->
+      <rect class="lane-band"   x="20"  y="16"  width="2210" height="234" rx="4" />
+      <rect class="lane-band-b" x="20"  y="262" width="2210" height="258" rx="4" />
+      <rect class="lane-band"   x="20"  y="532" width="2210" height="168" rx="4" />
+      <rect class="lane-edge"   x="20"  y="16"  width="2210" height="234" rx="4" />
+      <rect class="lane-edge"   x="20"  y="262" width="2210" height="258" rx="4" />
+      <rect class="lane-edge"   x="20"  y="532" width="2210" height="168" rx="4" />
+
+      <line class="lane-edge" x1="176" y1="16"  x2="176" y2="250" />
+      <line class="lane-edge" x1="176" y1="262" x2="176" y2="520" />
+      <line class="lane-edge" x1="176" y1="532" x2="176" y2="700" />
+
+      <!-- lane labels -->
+      <text class="lane-title" x="38" y="124">INVESTOR</text>
+      <text class="lane-sub"   x="38" y="142">in the browser</text>
+      <text class="lane-sub"   x="38" y="158">hushh.ai</text>
+
+      <text class="lane-title" x="38" y="370">HUSHH</text>
+      <text class="lane-sub"   x="38" y="388">on the server</text>
+      <text class="lane-sub"   x="38" y="404">Supabase · Cloud Run</text>
+      <text class="lane-sub"   x="38" y="420">Gmail</text>
+
+      <text class="lane-title" x="38" y="602">BUILD TIME</text>
+      <text class="lane-sub"   x="38" y="620">once, offline,</text>
+      <text class="lane-sub"   x="38" y="636">by a developer</text>
+
+      <!-- ============ LANE A — INVESTOR ============ -->
+
+      <!-- 1 Sign in -->
+      <rect class="n" x="196" y="122" width="168" height="76" rx="7" />
+      <text class="n-title" x="212" y="150">Sign in</text>
+      <text class="n-body"  x="212" y="169">Investor authenticates</text>
+      <text class="n-meta"  x="212" y="186">Supabase Auth</text>
+      <circle class="num-dot" cx="356" cy="122" r="10" />
+      <text class="n-num" x="356" y="126" text-anchor="middle">1</text>
+
+      <line class="edge" x1="364" y1="160" x2="398" y2="160" marker-end="url(#ah-main)" />
+
+      <!-- D1 decision -->
+      <polygon class="n" points="480,116 562,160 480,204 398,160" />
+      <text class="n-title" x="480" y="156" text-anchor="middle" font-size="13">NDA already</text>
+      <text class="n-title" x="480" y="172" text-anchor="middle" font-size="13">on file?</text>
+
+      <!-- D1 yes: long skip route along the top -->
+      <polyline class="edge" points="480,116 480,44 2120,44 2120,122" marker-end="url(#ah-main)" />
+      <text class="e-label" x="494" y="40">yes — skip everything below</text>
+
+      <text class="e-label" x="576" y="152">no</text>
+      <line class="edge" x1="562" y1="160" x2="596" y2="160" marker-end="url(#ah-main)" />
+
+      <!-- 2 Review packet -->
+      <rect class="n" x="596" y="122" width="168" height="76" rx="7" />
+      <text class="n-title" x="612" y="148">Review the packet</text>
+      <text class="n-body"  x="612" y="167">NDA in 6 clauses, plus</text>
+      <text class="n-body"  x="612" y="182">4 fund documents</text>
+      <text class="n-meta"  x="612" y="194">/sign-nda</text>
+      <circle class="num-dot" cx="756" cy="122" r="10" />
+      <text class="n-num" x="756" y="126" text-anchor="middle">2</text>
+
+      <line class="edge" x1="764" y1="160" x2="796" y2="160" marker-end="url(#ah-main)" />
+
+      <!-- 3 Consent and adopt -->
+      <rect class="n" x="796" y="122" width="168" height="76" rx="7" />
+      <text class="n-title" x="812" y="146">Consent &amp; adopt</text>
+      <text class="n-body"  x="812" y="164">Tick consent, acknowledge</text>
+      <text class="n-body"  x="812" y="179">all four, type legal name</text>
+      <text class="n-meta"  x="812" y="193">typed name = signature</text>
+      <circle class="num-dot" cx="956" cy="122" r="10" />
+      <text class="n-num" x="956" y="126" text-anchor="middle">3</text>
+
+      <line class="edge" x1="964" y1="160" x2="998" y2="160" marker-end="url(#ah-main)" />
+
+      <!-- D2 decision -->
+      <polygon class="n" points="1080,116 1162,160 1080,204 998,160" />
+      <text class="n-title" x="1080" y="156" text-anchor="middle" font-size="13">All three</text>
+      <text class="n-title" x="1080" y="172" text-anchor="middle" font-size="13">done?</text>
+
+      <!-- D2 no: loop back, submit stays disabled -->
+      <polyline class="edge-dash" points="1080,116 1080,72 880,72 880,122" marker-end="url(#ah-soft)" />
+      <text class="e-label-soft" x="900" y="66">no — the submit button stays disabled</text>
+
+      <text class="e-label" x="1092" y="230">yes</text>
+
+      <!-- ============ TRANSITION A → B ============ -->
+      <polyline class="edge" points="1080,204 1080,340 1196,340" marker-end="url(#ah-main)" />
+
+      <!-- branch to parallel PDF -->
+      <polyline class="edge-dash" points="1130,340 1130,460 1196,460" marker-end="url(#ah-soft)" />
+      <text class="e-label-soft" x="1006" y="440">in parallel</text>
+
+      <!-- ============ LANE B — SERVER ============ -->
+
+      <!-- 4 Record the signature -->
+      <rect class="n-sys" x="1196" y="302" width="168" height="76" rx="7" />
+      <text class="n-title on-sys" x="1212" y="326">Record the signature</text>
+      <text class="n-body" x="1212" y="344">Name, version and</text>
+      <text class="n-body" x="1212" y="359">timestamp are stored</text>
+      <text class="n-meta" x="1212" y="373">Supabase Postgres</text>
+      <circle class="num-dot-sys" cx="1356" cy="302" r="10" />
+      <text class="n-num" x="1356" y="306" text-anchor="middle">4</text>
+
+      <line class="edge" x1="1364" y1="340" x2="1396" y2="340" marker-end="url(#ah-main)" />
+
+      <!-- 5 Capture evidence (GOLD) -->
+      <rect class="n-evi" x="1396" y="302" width="168" height="76" rx="7" />
+      <text class="n-title on-evi" x="1412" y="326">Capture evidence</text>
+      <text class="n-body" x="1412" y="344">IP, signature ID, device,</text>
+      <text class="n-body" x="1412" y="359">time, consent version</text>
+      <text class="n-meta on-evi" x="1412" y="373">server-side only</text>
+      <circle class="num-dot-evi" cx="1556" cy="302" r="10" />
+      <text class="n-num" x="1556" y="306" text-anchor="middle">5</text>
+
+      <line class="edge" x1="1564" y1="340" x2="1596" y2="340" marker-end="url(#ah-main)" />
+
+      <!-- 6 Fill 13 tokens (GOLD) -->
+      <rect class="n-evi" x="1596" y="302" width="168" height="76" rx="7" />
+      <text class="n-title on-evi" x="1612" y="326">Fill 13 tokens</text>
+      <text class="n-body" x="1612" y="344">Names, dates and every</text>
+      <text class="n-body" x="1612" y="359">evidence value, ×4 docs</text>
+      <text class="n-meta on-evi" x="1612" y="373">signFundDocs.ts</text>
+      <circle class="num-dot-evi" cx="1756" cy="302" r="10" />
+      <text class="n-num" x="1756" y="306" text-anchor="middle">6</text>
+
+      <line class="edge" x1="1764" y1="340" x2="1796" y2="340" marker-end="url(#ah-main)" />
+
+      <!-- 7 Deliver -->
+      <rect class="n-sys" x="1796" y="302" width="168" height="76" rx="7" />
+      <text class="n-title on-sys" x="1812" y="326">Deliver</text>
+      <text class="n-body" x="1812" y="344">4 signed .docx to the</text>
+      <text class="n-body" x="1812" y="359">signer, notice to admin</text>
+      <text class="n-meta" x="1812" y="373">Gmail API</text>
+      <circle class="num-dot-sys" cx="1956" cy="302" r="10" />
+      <text class="n-num" x="1956" y="306" text-anchor="middle">7</text>
+
+      <!-- 7 → access granted -->
+      <polyline class="edge" points="1964,340 2000,340 2000,160 2036,160" marker-end="url(#ah-main)" />
+
+      <!-- LANE B row 2 — parallel PDF -->
+      <rect class="n" x="1196" y="429" width="168" height="62" rx="7" />
+      <text class="n-title" x="1212" y="450" font-size="13">Personalised NDA PDF</text>
+      <text class="n-body" x="1212" y="467">Requested by the browser</text>
+      <text class="n-meta" x="1212" y="482">Cloud Run</text>
+
+      <!-- LANE B row 2 — audit row -->
+      <line class="edge" x1="1480" y1="378" x2="1480" y2="429" marker-end="url(#ah-main)" />
+      <text class="e-label" x="1490" y="408">writes</text>
+      <rect class="n-evi" x="1396" y="429" width="168" height="62" rx="7" />
+      <text class="n-meta on-evi" x="1412" y="450" font-size="12">nda_signatures</text>
+      <text class="n-body" x="1412" y="467">signer_ip · signature_id</text>
+      <text class="n-body" x="1412" y="482">signer_user_agent</text>
+
+      <!-- LANE B row 2 — fail-soft -->
+      <polyline class="edge-dash" points="1730,378 1730,460 1796,460" marker-end="url(#ah-soft)" />
+      <text class="e-label-soft" x="1618" y="440">per document</text>
+      <rect class="n-soft" x="1796" y="429" width="168" height="62" rx="7" />
+      <text class="n-title on-soft" x="1812" y="450" font-size="13">Fail-soft</text>
+      <text class="n-body" x="1812" y="467">A doc that fails is skipped</text>
+      <text class="n-body" x="1812" y="482">and logged — email sends</text>
+
+      <!-- ============ ACCESS GRANTED (lane A, far right) ============ -->
+      <rect class="n-sys" x="2036" y="122" width="168" height="76" rx="7" />
+      <text class="n-title on-sys" x="2052" y="150">Access granted</text>
+      <text class="n-body" x="2052" y="169">The gate opens — full site</text>
+      <text class="n-body" x="2052" y="184">and onboarding</text>
+      <circle class="num-dot-sys" cx="2196" cy="122" r="10" />
+      <text class="n-num" x="2196" y="126" text-anchor="middle">8</text>
+
+      <!-- ============ LANE C — BUILD TIME ============ -->
+
+      <rect class="n-bld" x="996" y="578" width="168" height="76" rx="7" />
+      <text class="n-title on-bld" x="1012" y="604">4 blank .docx</text>
+      <text class="n-body" x="1012" y="622">The source agreements,</text>
+      <text class="n-body" x="1012" y="637">unsigned</text>
+      <text class="n-meta" x="1012" y="650">public/fund-documents/</text>
+      <circle class="num-dot-bld" cx="1156" cy="578" r="10" />
+      <text class="n-num" x="1156" y="582" text-anchor="middle">A</text>
+
+      <line class="edge-bld" x1="1164" y1="616" x2="1196" y2="616" marker-end="url(#ah-bld)" />
+
+      <rect class="n-bld" x="1196" y="578" width="168" height="76" rx="7" />
+      <text class="n-title on-bld" x="1212" y="602" font-size="14">Inject &amp; certify</text>
+      <text class="n-body" x="1212" y="620">Tokens added, ESIGN</text>
+      <text class="n-body" x="1212" y="635">certificate appended</text>
+      <text class="n-meta" x="1212" y="649">SHA-256 baked in</text>
+      <circle class="num-dot-bld" cx="1356" cy="578" r="10" />
+      <text class="n-num" x="1356" y="582" text-anchor="middle">B</text>
+
+      <line class="edge-bld" x1="1364" y1="616" x2="1396" y2="616" marker-end="url(#ah-bld)" />
+
+      <rect class="n-bld" x="1396" y="578" width="168" height="76" rx="7" />
+      <text class="n-title on-bld" x="1412" y="604">Verify</text>
+      <text class="n-body" x="1412" y="622">All 13 tokens present,</text>
+      <text class="n-body" x="1412" y="637">or the build fails loudly</text>
+      <circle class="num-dot-bld" cx="1556" cy="578" r="10" />
+      <text class="n-num" x="1556" y="582" text-anchor="middle">C</text>
+
+      <line class="edge-bld" x1="1564" y1="616" x2="1596" y2="616" marker-end="url(#ah-bld)" />
+
+      <rect class="n-bld" x="1596" y="578" width="168" height="76" rx="7" />
+      <text class="n-title on-bld" x="1612" y="602" font-size="14">Commit templates</text>
+      <text class="n-body" x="1612" y="620">Tokenised, hashed,</text>
+      <text class="n-body" x="1612" y="635">checked into the repo</text>
+      <text class="n-meta" x="1612" y="649">fundDocTemplates.base64.ts</text>
+      <circle class="num-dot-bld" cx="1756" cy="578" r="10" />
+      <text class="n-num" x="1756" y="582" text-anchor="middle">D</text>
+
+      <!-- build lane feeds runtime step 6 -->
+      <line class="edge-bld" x1="1680" y1="578" x2="1680" y2="378" marker-end="url(#ah-bld)" />
+      <text class="e-label" x="1694" y="500">the templates</text>
+      <text class="e-label" x="1694" y="516">step 6 fills in</text>
+
+    </svg>
+  </div>
+  <figcaption>Every arrow above the middle lane happens per signature, in seconds. The bottom lane happens once, by hand, before any investor exists — which is why nothing fragile runs while someone is waiting.</figcaption>
+</figure>
+
+<div class="wrap">
+
+  <ul class="legend">
+    <li><span class="swatch"></span><span><b>White</b>What the investor sees and does in the browser.</span></li>
+    <li><span class="swatch sys"></span><span><b>Mint</b>A Hushh system step running on the server.</span></li>
+    <li><span class="swatch evi"></span><span><b>Gold</b>Evidence and the certificate — the parts that make the signature hold up.</span></li>
+    <li><span class="swatch bld"></span><span><b>Slate</b>Build time. Runs once, offline, not per signature.</span></li>
+    <li><span class="swatch dash"></span><span><b>Dashed</b>A parallel path, or what happens when something fails.</span></li>
+  </ul>
+
+  <h2>What gets captured at the moment of signing</h2>
+  <p class="sub">This is step 5 in the diagram, and it is the part that turns a form submission into a signature.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Evidence</th>
+          <th>How it is captured</th>
+          <th>Why it matters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Signer</td>
+          <td>Typed name plus the account email</td>
+          <td>Ties the act to a specific person</td>
+        </tr>
+        <tr>
+          <td>Intent</td>
+          <td>An explicit tick agreeing to sign electronically, with the exact wording version recorded</td>
+          <td>Shows they meant to sign, rather than clicked by accident</td>
+        </tr>
+        <tr>
+          <td>Signature ID</td>
+          <td>A fresh unique code generated for this one signing event</td>
+          <td>Lets any single signature be traced end to end</td>
+        </tr>
+        <tr>
+          <td>Time</td>
+          <td>Both world-standard time and the signer's own local time</td>
+          <td>Establishes when it happened, unambiguously</td>
+        </tr>
+        <tr>
+          <td>IP address</td>
+          <td>Read from the server's own request headers — never accepted from the browser, because a browser can lie about it</td>
+          <td>Independent evidence of where the signature came from</td>
+        </tr>
+        <tr>
+          <td>Device</td>
+          <td>Browser and operating system</td>
+          <td>Corroborates the signing session</td>
+        </tr>
+        <tr>
+          <td>Integrity</td>
+          <td>A fingerprint calculated from the document's exact contents, fixed at build time</td>
+          <td>Proves the document was not altered afterwards</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <h3>The one idea worth taking away</h3>
+    <p>Carving a rubber stamp is delicate work. You do it once, carefully, in the workshop — and if you carve it wrong, you find out immediately, not in front of a customer. Pressing that stamp onto paper is instant and almost impossible to get wrong.</p>
+    <p>That is exactly the split in the diagram. The bottom lane carves: it opens four Word files, cuts in the placeholder slots, attaches the certificate page, and refuses to finish if even one of the thirteen slots is missing. The middle lane presses: it swaps placeholders for real values and sends the email. An investor waiting on their screen only ever meets the press.</p>
+  </div>
+
+  <footer>
+    Developer reference: docs/NDA_SIGNING_FLOW.md<br />
+    Signing flow landed across PRs #1870, #1871, #1872 and #1878.<br />
+    Classified as a Simple Electronic Signature with an audit certificate, mapped to the US ESIGN Act (2000) and UETA. Informational, not legal advice.
+  </footer>
+
+</div>
+
+</body>
+</html>
