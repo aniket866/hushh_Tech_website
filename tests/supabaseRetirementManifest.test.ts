@@ -64,6 +64,24 @@ describe("Supabase retirement manifest", () => {
     });
   });
 
+  it("binds the sanitized 30-day function traffic capture", () => {
+    const manifest = cloneManifest();
+    expect(manifest.live_function_traffic_evidence).toMatchObject({
+      active_functions: 112,
+      traffic_observed_functions: 18,
+      zero_traffic_observed: 94,
+      unattributed_requests: 0,
+      cutover_blocking_source_contracts: 17,
+      deployment_version_drift_functions: 96,
+      evidence_digest: "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
+    });
+
+    manifest.live_function_traffic_evidence.evidence_digest = "0".repeat(64);
+    expect(errorText(manifest)).toContain(
+      "live_function_traffic_evidence does not match the locked sanitized traffic evidence contract"
+    );
+  });
+
   it("rejects bundle evidence identity, version, and slug drift", () => {
     const evidence = cloneBundleEvidence();
     evidence.entries[0].function_id = "00000000-0000-0000-0000-000000000000";
