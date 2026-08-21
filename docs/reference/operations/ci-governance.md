@@ -59,11 +59,12 @@ Current `PR Validation` check surface:
 6. `PR Hygiene`
 7. `Semantic PR Guard` (advisory-first; not yet in `CI Status Gate`)
 8. `GCP Service Foundation`
-9. `Web Validation`
-10. `Lint`
-11. `Security Audit`
-12. `Sensitive NDA Gate`
-13. `CI Status Gate`
+9. `GCP Cloud SQL Attestor`
+10. `Web Validation`
+11. `Lint`
+12. `Security Audit`
+13. `Sensitive NDA Gate`
+14. `CI Status Gate`
 
 ## Queue and post-merge lanes
 

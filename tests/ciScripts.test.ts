@@ -205,6 +205,42 @@ describe("CI workflow scripts", () => {
     expect(governance).toContain("8. `GCP Service Foundation`");
   });
 
+  it("runs the network-off Cloud SQL attestor on its exact Node runtime", () => {
+    const prWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/ci.yml"),
+      "utf8"
+    );
+    const queueWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/queue-validation.yml"),
+      "utf8"
+    );
+    const rootPackage = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
+    );
+    const governance = fs.readFileSync(
+      path.join(repoRoot, "docs/reference/operations/ci-governance.md"),
+      "utf8"
+    );
+
+    expect(rootPackage.scripts["gcp:migration:check-cloudsql-attestor"]).toBe(
+      "npm --prefix cloud-run/hushh-tech-cloudsql-attestor run check"
+    );
+    for (const workflow of [prWorkflow, queueWorkflow]) {
+      expect(workflow).toContain('ATTESTOR_NODE_VERSION: "22.22.0"');
+      expect(workflow).toContain("gcp-cloudsql-attestor:");
+      expect(workflow).toContain("name: GCP Cloud SQL Attestor");
+      expect(workflow).toContain(
+        "cache-dependency-path: cloud-run/hushh-tech-cloudsql-attestor/package-lock.json"
+      );
+      expect(workflow).toContain(
+        "run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor ci"
+      );
+      expect(workflow).toContain("run: npm run gcp:migration:check-cloudsql-attestor");
+      expect(workflow).toContain("needs.gcp-cloudsql-attestor.result");
+    }
+    expect(governance).toContain("9. `GCP Cloud SQL Attestor`");
+  });
+
   it("registers each Hushh Research compatibility route once", () => {
     const runtime = fs.readFileSync(path.join(repoRoot, "server.js"), "utf8");
 

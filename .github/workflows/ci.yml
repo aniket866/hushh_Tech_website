@@ -20,6 +20,7 @@ concurrency:
 env:
   NODE_VERSION: "20.19.0"
   SERVICE_NODE_VERSION: "22.23.2"
+  ATTESTOR_NODE_VERSION: "22.22.0"
   VITE_SUPABASE_URL: "https://example.supabase.co"
   VITE_SUPABASE_ANON_KEY: "ci-anon-key"
   VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
@@ -119,6 +120,28 @@ jobs:
 
       - name: Validate the fail-closed Cloud Run service package
         run: bash scripts/ci/orchestrate.sh service
+
+  gcp-cloudsql-attestor:
+    name: GCP Cloud SQL Attestor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.ATTESTOR_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cloud-run/hushh-tech-cloudsql-attestor/package-lock.json
+
+      - name: Install pinned attestor dependencies
+        run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor ci
+
+      - name: Validate the network-off Cloud SQL attestor
+        run: npm run gcp:migration:check-cloudsql-attestor
+
+      - name: Reject vulnerable runtime dependencies
+        run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor audit --omit=dev --audit-level=high
 
   reviewer-context:
     name: Reviewer Context & Compliance
@@ -362,6 +385,7 @@ jobs:
       - env-contract
       - supabase-retirement-contract
       - gcp-service-foundation
+      - gcp-cloudsql-attestor
       - reviewer-context
       - pr-hygiene
       - phase2-pr-policy
@@ -381,6 +405,7 @@ jobs:
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
             ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
             ["GCP Service Foundation"]="${{ needs.gcp-service-foundation.result }}"
+            ["GCP Cloud SQL Attestor"]="${{ needs.gcp-cloudsql-attestor.result }}"
             ["Reviewer Context & Compliance"]="${{ needs.reviewer-context.result }}"
             ["PR Hygiene"]="${{ needs.pr-hygiene.result }}"
             ["Phase 2 PR Policy"]="${{ needs.phase2-pr-policy.result }}"

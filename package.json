@@ -38,6 +38,7 @@
     "gcp:migration:compile-target-schema": "node scripts/gcp/migration/target-schema-compiler.mjs",
     "gcp:migration:validate-target-schema-evidence": "node scripts/gcp/migration/target-schema-compile-evidence.mjs --validate --dry-run",
     "gcp:migration:validate-uat-cloudsql-attestation": "node scripts/gcp/migration/target-cloudsql-attestation-evidence.mjs",
+    "gcp:migration:check-cloudsql-attestor": "npm --prefix cloud-run/hushh-tech-cloudsql-attestor run check",
     "gcp:migration:validate-inventory": "node scripts/gcp/migration/validate-inventory.mjs",
     "gcp:migration:validate-identity-map": "node scripts/gcp/migration/validate-identity-map.mjs",
     "migration:native:contract": "node scripts/migration/check-native-cutover-gate.mjs",
