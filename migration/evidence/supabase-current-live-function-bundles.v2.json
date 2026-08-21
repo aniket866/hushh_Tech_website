@@ -1,0 +1,2349 @@
+{
+  "schema_version": 2,
+  "evidence_id": "hushh-tech-supabase-current-live-function-bundles",
+  "canonicalization": {
+    "version": 2,
+    "record_encoding": "uint32be_field_count_then_uint64be_length_prefixed_utf8_fields_v2",
+    "string_contract": "UTF8_NFC_NO_C0_C1_OR_DEL_CONTROL_CHARACTERS",
+    "recovery_snapshot_contract": "SINGLE_OPEN_O_NOFOLLOW_REGULAR_NLINK1_CURRENT_OWNER_SAFE_MODE_STABLE_FSTAT_IMMUTABLE_PRIVATE_COPY_V2"
+  },
+  "capture": {
+    "project_ref": "ibsisfnjxeowvdtvgzff",
+    "capture_started_at_utc": "2026-08-21T17:52:04.388Z",
+    "capture_completed_at_utc": "2026-08-21T18:03:38.344Z",
+    "metadata_surface": "GET /v1/projects/{ref}/functions via supabase_cli",
+    "bundle_surface": "GET /v1/projects/{ref}/functions/{slug}/body via supabase_cli_download_use_api",
+    "tool": "supabase_cli",
+    "tool_version": "2.115.0",
+    "source_write_mode": "READ_ONLY_NO_DEPLOYMENT"
+  },
+  "capture_integrity": {
+    "recovery_snapshot_digest_algorithm": "sha256_length_prefixed_utf8_recovery_file_records_v2",
+    "recovery_snapshot_digest": "b5621ff988f457f0226748da65770f21c1901a7b9c881f973476832722bbf3c4",
+    "recovery_file_count": 945,
+    "recovery_directory_count": 602,
+    "recovery_total_bytes": 2968118,
+    "accounting_status": "EXACT_NO_UNACCOUNTED_FILES_OR_DIRECTORIES"
+  },
+  "historical_binding": {
+    "manifest_id": "hushh-tech-no-hybrid-supabase-retirement",
+    "manifest_schema_version": 1,
+    "manifest_file_digest": "038e2221e48321b8c28f3df104093d28d3c44b18cfb9b3918c8ea0e73aaa1b85",
+    "manifest_active_functions_digest": "f0a18d0c1ece82c589f294b977b9fc8368a240ea5464724e9ad00e427aa3ce5d",
+    "historical_evidence_id": "hushh-tech-supabase-live-function-bundles",
+    "historical_evidence_schema_version": 1,
+    "historical_evidence_file_digest": "3ae1b5b8225347cee63cb8e42fdfe744e8f905ee7b3a9d2c4eccee3ae2c81bd4",
+    "historical_entry_digest": "182de37b13bfb9201cbe94f1c850e995f15bcdf92d38e08f73449b5cf119ea7b",
+    "historical_source_tree_digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+    "historical_source_tree_digest": "a976749fa43425152fddb2649ba6442500e412627a004f6ff60ca2892b9011a2"
+  },
+  "sanitization": {
+    "recovered_source_content_committed": false,
+    "raw_cli_output_committed": false,
+    "secret_or_token_values_committed": false,
+    "temporary_absolute_paths_committed": false,
+    "public_evidence": "current_metadata_safe_digests_file_counts_byte_counts_and_retry_classes_only"
+  },
+  "source_secret_scan": {
+    "tool": "gitleaks",
+    "tool_version": "8.24.2",
+    "config_digest": "7c8ffd31ad658569431be0f53001afc4eb96219d1324371600fe6857ae1811bf",
+    "status": "PASS",
+    "finding_count": 0
+  },
+  "cutover_assessment": {
+    "status": "CUTOVER_BLOCKING_VERSION_DRIFT",
+    "frozen_snapshot_uniform_version_delta": 43,
+    "required_next_capture": "FREEZE_EDGE_FUNCTION_DEPLOYMENTS_THEN_REPEAT_FULL_READ_ONLY_112_FUNCTION_CAPTURE",
+    "metadata_end_check_status": "NOT_PERFORMED_IN_V2_BLOCKING",
+    "bundle_to_metadata_version_binding_status": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK",
+    "source_revision_status": "NOT_PROVEN",
+    "source_revision": null,
+    "source_revision_reason": "SUPPORTED_LIST_AND_BODY_METADATA_DO_NOT_EXPOSE_A_DEPLOY_RUN_OR_GIT_SHA"
+  },
+  "historical_comparison": {
+    "comparison_basis": "SAFE_DIGESTS_AND_COUNTS_ONLY",
+    "content_equivalence_status": "NOT_ASSERTED_BETWEEN_V1_AND_V2_CANONICALIZATION",
+    "historical_extracted_bundles": 96,
+    "historical_extracted_files": 445,
+    "historical_extracted_bytes": 2677504,
+    "historical_source_tree_digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+    "historical_source_tree_digest": "a976749fa43425152fddb2649ba6442500e412627a004f6ff60ca2892b9011a2",
+    "current_extracted_bundles": 96,
+    "current_extracted_files": 445,
+    "current_extracted_bytes": 2842656,
+    "current_source_tree_digest_algorithm": "sha256_length_prefixed_utf8_per_slug_bundle_summary_records_v2",
+    "current_source_tree_digest": "2f203e524b8749272f49ae9c4051fefe73e7a877458ac34c2a3cf7b9c322b7d0"
+  },
+  "observed_counts": {
+    "active_functions": 112,
+    "version_exact": 16,
+    "version_drifted": 96,
+    "version_uniform_drift_delta": 43,
+    "version_uniform_drift_count": 96,
+    "provider_bundle_digests_present": 66,
+    "provider_bundle_digests_missing": 46,
+    "extracted_bundles": 96,
+    "store_not_found": 0,
+    "bundle_retrieval_failed": 16,
+    "capture_attempts_total": 144,
+    "extracted_on_first_attempt": 96,
+    "terminal_failures_after_max_attempts": 16,
+    "extracted_files": 445,
+    "extracted_bytes": 2842656
+  },
+  "current_metadata_digest": {
+    "digest_algorithm": "sha256_length_prefixed_utf8_current_function_metadata_records_v2",
+    "digest": "b15f57a658b2ae2a1e8399551ae9af92db1a652ade7401ad08b1a148567c798b"
+  },
+  "canonical_source_tree": {
+    "digest_algorithm": "sha256_length_prefixed_utf8_per_slug_bundle_summary_records_v2",
+    "digest": "2f203e524b8749272f49ae9c4051fefe73e7a877458ac34c2a3cf7b9c322b7d0"
+  },
+  "entries": [
+    {
+      "slug": "activate-agent",
+      "function_id": "d8137003-a488-48eb-b09e-890e53531f8e",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f822fa3581f3ca0bc03b60b0b2b9d75ba53259c24d59b36dacc606f7738f2359",
+        "file_count": 2,
+        "total_bytes": 3740
+      }
+    },
+    {
+      "slug": "agent-onboard-notify",
+      "function_id": "d3544429-bb12-41a1-a22d-14112bceeb3c",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "80664f9897c4d27616f47a5154686507b14fca3ea46dec3c0095cb5a51c482b1",
+        "file_count": 2,
+        "total_bytes": 4194
+      }
+    },
+    {
+      "slug": "asset-report-create",
+      "function_id": "2b397582-3adb-4a1e-aaf3-d99bfc4a57a8",
+      "status": "ACTIVE",
+      "current_version": 5728,
+      "manifest_version": 5685,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4d5f304c2fd43c1aeb84dc2ee49458f91cec2d08c2997ed2be202919e57f4eed",
+        "file_count": 4,
+        "total_bytes": 4546
+      }
+    },
+    {
+      "slug": "asset-report-get",
+      "function_id": "8e3b3832-1af6-4c56-90b0-6d60b1713737",
+      "status": "ACTIVE",
+      "current_version": 5724,
+      "manifest_version": 5681,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "ce8adae33f064c48cfcb929ac9f6f76811a30867d0ca35cb44b865bb34023084",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "ef3c40ab046cbf3f4183714be574ca9240801c3abaa78e5d20245f791139c2ad",
+        "file_count": 4,
+        "total_bytes": 4272
+      }
+    },
+    {
+      "slug": "bank-income",
+      "function_id": "8cecc3c4-1549-4674-8e22-9b5082ecee29",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f041a40b8c366bdea8ef3d8a1287f4985493354f8b488948e6bf53c1af70e9bd",
+        "file_count": 3,
+        "total_bytes": 3125
+      }
+    },
+    {
+      "slug": "bot_event",
+      "function_id": "c69fb9be-d645-41b8-b94f-4f938937858d",
+      "status": "ACTIVE",
+      "current_version": 5888,
+      "manifest_version": 5845,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "674ad91b045cf5d01e22efce727267a0a3c5183ff13ab923bd824108ef10afe9",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "9539a1e59aa7e9b96122ada882edde7090c734f572b2290ee507441cf505cff6",
+        "file_count": 1,
+        "total_bytes": 29443
+      }
+    },
+    {
+      "slug": "bot_start",
+      "function_id": "42bdc158-3157-4394-9850-5092ea072729",
+      "status": "ACTIVE",
+      "current_version": 5888,
+      "manifest_version": 5845,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "37c116606ed01fa1a97af3ac31599399cd4734247660ec4f4d24e6d038e71988",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "0f47a3b13de04c327a1ea9b13c6124661530695983747a22bc4353ec4f83fa0c",
+        "file_count": 1,
+        "total_bytes": 3998
+      }
+    },
+    {
+      "slug": "ceo-calendar-booking",
+      "function_id": "84e3138e-abbf-4554-b93b-a19de756d6de",
+      "status": "ACTIVE",
+      "current_version": 6097,
+      "manifest_version": 6054,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "9a0626670fdff5690f4432d8d97e6e9839b71053da7b0ed712db8a17021646f6",
+        "file_count": 2,
+        "total_bytes": 12188
+      }
+    },
+    {
+      "slug": "chat-check-access",
+      "function_id": "d51fc19a-8a22-42c1-b807-e75c02fb558f",
+      "status": "ACTIVE",
+      "current_version": 6209,
+      "manifest_version": 6166,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "cd06bafc0ac4dff396c17bac1ed975ed9ba2105e708c7391cfc9025ce2613708",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "cac0281a475a173038dfbbcecb8f220e53ec68b556ccef22d17ef2a7c1bdb794",
+        "file_count": 2,
+        "total_bytes": 5740
+      }
+    },
+    {
+      "slug": "chat-create-checkout",
+      "function_id": "59d75a30-37c1-42c0-bbbc-8b05914ead02",
+      "status": "ACTIVE",
+      "current_version": 6212,
+      "manifest_version": 6169,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "8be331006f68dcdf14f38fafc6d9423d17ab205edb5666c3960f778649034b1f",
+        "file_count": 2,
+        "total_bytes": 3447
+      }
+    },
+    {
+      "slug": "chat-verify-payment",
+      "function_id": "365540bf-21f2-4d0a-a3fd-e262690de000",
+      "status": "ACTIVE",
+      "current_version": 6213,
+      "manifest_version": 6170,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3110fe74f999c2bf56b94215eef2e80539368d5a07297327116f99b33ccb830d",
+        "file_count": 2,
+        "total_bytes": 3666
+      }
+    },
+    {
+      "slug": "claude-code-gen",
+      "function_id": "bf3686e7-3cd9-4d5d-ac4a-2a23adc8c161",
+      "status": "ACTIVE",
+      "current_version": 5538,
+      "manifest_version": 5495,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "242cc6776baa6736e21a813d4c12d79ec478ee1d34f1c2d227097115c0e8a243",
+        "file_count": 2,
+        "total_bytes": 8399
+      }
+    },
+    {
+      "slug": "coins-credit-notification",
+      "function_id": "2794f5bb-724f-4bb0-a8cc-7ddbdaf48f96",
+      "status": "ACTIVE",
+      "current_version": 5553,
+      "manifest_version": 5510,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "03554c0386b9387d894fa37efab919d2e293a360000c6be2a43be462957ce7c9",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "d9ffdf0335cea5580514e4bf165fbf7746aa9a24ee0a7a2f57a4487ee5118a2b",
+        "file_count": 6,
+        "total_bytes": 78647
+      }
+    },
+    {
+      "slug": "coins-deduction-notification",
+      "function_id": "c932996a-d681-4c1b-b296-c006150c29d3",
+      "status": "ACTIVE",
+      "current_version": 5554,
+      "manifest_version": 5511,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "0b159089e0224ed92c36b3f975fc043a4ce2304406f183fec55414de99be5772",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "33d3f4948ae2515865bb9289f8e655aa26c9c7da19a1dc09bc01a37201e065f0",
+        "file_count": 6,
+        "total_bytes": 78473
+      }
+    },
+    {
+      "slug": "create-link-token",
+      "function_id": "cf10c7ad-6d17-41d6-9a31-f62db2d13cc3",
+      "status": "ACTIVE",
+      "current_version": 5795,
+      "manifest_version": 5752,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "24c885e1fb73689e6a805874d7afede328b31f6f345361a92fb354bf26725aac",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "309d48df095fe93ec94fae01d2b06f243399b03f744a14cc39c590a7acc621af",
+        "file_count": 5,
+        "total_bytes": 14907
+      }
+    },
+    {
+      "slug": "create-verification-session",
+      "function_id": "b5f6d633-133b-4f54-a18b-3023d15faf30",
+      "status": "ACTIVE",
+      "current_version": 5612,
+      "manifest_version": 5569,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "68d4e52cae53277f583bb3a13ee54f24f226120d176a1c93d444accce6b71b9d",
+        "file_count": 2,
+        "total_bytes": 4519
+      }
+    },
+    {
+      "slug": "delete-user-account",
+      "function_id": "9245e883-603a-40c5-9b38-fb01656d9d41",
+      "status": "ACTIVE",
+      "current_version": 6334,
+      "manifest_version": 6291,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "a22ee4c6b1c40d04817f244f036cd1f6fa20e4084fe5ffeecfea88e07f0bfe7a",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "6388a219f25e94391d31dc2a77d516693c9bc4a0189228708c12304bd532a321",
+        "file_count": 5,
+        "total_bytes": 11622
+      }
+    },
+    {
+      "slug": "exchange-public-token",
+      "function_id": "2a3a9ec9-cc41-4ff1-ab05-2ddd20b3d1ab",
+      "status": "ACTIVE",
+      "current_version": 5771,
+      "manifest_version": 5728,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "903ca3e60c2bf2691bfa351893e295cf1cde1c00270e912a0ed5d9df48ad876a",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "274158d55ef75a5eec35c77447e5de1e5597ba8fd9f1719577422dfd81c11540",
+        "file_count": 6,
+        "total_bytes": 18630
+      }
+    },
+    {
+      "slug": "fund-coupon-redeem",
+      "function_id": "9df94ee2-a0eb-4ae7-bb72-934148d0b377",
+      "status": "ACTIVE",
+      "current_version": 3223,
+      "manifest_version": 3180,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "8b3f79a1e9252c894ecf024091d116c41a48dd68a3a0c1eefdea5bd51cab0644",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "0b3572d9821038555d31687fc79f3819dadf40154ee1be042f7b6d00ef0c3b98",
+        "file_count": 9,
+        "total_bytes": 110813
+      }
+    },
+    {
+      "slug": "fund-payment-admin-analytics",
+      "function_id": "7c9f2147-a928-4bd0-ba4c-0e21ff7fa77a",
+      "status": "ACTIVE",
+      "current_version": 3835,
+      "manifest_version": 3792,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "0ca197ae9bb8b10a4c514c74e9a3af8313e8e966215018c67b016320aba9a0b5",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "0aaf2005bf05fd8089769538a602cd3dcafd537fd06e5f313af91a9342fa54fd",
+        "file_count": 5,
+        "total_bytes": 30662
+      }
+    },
+    {
+      "slug": "fund-payment-admin-crm",
+      "function_id": "fc2240be-7a56-4973-835a-09dabd966363",
+      "status": "ACTIVE",
+      "current_version": 3845,
+      "manifest_version": 3802,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "ffa6a470168ca35c7e958fd5257e5dad084069f0cecd00dc013b81776a17b236",
+        "file_count": 6,
+        "total_bytes": 25058
+      }
+    },
+    {
+      "slug": "fund-payment-admin-detail",
+      "function_id": "ae00cf13-7dca-4c5b-8806-8092d2e48f75",
+      "status": "ACTIVE",
+      "current_version": 3901,
+      "manifest_version": 3858,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "70394d5f9e4e4d23dc6b9030b9f6c17a22cccf953538c37b7fad7260abf79b31",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "806b89f470ca7b2c486c123259b02b26b11fbfa93a13bd4be0fc9d9e85aa41fc",
+        "file_count": 7,
+        "total_bytes": 42971
+      }
+    },
+    {
+      "slug": "fund-payment-admin-kyc-review",
+      "function_id": "b0ec8ab3-286e-4377-aefa-46e6f5f1f8dc",
+      "status": "ACTIVE",
+      "current_version": 3845,
+      "manifest_version": 3802,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3b881732ca131f7d3cf487755a6d94099fb324a696f41b3a547d75a759c74503",
+        "file_count": 9,
+        "total_bytes": 37263
+      }
+    },
+    {
+      "slug": "fund-payment-admin-kyc-screen",
+      "function_id": "b929fa86-e495-42db-98d0-0d4f4a60c189",
+      "status": "ACTIVE",
+      "current_version": 3845,
+      "manifest_version": 3802,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "79878ffa2480c21c8af8326bb6926e568a6cd2fe818fe675c5ed7cf8b8477109",
+        "file_count": 9,
+        "total_bytes": 37829
+      }
+    },
+    {
+      "slug": "fund-payment-admin-list",
+      "function_id": "ed05bb00-651d-4e85-bd4f-c6cebf2b43ee",
+      "status": "ACTIVE",
+      "current_version": 4019,
+      "manifest_version": 3976,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "2fad2ad15ef167dbadf16844a911ee720f4b17356bfe0e7c5af118445c513f8a",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4db0217c32ef5d858f4a133e6f4feb081420c127ba495d06b18e476d1d3c77e5",
+        "file_count": 5,
+        "total_bytes": 24316
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview",
+      "function_id": "c319b177-0ba5-4467-8159-68745a96345b",
+      "status": "ACTIVE",
+      "current_version": 3899,
+      "manifest_version": 3856,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "bb47f696b8288ad8da434fea77702847eeda0242643cc17835296dc089583e07",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "656b666ae145055ee23a8f97a98513d6e3ff1848a206538e2ae16daca303894c",
+        "file_count": 6,
+        "total_bytes": 38625
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview-list",
+      "function_id": "157ac2c1-934d-44ac-8aa7-7f0d9fd50247",
+      "status": "ACTIVE",
+      "current_version": 3845,
+      "manifest_version": 3802,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3917c8b54ac8e66e797c07dcc5a99678cc03ea9d14f9231791242bbffd71fd52",
+        "file_count": 8,
+        "total_bytes": 46397
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview-metrics",
+      "function_id": "7c0189f0-50ac-4bfd-a8bd-834b5e8b8ac3",
+      "status": "ACTIVE",
+      "current_version": 3845,
+      "manifest_version": 3802,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "736067da58586f5663103794d710de3c4a2233da393919d5aa040ace093fcd84",
+        "file_count": 8,
+        "total_bytes": 43560
+      }
+    },
+    {
+      "slug": "fund-payment-admin-remind",
+      "function_id": "cd7ddfc8-a1e0-4df6-85ee-e1fbfbcfd190",
+      "status": "ACTIVE",
+      "current_version": 3847,
+      "manifest_version": 3804,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "8ff56366c2beda27e944d8b13f9d09af775e262da7d68f086c6b70d2c38e21ce",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4a5564386b41bfce94dbae86acf11373f95af3f21f155b249f9ad61d42cceb0e",
+        "file_count": 10,
+        "total_bytes": 98058
+      }
+    },
+    {
+      "slug": "fund-payment-admin-resend",
+      "function_id": "c19980d1-d3aa-449c-aaa3-5d22de67020b",
+      "status": "ACTIVE",
+      "current_version": 3847,
+      "manifest_version": 3804,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "4871417debbac6c75f52eb1abf88d0d34e9a59a0c844d39474453197fd7767af",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "b6d00c1517d07a4f88199302014aabf6cf3eb46b323ba19d0632cbcc4cf6af95",
+        "file_count": 10,
+        "total_bytes": 102111
+      }
+    },
+    {
+      "slug": "fund-payment-admin-verify",
+      "function_id": "63c4b3c2-1dec-4684-b2b2-fa9fd8f91bec",
+      "status": "ACTIVE",
+      "current_version": 4135,
+      "manifest_version": 4092,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "959ac551bc73f477eff64bd7e958afecb7aca12aec099509e944cdb353c8bf9e",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f7b5694442de921651e6dcba0cc9a3dd286177ab8bc2bfd95193fe9cdcf882ae",
+        "file_count": 10,
+        "total_bytes": 107443
+      }
+    },
+    {
+      "slug": "fund-payment-checkout",
+      "function_id": "5e02d042-945b-4daa-b0b4-9d55fcb865ef",
+      "status": "ACTIVE",
+      "current_version": 4131,
+      "manifest_version": 4088,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "a3290ed9526dee845e307b00afcebd64dd74d1f6801b9f5f7d94a4a3ef6f38dc",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "df6d6ed63b42ce28ee64cde5db14645d72fb3cbf516e27bbea917f3f2202c7d0",
+        "file_count": 5,
+        "total_bytes": 24182
+      }
+    },
+    {
+      "slug": "fund-payment-request-create",
+      "function_id": "cce8f22e-d4dc-46ae-820c-c26f51088656",
+      "status": "ACTIVE",
+      "current_version": 4135,
+      "manifest_version": 4092,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "5a064246600837609efe6a150906904cda83c8fa2264217bbf51428f3ff82a3a",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "74166d1f45fc1a634215fe8b7ff1c11cc08f0cd4ac32c435705d8810c5c27172",
+        "file_count": 9,
+        "total_bytes": 110259
+      }
+    },
+    {
+      "slug": "fund-payment-status",
+      "function_id": "09f29e73-a406-4886-9cf9-712e4a79fcb2",
+      "status": "ACTIVE",
+      "current_version": 4130,
+      "manifest_version": 4087,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "4d1522d0735b0d6f6bab0e4fe1a1738f0f78779730a151acca74718894b3a0aa",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "2e09a6cacecc5a5420e20a0eb8bd7acbea40cb015a9a0b6f7d4b2603f4991b7f",
+        "file_count": 5,
+        "total_bytes": 19514
+      }
+    },
+    {
+      "slug": "fund-payment-token-status",
+      "function_id": "a23f2c01-8215-489d-961b-49259b499b13",
+      "status": "ACTIVE",
+      "current_version": 4074,
+      "manifest_version": 4031,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "501a18f6bd39b8dc3297b02684807e038ed8254b5efd1ac9f9f88ecf6ca925ce",
+        "file_count": 5,
+        "total_bytes": 19347
+      }
+    },
+    {
+      "slug": "fund-stripe-webhook",
+      "function_id": "657cb164-3567-4f41-a285-3040ef13c769",
+      "status": "ACTIVE",
+      "current_version": 4138,
+      "manifest_version": 4095,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "5e094a7854e2dbf4a1953e722e75569ffa718bfd12480ee7af685fbafd47b6f5",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "6fb5d6e2425299b1643e7956062710951b19af638e7350f97bdbd914ba984089",
+        "file_count": 9,
+        "total_bytes": 117338
+      }
+    },
+    {
+      "slug": "fund-transfer-sandbox-start",
+      "function_id": "a4f0ff3b-896d-46bd-bf26-39520b769d13",
+      "status": "ACTIVE",
+      "current_version": 4172,
+      "manifest_version": 4129,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "e8a4035813b7ee396f32bd1df5cd8cea6b415164154b306f250af722f70b0d27",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "898a32afb9f55bfae33ec1bb54de637a6da0daa33c221494fb94efb23e84c90a",
+        "file_count": 7,
+        "total_bytes": 43728
+      }
+    },
+    {
+      "slug": "gemini-voice-token",
+      "function_id": "29bcc361-69d5-4777-aba2-813a5f4799b9",
+      "status": "ACTIVE",
+      "current_version": 5537,
+      "manifest_version": 5494,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "a0b1be7e5fb81dac6ff256fe5dea3e5696e200adb3e937292ad54a9686bd3e16",
+        "file_count": 2,
+        "total_bytes": 3551
+      }
+    },
+    {
+      "slug": "generate-investor-profile",
+      "function_id": "bcc9c2f5-1705-4a55-8166-3c9a852bcfc4",
+      "status": "ACTIVE",
+      "current_version": 6221,
+      "manifest_version": 6178,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "a953b24ba5b0de891580774285a7ac631142470f87f8741adbbb43966e689fd1",
+        "file_count": 2,
+        "total_bytes": 9110
+      }
+    },
+    {
+      "slug": "get-auth-numbers",
+      "function_id": "a26c29ca-1d90-45f7-86e4-3c6a90cf9fcb",
+      "status": "ACTIVE",
+      "current_version": 5549,
+      "manifest_version": 5506,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "3224a3794b7cc5e4d18f3ce819fca5bacd0469a015a429eabf3648e76369ddf6",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "e6ac61c2fa58282f56dd490704f284582be7309d2f6d5f06fee4f1082dd85c59",
+        "file_count": 6,
+        "total_bytes": 14777
+      }
+    },
+    {
+      "slug": "get-locations",
+      "function_id": "b31a7ad3-53f6-42f0-a98a-f61ef8f9b987",
+      "status": "ACTIVE",
+      "current_version": 5623,
+      "manifest_version": 5580,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4a7d46510f6860a5db410e48389af184199ee6a2d7dffbc9b462f69246c0da0c",
+        "file_count": 2,
+        "total_bytes": 3093
+      }
+    },
+    {
+      "slug": "get-secrets",
+      "function_id": "f1d291a3-393c-4791-aa56-a25730d4e1f6",
+      "status": "ACTIVE",
+      "current_version": 20,
+      "manifest_version": 20,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": "81634b9fda34ae245175fbb1ec2649282582c49ab44d2afe01596de36c0a209e",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "github-devops-notify",
+      "function_id": "9d5b0e1a-d76d-4dcd-a3a2-14afb19d09b4",
+      "status": "ACTIVE",
+      "current_version": 6207,
+      "manifest_version": 6164,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "38369fb468d2830f6ac5646c864c1d5d1868dd0d465c300ff662392ff9f7cdfa",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "c0ba88aa56b479ef5ae5ccea04ad0a3f1dbab407f807188d79ca27cb7e55cecd",
+        "file_count": 3,
+        "total_bytes": 18681
+      }
+    },
+    {
+      "slug": "hushh-address-inference",
+      "function_id": "187dc3ad-591d-4ebb-9ca8-771a57b5e65b",
+      "status": "ACTIVE",
+      "current_version": 6134,
+      "manifest_version": 6091,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "1fe317cb324fa20344fdc64fa40c71e99b8d41b2a5cc8830480a609da5e27e5b",
+        "file_count": 3,
+        "total_bytes": 22003
+      }
+    },
+    {
+      "slug": "hushh-ai-chat",
+      "function_id": "478ec6e2-2fbb-421d-b2fc-e0ed1047daca",
+      "status": "ACTIVE",
+      "current_version": 6173,
+      "manifest_version": 6130,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "94a3fad68b862bf657d66318c406d3a07c333f410dfa4a24196448d281678d50",
+        "file_count": 3,
+        "total_bytes": 33027
+      }
+    },
+    {
+      "slug": "hushh-dob-inference",
+      "function_id": "90c56386-84b7-4832-b83e-d6fd562b238f",
+      "status": "ACTIVE",
+      "current_version": 6148,
+      "manifest_version": 6105,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "744ba33f3ef6b3a05b9681d21df538935f4cabfb5372b96d8175b851d910601d",
+        "file_count": 3,
+        "total_bytes": 19407
+      }
+    },
+    {
+      "slug": "hushh-location-geocode",
+      "function_id": "b61e87bc-11e1-4d7e-ae37-197b7783c078",
+      "status": "ACTIVE",
+      "current_version": 6135,
+      "manifest_version": 6092,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "8f4286a07dccc7f2832d4f0419e835f23e1cdde1369d180088ff2ba9309fbc61",
+        "file_count": 3,
+        "total_bytes": 9645
+      }
+    },
+    {
+      "slug": "hushh-profile-search",
+      "function_id": "672b359b-50cd-43c4-8617-6f6dd87f6199",
+      "status": "ACTIVE",
+      "current_version": 6162,
+      "manifest_version": 6119,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "190f4a5f81917d3f6128ca5647cb18118975440913f2de3542044a112aeb8618",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "36d4b0c00e1d8e660536551ad00033e6005342a26b1c47672e402c2b5ab1bd57",
+        "file_count": 4,
+        "total_bytes": 77996
+      }
+    },
+    {
+      "slug": "identity-verification-webhook",
+      "function_id": "0b976014-6cc7-4654-a562-dae9744bac33",
+      "status": "ACTIVE",
+      "current_version": 6201,
+      "manifest_version": 6158,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "b88b395c60721544bb0bc5b9a6988f78c9cbc7a2359e8af4f308fdb4a676436b",
+        "file_count": 2,
+        "total_bytes": 7545
+      }
+    },
+    {
+      "slug": "investments-transactions",
+      "function_id": "7b2946d0-e314-4460-859d-2cf03c0c32aa",
+      "status": "ACTIVE",
+      "current_version": 5725,
+      "manifest_version": 5682,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "9296e20f3c5990bacd983e398d4385a014b8a74c6dc97fe34229ff16f0d8b93a",
+        "file_count": 3,
+        "total_bytes": 2886
+      }
+    },
+    {
+      "slug": "investor-agent-mcp",
+      "function_id": "ab924c88-1269-4a67-8a94-1bb76bee6eae",
+      "status": "ACTIVE",
+      "current_version": 6213,
+      "manifest_version": 6170,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "2804ccd64d428456a167f30aabcc09d6ade3d9c30c4337210f84751a7b1914b1",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "03f6e845fb0e651e651d0164f20967969d8002f70e2c7128c5e4dc866ac155e7",
+        "file_count": 4,
+        "total_bytes": 33942
+      }
+    },
+    {
+      "slug": "investor-chat",
+      "function_id": "ce9bb50a-29b6-41e4-a267-2ceda720f39d",
+      "status": "ACTIVE",
+      "current_version": 6220,
+      "manifest_version": 6177,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "d42902d68bd5400291704c8f029ffbb831486a32e7f6a441fc58c6a3623bac45",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f1b67ef629dc52066cf6a0e84fc1032722edb2bf46b44d3517b5e9ad71bde1db",
+        "file_count": 2,
+        "total_bytes": 12319
+      }
+    },
+    {
+      "slug": "investor-og-image",
+      "function_id": "486a2bf5-3374-40f4-9a9c-b4f1d3ccd1a8",
+      "status": "ACTIVE",
+      "current_version": 6215,
+      "manifest_version": 6172,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "3bec00a0f6aee9fc7cd635bcf5318b0fa49679b5d1cdaa07f66dda521724189c",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "ee32d94f5bedd01860d11b82fe3e9471dedcefd5971e819c0aa64b56ac8af684",
+        "file_count": 2,
+        "total_bytes": 5821
+      }
+    },
+    {
+      "slug": "ios-build-tracker",
+      "function_id": "a945f586-fa01-4cd9-a358-c062eae4e059",
+      "status": "ACTIVE",
+      "current_version": 5607,
+      "manifest_version": 5564,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f18778aa87aa621c0325af3666e85837ef7904e1e89982c863d1a131caaeb887",
+        "file_count": 2,
+        "total_bytes": 7074
+      }
+    },
+    {
+      "slug": "kyc-agent-a2a",
+      "function_id": "fba3785b-d893-4845-b567-e7fb682a5ac5",
+      "status": "ACTIVE",
+      "current_version": 6207,
+      "manifest_version": 6164,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "11f29ef2515bb9524c6d2a461e07bdb8932b5176e151092b02e4fe3078fe2dfb",
+        "file_count": 2,
+        "total_bytes": 22890
+      }
+    },
+    {
+      "slug": "kyc-agent-a2a-protocol",
+      "function_id": "c25d15c5-1442-43ba-bbe0-3d4fe1a47bb5",
+      "status": "ACTIVE",
+      "current_version": 6206,
+      "manifest_version": 6163,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "62aaf72096e55ec10fa8cac1149ba0ca5a63f8c928156ffbc0d7272b2a8241b0",
+        "file_count": 2,
+        "total_bytes": 49552
+      }
+    },
+    {
+      "slug": "kyc-agent-agentic",
+      "function_id": "0a83823b-39fb-4fbd-abc7-6e0024353eaa",
+      "status": "ACTIVE",
+      "current_version": 6206,
+      "manifest_version": 6163,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "345a93f39a53ead3b7a01206f8e983f032c938669de5af6c84da1af004bf9652",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f59f8899a95a8e9b81d01b49cd40c48e066db760475ebd21310a07ef497d2271",
+        "file_count": 3,
+        "total_bytes": 39675
+      }
+    },
+    {
+      "slug": "kyc-orchestrator",
+      "function_id": "ca663922-ca7e-4c0f-b020-9932580c42b0",
+      "status": "ACTIVE",
+      "current_version": 76,
+      "manifest_version": 76,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": "a2e2836b000ad07d294b83b69bbccc858f1a4c2f3185a79370525253a09f87b0",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "lead_create",
+      "function_id": "24671149-9ff3-4742-a935-8198dc175d9f",
+      "status": "ACTIVE",
+      "current_version": 5888,
+      "manifest_version": 5845,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "9ebd39e6c9c9c928a2183883926730ce401147f78eb74a757f00da1dcb572546",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f25c4c33dc9a32e213833fbcf047c6f7b0d5196ad98437f81abe2510a82d3283",
+        "file_count": 1,
+        "total_bytes": 4506
+      }
+    },
+    {
+      "slug": "liabilities",
+      "function_id": "89f13ebd-4f77-4ba3-af8f-4692c7e08ccf",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f5e862ce4ffda13498cd30b8b1a38000448aeb9d2ee868b23d0c85ce6119a002",
+        "file_count": 3,
+        "total_bytes": 3357
+      }
+    },
+    {
+      "slug": "mcp-agent-card",
+      "function_id": "b1b1bc8b-a7d8-468b-be49-cae542228f2e",
+      "status": "ACTIVE",
+      "current_version": 5538,
+      "manifest_version": 5495,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "985f0b9ba5d264e952cc0982faa5a9729d7e1c67d25f0259ca8d36d98f107422",
+        "file_count": 2,
+        "total_bytes": 4323
+      }
+    },
+    {
+      "slug": "nda-admin-fetch",
+      "function_id": "57a9c1e5-404b-47a3-a86f-1ffd0c7a3267",
+      "status": "ACTIVE",
+      "current_version": 6320,
+      "manifest_version": 6277,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "2cecf4e6b64ea2278d30bdf9734341bc10dd0ae3ff6175b2040fe41407c9c2a8",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "c0efaca3fcea7e30fcb1898ba90c96306fea754598217a2281691bc5e9ef896f",
+        "file_count": 2,
+        "total_bytes": 3825
+      }
+    },
+    {
+      "slug": "nda-signed-notification",
+      "function_id": "2d961ec8-deed-4cdc-a00a-2d61560dd1a9",
+      "status": "ACTIVE",
+      "current_version": 6368,
+      "manifest_version": 6325,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "be2142d395b952e6bba97dec1ad19a3bc031d5f1840401c78c5c03b423e5c088",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "71843e045083dc808bcb7f98eb1f7f0b1e79be800da66a9f330de46d692b11fc",
+        "file_count": 12,
+        "total_bytes": 295122
+      }
+    },
+    {
+      "slug": "nws-score-notification",
+      "function_id": "4925c7a1-8163-4493-ae59-89f57f9e4cf3",
+      "status": "ACTIVE",
+      "current_version": 5544,
+      "manifest_version": 5501,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "864be3d6ea5bca2d666f4803fcca203b60a51fc3e330e335ad9d8a0fcb1e2533",
+        "file_count": 2,
+        "total_bytes": 13503
+      }
+    },
+    {
+      "slug": "onboarding-create-checkout",
+      "function_id": "066df8f1-281c-490c-8dfe-ffe64fd49072",
+      "status": "ACTIVE",
+      "current_version": 6171,
+      "manifest_version": 6128,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4470b76beaf68223122dba2d1f797c0024c7e4fc48e17ce762329d340aeacd13",
+        "file_count": 2,
+        "total_bytes": 5586
+      }
+    },
+    {
+      "slug": "onboarding-funding-name-match",
+      "function_id": "458116f3-1605-48e6-ac4f-4babbbbd56a6",
+      "status": "ACTIVE",
+      "current_version": 2971,
+      "manifest_version": 2928,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "b3582192b06676484a06178773bc132057e85f55ac21202e03650a175528fb5e",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "5005de2f287647ffe81bd473230aea0bdc81d2bff3995261ac940d1cb4909b7b",
+        "file_count": 6,
+        "total_bytes": 25795
+      }
+    },
+    {
+      "slug": "onboarding-invite-complete",
+      "function_id": "86a83997-3934-4ad5-8455-d30df79d8671",
+      "status": "ACTIVE",
+      "current_version": 3114,
+      "manifest_version": 3071,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "ac2d7407315ea0f46aafb9dc4ded36fa30c1a1981e277010777913923dcc9db8",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "396ac72f1d1590b78fdb0059b8d346fbd110edf6a1932906f424f61ddbaf5dc3",
+        "file_count": 7,
+        "total_bytes": 34259
+      }
+    },
+    {
+      "slug": "onboarding-invite-create",
+      "function_id": "7672baca-1e2c-4e96-8038-559af7a0d0c6",
+      "status": "ACTIVE",
+      "current_version": 3113,
+      "manifest_version": 3070,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "fbf37afc6492cf1a3b0ac26c0b7c6c277fa15788f06ac98a3b607a4c92101ca7",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "8ae4e1c184344963d16bbdaf2722d8913544b636868ab444c0c6f8fa1f702911",
+        "file_count": 7,
+        "total_bytes": 32048
+      }
+    },
+    {
+      "slug": "onboarding-invite-link-token",
+      "function_id": "5f8004a9-8def-45d7-bc7b-6bd06ce81930",
+      "status": "ACTIVE",
+      "current_version": 2971,
+      "manifest_version": 2928,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "8c126bf7b39fa61ffce0202507fb45863a28a99059b5d86c9f45784195f91226",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "a93d1f36b70cd12309e4aa29543f2acf373d9236f944475c0fcf18efc904af00",
+        "file_count": 7,
+        "total_bytes": 29083
+      }
+    },
+    {
+      "slug": "onboarding-invite-load",
+      "function_id": "a9eaba79-b78d-4d10-8de1-bc067d7d7cde",
+      "status": "ACTIVE",
+      "current_version": 3114,
+      "manifest_version": 3071,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "9c7fa66338f7f11bf65b914ef8b56a63b2cb5c840f8f847de9c6b7a0c5645686",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4582659cf7861e0fa274d818393d5b4d27d420e71ed1d1ea33c6c24962f8de72",
+        "file_count": 7,
+        "total_bytes": 33037
+      }
+    },
+    {
+      "slug": "onboarding-invite-plaid-exchange",
+      "function_id": "df84ff30-8085-4d78-9eef-91db375a771a",
+      "status": "ACTIVE",
+      "current_version": 2971,
+      "manifest_version": 2928,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "470f708b87d49ee87c4b2a788825d5dd238343e94fd2e092940fa6e5097067e4",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "44c8ff916333aaaa088c821f1bee2f4a7aaf36d8358df4fe38e97a59963a5978",
+        "file_count": 8,
+        "total_bytes": 35084
+      }
+    },
+    {
+      "slug": "onboarding-invite-resend",
+      "function_id": "6165c97e-1721-45d0-9356-d25cf95e5e13",
+      "status": "ACTIVE",
+      "current_version": 3113,
+      "manifest_version": 3070,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "9c8b0d1d6b3283097e7481a8a3309683bec19990fda7069563c795ae6bcaeab9",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "d88e7daf4d13d7e42a746367fd6dc8de4b0ab2c33c5bccc366ad41be62c2442e",
+        "file_count": 6,
+        "total_bytes": 26638
+      }
+    },
+    {
+      "slug": "onboarding-invite-revoke",
+      "function_id": "ee8c2951-d099-4512-bd9f-2f843d84e407",
+      "status": "ACTIVE",
+      "current_version": 3113,
+      "manifest_version": 3070,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "27e6f17f491ec99cbe97365015d4a59e5b0bd2e91d3da839e2e5d41d321a53bd",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "361495ae3a011ee73c70de342cca8a3b6178049a6a83de1d290fec03071955f4",
+        "file_count": 5,
+        "total_bytes": 21636
+      }
+    },
+    {
+      "slug": "onboarding-invite-save",
+      "function_id": "9397d53e-890c-400f-936d-041b4b8b901f",
+      "status": "ACTIVE",
+      "current_version": 3114,
+      "manifest_version": 3071,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "e1fbc435a95c1552cc3df714f036d3c9299366fa09d59db1c8f03f6e86ccedd9",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "7f3002630a96171660d80ba9e519f2bd30f4ce560fbcec6ab43430eedea58e26",
+        "file_count": 7,
+        "total_bytes": 33146
+      }
+    },
+    {
+      "slug": "onboarding-proof-of-funds",
+      "function_id": "7108be41-f77f-4eda-b812-c74b0d9d9a24",
+      "status": "ACTIVE",
+      "current_version": 3113,
+      "manifest_version": 3070,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "d6eb718ebe9872cdb5cef1341a85233f5206bb286d3e32e830374e0ed11fc390",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "4f54923d7b0b6eec86451bf1e5c8f1b8c5a2fe1ab3344b7abe46700e1477cd3c",
+        "file_count": 6,
+        "total_bytes": 23460
+      }
+    },
+    {
+      "slug": "onboarding-submit-application",
+      "function_id": "7ce03017-2040-460e-bb11-8183b3fb747a",
+      "status": "ACTIVE",
+      "current_version": 3113,
+      "manifest_version": 3070,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "a55445e6240d7fa898facd9abb1574651f165cb8aec54425b997175a9315d5ab",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "35f5db1300bae04d22a1b817180c4e5f540143d50d685e3b697eedcaf0f20601",
+        "file_count": 6,
+        "total_bytes": 27235
+      }
+    },
+    {
+      "slug": "onboarding-verify-payment",
+      "function_id": "27a34847-bdaf-4247-ac84-2041562731fd",
+      "status": "ACTIVE",
+      "current_version": 6202,
+      "manifest_version": 6159,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "0bbe02e0c1fa000b980c4c3859be71cf48858870d1b7ffc555718bf75e9a5d87",
+        "file_count": 2,
+        "total_bytes": 4460
+      }
+    },
+    {
+      "slug": "plaid-data-sync",
+      "function_id": "49440a23-3211-4d01-80af-dae2e5796a7a",
+      "status": "ACTIVE",
+      "current_version": 4173,
+      "manifest_version": 4130,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "92d3ae915ab6c5d4e55f054002ac448cdcb823cffa279ec2421c133517aafafa",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "c4d794566462a6e8febccf2d70db58c0dbd0400166741d5403b85a359008211e",
+        "file_count": 7,
+        "total_bytes": 40178
+      }
+    },
+    {
+      "slug": "plaid-data-sync-product",
+      "function_id": "acf9f44e-eb64-4799-81eb-4f980cd8c812",
+      "status": "ACTIVE",
+      "current_version": 4136,
+      "manifest_version": 4093,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "115f3ed4f61fec036ca6d3ec257d1ad0e54d99e056cf96c91118189962a5e358",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "8492c2d3295059bfd03a0dc11e614f977a2fb93ad7279ffc2f9452901ce31e47",
+        "file_count": 7,
+        "total_bytes": 39277
+      }
+    },
+    {
+      "slug": "plaid-data-sync-start",
+      "function_id": "be9f07d3-d9dd-4989-bb3d-98efd72751eb",
+      "status": "ACTIVE",
+      "current_version": 4136,
+      "manifest_version": 4093,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "8e75784990205a1e8c1149ff309b3cf5e714cd35cc17b0d74391a261cd4a353e",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "ad13beb3712e1fa42eda83bc18d06650cee9844e08461ed63ce9d87a32057647",
+        "file_count": 7,
+        "total_bytes": 42405
+      }
+    },
+    {
+      "slug": "plaid-data-webhook",
+      "function_id": "78b486be-c2a4-4d80-b5a0-1dc59adc7967",
+      "status": "ACTIVE",
+      "current_version": 4137,
+      "manifest_version": 4094,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "e3e88dd3d55f79f167bcb2bde60e7cafc3c04fe6c879927c817715d3492a52c7",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "ef127f53865f8c36d0861cb684407b7b29ee3b4e78ce1caece658117734777e5",
+        "file_count": 6,
+        "total_bytes": 36888
+      }
+    },
+    {
+      "slug": "plaid-diagnostics-log",
+      "function_id": "51dc3d49-0f7d-4ed3-b2fd-2e6eeb30e6e4",
+      "status": "ACTIVE",
+      "current_version": 4066,
+      "manifest_version": 4023,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "483aae9c77e4f2e0618524e965b24d556c10068968d42e7069f2466f310d23c2",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3a2a2309233d4e3e965acb34f6030a650b038bd07aad92008624df7953b80bf8",
+        "file_count": 3,
+        "total_bytes": 4792
+      }
+    },
+    {
+      "slug": "plaid-income-link-token",
+      "function_id": "cd7c9587-ca0f-465f-8c07-1da93d2e3d3a",
+      "status": "ACTIVE",
+      "current_version": 4136,
+      "manifest_version": 4093,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "866bf09ecc02884f3d8e8c9b98f40aa3b54d6a4b7cb710825a88a4f9d8401c5c",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "af46f8a83dea243f9f2106d8bb1e74f664f03ed7c5fd17db3471e6d481e24a62",
+        "file_count": 6,
+        "total_bytes": 14537
+      }
+    },
+    {
+      "slug": "plaid-transfer-sandbox-simulate",
+      "function_id": "c35efa55-ac41-4000-9af1-7fcb170c3e06",
+      "status": "ACTIVE",
+      "current_version": 4171,
+      "manifest_version": 4128,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "4f834b75aedfda8dc8cb83b998b81dcb40ab4921c76463a1a7f7accb379f481a",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "7be5c4aa39c0fdebe36eb35bcf6e86c446e308108d8af63c7783d499ab4613cc",
+        "file_count": 5,
+        "total_bytes": 14397
+      }
+    },
+    {
+      "slug": "plaid-transfer-webhook",
+      "function_id": "d8e0c49a-e2d8-44da-bd04-83d4add54a0a",
+      "status": "ACTIVE",
+      "current_version": 4173,
+      "manifest_version": 4130,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "820881666fe0cd11bbcaf739d9939d114e08a9b4a94c32bafa9d547537a203ca",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "103cceda8eaad0bdb602a0caa6777bd332ca1c1df1ef13bed3939d8c2eb2675e",
+        "file_count": 5,
+        "total_bytes": 20128
+      }
+    },
+    {
+      "slug": "plaid-unlink-item",
+      "function_id": "39655d89-e1bf-44a3-9814-a1b0bb2fa31e",
+      "status": "ACTIVE",
+      "current_version": 4138,
+      "manifest_version": 4095,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "3d986f940fe6e03a7c8a611b8ab7230289fd5666524f384d330545cd73949850",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "b7f66268e7d0c63ddf055ade9f3accf21d22451218f65f85da9040600051125a",
+        "file_count": 6,
+        "total_bytes": 18229
+      }
+    },
+    {
+      "slug": "portfolio-deploy",
+      "function_id": "bd044671-2276-4b31-896f-88bec0c5f336",
+      "status": "ACTIVE",
+      "current_version": 612,
+      "manifest_version": 612,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "portfolio-generate",
+      "function_id": "0e5f90c5-da09-4bdf-928d-4653d202726a",
+      "status": "ACTIVE",
+      "current_version": 615,
+      "manifest_version": 615,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "portfolio-photo-enhance",
+      "function_id": "424ac355-1158-4a0f-a1ee-aef17b3e41c8",
+      "status": "ACTIVE",
+      "current_version": 615,
+      "manifest_version": 615,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "portfolio-slug-check",
+      "function_id": "81dcee04-fc46-4e5a-abdb-9c5ed63b27d2",
+      "status": "ACTIVE",
+      "current_version": 615,
+      "manifest_version": 615,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "public-signup-metrics",
+      "function_id": "19875568-5651-4be7-ab1f-6695f69ea760",
+      "status": "ACTIVE",
+      "current_version": 5533,
+      "manifest_version": 5490,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "5e89cbd5a315147b45b219fbcbe7469d6e257da78495ba3a9f61077c04656821",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "1a2347c9c8b6c8655f8d20a195b16fc921ab65a0bdac54486ca49b38ea11ee17",
+        "file_count": 3,
+        "total_bytes": 12121
+      }
+    },
+    {
+      "slug": "sandbox-create-test-item",
+      "function_id": "863ffcdd-2d35-47a3-ab90-77c357985c76",
+      "status": "ACTIVE",
+      "current_version": 5591,
+      "manifest_version": 5548,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "a377bac62445f58c7eea0daed41aa366518c2ed97986628035f1d1e83e06c863",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3e3d4259b136975ad1b36c6866d71208815b9288f1dab482f7c6f883f08bc4c4",
+        "file_count": 6,
+        "total_bytes": 22652
+      }
+    },
+    {
+      "slug": "send-email-notification",
+      "function_id": "288bd1c4-d52b-4517-ad5f-e4967dbf526b",
+      "status": "ACTIVE",
+      "current_version": 6209,
+      "manifest_version": 6166,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "f997e883ba00b990cc6564bb22c927e35e26b024990ce1d825854e1aa4da6969",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "cba9aa1cadb2123bf3e3f23421b4e8ee20a983ef8006f78eba38c84abdbb9cd6",
+        "file_count": 2,
+        "total_bytes": 7620
+      }
+    },
+    {
+      "slug": "send-kyc-email",
+      "function_id": "8c1b166b-d800-4b8d-9399-88fffbf911a3",
+      "status": "ACTIVE",
+      "current_version": 664,
+      "manifest_version": 664,
+      "version_delta": 0,
+      "verify_jwt": true,
+      "provider_bundle_digest": "c7bdd7f95c697803937d5f7ffdcc90e1e8b7a296a77b2a836d7682ce4495e940",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "shadow-investigator",
+      "function_id": "3214d6b2-cb37-4d21-b0c9-27fd6f22112c",
+      "status": "ACTIVE",
+      "current_version": 6130,
+      "manifest_version": 6087,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "4b184429f461003fa451c1ab9130c42bf0c619ff4762b6a3e0abc2d5458f86a5",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "952573fda3aff2b079d6658d758e70a3d54e01d8d4d588eae7e4f8d378dc2aa7",
+        "file_count": 5,
+        "total_bytes": 30025
+      }
+    },
+    {
+      "slug": "signal-decision-report",
+      "function_id": "4500c152-45c1-4688-bbec-6d21ce0308eb",
+      "status": "ACTIVE",
+      "current_version": 5727,
+      "manifest_version": 5684,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "3da242bea09a5d68f2e19d39075ca125296158244ccb46ddbe1ff1e041bac898",
+        "file_count": 4,
+        "total_bytes": 3783
+      }
+    },
+    {
+      "slug": "signal-evaluate",
+      "function_id": "363e2501-aab7-43ae-a905-2abd6b8f72e7",
+      "status": "ACTIVE",
+      "current_version": 5727,
+      "manifest_version": 5684,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "d1ff316192fae94d56a798405bb05fba0c0738a6bcff26b0c291470b2b26c3b5",
+        "file_count": 4,
+        "total_bytes": 4242
+      }
+    },
+    {
+      "slug": "signal-return-report",
+      "function_id": "11f69350-a801-464b-8b8c-bf1bfbb321c6",
+      "status": "ACTIVE",
+      "current_version": 5727,
+      "manifest_version": 5684,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "c12c23f7dcc735350ededbe2fa2ab14d01bd36f7a6dda840a45496283192ac6c",
+        "file_count": 4,
+        "total_bytes": 3425
+      }
+    },
+    {
+      "slug": "site-analyze",
+      "function_id": "21fdfb16-91e3-4cb4-af43-370fa83052f9",
+      "status": "ACTIVE",
+      "current_version": 610,
+      "manifest_version": 610,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": "79230f26a8acb15cf2d9540e757cdd3e219a3b623e8a52c08dbc8b580b33dc03",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "site-edit",
+      "function_id": "d43b4e4b-9dc7-4a74-b5cf-896a05d4c231",
+      "status": "ACTIVE",
+      "current_version": 610,
+      "manifest_version": 610,
+      "version_delta": 0,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "site-extract",
+      "function_id": "07ac20db-0c28-4062-9ef3-8ee43c2b56b1",
+      "status": "ACTIVE",
+      "current_version": 610,
+      "manifest_version": 610,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": "3b4b0a2a85c0150ed1fbd3d4da748eccd4347cfbc19c902710c89d91cfe2e795",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "site-generate",
+      "function_id": "3b82f0e1-14ef-44fd-8268-82eadd3bbf62",
+      "status": "ACTIVE",
+      "current_version": 620,
+      "manifest_version": 620,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "site-orchestrator",
+      "function_id": "859c9d8b-56d0-442f-806c-b7e6081f941d",
+      "status": "ACTIVE",
+      "current_version": 612,
+      "manifest_version": 612,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "site-publish",
+      "function_id": "6a862c18-cb18-4a62-b870-6c73a16e1ce2",
+      "status": "ACTIVE",
+      "current_version": 618,
+      "manifest_version": 618,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "stock-quotes",
+      "function_id": "4f2068d6-f07a-409d-8af4-ba12e5df9017",
+      "status": "ACTIVE",
+      "current_version": 6328,
+      "manifest_version": 6285,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "c61006bb8c6a05e2fe7983cc45717fb8262bd089c1d6014815be014e177a35b5",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "844dbe3b4698e0d93b29a831bb79449886f571aebc1078c3258109da504e3647",
+        "file_count": 2,
+        "total_bytes": 4917
+      }
+    },
+    {
+      "slug": "stripe-identity-session",
+      "function_id": "d9c4fb1b-c0c5-48a4-a5eb-191c8ad5c35b",
+      "status": "ACTIVE",
+      "current_version": 665,
+      "manifest_version": 665,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "stripe-identity-webhook",
+      "function_id": "bc79ede2-7b3e-42fc-9881-0ae85d631db1",
+      "status": "ACTIVE",
+      "current_version": 662,
+      "manifest_version": 662,
+      "version_delta": 0,
+      "verify_jwt": false,
+      "provider_bundle_digest": "9f36df2c8fbc1d339af0d098633d6c65b84f401dbae13425bdc80ecb2a2d69b5",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    },
+    {
+      "slug": "ticket_create",
+      "function_id": "a448e353-d4ce-45c7-99de-1668ab89045f",
+      "status": "ACTIVE",
+      "current_version": 5888,
+      "manifest_version": 5845,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": "78393db38825e367ffabb73e1ad7bba8927c4e395ebf47b5c7d7a892fd1453b4",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "f282d7878f0dbd7c7ccca35d533a0f1c227b078f6f05e3fc3a51ab236b8cf116",
+        "file_count": 1,
+        "total_bytes": 4335
+      }
+    },
+    {
+      "slug": "transactions-sync",
+      "function_id": "c797dc47-4903-4675-a718-8b3153815d63",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": false,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "6e399e6a309897d145ad91f1a07839723a30fc7430762b458533809ac7f48e6e",
+        "file_count": 3,
+        "total_bytes": 4477
+      }
+    },
+    {
+      "slug": "vault-access-notification",
+      "function_id": "0527dbba-98bf-4b3c-8f5a-f46cc2f79a87",
+      "status": "ACTIVE",
+      "current_version": 5535,
+      "manifest_version": 5492,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": "44266a02ffc33847474e2968e095bd22e2dc7a9fb39af92d1cadd6f26d699a49",
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "7e24d50d307ef1bdee13f2ed23f0f9bb38a34c2c3c47f186ec8fff739b80a6e3",
+        "file_count": 6,
+        "total_bytes": 84724
+      }
+    },
+    {
+      "slug": "veo-generate-video",
+      "function_id": "b22e572e-5b93-4c3d-a033-66273bce3c16",
+      "status": "ACTIVE",
+      "current_version": 6150,
+      "manifest_version": 6107,
+      "version_delta": 43,
+      "verify_jwt": true,
+      "provider_bundle_digest": null,
+      "historical_capture_status": "EXTRACTED",
+      "capture_status": "EXTRACTED",
+      "capture_attempts": 1,
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2",
+        "canonical_digest": "d79f6c795afdcf8619ab2d2592e04f43e8e4250e505c2cb74c2cc95b2442d677",
+        "file_count": 3,
+        "total_bytes": 7377
+      }
+    },
+    {
+      "slug": "voice-agent-turn",
+      "function_id": "87a0417d-2aaf-4b94-a938-bfd064cd4f39",
+      "status": "ACTIVE",
+      "current_version": 654,
+      "manifest_version": 654,
+      "version_delta": 0,
+      "verify_jwt": true,
+      "provider_bundle_digest": "7ebbf35f551d84b310569825c3fc0a984417eea851c68f6431175bb825c46217",
+      "historical_capture_status": "STORE_NOT_FOUND",
+      "capture_status": "BUNDLE_RETRIEVAL_FAILED",
+      "capture_attempts": 3,
+      "retrieval_failure": {
+        "http_status": 500,
+        "provider_error_code": "FunctionsApiStatusError",
+        "failure_class": "FAILED_TO_RETRIEVE_FUNCTION_BUNDLE",
+        "terminal_after_max_attempts": true,
+        "attempt_response_classes": [
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED",
+          "BUNDLE_RETRIEVAL_FAILED"
+        ],
+        "attempt_evidence_digest_algorithm": "sha256_length_prefixed_utf8_attempt_response_class_records_v2",
+        "attempt_evidence_digest": "62901cc6f27cccfb85ad9b2b4f09d6cdfabd3b6afe2faba9751c3bb129c32a07"
+      }
+    }
+  ],
+  "evidence_digest": {
+    "digest_algorithm": "sha256_length_prefixed_utf8_canonical_json_record_v2",
+    "digest": "abce166ff5f1af61b1ff7fa8f3839b21ff55d8a255efdf520fd724cfa8bba219"
+  }
+}
