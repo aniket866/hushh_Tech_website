@@ -118,9 +118,9 @@ PGSERVICE=hushh-tech-supabase-readonly \
   > /secure-temporary-path/source-catalog.csv
 ```
 
-This command is documentation only in this PR. The service entry and encrypted
-output path are provisioned by the later governed job; these checked-in scripts
-never create either one or open the source connection.
+This checked-in command remains a reference. The protected evidence capture ran
+outside the repository; these scripts do not create a service entry, open the
+source connection, or store the captured catalog in Git.
 
 The snapshot contract is:
 
@@ -208,15 +208,17 @@ The snapshot contract is:
     "customTriggerSignaturesHash": "<sha256>",
     "defaultExpressionHashesHash": "<sha256>",
     "customFunctionDefinitionEvidence": {
-      "state": "NOT_CAPTURED_BLOCKING",
-      "hash": null
+      "state": "CAPTURED_HASH_ONLY",
+      "hashAlgorithm": "sha256_canonical_json_v1",
+      "functionCount": 24,
+      "hash": "<sha256>"
     }
   },
   "schemaDumpArtifact": {
-    "state": "NOT_CAPTURED_BLOCKING",
-    "sha256": null,
-    "encryption": null,
-    "reviewed": false,
+    "state": "CAPTURED_ENCRYPTED_REVIEWED",
+    "sha256": "da99ca16a8cee1646814f05087db9487555180ae653770b298467ddd63c606d7",
+    "encryption": "CLOUD_KMS",
+    "reviewed": true,
     "containsData": false
   },
   "authUsers": [
@@ -240,19 +242,46 @@ allowlist (16 callable plus eight trigger functions), and 369 users. The
 validator separately scans the repository for exactly 203 `CREATE POLICY`
 declarations. The checked-in sanitized evidence artifact binds the exact 128
 policy contracts, 142 function contracts, and 381 default-expression hashes;
-it contains no default literals or function bodies. Custom function body hashes
-remain `NOT_CAPTURED_BLOCKING` until a later governed encrypted schema capture.
-Raw emails are not required. Password hashes, sessions,
-refresh/access tokens, one-time passwords, magic links, keys, connection
-strings, function bodies, and default literals are rejected or excluded from
-this sanitized contract.
+it contains no default literals or function bodies. The separate
+`frozen-live-schema-capture-hashes.v1.json` artifact binds the exact read-only,
+repeatable-read capture, 24 per-function definition hashes, aggregate collection
+hashes, and capture-query hash. The
+`frozen-encrypted-schema-dump-evidence.v1.json` artifact separately binds the
+reviewed schema-only dump, Cloud Key Management Service key version, ciphertext
+hash, exact Cloud Storage generations, bucket controls, round-trip verification,
+and zero-finding secret scan. Plaintext, compressed plaintext, ciphertext, the
+source capture, and the raw query envelope remain outside Git and are explicitly
+forbidden from repository storage. Raw emails are not required. Password
+hashes, sessions, refresh/access tokens, one-time passwords, magic links, keys,
+connection strings, function bodies, and default literals are rejected or
+excluded from the committed sanitized contracts.
 
-Inventory hashes prove metadata parity, but they do not recreate schema. Seed
-or restore remains blocked until a reviewed schema-only dump is stored with
-Cloud Key Management Service encryption and its SHA-256 artifact hash is added
-as `CAPTURED_ENCRYPTED_REVIEWED`. The dump must contain no row data. This PR
-does not capture that artifact and therefore reports
-`ENCRYPTED_SCHEMA_DUMP_ARTIFACT_NOT_CAPTURED`.
+Rebuild the hash-only evidence from protected local capture files without
+printing definitions:
+
+```bash
+npm run --silent gcp:migration:bind-schema-evidence -- \
+  --capture=/secure-temporary-path/schema-capture.v1.json \
+  --raw-envelope=/secure-temporary-path/schema-capture.raw.json
+```
+
+The output is counts, signatures, and SHA-256 hashes only. It must exactly match
+`migration/contracts/frozen-live-schema-capture-hashes.v1.json`; the plaintext
+inputs must not be committed or uploaded as CI artifacts.
+
+Inventory hashes prove metadata parity, but they do not recreate schema. The
+reviewed schema-only dump is now Cloud Key Management Service encrypted in the
+private UAT evidence bucket and bound here only by hashes and immutable object
+generations. It contains no row data, its encryption round trip was verified,
+and the validator accepts only the exact ciphertext SHA-256 value. This clears
+the encrypted-artifact evidence gate; execution remains plan-only, so
+`applyReady` stays false and `PLAN_ONLY_EXECUTION` remains.
+
+The temporary capture role was disabled with an epoch validity after capture. A
+later command-line metadata check refreshed its validity timestamp without
+enabling login; the final cleanup restored `NOLOGIN` plus epoch and verified
+both in the same result. The exact cleanup timestamp was not captured, and the
+sanitized evidence records that fact instead of inventing one.
 
 Validate an encrypted-workspace snapshot without printing identities:
 

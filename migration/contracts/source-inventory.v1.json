@@ -21,6 +21,14 @@
     "path": "migration/contracts/frozen-live-schema-facts.v1.json",
     "sha256": "a761d9425314f7acaa0bad1afd477cf0c4c2876b0e11c66f8664e5dd7415d163"
   },
+  "frozenSchemaCaptureHashesArtifact": {
+    "path": "migration/contracts/frozen-live-schema-capture-hashes.v1.json",
+    "sha256": "01855cc14bc4edd59ecb852e95999aee5e5867c4ddb26287276b8e82f8fca280"
+  },
+  "frozenEncryptedSchemaDumpEvidenceArtifact": {
+    "path": "migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json",
+    "sha256": "5895170f023d1cd9c4e376cb7d566ac35f536555209a14d53cc28c2c952e89a4"
+  },
   "liveSchemaEvidence": {
     "state": "FROZEN_SANITIZED",
     "hashAlgorithm": "sha256_canonical_json_v1",
@@ -40,8 +48,10 @@
     "customTriggerSignaturesHash": "e7880314457c38597c2fc21955df43df2be5b007f41891f19d24d8d34e9cc89b",
     "defaultExpressionHashesHash": "c29ea008f7ba7bce95549643023315102d67bb4e3f1b9008b8a93221bc694fef",
     "customFunctionDefinitionEvidence": {
-      "state": "NOT_CAPTURED_BLOCKING",
-      "hash": null
+      "state": "CAPTURED_HASH_ONLY",
+      "hashAlgorithm": "sha256_canonical_json_v1",
+      "functionCount": 24,
+      "hash": "dbd929145b352378d0095283b49f8dddeef5898c9606c37616c3bb50760e7d17"
     }
   },
   "schemaDumpArtifactContract": {

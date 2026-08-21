@@ -9,6 +9,18 @@ const frozenSchemaFactsUrl = new URL(
   "../../../migration/contracts/frozen-live-schema-facts.v1.json",
   import.meta.url
 );
+const frozenSchemaCaptureHashesUrl = new URL(
+  "../../../migration/contracts/frozen-live-schema-capture-hashes.v1.json",
+  import.meta.url
+);
+const frozenEncryptedSchemaDumpEvidenceUrl = new URL(
+  "../../../migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json",
+  import.meta.url
+);
+const schemaCaptureSqlUrl = new URL(
+  "../../../migration/sql/source_schema_capture_read_only.sql",
+  import.meta.url
+);
 
 export class MigrationContractError extends Error {
   constructor(code, message) {
@@ -28,9 +40,27 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function readContract() {
   const parsed = JSON.parse(readFileSync(contractUrl, "utf8"));
   const frozenSchemaFactsBytes = readFileSync(frozenSchemaFactsUrl);
+  const frozenSchemaCaptureHashesBytes = readFileSync(frozenSchemaCaptureHashesUrl);
+  const frozenEncryptedSchemaDumpEvidenceBytes = readFileSync(
+    frozenEncryptedSchemaDumpEvidenceUrl
+  );
+  const schemaCaptureSqlBytes = readFileSync(schemaCaptureSqlUrl);
   const tables = parsed.publicTables;
   if (!Array.isArray(tables) || tables.length !== parsed.expected.publicTables) {
     fail("INVALID_CONTRACT", "The source contract must name exactly 70 public tables.");
@@ -82,6 +112,174 @@ function readContract() {
     frozenSchemaFacts.defaultExpressionHashes?.length !== 381
   ) {
     fail("INVALID_CONTRACT", "Frozen sanitized schema facts are incomplete.");
+  }
+  const frozenCaptureArtifact = parsed.frozenSchemaCaptureHashesArtifact;
+  const frozenCaptureArtifactHash = createHash("sha256")
+    .update(frozenSchemaCaptureHashesBytes)
+    .digest("hex");
+  if (
+    frozenCaptureArtifact?.path !==
+      "migration/contracts/frozen-live-schema-capture-hashes.v1.json" ||
+    frozenCaptureArtifact?.sha256 !== frozenCaptureArtifactHash
+  ) {
+    fail("INVALID_CONTRACT", "The frozen schema-capture hash artifact has drifted.");
+  }
+  const frozenSchemaCaptureHashes = JSON.parse(
+    frozenSchemaCaptureHashesBytes.toString("utf8")
+  );
+  const captureSourceArtifacts = frozenSchemaCaptureHashes.sourceArtifacts ?? {};
+  const captureCounts = frozenSchemaCaptureHashes.counts ?? {};
+  const captureCollectionHashes = frozenSchemaCaptureHashes.collectionHashes ?? {};
+  const lockedCaptureCounts = {
+    tables: 70,
+    columns: 1061,
+    constraints: 270,
+    indexes: 232,
+    triggers: 24,
+    policies: 118,
+    custom_functions: 24,
+    sequences: 0,
+    enums: 12,
+    extensions: 6,
+    table_grants: 1929,
+    routine_grants: 585,
+    publication_tables: 3,
+  };
+  const lockedCaptureCollectionNames = [
+    "tables",
+    "columns",
+    "constraints",
+    "indexes",
+    "triggers",
+    "policies",
+    "customFunctions",
+    "sequences",
+    "enums",
+    "extensions",
+    "tableGrants",
+    "routineGrants",
+    "publicationTables",
+  ];
+  const schemaCaptureSqlHash = createHash("sha256").update(schemaCaptureSqlBytes).digest("hex");
+  if (
+    frozenSchemaCaptureHashes.version !== 1 ||
+    frozenSchemaCaptureHashes.sourceProjectRef !== parsed.source.projectRef ||
+    frozenSchemaCaptureHashes.database !== parsed.source.database ||
+    frozenSchemaCaptureHashes.postgresMajor !== 17 ||
+    frozenSchemaCaptureHashes.contents !== "HASHES_COUNTS_AND_FUNCTION_SIGNATURES_ONLY" ||
+    frozenSchemaCaptureHashes.captureMode !== "READ_ONLY_REPEATABLE_READ_ROLLBACK" ||
+    Object.keys(captureCounts).length !== Object.keys(lockedCaptureCounts).length ||
+    Object.entries(lockedCaptureCounts).some(([key, value]) => captureCounts[key] !== value) ||
+    Object.keys(captureCollectionHashes).length !== lockedCaptureCollectionNames.length ||
+    lockedCaptureCollectionNames.some(
+      (key) => !/^[0-9a-f]{64}$/.test(captureCollectionHashes[key] ?? "")
+    ) ||
+    captureSourceArtifacts.repositoryStorage !== "FORBIDDEN" ||
+    captureSourceArtifacts.encryptedSchemaDumpState !== "CAPTURED_ENCRYPTED_REVIEWED" ||
+    captureSourceArtifacts.captureQuerySha256 !== schemaCaptureSqlHash ||
+    [
+      "normalizedCaptureSha256",
+      "canonicalCaptureSha256",
+      "rawQueryEnvelopeSha256",
+      "captureQuerySha256",
+    ].some((key) => !/^[0-9a-f]{64}$/.test(captureSourceArtifacts[key] ?? ""))
+  ) {
+    fail("INVALID_CONTRACT", "Frozen schema-capture hash evidence is incomplete.");
+  }
+
+  const encryptedDumpArtifact = parsed.frozenEncryptedSchemaDumpEvidenceArtifact;
+  const encryptedDumpArtifactHash = createHash("sha256")
+    .update(frozenEncryptedSchemaDumpEvidenceBytes)
+    .digest("hex");
+  if (
+    encryptedDumpArtifact?.path !==
+      "migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json" ||
+    encryptedDumpArtifact?.sha256 !== encryptedDumpArtifactHash
+  ) {
+    fail("INVALID_CONTRACT", "The frozen encrypted schema-dump evidence hash has drifted.");
+  }
+  const frozenEncryptedSchemaDumpEvidence = JSON.parse(
+    frozenEncryptedSchemaDumpEvidenceBytes.toString("utf8")
+  );
+  const lockedEncryptedSchemaDumpEvidence = {
+    version: 1,
+    sourceProjectRef: "ibsisfnjxeowvdtvgzff",
+    database: "postgres",
+    scope: "SCHEMA_ONLY_PUBLIC",
+    contents: "HASHES_COUNTS_GENERATIONS_AND_CONTROL_STATE_ONLY",
+    dump: {
+      plaintextSha256: "330de0785b3d8c109b538f9ffb75886c255e14bdbcfb8ecffa02e94ddaa7c570",
+      compressedPlaintextSha256:
+        "8f9a5bf29e5cfbf58f71dcf2510f16bb9abff835f76017f8475050daaf4bb4b2",
+      bytes: 210_601,
+      lines: 6_203,
+      tables: 70,
+      functions: 24,
+      policies: 118,
+      triggers: 24,
+      explicitIndexes: 121,
+      copyOrInsertStatements: 0,
+      containsData: false,
+    },
+    encryption: {
+      type: "CLOUD_KMS",
+      keyVersion:
+        "projects/hushh-tech-uat/locations/us-central1/keyRings/hushh-tech-cutover-uat/cryptoKeys/migration-archive/cryptoKeyVersions/1",
+      keyVersionState: "ENABLED",
+      algorithm: "GOOGLE_SYMMETRIC_ENCRYPTION",
+      protectionLevel: "SOFTWARE",
+      ciphertextSha256:
+        "da99ca16a8cee1646814f05087db9487555180ae653770b298467ddd63c606d7",
+      ciphertextBytes: 25_971,
+      roundTripVerified: true,
+    },
+    storage: {
+      projectId: "hushh-tech-uat",
+      bucket: "hushh-tech-migration-evidence-uat",
+      object: "schema/2026-08-21/hushh-tech-public-schema.sql.gz.kms",
+      generation: "1787322787490900",
+      manifestObject: "schema/2026-08-21/hushh-tech-public-schema.dump.manifest.v1.json",
+      manifestGeneration: "1787322790837124",
+      manifestSha256:
+        "eb923e8dd35abd11de7b35bc57234e76c5e8415012e701e20f9e9ce9965286ad",
+      uniformBucketLevelAccess: true,
+      publicAccessPrevention: "enforced",
+      versioning: true,
+      softDeleteSeconds: 604_800,
+    },
+    temporaryLoginRole: {
+      roleName: "cli_login_postgres",
+      enabledAt: "2026-08-21T14:31:54.410362Z",
+      revokedAt: "2026-08-21T14:32:05.139879Z",
+      finalCanLogin: false,
+      finalValidUntil: "1970-01-01T00:00:00Z",
+    },
+    postCaptureVerification: {
+      cliControlPlaneValidityRefreshObserved: true,
+      loginRemainedDisabled: true,
+      finalCleanupCanLogin: false,
+      finalCleanupValidUntil: "1970-01-01T00:00:00Z",
+      exactCleanupTimestampCaptured: false,
+    },
+    secretScan: {
+      engine: "gitleaks",
+      findingCount: 0,
+    },
+    repositoryStorage: {
+      plaintextDump: "FORBIDDEN",
+      compressedPlaintext: "FORBIDDEN",
+      ciphertext: "FORBIDDEN",
+      sanitizedEvidenceOnly: true,
+    },
+  };
+  if (
+    canonicalJson(frozenEncryptedSchemaDumpEvidence) !==
+    canonicalJson(lockedEncryptedSchemaDumpEvidence)
+  ) {
+    fail(
+      "INVALID_CONTRACT",
+      "Frozen encrypted schema-dump evidence must match the reviewed hash-only artifact exactly."
+    );
   }
 
   const expected = parsed.expected ?? {};
@@ -148,6 +346,37 @@ function readContract() {
       "The custom function allowlist must split into 16 callable RPCs and 8 trigger functions."
     );
   }
+  const definitionHashes = frozenSchemaCaptureHashes.customFunctionDefinitionHashes;
+  if (
+    !Array.isArray(definitionHashes) ||
+    definitionHashes.length !== customSignatures.length ||
+    definitionHashes.some(
+      (entry, index) =>
+        !entry ||
+        Object.keys(entry).sort().join(",") !== "definitionHash,signature" ||
+        entry.signature !== customSignatures[index] ||
+        !/^[0-9a-f]{64}$/.test(entry.definitionHash ?? "")
+    )
+  ) {
+    fail(
+      "INVALID_CONTRACT",
+      "Frozen schema capture must bind all 24 custom function definition hashes."
+    );
+  }
+  const calculatedDefinitionEvidenceHash = createHash("sha256")
+    .update(
+      JSON.stringify(
+        definitionHashes.map(({ definitionHash, signature }) => ({
+          definitionHash,
+          signature,
+        }))
+      ),
+      "utf8"
+    )
+    .digest("hex");
+  if (frozenSchemaCaptureHashes.customFunctionDefinitionsHash !== calculatedDefinitionEvidenceHash) {
+    fail("INVALID_CONTRACT", "Frozen function-definition evidence hash has drifted.");
+  }
 
   const liveEvidence = parsed.liveSchemaEvidence ?? {};
   if (
@@ -176,13 +405,19 @@ function readContract() {
   if (evidenceHashes.some((key) => !/^[0-9a-f]{64}$/.test(liveEvidence[key] ?? ""))) {
     fail("INVALID_CONTRACT", "Frozen live-schema evidence must use SHA-256 hashes.");
   }
+  const customFunctionDefinitionEvidence = liveEvidence.customFunctionDefinitionEvidence;
   if (
-    liveEvidence.customFunctionDefinitionEvidence?.state !== "NOT_CAPTURED_BLOCKING" ||
-    liveEvidence.customFunctionDefinitionEvidence?.hash !== null
+    customFunctionDefinitionEvidence?.state !== "CAPTURED_HASH_ONLY" ||
+    customFunctionDefinitionEvidence?.hashAlgorithm !== "sha256_canonical_json_v1" ||
+    customFunctionDefinitionEvidence?.functionCount !== expected.liveCustomPublicFunctions ||
+    customFunctionDefinitionEvidence?.hash !==
+      frozenSchemaCaptureHashes.customFunctionDefinitionsHash ||
+    Object.keys(customFunctionDefinitionEvidence ?? {}).sort().join(",") !==
+      "functionCount,hash,hashAlgorithm,state"
   ) {
     fail(
       "INVALID_CONTRACT",
-      "Custom function body evidence must remain blocking until governed capture."
+      "Custom function definitions must bind to the reviewed hash-only capture."
     );
   }
 
@@ -199,6 +434,8 @@ function readContract() {
     );
   }
   parsed.frozenSchemaFacts = frozenSchemaFacts;
+  parsed.frozenSchemaCaptureHashes = frozenSchemaCaptureHashes;
+  parsed.frozenEncryptedSchemaDumpEvidence = frozenEncryptedSchemaDumpEvidence;
   return deepFreeze(parsed);
 }
 

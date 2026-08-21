@@ -36,6 +36,12 @@ import {
 } from '../scripts/gcp/migration/source-inventory.mjs';
 
 const root = process.cwd();
+const frozenDefinitionHashes = new Map(
+  SOURCE_CONTRACT.frozenSchemaCaptureHashes.customFunctionDefinitionHashes.map((entry) => [
+    entry.signature,
+    entry.definitionHash,
+  ]),
+);
 
 function legacyUuid(index: number) {
   return `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`;
@@ -96,9 +102,7 @@ function frozenFunctionFact(entry: Record<string, unknown>) {
     volatility,
     securityDefiner: entry.security_definer,
     extensionOwned: !isCustom,
-    definitionHash: isCustom
-      ? canonicalHash({ signature, bodyEvidence: 'not-captured-blocking' })
-      : null,
+    definitionHash: isCustom ? frozenDefinitionHashes.get(signature) : null,
   };
 }
 
@@ -283,10 +287,11 @@ function syntheticInputs() {
     },
     frozenLiveEvidence: { ...SOURCE_CONTRACT.liveSchemaEvidence },
     schemaDumpArtifact: {
-      state: 'NOT_CAPTURED_BLOCKING',
-      sha256: null,
-      encryption: null,
-      reviewed: false,
+      state: 'CAPTURED_ENCRYPTED_REVIEWED',
+      sha256:
+        SOURCE_CONTRACT.frozenEncryptedSchemaDumpEvidence.encryption.ciphertextSha256,
+      encryption: 'CLOUD_KMS',
+      reviewed: true,
       containsData: false,
     },
     authUsers,
@@ -424,14 +429,10 @@ describe('read-only source inventory', () => {
       customPublicFunctionCount: 24,
       rpcCount: 16,
       customTriggerFunctionCount: 8,
-      schemaDumpArtifactReady: false,
+      schemaDumpArtifactReady: true,
       applyReady: false,
     });
-    expect(summary.blockers).toEqual([
-      'PLAN_ONLY_EXECUTION',
-      'CUSTOM_FUNCTION_DEFINITION_EVIDENCE_NOT_CAPTURED',
-      'ENCRYPTED_SCHEMA_DUMP_ARTIFACT_NOT_CAPTURED',
-    ]);
+    expect(summary.blockers).toEqual(['PLAN_ONLY_EXECUTION']);
     const reordered = {
       ...inventory,
       tables: [...inventory.tables].reverse().map((table) => ({
@@ -572,7 +573,7 @@ describe('read-only source inventory', () => {
     ).toThrow(/24-signature allowlist/);
   });
 
-  it('rejects frozen default drift and keeps custom body evidence blocking', () => {
+  it('rejects frozen default and custom function definition drift', () => {
     const { inventory } = syntheticInputs();
     const first = validateSourceInventory(inventory, uatBoundary());
     const changed = {
@@ -608,26 +609,61 @@ describe('read-only source inventory', () => {
         uatBoundary(),
       ),
     ).toThrow(/definitions require SHA-256 hashes/);
+    expect(() =>
+      validateSourceInventory(
+        {
+          ...inventory,
+          schemaFacts: {
+            ...inventory.schemaFacts,
+            functions: inventory.schemaFacts.functions.map((entry) =>
+              entry.extensionOwned === false && entry.name === 'batch_agent_selections'
+                ? { ...entry, definitionHash: canonicalHash('different-valid-definition') }
+                : entry,
+            ),
+          },
+        },
+        uatBoundary(),
+      ),
+    ).toThrow(/frozen hash-only capture/);
 
-    const reviewedSchemaArtifact = {
-      ...inventory,
-      schemaDumpArtifact: {
-        state: 'CAPTURED_ENCRYPTED_REVIEWED',
-        sha256: canonicalHash('synthetic-encrypted-schema-only-dump'),
-        encryption: 'CLOUD_KMS',
-        reviewed: true,
-        containsData: false,
-      },
-    };
-    expect(validateSourceInventory(reviewedSchemaArtifact, uatBoundary())).toMatchObject({
-      schemaDumpArtifactReady: true,
-      applyReady: false,
-      blockers: [
-        'PLAN_ONLY_EXECUTION',
-        'CUSTOM_FUNCTION_DEFINITION_EVIDENCE_NOT_CAPTURED',
-      ],
-    });
-    expect(first.blockers).toContain('CUSTOM_FUNCTION_DEFINITION_EVIDENCE_NOT_CAPTURED');
+    expect(() =>
+      validateSourceInventory(
+        {
+          ...inventory,
+          schemaDumpArtifact: {
+            ...inventory.schemaDumpArtifact,
+            sha256: canonicalHash('different-valid-ciphertext'),
+          },
+        },
+        uatBoundary(),
+      ),
+    ).toThrow(/exact reviewed Cloud KMS ciphertext hash/);
+    expect(() =>
+      validateSourceInventory(
+        {
+          ...inventory,
+          schemaDumpArtifact: {
+            ...inventory.schemaDumpArtifact,
+            reviewed: false,
+          },
+        },
+        uatBoundary(),
+      ),
+    ).toThrow(/exact reviewed Cloud KMS ciphertext hash/);
+    expect(() =>
+      validateSourceInventory(
+        {
+          ...inventory,
+          schemaDumpArtifact: {
+            ...inventory.schemaDumpArtifact,
+            containsData: true,
+          },
+        },
+        uatBoundary(),
+      ),
+    ).toThrow(/exact reviewed Cloud KMS ciphertext hash/);
+    expect(first.blockers).toEqual(['PLAN_ONLY_EXECUTION']);
+    expect(first.blockers).not.toContain('CUSTOM_FUNCTION_DEFINITION_EVIDENCE_NOT_CAPTURED');
   });
 
   it('rejects exact frozen policy and function contract drift', () => {

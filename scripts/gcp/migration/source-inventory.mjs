@@ -603,22 +603,29 @@ function validateFrozenSchemaFactHashes(snapshot) {
       "Inventory must contain exactly 381 frozen default-expression hashes."
     );
   }
-  const untrustedObservedDefinitionInputHash = canonicalHash(
-    sortEvidenceFacts(
-      snapshot.schemaFacts.functions
-        .filter((entry) => !entry.extensionOwned)
-        .map((entry) => ({
-          signature: functionSignature(entry),
-          definitionHash: entry.definitionHash,
-        }))
-    )
-  );
+  const customFunctionDefinitionFacts = snapshot.schemaFacts.functions
+    .filter((entry) => !entry.extensionOwned)
+    .map((entry) => ({
+      signature: functionSignature(entry),
+      definitionHash: entry.definitionHash,
+    }))
+    .sort((left, right) =>
+      left.signature < right.signature ? -1 : left.signature > right.signature ? 1 : 0
+    );
+  const customFunctionDefinitionsHash = canonicalHash(customFunctionDefinitionFacts);
+  if (customFunctionDefinitionsHash !== expected.customFunctionDefinitionEvidence.hash) {
+    fail(
+      "FROZEN_FUNCTION_DEFINITION_HASH_MISMATCH",
+      "Custom function definition hashes do not match the frozen hash-only capture."
+    );
+  }
   return Object.freeze({
     ...actual,
     customFunctionDefinitionEvidence: Object.freeze({
       state: expected.customFunctionDefinitionEvidence.state,
+      hashAlgorithm: expected.customFunctionDefinitionEvidence.hashAlgorithm,
+      functionCount: expected.customFunctionDefinitionEvidence.functionCount,
       hash: expected.customFunctionDefinitionEvidence.hash,
-      untrustedObservedDefinitionInputHash,
     }),
   });
 }
@@ -747,34 +754,17 @@ function validateSchemaDumpArtifact(artifact) {
     ["state", "sha256", "encryption", "reviewed", "containsData"],
     "schemaDumpArtifact"
   );
-  if (artifact.containsData !== false) {
-    fail("SCHEMA_DUMP_DATA_FORBIDDEN", "The schema artifact must never contain row data.");
-  }
-  if (artifact.state === "NOT_CAPTURED_BLOCKING") {
-    if (
-      artifact.sha256 !== null ||
-      artifact.encryption !== null ||
-      artifact.reviewed !== false
-    ) {
-      fail(
-        "INVALID_SCHEMA_DUMP_ARTIFACT",
-        "An uncaptured schema artifact cannot claim a hash, encryption, or review."
-      );
-    }
-    return Object.freeze({
-      ready: false,
-      blocker: "ENCRYPTED_SCHEMA_DUMP_ARTIFACT_NOT_CAPTURED",
-    });
-  }
+  const frozen = SOURCE_CONTRACT.frozenEncryptedSchemaDumpEvidence;
   if (
     artifact.state !== "CAPTURED_ENCRYPTED_REVIEWED" ||
-    !SHA256_PATTERN.test(artifact.sha256 ?? "") ||
-    artifact.encryption !== SOURCE_CONTRACT.schemaDumpArtifactContract.requiredEncryption ||
-    artifact.reviewed !== true
+    artifact.sha256 !== frozen.encryption.ciphertextSha256 ||
+    artifact.encryption !== frozen.encryption.type ||
+    artifact.reviewed !== true ||
+    artifact.containsData !== frozen.dump.containsData
   ) {
     fail(
       "INVALID_SCHEMA_DUMP_ARTIFACT",
-      "Seed or restore requires a reviewed Cloud KMS-encrypted schema-only dump hash."
+      "Schema-dump input must bind to the exact reviewed Cloud KMS ciphertext hash."
     );
   }
   return Object.freeze({ ready: true, blocker: null });
@@ -1054,7 +1044,6 @@ export function validateSourceInventory(snapshot, boundary) {
     applyReady: false,
     blockers: Object.freeze([
       "PLAN_ONLY_EXECUTION",
-      "CUSTOM_FUNCTION_DEFINITION_EVIDENCE_NOT_CAPTURED",
       ...(schemaDump.blocker ? [schemaDump.blocker] : []),
     ]),
     frozenSchemaFactHashes,
