@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 
 import { digestBundleEvidenceEntries } from "./generate-supabase-live-function-bundle-evidence.mjs";
 import { checkGeneratedFunctionRegistry } from "./generate-supabase-retirement-function-registry.mjs";
+import { validateFunctionTrafficEvidence } from "./check-supabase-function-traffic-evidence.mjs";
+import { DEFAULT_TRAFFIC_EVIDENCE_PATH } from "./generate-supabase-function-traffic-evidence.mjs";
 
 export const DEFAULT_MANIFEST_PATH = path.join(
   "migration",
@@ -83,6 +85,49 @@ const EXPECTED_LIVE_FUNCTION_BUNDLE_EVIDENCE = {
     "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
   canonical_source_tree_digest:
     "a976749fa43425152fddb2649ba6442500e412627a004f6ff60ca2892b9011a2",
+};
+const EXPECTED_LIVE_FUNCTION_TRAFFIC_EVIDENCE = {
+  path: DEFAULT_TRAFFIC_EVIDENCE_PATH,
+  schema_version: 1,
+  evidence_digest_algorithm: "sha256_of_stable_json_without_evidence_digest_v1",
+  evidence_digest: "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
+  window_start_utc: "2026-07-22T16:00:00.000Z",
+  window_end_utc: "2026-08-21T16:00:00.000Z",
+  bucket_width_hours: 24,
+  interval_semantics:
+    "HALF_OPEN_START_INCLUSIVE_END_EXCLUSIVE_ENFORCED_IN_CLICKHOUSE_SQL",
+  per_function_bucket_representation:
+    "SPARSE_NONZERO_BY_WINDOW_INDEX_OMITTED_IS_ZERO",
+  provider_retention_days: 90,
+  active_functions: 112,
+  traffic_observed_functions: 18,
+  zero_traffic_observed: 94,
+  known_function_requests: 26481,
+  unattributed_requests: 0,
+  cutover_blocking_source_contracts: 17,
+  deployment_version_drift_functions: 96,
+  summary_digest_algorithm: "sha256_of_stable_expected_counts_json_v1",
+  summary_digest:
+    "523345dd3bf22ec87cedf9a31a1c25aa5647f61db74a192d7fc826643dfba208",
+  window_digest_algorithm: "sha256_of_stable_window_json_lines_v1",
+  window_digest:
+    "36d79314958f9c56dd88a6bf81a0ddb89b6e0bfacb5637b27c72cfbb52699fe5",
+  query_template_digest_algorithm: "sha256_utf8_v1",
+  query_template_digest:
+    "30c9fd867f9001a8bc6e10704f031df42aef3bd4199a5855bad826d7a24b6508",
+  deployment_binding_digest_algorithm:
+    "sha256_of_sorted_slug_and_deployment_binding_hash_lines_v1",
+  deployment_binding_digest:
+    "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
+  deployment_updated_at_digest_algorithm:
+    "sha256_of_sorted_slug_and_updated_at_hash_lines_v1",
+  deployment_updated_at_digest:
+    "172b8956911bc48de78984cebfb804059f3751915edd1c95834bc9d2d02c96c9",
+  deployment_version_delta_histogram: { 0: 16, 40: 96 },
+  deployment_version_delta_digest_algorithm:
+    "sha256_of_sorted_delta_count_lines_v1",
+  deployment_version_delta_digest:
+    "7f4d4af8fb38ece4c5ba58e02a1a204616933db08dc05c9762c05403acead7d7",
 };
 const LIVE_BUNDLE_TOP_LEVEL_KEYS = [
   "schema_version",
@@ -254,6 +299,16 @@ export function validateManifest(manifest) {
   ) {
     errors.push(
       "live_function_bundle_evidence does not match the locked sanitized bundle evidence contract."
+    );
+  }
+  if (
+    !sameRecord(
+      manifest.live_function_traffic_evidence,
+      EXPECTED_LIVE_FUNCTION_TRAFFIC_EVIDENCE
+    )
+  ) {
+    errors.push(
+      "live_function_traffic_evidence does not match the locked sanitized traffic evidence contract."
     );
   }
 
@@ -855,14 +910,28 @@ export function readAndValidateManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
   const evidencePath = path.resolve(DEFAULT_LIVE_FUNCTION_BUNDLE_EVIDENCE_PATH);
   const evidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
   const evidenceResult = validateLiveFunctionBundleEvidence(manifest, evidence);
+  const trafficEvidencePath = path.resolve(DEFAULT_TRAFFIC_EVIDENCE_PATH);
+  const trafficEvidence = JSON.parse(fs.readFileSync(trafficEvidencePath, "utf8"));
+  const trafficEvidenceResult = validateFunctionTrafficEvidence(
+    manifest,
+    evidence,
+    trafficEvidence
+  );
   return {
     manifestPath: absolutePath,
     evidencePath,
-    valid: manifestResult.valid && evidenceResult.valid,
-    errors: [...manifestResult.errors, ...evidenceResult.errors],
+    trafficEvidencePath,
+    valid:
+      manifestResult.valid && evidenceResult.valid && trafficEvidenceResult.valid,
+    errors: [
+      ...manifestResult.errors,
+      ...evidenceResult.errors,
+      ...trafficEvidenceResult.errors,
+    ],
     observed: {
       ...manifestResult.observed,
       live_function_bundle_evidence: evidenceResult.observed,
+      live_function_traffic_evidence: trafficEvidenceResult.observed,
     },
   };
 }

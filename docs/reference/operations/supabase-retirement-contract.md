@@ -10,9 +10,12 @@ already happened.
 
 - Manifest: `migration/manifests/supabase-retirement.v1.json`
 - Sanitized live-bundle evidence: `migration/evidence/supabase-live-function-bundles.v1.json`
+- Sanitized 30-day function-traffic evidence: `migration/evidence/supabase-function-traffic-30d.v1.json`
 - Validator: `scripts/ci/check-supabase-retirement-manifest.mjs`
+- Traffic validator: `scripts/ci/check-supabase-function-traffic-evidence.mjs`
 - Generator: `scripts/ci/generate-supabase-retirement-function-registry.mjs`
 - Evidence generator: `scripts/ci/generate-supabase-live-function-bundle-evidence.mjs`
+- Traffic evidence generator: `scripts/ci/generate-supabase-function-traffic-evidence.mjs`
 - Runtime registry: `api/shared/supabaseRetirementFunctionRegistry.generated.js`
 - Fail-closed resolver: `api/shared/supabaseRetirementFunctionRegistry.js`
 - Negative tests: `tests/supabaseRetirementManifest.test.ts`
@@ -21,6 +24,7 @@ Run the blocking check locally:
 
 ```bash
 npm run migration:retirement:check
+npm run migration:function-traffic:check
 ```
 
 When an approved migration-state change is made in the manifest, regenerate the
@@ -83,7 +87,86 @@ capture alone does not prove request, response, authentication, idempotency, or
 side-effect parity and does not mark either function as ported. `get-secrets`
 remains `RETIRE_WITH_410` and its unavailable store bundle is never recreated.
 
-The evidence can only be regenerated from an approved read-only recovery root:
+## Sanitized 30-day traffic evidence
+
+The traffic capture used the supported read-only Supabase Management API route
+`GET /v1/projects/{ref}/analytics/endpoints/logs` with ClickHouse SQL against
+`function_edge_logs`. It ran one aggregate query for each of 30 daily windows,
+from `2026-07-22T16:00:00.000Z` through `2026-08-21T16:00:00.000Z`. Every query
+enforces a half-open interval in SQL: the start is included and the end is
+excluded. Adjacent windows therefore have no gap and cannot double-count an
+event exactly on a shared boundary.
+
+One shared limiter runs before every Management API attempt: deployment
+inventory, first window attempts, HTTP retries, and complete-window retries.
+The minimum spacing is 6.5 seconds, which stays below the observed 10 requests
+per minute limit.
+
+The provider contracts are documented in the [Management API logs
+reference](https://supabase.com/docs/reference/api/v1-get-project-logs), the
+[logs endpoint migration notice](https://supabase.com/changelog/48235-migration-of-supabase-management-api-logs-all-analytics-endpoint-to-logs-endpoint),
+and the [ClickHouse log filtering
+guide](https://supabase.com/docs/guides/monitoring-and-debugging/advanced-log-filtering).
+
+The current provider boundary was observed at 90 days, so the requested 30-day
+window was available. This is capture evidence, not a promise that provider
+retention cannot change. The artifact contains only per-slug UTC aggregates:
+request counts, status classes, method counts, authorization-marker presence,
+latency and response-size ranges, and deterministic query/response hashes. It
+contains no raw logs, bodies, headers, tokens, email addresses, IP addresses,
+object names, or request paths.
+
+The 30 global window records retain every boundary, materialized query hash,
+provider-response hash, and reconciled count. Per-function records retain
+totals plus only nonzero buckets keyed by global window index; an omitted bucket
+is validator-defined zero. This keeps the checked-in evidence reviewable
+without weakening daily reconciliation.
+
+The standalone traffic check does not trust the three artifacts merely because
+they agree with one another. It independently recomputes the frozen active
+function inventory digest and the live-bundle evidence digest, then binds the
+traffic artifact's computed summary, window, query, deployment, update-time,
+and full-artifact digests to the retirement manifest. A consistent slug or
+digest substitution across all three files still fails closed.
+
+All 112 active slugs have a terminal traffic-evidence status. Eighteen had
+traffic and 94 had zero traffic observed; zero traffic is never labeled unused.
+The 30 windows contain 26,481 attributed requests and zero unattributed
+requests. A later nonzero `__UNATTRIBUTED__` aggregate is cutover-blocking and
+requires a separate private investigation.
+
+All 16 function-store `STORE_NOT_FOUND` slugs had zero traffic observed in this
+window. That does not make them safe to retire: 11 still require contract
+reconstruction, four still lack a recoverable live bundle, and `get-secrets`
+remains the deliberate `410 FEATURE_RETIRED` route. Including the two extracted
+functions that still require contract reconstruction, 17 source contracts
+remain cutover-blocking.
+
+The current read-only deployment inventory also differs from the frozen bundle
+snapshot for 96 of 112 slugs. Only hash-bound deployment bindings and drift
+statuses are committed; raw deployment metadata is not. This drift blocks
+cutover and requires a separately reviewed source re-extraction. The existing
+live-bundle evidence is not rewritten by this traffic lane.
+
+The bound version-delta histogram is exact: 16 functions have delta `0` and all
+96 drifted functions have delta `+40`. Its SHA-256 is
+`7f4d4af8fb38ece4c5ba58e02a1a204616933db08dc05c9762c05403acead7d7`.
+The validator rejects any histogram, digest, or manifest-binding change.
+
+Traffic capture output is always explicit and create-only. The generator
+accepts only a new, policy-named direct child of `migration/evidence`, rejects
+symlink traversal, uses exclusive file creation, and never creates arbitrary
+directories or overwrites an artifact:
+
+```bash
+npm run migration:function-traffic:capture -- \
+  --project-ref ibsisfnjxeowvdtvgzff \
+  --window-end 2026-08-21T16:00:00.000Z \
+  --output migration/evidence/supabase-function-traffic-30d.review.json
+```
+
+The live-bundle evidence can only be regenerated from an approved read-only
+recovery root:
 
 ```bash
 node scripts/ci/generate-supabase-live-function-bundle-evidence.mjs \
