@@ -29,6 +29,10 @@
     "path": "migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json",
     "sha256": "5895170f023d1cd9c4e376cb7d566ac35f536555209a14d53cc28c2c952e89a4"
   },
+  "firebasePolicyMappingArtifact": {
+    "path": "migration/contracts/firebase-policy-mapping.v1.json",
+    "sha256": "8734dc78c6c32936c9a168b080da88c4fe32108b1e72eb3f192a9000f1270ecb"
+  },
   "liveSchemaEvidence": {
     "state": "FROZEN_SANITIZED",
     "hashAlgorithm": "sha256_canonical_json_v1",

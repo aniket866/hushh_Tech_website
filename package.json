@@ -25,6 +25,7 @@
     "gcp:secrets:migrate-uat": "node scripts/gcp/migrate-hushh-tech-uat-env-to-secrets.mjs",
     "gcp:migration:plan": "node scripts/gcp/migration/plan-cutover.mjs",
     "gcp:migration:bind-schema-evidence": "node scripts/gcp/migration/schema-capture-evidence.mjs",
+    "gcp:migration:compile-target-schema": "node scripts/gcp/migration/target-schema-compiler.mjs",
     "gcp:migration:validate-inventory": "node scripts/gcp/migration/validate-inventory.mjs",
     "gcp:migration:validate-identity-map": "node scripts/gcp/migration/validate-identity-map.mjs",
     "build:web": "npm run build:assets && vite build",

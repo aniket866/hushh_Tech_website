@@ -283,6 +283,88 @@ enabling login; the final cleanup restored `NOLOGIN` plus epoch and verified
 both in the same result. The exact cleanup timestamp was not captured, and the
 sanitized evidence records that fact instead of inventing one.
 
+## Offline target-schema compilation
+
+The reviewed encrypted schema-only dump may be decrypted only into an
+operator-owned temporary file outside this repository. The target compiler
+accepts that private plaintext path, verifies its exact frozen SHA-256, byte and
+line counts, and requires the captured 70 tables, 24 custom functions, 118
+public policies, 24 triggers, and 121 explicit indexes. It does not call
+Supabase, GCP, PostgreSQL, Firebase, or a shell subprocess.
+
+The output directory must also be new and outside the repository. The compiler
+creates it with mode `0700` and writes seven mode-`0600` `.sql.plan` review
+artifacts plus one hash-only manifest. Source SQL, function bodies, policy
+expressions, absolute paths, and credentials never enter standard output. Each
+phase starts a transaction that raises `PLAN_ONLY_EXECUTION` before any target
+statement and ends with `ROLLBACK`; this package has no apply path.
+
+```bash
+umask 077
+npm run --silent gcp:migration:compile-target-schema -- \
+  --schema-dump=/secure-temporary-path/hushh-tech-public-schema.sql \
+  --output-dir=/secure-temporary-path/compiled-target-schema \
+  --dry-run
+```
+
+Compilation is deterministic and fail-closed:
+
+- all 70 raw public tables remain present with their source UUID values
+  unchanged;
+- `hushh_identity.identity_links` retains the legacy UUID while Firebase UID is
+  canonical;
+- `UNCLAIMED_LEGACY_PRINCIPAL` rows have no Firebase UID and cannot read through
+  row-level security;
+- the 70 explicitly mapped ownership policies replace `auth.uid()` with an
+  ACTIVE-only lookup from transaction-local `app.firebase_uid`;
+- all `auth.jwt()` claim policies, source service-role policies, and
+  unconditional privileged policies stay blocked rather than being weakened;
+- 48/118 public source policies have an explicit blocked disposition, so the
+  plan cannot be marked apply-ready until their API authorization is reviewed;
+- former `auth.users(id)` foreign keys are translated to the unique preserved
+  legacy UUID in `hushh_identity.identity_links`, including denied unclaimed
+  principals;
+- all 70 tables enable and force row-level security for the non-privileged
+  runtime role;
+- `hushh_tech_schema_owner` is a sealed `NOLOGIN NOINHERIT` owner for the three
+  target schemas and every reviewed table, sequence, and function; migration,
+  runtime, audit, and rollback roles cannot own or inherit into it, and it has
+  no member until a separate governed executor review; all four operational
+  roles are explicitly denied database and target-schema `CREATE`;
+- source owners and `anon`, `authenticated`, `service_role`, or public grants
+  are discarded and replaced by target-role grants;
+- none of the 16 legacy callable RPCs are created or granted; the four generic
+  delete helpers are withheld completely;
+- only the eight frozen trigger functions are retained, and each is assigned
+  to the sealed schema owner and revoked from public plus the owner and all four
+  operational roles in the same guarded phase;
+- quoted source identifiers are tokenized outside literals and comments, so
+  quoted `auth.uid()` is translated while quoted `auth.jwt()` and Storage calls
+  remain blocking dependencies;
+- source `ALTER TABLE` statements default-deny every form except the exact
+  captured `ADD CONSTRAINT` family; and
+- migration, audit, and rollback roles receive separate forced-row-level
+  security policies for only their operational phases;
+- the ten Storage policies are recorded as excluded because the six buckets
+  move to GCS IAM rather than Cloud SQL.
+
+The sanitized manifest always reports `applyReady: false` with
+`PLAN_ONLY_EXECUTION`, `GOVERNED_EXECUTOR_NOT_PRESENT`, and
+`SEALED_SCHEMA_OWNER_EXECUTOR_BINDING_REQUIRED`, plus
+`LIVE_TARGET_ATTESTATION_REQUIRED`. It also keeps the 48 blocked policy
+contracts, 16 withheld RPC contracts, and exact six-extension review as
+cutover blockers. Function, trigger, and index bodies are bound by the reviewed
+monolithic plaintext SHA-256; the independent capture hashes are loaded and
+artifact-bound but are not falsely described as re-derived by this compiler.
+A private write re-hashes the supplied dump and identity foundation, recompiles
+all seven phases in the same process, and binds the full report envelope,
+including the observed source hash, into the aggregate digest.
+A later governed executor must independently attest the exact target, roles,
+extension support, and catalog before it can produce executable SQL. Never
+commit the decrypted dump or compiled private phases. The exact 210,601-byte
+offline compile is a required operator gate because the decrypted input is
+intentionally absent from the repository.
+
 Validate an encrypted-workspace snapshot without printing identities:
 
 ```bash
