@@ -223,6 +223,7 @@ function readContract() {
       plaintextSha256: "330de0785b3d8c109b538f9ffb75886c255e14bdbcfb8ecffa02e94ddaa7c570",
       compressedPlaintextSha256:
         "8f9a5bf29e5cfbf58f71dcf2510f16bb9abff835f76017f8475050daaf4bb4b2",
+      compressedPlaintextBytes: 25_886,
       bytes: 210_601,
       lines: 6_203,
       tables: 70,

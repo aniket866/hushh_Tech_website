@@ -213,6 +213,7 @@ describe('hash-only schema capture evidence', () => {
       createHash('sha256').update(encryptedEvidenceBytes).digest('hex'),
     );
     expect(encryptedEvidence.dump).toMatchObject({
+      compressedPlaintextBytes: 25886,
       tables: 70,
       functions: 24,
       policies: 118,
