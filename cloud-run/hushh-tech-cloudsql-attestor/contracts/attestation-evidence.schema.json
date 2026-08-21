@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hushh-tech:cloudsql-attestor:evidence:v1",
+  "title": "Hushh Tech UAT Cloud SQL catalog capture evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "kind", "status", "target", "bindings", "execution", "checks", "collections", "blockers", "captureSha256", "evidenceSha256"],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "imageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "nullableCount": { "type": ["integer", "null"], "minimum": 0 },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "rowCount", "sha256"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "enum": ["NOT_CAPTURED", "CAPTURED"] },
+        "rowCount": { "type": ["integer", "null"], "minimum": 0, "maximum": 10000 },
+        "sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      }
+    }
+  },
+  "properties": {
+    "version": { "const": 1 },
+    "kind": { "const": "HUSHH_TECH_UAT_CLOUDSQL_CATALOG_CAPTURE" },
+    "status": { "enum": ["NOT_EXECUTED", "BLOCKED", "CAPTURED"] },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "project", "region", "instance", "database", "postgresMajor", "auditRole"],
+      "properties": {
+        "environment": { "const": "uat" },
+        "project": { "const": "hushh-tech-uat" },
+        "region": { "const": "us-central1" },
+        "instance": { "const": "hushh-tech-app-pg-uat" },
+        "database": { "const": "hushh_tech_app" },
+        "postgresMajor": { "const": 17 },
+        "auditRole": { "const": "audit" }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basePrHead", "executionContractSha256", "querySetSha256", "boundsQuerySha256", "catalogQuerySha256", "sourceSha256", "baseImageDigest", "imageDigest"],
+      "properties": {
+        "basePrHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "executionContractSha256": { "$ref": "#/$defs/sha256" },
+        "querySetSha256": { "$ref": "#/$defs/sha256" },
+        "boundsQuerySha256": { "$ref": "#/$defs/sha256" },
+        "catalogQuerySha256": { "$ref": "#/$defs/sha256" },
+        "sourceSha256": { "$ref": "#/$defs/sha256" },
+        "baseImageDigest": { "$ref": "#/$defs/imageDigest" },
+        "imageDigest": { "oneOf": [{ "$ref": "#/$defs/imageDigest" }, { "type": "null" }] }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "dryRun", "hardProcessSupervisor", "hardProcessDeadlineMs", "workerDeadlineMs", "connectorCreated", "poolCreated", "connectorCloseCalled", "poolCloseCalled", "connectorCalls", "connectionAttempts", "queryStatements", "applicationRetries", "connectorTransportRetryCount", "connectorTransportRetryPolicy", "rawCatalogRowsLogged", "rawCatalogRowsPersisted"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "dryRun": { "type": "boolean" },
+        "hardProcessSupervisor": { "type": "boolean" },
+        "hardProcessDeadlineMs": { "const": 25000 },
+        "workerDeadlineMs": { "const": 22000 },
+        "connectorCreated": { "$ref": "#/$defs/nullableBoolean" },
+        "poolCreated": { "$ref": "#/$defs/nullableBoolean" },
+        "connectorCloseCalled": { "$ref": "#/$defs/nullableBoolean" },
+        "poolCloseCalled": { "$ref": "#/$defs/nullableBoolean" },
+        "connectorCalls": { "$ref": "#/$defs/nullableCount" },
+        "connectionAttempts": { "$ref": "#/$defs/nullableCount" },
+        "queryStatements": { "$ref": "#/$defs/nullableCount" },
+        "applicationRetries": { "const": 0 },
+        "connectorTransportRetryCount": { "type": "null" },
+        "connectorTransportRetryPolicy": { "const": "CONNECTOR_LIBRARY_MANAGED_READ_ONLY_NOT_COUNTED" },
+        "rawCatalogRowsLogged": { "const": false },
+        "rawCatalogRowsPersisted": { "const": false }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["databaseMatches", "auditRoleMatches", "postgres17", "transactionReadOnly", "applicationRelationsEmpty", "applicationSequencesEmpty", "applicationFunctionsEmpty", "applicationTriggersEmpty", "expectedRoleSetPresent", "roleFlagsSafe", "auditTemporaryPrivilegeDenied", "auditDatabaseCreateDenied", "auditPublicSchemaCreateDenied", "auditAllSchemaCreateDenied", "auditWritableMembershipDenied", "auditWritableObjectPrivilegesDenied", "auditWritableDefaultPrivilegesDenied", "catalogBoundsSatisfied"],
+      "properties": {
+        "databaseMatches": { "$ref": "#/$defs/nullableBoolean" },
+        "auditRoleMatches": { "$ref": "#/$defs/nullableBoolean" },
+        "postgres17": { "$ref": "#/$defs/nullableBoolean" },
+        "transactionReadOnly": { "$ref": "#/$defs/nullableBoolean" },
+        "applicationRelationsEmpty": { "$ref": "#/$defs/nullableBoolean" },
+        "applicationSequencesEmpty": { "$ref": "#/$defs/nullableBoolean" },
+        "applicationFunctionsEmpty": { "$ref": "#/$defs/nullableBoolean" },
+        "applicationTriggersEmpty": { "$ref": "#/$defs/nullableBoolean" },
+        "expectedRoleSetPresent": { "$ref": "#/$defs/nullableBoolean" },
+        "roleFlagsSafe": { "$ref": "#/$defs/nullableBoolean" },
+        "auditTemporaryPrivilegeDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditDatabaseCreateDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditPublicSchemaCreateDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditAllSchemaCreateDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditWritableMembershipDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditWritableObjectPrivilegesDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "auditWritableDefaultPrivilegesDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "catalogBoundsSatisfied": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "collections": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "database_identity" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "schemas" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "relations" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "sequences" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "functions" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "triggers" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "extensions" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "roles" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "role_memberships" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "object_ownership" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "object_acls" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/collection" }, { "properties": { "name": { "const": "default_acls" } } }] }
+      ],
+      "items": false
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+      "uniqueItems": true
+    },
+    "captureSha256": { "$ref": "#/$defs/sha256" },
+    "evidenceSha256": { "$ref": "#/$defs/sha256" }
+  }
+}
