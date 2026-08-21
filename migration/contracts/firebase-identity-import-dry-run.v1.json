@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "contents": "SANITIZED_AGGREGATES_AND_PAYLOAD_SCHEMAS_ONLY",
+  "source": {
+    "projectRef": "ibsisfnjxeowvdtvgzff",
+    "inventoryContractPath": "migration/contracts/source-inventory.v1.json",
+    "identityRowsRepositoryStorage": "FORBIDDEN"
+  },
+  "authority": {
+    "projectId": "hushh-pda",
+    "tenantId": null,
+    "issuer": "https://securetoken.google.com/hushh-pda",
+    "audience": "hushh-pda",
+    "productId": "hushh-tech"
+  },
+  "lockedDispositions": {
+    "authUsers": 369,
+    "linkedExistingFirebase": 165,
+    "importedFirebase": 204,
+    "appleWithoutEmail": 3,
+    "emailSignInUsers": 4,
+    "unclaimedLegacyPrincipals": 65,
+    "emailOnlyLinks": 0
+  },
+  "execution": {
+    "mode": "DRY_RUN",
+    "executionEnabled": false,
+    "liveSourceReads": false,
+    "firebaseAdminReads": false,
+    "firebaseAdminWrites": false,
+    "gcpWrites": false,
+    "productionMutations": false
+  },
+  "batching": {
+    "dispositionBatchSize": 100,
+    "firebaseImportBatchSize": 100,
+    "firebaseAdminMaximumBatchSize": 1000,
+    "order": "LEGACY_UUID_ASCENDING",
+    "resume": "HASH_CHAINED_CHECKPOINTS"
+  },
+  "relogin": {
+    "scope": "HUSHH_TECH_PRODUCT_ONLY",
+    "productBinding": "hushh-tech",
+    "enforcement": "SERVER_AUTH_TIME_CUTOFF",
+    "epochFormat": "RFC3339_UTC_SECONDS",
+    "firebaseGlobalRevocationAllowed": false,
+    "researchSessionRevocationAllowed": false
+  },
+  "calendarReconnect": {
+    "evidenceContents": "SANITIZED_RECONNECT_FLAGS_ONLY",
+    "requiredUserRows": 369,
+    "reconnectAction": "RECONNECT_ONCE",
+    "nonReconnectAction": "NOT_REQUIRED",
+    "googleRefreshTokenMigration": "FORBIDDEN",
+    "identityRowsRepositoryStorage": "FORBIDDEN"
+  },
+  "firebaseAdminImportSchema": {
+    "call": "auth.importUsers",
+    "batchAllowedKeys": [
+      "users",
+      "options"
+    ],
+    "recordRequiredKeys": [
+      "uid",
+      "emailVerified",
+      "disabled"
+    ],
+    "recordOptionalKeys": [
+      "email",
+      "displayName",
+      "photoURL",
+      "phoneNumber",
+      "metadata",
+      "providerData",
+      "passwordHash"
+    ],
+    "providerRecordAllowedKeys": [
+      "uid",
+      "providerId",
+      "email",
+      "displayName",
+      "photoURL",
+      "phoneNumber"
+    ],
+    "bcryptImportOptions": {
+      "hash": {
+        "algorithm": "BCRYPT"
+      }
+    },
+    "protectedRuntimeOnlyFields": [
+      "email",
+      "displayName",
+      "photoURL",
+      "phoneNumber",
+      "metadata",
+      "providerData",
+      "passwordHash"
+    ],
+    "forbiddenFields": [
+      "customClaims",
+      "passwordSalt",
+      "refreshToken",
+      "accessToken",
+      "sessionToken",
+      "otp",
+      "magicLink"
+    ],
+    "repositoryPayloadStorage": "FORBIDDEN"
+  },
+  "checkpointEvidenceSchema": {
+    "requiredKeys": [
+      "replayKey",
+      "stream",
+      "sequence",
+      "cursor",
+      "rowCount",
+      "batchHash",
+      "previousCheckpointHash",
+      "checkpointHash"
+    ],
+    "hashAlgorithm": "sha256_canonical_json_v1",
+    "writeMode": "APPEND_ONLY_CREATE"
+  },
+  "rollbackEvidenceSchema": {
+    "requiredKeys": [
+      "replayKey",
+      "authorityBindingHash",
+      "mappingInputHash",
+      "createdFirebaseUidHashes",
+      "preexistingFirebaseUidHashes",
+      "batchCheckpointHashes",
+      "recordedAt"
+    ],
+    "hashAlgorithm": "sha256_canonical_json_v1",
+    "existingLinkedUsersDeletion": "FORBIDDEN",
+    "createdUsersDeletion": "FORBIDDEN_IN_DRY_RUN",
+    "dryRunRollback": "NO_MUTATIONS_TO_ROLL_BACK",
+    "repositoryStorage": "HASHES_AND_COUNTS_ONLY"
+  },
+  "futureExecutorGates": {
+    "freshFirebaseAuthorityRead": "REQUIRED",
+    "uidCollisionCheck": "REQUIRED_IMMEDIATELY_BEFORE_EACH_BATCH",
+    "providerOwnershipCheck": "REQUIRED_IMMEDIATELY_BEFORE_EACH_BATCH",
+    "maximumEvidenceAgeSeconds": 300,
+    "satisfiedByDryRun": false
+  },
+  "blockers": [
+    "DRY_RUN_ONLY",
+    "PROTECTED_IMPORT_VALUES_NOT_PRESENT",
+    "LIVE_FIREBASE_IMPORT_EXECUTOR_ABSENT",
+    "FRESH_LIVE_UID_COLLISION_PREFLIGHT_REQUIRED",
+    "CUTOVER_APPROVAL_REQUIRED"
+  ]
+}

@@ -12,6 +12,10 @@
     "projectId": "hushh-pda",
     "tenantId": null
   },
+  "firebaseIdentityImportDryRunContractArtifact": {
+    "path": "migration/contracts/firebase-identity-import-dry-run.v1.json",
+    "sha256": "49b95dbc091beae03ae675051bf57e89953abc2cef0d547cfeffbba9e6fd9e44"
+  },
   "retirementManifest": {
     "path": "migration/manifests/supabase-retirement.v1.json",
     "tableDigestAlgorithm": "sha256_sorted_newline_v1",

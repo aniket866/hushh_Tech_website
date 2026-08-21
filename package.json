@@ -36,6 +36,7 @@
     "gcp:migration:validate-identity-map": "node scripts/gcp/migration/validate-identity-map.mjs",
     "migration:native:contract": "node scripts/migration/check-native-cutover-gate.mjs",
     "migration:native:deletion-ready": "node scripts/migration/check-native-cutover-gate.mjs --assert-ready",
+    "gcp:migration:plan-firebase-identities": "node scripts/gcp/migration/plan-firebase-identity-import.mjs",
     "build:web": "npm run build:assets && vite build",
     "build": "vitest run && npm run build:web",
     "preview": "vite preview",

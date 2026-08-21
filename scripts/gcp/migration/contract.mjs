@@ -21,6 +21,10 @@ const firebasePolicyMappingUrl = new URL(
   "../../../migration/contracts/firebase-policy-mapping.v1.json",
   import.meta.url
 );
+const firebaseIdentityImportDryRunContractUrl = new URL(
+  "../../../migration/contracts/firebase-identity-import-dry-run.v1.json",
+  import.meta.url
+);
 const schemaCaptureSqlUrl = new URL(
   "../../../migration/sql/source_schema_capture_read_only.sql",
   import.meta.url
@@ -65,6 +69,9 @@ function readContract() {
     frozenEncryptedSchemaDumpEvidenceUrl
   );
   const firebasePolicyMappingBytes = readFileSync(firebasePolicyMappingUrl);
+  const firebaseIdentityImportDryRunContractBytes = readFileSync(
+    firebaseIdentityImportDryRunContractUrl
+  );
   const schemaCaptureSqlBytes = readFileSync(schemaCaptureSqlUrl);
   const tables = parsed.publicTables;
   if (!Array.isArray(tables) || tables.length !== parsed.expected.publicTables) {
@@ -390,6 +397,59 @@ function readContract() {
     );
   }
 
+  const firebaseIdentityArtifact = parsed.firebaseIdentityImportDryRunContractArtifact;
+  const firebaseIdentityArtifactHash = createHash("sha256")
+    .update(firebaseIdentityImportDryRunContractBytes)
+    .digest("hex");
+  if (
+    firebaseIdentityArtifact?.path !==
+      "migration/contracts/firebase-identity-import-dry-run.v1.json" ||
+    firebaseIdentityArtifact?.sha256 !== firebaseIdentityArtifactHash
+  ) {
+    fail(
+      "INVALID_CONTRACT",
+      "The Firebase identity dry-run contract hash has drifted."
+    );
+  }
+  const firebaseIdentityImportDryRunContract = JSON.parse(
+    firebaseIdentityImportDryRunContractBytes.toString("utf8")
+  );
+  const identityCounts = firebaseIdentityImportDryRunContract.lockedDispositions ?? {};
+  const identityExecution = firebaseIdentityImportDryRunContract.execution ?? {};
+  const identityAuthority = firebaseIdentityImportDryRunContract.authority ?? {};
+  if (
+    firebaseIdentityImportDryRunContract.version !== 1 ||
+    firebaseIdentityImportDryRunContract.contents !==
+      "SANITIZED_AGGREGATES_AND_PAYLOAD_SCHEMAS_ONLY" ||
+    firebaseIdentityImportDryRunContract.source?.projectRef !== parsed.source.projectRef ||
+    firebaseIdentityImportDryRunContract.source?.identityRowsRepositoryStorage !==
+      "FORBIDDEN" ||
+    identityAuthority.projectId !== parsed.firebaseAuthority.projectId ||
+    identityAuthority.tenantId !== parsed.firebaseAuthority.tenantId ||
+    identityAuthority.issuer !== "https://securetoken.google.com/hushh-pda" ||
+    identityAuthority.audience !== "hushh-pda" ||
+    identityAuthority.productId !== "hushh-tech" ||
+    identityCounts.authUsers !== expected.authUsers ||
+    identityCounts.linkedExistingFirebase !== expected.existingFirebaseProviderLinks ||
+    identityCounts.importedFirebase !== expected.newFirebaseIdentities ||
+    identityCounts.appleWithoutEmail !== expected.appleUsersWithoutEmail ||
+    identityCounts.emailSignInUsers !== expected.emailPasswordUsers ||
+    identityCounts.unclaimedLegacyPrincipals !== expected.unclaimedLegacyPrincipals ||
+    identityCounts.emailOnlyLinks !== 0 ||
+    identityExecution.mode !== "DRY_RUN" ||
+    identityExecution.executionEnabled !== false ||
+    identityExecution.liveSourceReads !== false ||
+    identityExecution.firebaseAdminReads !== false ||
+    identityExecution.firebaseAdminWrites !== false ||
+    identityExecution.gcpWrites !== false ||
+    identityExecution.productionMutations !== false
+  ) {
+    fail(
+      "INVALID_CONTRACT",
+      "The Firebase identity import contract must remain execution-disabled and baseline-locked."
+    );
+  }
+
   const customSignatures = parsed.customPublicFunctionSignatures;
   if (
     !Array.isArray(customSignatures) ||
@@ -514,6 +574,8 @@ function readContract() {
   parsed.frozenSchemaCaptureHashes = frozenSchemaCaptureHashes;
   parsed.frozenEncryptedSchemaDumpEvidence = frozenEncryptedSchemaDumpEvidence;
   parsed.firebasePolicyMapping = firebasePolicyMapping;
+  parsed.firebaseIdentityImportDryRunContract = firebaseIdentityImportDryRunContract;
+  parsed.firebaseIdentityImportDryRunContractHash = firebaseIdentityArtifactHash;
   return deepFreeze(parsed);
 }
 

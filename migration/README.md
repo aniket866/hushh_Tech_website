@@ -446,6 +446,88 @@ npm run --silent gcp:migration:validate-identity-map -- \
 Only counts and SHA-256 input hashes go to standard output. Provider subjects
 and identity rows remain in the encrypted workspace.
 
+### Firebase import dry run
+
+`migration/contracts/firebase-identity-import-dry-run.v1.json` freezes the
+execution-disabled Firebase import contract. It binds the tenantless
+`hushh-pda` issuer and audience to the `hushh-tech` product, the exact
+165 existing links and 204 deterministic imports, the three Apple identities
+without email, four email sign-in identities, and 65 denied unclaimed legacy
+principals. The contract also freezes the allowed Firebase Admin import record
+fields. Protected email, profile, provider, and bcrypt values are named only as
+runtime field classes; no value or identity row is stored in the repository.
+
+The dry run additionally requires a protected calendar reconnect file with
+exactly one boolean row for every Auth identity:
+
+```json
+{
+  "version": 1,
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "contents": "SANITIZED_RECONNECT_FLAGS_ONLY",
+  "users": [
+    {
+      "legacyUserUuid": "00000000-0000-4000-8000-000000000001",
+      "reconnectRequired": true
+    }
+  ]
+}
+```
+
+The abbreviated array shows shape only. The protected file must contain the
+exact same 369 legacy UUIDs as the sanitized inventory. It contains no Google
+refresh token; such tokens are deliberately not migrated. Identities marked
+`reconnectRequired` receive a one-time calendar reconnect action.
+
+All four protected input files must be regular files outside the repository,
+owned by the current user, and have permissions exactly `0600`. Symbolic links,
+group/world permissions, oversized files, and metadata changes during a read
+fail closed.
+
+Generate the aggregate-only UAT import dry run:
+
+```bash
+npm run --silent gcp:migration:plan-firebase-identities -- \
+  --inventory=/secure-temporary-path/source-inventory.json \
+  --firebase=/secure-temporary-path/firebase-provider-index.json \
+  --unclaimed=/secure-temporary-path/unclaimed-principals.json \
+  --calendar=/secure-temporary-path/calendar-reconnect-evidence.json \
+  --relogin-epoch=2026-08-22T00:00:00Z \
+  --environment=uat \
+  --source-project-ref=ibsisfnjxeowvdtvgzff \
+  --source-database=postgres \
+  --target-project=hushh-tech-uat \
+  --target-region=us-central1 \
+  --target-instance=hushh-tech-app-pg-uat \
+  --target-database=hushh_tech_app \
+  --postgres-major=17 \
+  --dry-run
+```
+
+The proposed re-login epoch is bound into the replay key. Hushh Tech APIs use
+it as a product-local `auth_time` cutoff. The plan forbids Firebase global token
+revocation and Hushh Research session revocation. A changed epoch, authority
+index, calendar classification, mapping input, target, or payload schema creates
+a different replay key and cannot resume an older checkpoint chain.
+
+Disposition rows use four batches of 100/100/100/69. The 204 new Firebase
+identities use three import batches of 100/100/4. Every batch has a deterministic
+idempotency key and hash-chained checkpoint. Output contains aggregate counts,
+input and contract hashes, batch row counts, checkpoint hashes, and rollback
+schema evidence only. It never contains a legacy UUID, Firebase UID, provider
+subject, email, password hash, session, or token.
+
+This package has no Firebase Admin dependency, network client, import call, or
+output-file option. `--execute`, `--apply`, implicit dry run, and
+`--dry-run=false` fail closed. The plan remains blocked by `DRY_RUN_ONLY`,
+`PROTECTED_IMPORT_VALUES_NOT_PRESENT`, `LIVE_FIREBASE_IMPORT_EXECUTOR_ABSENT`,
+`FRESH_LIVE_UID_COLLISION_PREFLIGHT_REQUIRED`, and
+`CUTOVER_APPROVAL_REQUIRED`. This dry-run planner has no user-deletion or
+rollback-write authority. A later independently reviewed executor must bind
+protected values, re-read Firebase immediately before every batch, recheck UID
+collisions and provider ownership, and append rollback evidence before any
+import can be considered.
+
 ## Target schema
 
 `migration/sql/001_identity_migration_foundation.sql` defines:
