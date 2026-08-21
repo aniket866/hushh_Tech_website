@@ -147,7 +147,28 @@ export function buildGcpFunctionContracts(entries = []) {
   return contracts;
 }
 
-// Deliberately empty. A function is not reachable merely because it appears in
-// the frozen 112-function inventory. Each port adds one reviewed contract here
-// only after the target service and its contract tests are green.
-export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([]);
+// Contract presence is not enablement. The frozen 112-function registry is
+// checked before this map, so these two reviewed contracts remain unreachable
+// until live UAT parity moves one exact slug to PORTED_AND_VERIFIED.
+export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
+  {
+    slug: "hushh-location-geocode",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 16_384,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "stock-quotes",
+    methods: ["GET", "POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 8_192,
+    timeoutMs: 25_000,
+  },
+]);

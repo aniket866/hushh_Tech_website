@@ -56,7 +56,10 @@ assert.equal(
   ),
   false,
 );
-assert.deepEqual(Object.keys(FUNCTION_CONTRACTS), []);
+assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
+  "hushh-location-geocode",
+  "stock-quotes",
+]);
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
 for (const allowlists of [
   SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,

@@ -41,6 +41,7 @@ const ALLOWED_METHODS = new Set([
   "DELETE",
 ]);
 const RESPONSE_HEADER_ALLOWLIST = new Set([
+  "cache-control",
   "content-disposition",
   "content-type",
   "etag",
@@ -262,7 +263,7 @@ function setSecurityHeaders(_request, response, next) {
   next();
 }
 
-function normalizeHandlerResponse(output) {
+function normalizeHandlerResponse(output, contract = null) {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
     throw new RuntimeError(
       "HANDLER_CONTRACT_INVALID",
@@ -304,7 +305,8 @@ function normalizeHandlerResponse(output) {
       !RESPONSE_HEADER_ALLOWLIST.has(name) ||
       !value ||
       value.length > 2_048 ||
-      name in headers
+      name in headers ||
+      (name === "cache-control" && value !== contract?.cacheControl)
     ) {
       throw new RuntimeError(
         "HANDLER_CONTRACT_INVALID",
@@ -350,8 +352,8 @@ function normalizeHandlerResponse(output) {
   });
 }
 
-function sendHandlerResponse(response, output) {
-  const normalized = normalizeHandlerResponse(output);
+function sendHandlerResponse(response, output, contract) {
+  const normalized = normalizeHandlerResponse(output, contract);
   for (const [name, value] of Object.entries(normalized.headers)) {
     response.setHeader(name, value);
   }
@@ -458,6 +460,7 @@ export function createApp({
       response,
       config.handlerDeadlineMs,
     );
+    let responseContract = null;
     try {
       const execution = (async () => {
         const method = String(request.method ?? "").toUpperCase();
@@ -491,7 +494,8 @@ export function createApp({
             503,
           );
         }
-        assertFunctionRequestContract(contracts[entry.slug], {
+        responseContract = contracts[entry.slug] ?? null;
+        assertFunctionRequestContract(responseContract, {
           method,
           route,
           headers: request.headers,
@@ -580,7 +584,10 @@ export function createApp({
             webhookClaim,
           });
           throwIfAborted(deadline.signal);
-          const normalizedOutput = normalizeHandlerResponse(output);
+          const normalizedOutput = normalizeHandlerResponse(
+            output,
+            responseContract,
+          );
           if (webhookClaim) {
             const completion = buildWebhookCompletion(
               normalizedOutput,
@@ -614,7 +621,7 @@ export function createApp({
         throw deadline.signal.reason;
       }
       if (deadline.clientClosed() || response.destroyed) return;
-      return sendHandlerResponse(response, output);
+      return sendHandlerResponse(response, output, responseContract);
     } catch (error) {
       if (deadline.clientClosed() || response.destroyed) {
         log({

@@ -100,6 +100,7 @@ function contractsFor(entry, overrides = {}) {
       query: {},
       body: "required",
       mediaTypes: ["application/json"],
+      maxRequestBytes: 16_384,
       ...overrides,
     },
   });

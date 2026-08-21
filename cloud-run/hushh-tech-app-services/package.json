@@ -10,7 +10,7 @@
     "start": "node src/server.js",
     "registry:check": "node scripts/static-check.mjs --registry-only",
     "static:check": "node scripts/static-check.mjs",
-    "syntax:check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/contracts.js && node --check src/database.js && node --check src/firestore-rate-limit.js && node --check src/registry.js && node --check src/table-privileges.js && node --check src/shared-rate-limit.js && node --check src/webhook-ledger.js && node --check src/auth/firebase.js && node --check src/auth/google.js && node --check src/webhooks.js",
+    "syntax:check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/contracts.js && node --check src/database.js && node --check src/firestore-rate-limit.js && node --check src/registry.js && node --check src/table-privileges.js && node --check src/shared-rate-limit.js && node --check src/webhook-ledger.js && node --check src/auth/firebase.js && node --check src/auth/google.js && node --check src/adapters/investor-read-only.js && node --check src/handlers/investor-read-only.js && node --check src/webhooks.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "check": "npm run syntax:check && npm run static:check && npm test"
   },
