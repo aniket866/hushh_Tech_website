@@ -1,17 +1,22 @@
 import { DEFAULT_AUTH_REDIRECT, sanitizeInternalRedirect } from "../utils/security";
 import { normalizeLegacyOnboardingRedirectTarget } from "../services/onboarding/flow";
+import {
+  HUSHH_RESEARCH_CALLBACK_PATH,
+  HUSHH_RESEARCH_START_ROUTE,
+  isHushhResearchAuthRoute,
+} from "../services/hushhResearch/contracts";
 
 export const GUEST_AUTH_ROUTE_PREFIXES = [
   "/login",
   "/signup",
   "/auth/callback",
+  "/auth/hushh-research",
   "/sign-nda",
   "/document-viewer",
 ] as const;
 
 export const PUBLIC_MARKETING_ROUTE_PREFIXES = [
   "/",
-  "/profile",
   "/metric",
   "/metrics",
   "/privacy-policy",
@@ -39,6 +44,16 @@ export const PUBLIC_MARKETING_ROUTE_PREFIXES = [
   "/kai",
   "/kai-india",
   "/studio",
+] as const;
+
+export const PUBLIC_MARKETING_EXACT_ROUTES = ["/profile"] as const;
+
+export const HUSHH_RESEARCH_EXACT_ROUTES = [
+  "/",
+  "/profile",
+  "/signed-out",
+  HUSHH_RESEARCH_START_ROUTE,
+  HUSHH_RESEARCH_CALLBACK_PATH,
 ] as const;
 
 export const AUTHENTICATED_ACCOUNT_ROUTE_PREFIXES = [
@@ -84,13 +99,48 @@ function matchesSharedPrefix(pathname: string, routePrefix: string): boolean {
   return normalizePathname(pathname).startsWith(normalizePathname(routePrefix));
 }
 
+function decodeReportId(segment: string): string | null {
+  let decoded = segment;
+
+  try {
+    // React Router and the browser can decode at different layers. Decode a
+    // bounded number of times so an encoded slash cannot become a second
+    // route segment after this policy check.
+    for (let index = 0; index < 3; index += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
+  } catch {
+    return null;
+  }
+
+  return /^[a-z0-9][a-z0-9._~-]{0,127}$/i.test(decoded) &&
+    decoded !== "." &&
+    decoded !== ".."
+    ? decoded
+    : null;
+}
+
+function isHushhResearchReportRoute(pathname: string): boolean {
+  const normalizedPath = normalizePathname(pathname);
+  const match = normalizedPath.match(/^\/reports\/([^/]+)\/?$/);
+  return Boolean(match?.[1] && decodeReportId(match[1]));
+}
+
 export function isGuestAuthRoute(pathname: string): boolean {
   return GUEST_AUTH_ROUTE_PREFIXES.some((route) => matchesRoute(pathname, route));
 }
 
 export function isPublicMarketingRoute(pathname: string): boolean {
-  return PUBLIC_MARKETING_ROUTE_PREFIXES.some((route) =>
-    matchesRoute(pathname, route)
+  const normalizedPath = normalizePathname(pathname);
+  return (
+    PUBLIC_MARKETING_EXACT_ROUTES.some(
+      (route) => normalizePathname(route) === normalizedPath,
+    ) ||
+    PUBLIC_MARKETING_ROUTE_PREFIXES.some((route) =>
+      matchesRoute(pathname, route)
+    )
   );
 }
 
@@ -111,6 +161,17 @@ export function canGuestAccessRoute(pathname: string): boolean {
     isGuestAuthRoute(pathname) ||
     isPublicMarketingRoute(pathname) ||
     isPublicSharedProfileRoute(pathname)
+  );
+}
+
+export function canHushhResearchAccessRoute(pathname: string): boolean {
+  const normalizedPath = normalizePathname(pathname);
+  return (
+    isHushhResearchAuthRoute(pathname) ||
+    HUSHH_RESEARCH_EXACT_ROUTES.some(
+      (route) => normalizePathname(route) === normalizedPath,
+    ) ||
+    isHushhResearchReportRoute(pathname)
   );
 }
 

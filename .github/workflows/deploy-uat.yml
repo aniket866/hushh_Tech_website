@@ -19,7 +19,7 @@ permissions:
   checks: read
 
 concurrency:
-  group: deploy-uat-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.inputs.sha || github.run_id }}
+  group: deploy-uat
   cancel-in-progress: false
 
 env:
@@ -31,6 +31,13 @@ env:
   VITE_SUPABASE_URL: https://example.supabase.co
   VITE_SUPABASE_ANON_KEY: ci-anon-key
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_API_BASE_URL: https://api.uat.hushh.ai
+  HUSHH_RESEARCH_WEB_BASE_URL: https://uat.one.hushh.ai
+  HUSHH_RESEARCH_AUDIENCE: hushh-tech-uat
+  HUSHH_RESEARCH_REDIRECT_URI: https://uat.hushhtech.com/auth/hushh-research/callback
+  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda
+  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda.firebaseapp.com
+  HUSHH_RESEARCH_DEVELOPER_APP_ID: app_hushh-technologies_cd1895ef
 
 jobs:
   deploy:
@@ -40,6 +47,9 @@ jobs:
     environment:
       name: UAT – hushh-tech
       url: https://uat.hushhtech.com
+    env:
+      HUSHH_RESEARCH_CLIENT_ENABLED: ${{ vars.HUSHH_RESEARCH_CLIENT_ENABLED || 'false' }}
+      HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST: ${{ vars.HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST || '' }}
     steps:
       - name: Assert manual dispatch originates from main
         if: github.event_name == 'workflow_dispatch'
@@ -114,6 +124,33 @@ jobs:
             exit 1
           fi
 
+      - name: Capture predeploy Cloud Run revision
+        id: predeploy-state
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          if [ -z "$revision" ]; then
+            echo "::error::Expected exactly one explicit 100%-serving UAT revision."
+            exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          jq -n \
+            --arg revision "$revision" \
+            --arg sha "${{ steps.resolve-sha.outputs.sha }}" \
+            '{captured_revision:$revision,requested_sha:$sha}' \
+            > /tmp/uat-predeploy-state.json
+
       - name: Load web auth build env from Secret Manager
         shell: bash
         run: |
@@ -169,6 +206,10 @@ jobs:
             hushh-tech-metrics-search-console-type
             hushh-tech-metrics-search-console-data-state
             hushh-tech-metrics-search-console-row-limit
+            hushh-tech-uat-research-developer-token
+            hushh-tech-uat-research-x25519-private-key
+            hushh-tech-uat-research-firebase-api-key
+            hushh-tech-uat-research-firebase-app-id
           )
 
           for secret_name in "${runtime_secret_names[@]}"; do
@@ -217,6 +258,19 @@ jobs:
             echo "::error::VITE_ALLOW_INSECURE_BROWSER_LLM must remain false in UAT."
             exit 1
           fi
+          case "$HUSHH_RESEARCH_CLIENT_ENABLED" in
+            true)
+              if [ -z "$HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST" ]; then
+                echo "::error::HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST is required when the UAT Research client is enabled."
+                exit 1
+              fi
+              ;;
+            false) ;;
+            *)
+              echo "::error::HUSHH_RESEARCH_CLIENT_ENABLED must be true or false."
+              exit 1
+              ;;
+          esac
       - run: npm run env:check
       - run: npm run build:web
 
@@ -224,7 +278,7 @@ jobs:
       - name: Deploy to Cloud Run
         shell: bash
         run: |
-          runtime_env="NODE_ENV=staging,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-uat,GOOGLE_CLOUD_LOCATION=us-central1,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true"
+          runtime_env="^|^NODE_ENV=staging|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
           runtime_secrets="SUPABASE_URL=hushh-tech-supabase-url:latest"
           runtime_secrets+=",SUPABASE_SERVICE_ROLE_KEY=hushh-tech-supabase-service-role-key:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
@@ -241,6 +295,10 @@ jobs:
           runtime_secrets+=",SEARCH_CONSOLE_TYPE=hushh-tech-metrics-search-console-type:latest"
           runtime_secrets+=",SEARCH_CONSOLE_DATA_STATE=hushh-tech-metrics-search-console-data-state:latest"
           runtime_secrets+=",SEARCH_CONSOLE_ROW_LIMIT=hushh-tech-metrics-search-console-row-limit:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_DEVELOPER_TOKEN=hushh-tech-uat-research-developer-token:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY=hushh-tech-uat-research-x25519-private-key:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_API_KEY=hushh-tech-uat-research-firebase-api-key:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_APP_ID=hushh-tech-uat-research-firebase-app-id:latest"
           build_tag="build-$(echo '${{ steps.resolve-sha.outputs.sha }}' | cut -c1-8)"
           gcloud run deploy hushh-tech-website \
             --source . \
@@ -272,6 +330,44 @@ jobs:
           set -euo pipefail
           npm --silent run verify:sensitive-nda-gate -- --target=uat --expected-min=1 2>&1 | tee /tmp/uat-sensitive-nda-gate.json
 
+      - name: Verify Research client contract
+        env:
+          EXPECTED_HUSHH_RESEARCH_CLIENT_ENABLED: ${{ env.HUSHH_RESEARCH_CLIENT_ENABLED }}
+        run: node scripts/smoke-hushh-research-client.mjs "$SMOKE_BASE_URL" > /tmp/uat-hushh-research-client-smoke.json
+
+      - name: Restore captured revision after a failed deploy or smoke
+        if: failure() && steps.predeploy-state.outputs.revision != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          captured_revision="${{ steps.predeploy-state.outputs.revision }}"
+          gcloud run services update-traffic hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --to-revisions="${captured_revision}=100" \
+            --quiet
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          serving_revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          positive_traffic_targets="$(jq '[.status.traffic[]? | select((.percent // 0) > 0)] | length' <<<"$service_json")"
+          if [ "$serving_revision" != "$captured_revision" ] || [ "$positive_traffic_targets" -ne 1 ]; then
+            echo "::error::Rollback did not restore one captured revision at 100% traffic."
+            exit 1
+          fi
+          jq -n \
+            --arg revision "$serving_revision" \
+            --arg sha "${{ steps.resolve-sha.outputs.sha }}" \
+            '{status:"rolled_back",serving_revision:$revision,failed_sha:$sha,traffic_percent:100}' \
+            > /tmp/uat-rollback-state.json
+
       - name: Upload UAT smoke artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -287,3 +383,21 @@ jobs:
           name: uat-sensitive-nda-gate
           if-no-files-found: warn
           path: /tmp/uat-sensitive-nda-gate.json
+
+      - name: Upload UAT Research client smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-hushh-research-client-smoke
+          if-no-files-found: error
+          path: /tmp/uat-hushh-research-client-smoke.json
+
+      - name: Upload UAT predeploy and rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-revision-safety
+          if-no-files-found: warn
+          path: |
+            /tmp/uat-predeploy-state.json
+            /tmp/uat-rollback-state.json

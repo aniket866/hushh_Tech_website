@@ -1,17 +1,21 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FiMenu, FiX, FiChevronDown, FiUser, FiTrash2, FiChevronDown as FiArrowDown } from "react-icons/fi";
+import { FiMenu, FiX } from "react-icons/fi";
 import { useTranslation } from "react-i18next";
 import { Image, useToast, useBreakpointValue, useDisclosure } from "@chakra-ui/react";
 import hushhLogo from "../components/images/Hushhogo.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DeleteAccountModal from "./DeleteAccountModal";
-import { useStockQuotes, StockQuote, STOCK_LOGOS } from "../hooks/useStockQuotes";
+import { useStockQuotes, StockQuote } from "../hooks/useStockQuotes";
 import { useConstantTickerMotion } from "../hooks/useConstantTickerMotion";
 import config from "../resources/config/config";
 import { useAuthSession } from "../auth/AuthSessionProvider";
 import { useInvestorJourneyCta } from "../hooks/useInvestorJourneyCta";
 import { SkipToContentLink } from "./ui/SkipToContentLink";
+import {
+  isHushhResearchProductBoundary,
+  readHushhCoinsBalance,
+} from "../services/hushhResearch/legacyProductData";
 
 const WELCOME_TOAST_PENDING_KEY = "showWelcomeToast";
 const WELCOME_TOAST_USER_KEY = "showWelcomeToastUserId";
@@ -50,23 +54,16 @@ const TickerChip = ({ quote, isLoading }: { quote: StockQuote; isLoading?: boole
 };
 
 export default function Navbar() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [toastShown, setToastShown] = useState(false);
   const previousUserIdRef = useRef<string | null>(null);
-  const [careerDropdownOpen, setCareerDropdownOpen] = useState(false);
-  const [mobileCareerDropdownOpen, setMobileCareerDropdownOpen] = useState(false);
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const { isOpen: isDeleteModalOpen, onOpen: onDeleteModalOpen, onClose: onDeleteModalClose } = useDisclosure();
   const navigate = useNavigate();
   const location = useLocation();
   const drawerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tickerLoopRef = useRef<HTMLDivElement>(null);
   const tickerTrackRef = useRef<HTMLDivElement>(null);
-  const careerDropdownRef = useRef<HTMLDivElement>(null);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const [hushhCoins, setHushhCoins] = useState<number | null>(null);
   const toast = useToast();
   const isMobile = useBreakpointValue({ base: true, lg: false });
@@ -77,9 +74,16 @@ export default function Navbar() {
   const isOnboarding = location.pathname.startsWith('/onboarding');
   const isProfilePage = location.pathname.startsWith('/hushh-user-profile');
   const hideTicker = isOnboarding || isProfilePage;
+  const isResearchBoundary = isHushhResearchProductBoundary(
+    location.pathname,
+    user,
+  );
 
   // Fetch real-time stock quotes (refreshes every 2 minutes for 27 stocks)
-  const { quotes, loading: quotesLoading, lastUpdated } = useStockQuotes(120000);
+  const { quotes, loading: quotesLoading, lastUpdated } = useStockQuotes(
+    120000,
+    !isResearchBoundary,
+  );
 
   // quotes already includes fallback data from the hook, so we can use it directly
   const displayQuotes = quotes;
@@ -116,7 +120,7 @@ export default function Navbar() {
     const accountJustDeleted = localStorage.getItem("accountJustDeleted");
     if (accountJustDeleted === "true") {
       localStorage.removeItem("accountJustDeleted");
-      setToastShown(true);
+      queueMicrotask(() => setToastShown(true));
       return;
     }
 
@@ -126,7 +130,7 @@ export default function Navbar() {
     const isPendingForCurrentUser = shouldShowWelcomeToast && (!pendingToastUserId || pendingToastUserId === currentUserId);
 
     if (!isPendingForCurrentUser) {
-      setToastShown(true);
+      queueMicrotask(() => setToastShown(true));
       return;
     }
     
@@ -139,24 +143,30 @@ export default function Navbar() {
     });
     sessionStorage.removeItem(WELCOME_TOAST_PENDING_KEY);
     sessionStorage.removeItem(WELCOME_TOAST_USER_KEY);
-    setToastShown(true);
+    queueMicrotask(() => setToastShown(true));
   }, [session, toastShown, toast, t, user?.id]);
 
   // Fetch Hushh Coins balance when authenticated
   useEffect(() => {
-    if (!user?.id || !config.supabaseClient) { setHushhCoins(null); return; }
+    if (!user?.id || !config.supabaseClient) {
+      queueMicrotask(() => setHushhCoins(null));
+      return;
+    }
+    if (isResearchBoundary) {
+      queueMicrotask(() => setHushhCoins(null));
+      return;
+    }
     const fetchCoins = async () => {
       try {
-        const { data } = await config.supabaseClient!
-          .from('ceo_meeting_payments')
-          .select('hushh_coins_awarded')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        setHushhCoins(data?.hushh_coins_awarded ?? 0);
+        const result = await readHushhCoinsBalance(
+          config.supabaseClient!,
+          user,
+        );
+        setHushhCoins(result.mode === "legacy" ? result.balance : null);
       } catch { setHushhCoins(0); }
     };
     fetchCoins();
-  }, [user?.id]);
+  }, [isResearchBoundary, user]);
 
   const isAuthenticated = status === "authenticated";
 
@@ -192,24 +202,6 @@ export default function Navbar() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  useEffect(() => {
-    // Handle click outside to close profile dropdown
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
-        setProfileDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const toggleProfileDropdown = () => {
-    setProfileDropdownOpen((prev) => !prev);
-  };
-
   const handleAccountDeleted = () => {
     // Reset states immediately for proper UI update
     setToastShown(true); // Prevent welcome toast from showing
@@ -221,22 +213,6 @@ export default function Navbar() {
       navigate("/");
     }, 100);
   };
-
-  // Handle scroll to check if user reached bottom of menu
-  const handleMenuScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
-    setShowScrollIndicator(!isNearBottom);
-  }, []);
-
-  // Check if menu needs scroll indicator when drawer opens
-  useEffect(() => {
-    if (isOpen && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const needsScroll = container.scrollHeight > container.clientHeight;
-      setShowScrollIndicator(needsScroll);
-    }
-  }, [isOpen]);
 
   return (
     <>
