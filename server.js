@@ -118,8 +118,6 @@ app.all('/api/hushh-research/*', async (req, res) => wrapHandler(await loadApi('
 // retirement registry contains exactly 112 known slugs; unknown, retired, and
 // not-yet-verified entries fail closed and never proxy back to Supabase.
 app.all('/functions/v1/*', async (req, res) => wrapHandler(await loadApi('legacy-functions'))(req, res));
-app.all('/api/hushh-research/config', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
-app.all('/api/hushh-research/*', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
 
 // ---------------------------------------------------------------------------
 // .well-known routes (Apple App Site Association, etc.)

@@ -169,6 +169,44 @@ describe("CI workflow scripts", () => {
     }
   });
 
+  it("runs the fail-closed GCP service package in PR and merge-queue CI", () => {
+    const prWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/ci.yml"),
+      "utf8"
+    );
+    const queueWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/queue-validation.yml"),
+      "utf8"
+    );
+    const orchestrator = fs.readFileSync(
+      path.join(repoRoot, "scripts/ci/orchestrate.sh"),
+      "utf8"
+    );
+
+    for (const workflow of [prWorkflow, queueWorkflow]) {
+      expect(workflow).toContain('SERVICE_NODE_VERSION: "22.23.2"');
+      expect(workflow).toContain("gcp-service-foundation:");
+      expect(workflow).toContain("name: GCP Service Foundation");
+      expect(workflow).toContain(
+        "cache-dependency-path: cloud-run/hushh-tech-app-services/package-lock.json"
+      );
+      expect(workflow).toContain("run: bash scripts/ci/orchestrate.sh service");
+      expect(workflow).toContain("needs.gcp-service-foundation.result");
+    }
+
+    expect(orchestrator).toContain("cd cloud-run/hushh-tech-app-services");
+    expect(orchestrator).toContain("npm ci --ignore-scripts");
+    expect(orchestrator).toContain("npm run check");
+    expect(orchestrator).toContain("npm audit --omit=dev");
+  });
+
+  it("registers each Hushh Research compatibility route once", () => {
+    const runtime = fs.readFileSync(path.join(repoRoot, "server.js"), "utf8");
+
+    expect(runtime.match(/app\.all\('\/api\/hushh-research\/config'/g)).toHaveLength(1);
+    expect(runtime.match(/app\.all\('\/api\/hushh-research\/\*'/g)).toHaveLength(1);
+  });
+
   it("accepts a conventional PR title and complete template metadata", () => {
     const tempDir = makeTempDir();
     const eventPath = path.join(tempDir, "event.json");

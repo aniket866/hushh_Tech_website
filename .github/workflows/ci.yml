@@ -19,6 +19,7 @@ concurrency:
 
 env:
   NODE_VERSION: "20.19.0"
+  SERVICE_NODE_VERSION: "22.23.2"
   VITE_SUPABASE_URL: "https://example.supabase.co"
   VITE_SUPABASE_ANON_KEY: "ci-anon-key"
   VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
@@ -102,6 +103,22 @@ jobs:
 
       - name: Validate frozen migration inventory
         run: bash scripts/ci/orchestrate.sh retirement
+
+  gcp-service-foundation:
+    name: GCP Service Foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.SERVICE_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cloud-run/hushh-tech-app-services/package-lock.json
+
+      - name: Validate the fail-closed Cloud Run service package
+        run: bash scripts/ci/orchestrate.sh service
 
   reviewer-context:
     name: Reviewer Context & Compliance
@@ -344,6 +361,7 @@ jobs:
       - secret-scan
       - env-contract
       - supabase-retirement-contract
+      - gcp-service-foundation
       - reviewer-context
       - pr-hygiene
       - phase2-pr-policy
@@ -362,6 +380,7 @@ jobs:
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
             ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
+            ["GCP Service Foundation"]="${{ needs.gcp-service-foundation.result }}"
             ["Reviewer Context & Compliance"]="${{ needs.reviewer-context.result }}"
             ["PR Hygiene"]="${{ needs.pr-hygiene.result }}"
             ["Phase 2 PR Policy"]="${{ needs.phase2-pr-policy.result }}"

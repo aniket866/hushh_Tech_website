@@ -15,6 +15,7 @@ concurrency:
 
 env:
   NODE_VERSION: "20.19.0"
+  SERVICE_NODE_VERSION: "22.23.2"
   VITE_SUPABASE_URL: "https://example.supabase.co"
   VITE_SUPABASE_ANON_KEY: "ci-anon-key"
   VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
@@ -68,6 +69,22 @@ jobs:
 
       - name: Validate frozen migration inventory
         run: bash scripts/ci/orchestrate.sh retirement
+
+  gcp-service-foundation:
+    name: GCP Service Foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.SERVICE_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cloud-run/hushh-tech-app-services/package-lock.json
+
+      - name: Validate the fail-closed Cloud Run service package
+        run: bash scripts/ci/orchestrate.sh service
 
   web-validation:
     name: Web Validation
@@ -156,6 +173,7 @@ jobs:
       - secret-scan
       - env-contract
       - supabase-retirement-contract
+      - gcp-service-foundation
       - web-validation
       - lint
       - security-audit
@@ -170,6 +188,7 @@ jobs:
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
             ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
+            ["GCP Service Foundation"]="${{ needs.gcp-service-foundation.result }}"
             ["Web Validation"]="${{ needs.web-validation.result }}"
             ["Lint"]="${{ needs.lint.result }}"
             ["Security Audit"]="${{ needs.security-audit.result }}"
