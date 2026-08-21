@@ -27,6 +27,7 @@
     "gcp:migration:bind-schema-evidence": "node scripts/gcp/migration/schema-capture-evidence.mjs",
     "gcp:migration:compile-target-schema": "node scripts/gcp/migration/target-schema-compiler.mjs",
     "gcp:migration:validate-target-schema-evidence": "node scripts/gcp/migration/target-schema-compile-evidence.mjs --validate --dry-run",
+    "gcp:migration:validate-uat-cloudsql-attestation": "node scripts/gcp/migration/target-cloudsql-attestation-evidence.mjs",
     "gcp:migration:validate-inventory": "node scripts/gcp/migration/validate-inventory.mjs",
     "gcp:migration:validate-identity-map": "node scripts/gcp/migration/validate-identity-map.mjs",
     "build:web": "npm run build:assets && vite build",
