@@ -104,26 +104,22 @@ function canonicalAudience(value, expectedOrigin) {
   return parsed.origin;
 }
 
-function googleCallers(value) {
+function expectedGoogleCaller(serviceOwner, projectId, stage) {
+  const account =
+    serviceOwner === "worker"
+      ? `hushh-tech-task-runner-${stage}`
+      : `hushh-tech-web-gateway-${stage}`;
+  return `${account}@${projectId}.iam.gserviceaccount.com`;
+}
+
+function googleCallers(value, expected) {
   const callers = value
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
-  const unique = new Set(callers);
-  if (
-    callers.length < 1 ||
-    callers.length > 10 ||
-    unique.size !== callers.length ||
-    callers.some(
-      (email) =>
-        email.length > 254 ||
-        !/^[a-z0-9][a-z0-9-]*@[a-z0-9-]+\.iam\.gserviceaccount\.com$/.test(
-          email,
-        ),
-    )
-  ) {
+  if (callers.length !== 1 || callers[0] !== expected) {
     throw new ConfigurationError(
-      "ALLOWED_GOOGLE_CALLERS must contain one to ten unique service accounts.",
+      "ALLOWED_GOOGLE_CALLERS does not match this service and project.",
     );
   }
   return Object.freeze(callers);
@@ -194,6 +190,7 @@ export function readRuntimeConfig(env = process.env) {
     ),
     allowedGoogleCallers: googleCallers(
       required(env, "ALLOWED_GOOGLE_CALLERS"),
+      expectedGoogleCaller(serviceOwner, projectId, project.stage),
     ),
     firebaseProjectId,
     productClient: PRODUCT_CLIENT_ID,

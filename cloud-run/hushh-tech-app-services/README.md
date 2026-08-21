@@ -23,6 +23,9 @@ closed.
 - Cloud Run ingress and Invoker IAM remain infrastructure controls. Readiness
   also requires an explicit private-ingress contract.
 - Every compatibility request requires a Google-signed caller token.
+- User-facing and webhook services accept only the checked-in
+  `hushh-tech-web-gateway-{stage}` caller. The worker accepts only the
+  checked-in `hushh-tech-task-runner-{stage}` caller.
 - User routes then reverify the forwarded, product-bound Firebase token with
   revocation checking.
 - Webhooks retain exact raw bytes and require one of six explicit verifier
@@ -30,6 +33,10 @@ closed.
 - Worker routes accept Google service identities only.
 - Database work runs inside a transaction with transaction-local
   `app.firebase_uid`; pooled connections are reset before reuse.
+- Readiness requires an exact per-service table privilege allowlist, forced
+  row-level security on every accessible base table, and zero application
+  object ownership by the runtime role or any role it can assume. Every table
+  privilege allowlist is empty while all handlers remain disabled.
 - Cloud SQL uses IAM database authentication over private IP. Password and
   connection-string configuration is rejected.
 

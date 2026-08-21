@@ -34,20 +34,92 @@ const SERVICE_NAMES = Object.freeze({
   "signed-webhook-service": "hushh-tech-webhooks",
   worker: "hushh-tech-worker",
 });
+const PROJECTS = Object.freeze({
+  uat: Object.freeze({
+    id: "hushh-tech-uat",
+    number: "175298245599",
+    audience: "hushh-tech-uat",
+    instance: "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
+  }),
+  prod: Object.freeze({
+    id: "hushh-tech-prod",
+    number: "646258530541",
+    audience: "hushh-tech-prod",
+    instance: "hushh-tech-prod:us-central1:hushh-tech-app-pg-prod",
+  }),
+});
 
-test("all seven owners bind to their exact UAT runtime database identity", () => {
+function expectedCaller(serviceOwner, stage, projectId) {
+  const account =
+    serviceOwner === "worker"
+      ? `hushh-tech-task-runner-${stage}`
+      : `hushh-tech-web-gateway-${stage}`;
+  return `${account}@${projectId}.iam.gserviceaccount.com`;
+}
+
+function ownerRuntimeEnv(serviceOwner, stage, overrides = {}) {
+  const project = PROJECTS[stage];
+  return runtimeEnv({
+    SERVICE_OWNER: serviceOwner,
+    GOOGLE_CLOUD_PROJECT: project.id,
+    SERVICE_AUDIENCE: `https://${SERVICE_NAMES[serviceOwner]}-${project.number}.us-central1.run.app`,
+    ALLOWED_GOOGLE_CALLERS: expectedCaller(serviceOwner, stage, project.id),
+    PRODUCT_AUDIENCE: project.audience,
+    INSTANCE_CONNECTION_NAME: project.instance,
+    PGUSER: `${ACCOUNT_STEMS[serviceOwner]}-${stage}@${project.id}.iam`,
+    ...overrides,
+  });
+}
+
+test("all seven owners bind to their exact UAT and production identities", () => {
   assert.equal(SERVICE_OWNERS.length, 7);
-  for (const serviceOwner of SERVICE_OWNERS) {
-    const config = readRuntimeConfig(
-      runtimeEnv({
-        SERVICE_OWNER: serviceOwner,
-        SERVICE_AUDIENCE: `https://${SERVICE_NAMES[serviceOwner]}-175298245599.us-central1.run.app`,
-        PGUSER: `${ACCOUNT_STEMS[serviceOwner]}-uat@hushh-tech-uat.iam`,
-      }),
-    );
-    assert.equal(config.serviceOwner, serviceOwner);
-    assert.equal(config.databaseUser, `${ACCOUNT_STEMS[serviceOwner]}-uat@hushh-tech-uat.iam`);
-    assert.ok(serviceRule(serviceOwner));
+  for (const stage of Object.keys(PROJECTS)) {
+    const project = PROJECTS[stage];
+    for (const serviceOwner of SERVICE_OWNERS) {
+      const config = readRuntimeConfig(ownerRuntimeEnv(serviceOwner, stage));
+      assert.equal(config.serviceOwner, serviceOwner);
+      assert.equal(
+        config.databaseUser,
+        `${ACCOUNT_STEMS[serviceOwner]}-${stage}@${project.id}.iam`,
+      );
+      assert.deepEqual(config.allowedGoogleCallers, [
+        expectedCaller(serviceOwner, stage, project.id),
+      ]);
+      assert.ok(serviceRule(serviceOwner));
+    }
+  }
+});
+
+test("every owner rejects missing, extra, cross-project, and wrong-role callers", () => {
+  for (const stage of Object.keys(PROJECTS)) {
+    const project = PROJECTS[stage];
+    const otherStage = stage === "uat" ? "prod" : "uat";
+    const otherProject = PROJECTS[otherStage];
+    for (const serviceOwner of SERVICE_OWNERS) {
+      const exact = expectedCaller(serviceOwner, stage, project.id);
+      const wrongRole =
+        serviceOwner === "worker"
+          ? expectedCaller("identity-api", stage, project.id)
+          : expectedCaller("worker", stage, project.id);
+      const invalidCallers = [
+        "",
+        `${exact},${wrongRole}`,
+        expectedCaller(serviceOwner, otherStage, otherProject.id),
+        wrongRole,
+        `unexpected@${project.id}.iam.gserviceaccount.com`,
+      ];
+      for (const caller of invalidCallers) {
+        assert.throws(
+          () =>
+            readRuntimeConfig(
+              ownerRuntimeEnv(serviceOwner, stage, {
+                ALLOWED_GOOGLE_CALLERS: caller,
+              }),
+            ),
+          ConfigurationError,
+        );
+      }
+    }
   }
 });
 

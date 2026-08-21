@@ -11,7 +11,7 @@ export function runtimeEnv(overrides = {}) {
     SERVICE_AUDIENCE:
       "https://hushh-tech-identity-api-175298245599.us-central1.run.app",
     ALLOWED_GOOGLE_CALLERS:
-      "hushh-tech-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+      "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
     FIREBASE_PROJECT_ID: "hushh-pda",
     PRODUCT_AUDIENCE: "hushh-tech-uat",
     PRODUCT_CLIENT_APP_ID: "app_hushh-technologies_cd1895ef",

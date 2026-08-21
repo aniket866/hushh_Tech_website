@@ -18,7 +18,7 @@ const CONFIG = Object.freeze({
   serviceAudience:
     "https://hushh-tech-worker-175298245599.us-central1.run.app",
   allowedGoogleCallers: Object.freeze([
-    "hushh-tech-tasks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "hushh-tech-task-runner-uat@hushh-tech-uat.iam.gserviceaccount.com",
   ]),
 });
 
@@ -167,7 +167,7 @@ function googlePayload(overrides = {}) {
     iat: NOW_SECONDS - 10,
     sub: "google-service-subject",
     email:
-      "hushh-tech-tasks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+      "hushh-tech-task-runner-uat@hushh-tech-uat.iam.gserviceaccount.com",
     email_verified: true,
     ...overrides,
   };
@@ -195,7 +195,7 @@ test("private worker ingress reverifies direct Google OIDC identity", async () =
   assert.deepEqual(actor, {
     kind: "google-service",
     email:
-      "hushh-tech-tasks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+      "hushh-tech-task-runner-uat@hushh-tech-uat.iam.gserviceaccount.com",
     subject: "google-service-subject",
   });
 });

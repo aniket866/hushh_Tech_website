@@ -9,7 +9,7 @@ import { errorCode, request } from "./helpers.js";
 
 const INTERNAL_CALLER = Object.freeze({
   kind: "google-service",
-  email: "gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  email: "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
   subject: "gateway-subject",
 });
 const FIREBASE_ACTOR = Object.freeze({

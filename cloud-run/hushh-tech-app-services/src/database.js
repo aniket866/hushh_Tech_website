@@ -2,6 +2,10 @@ import { Connector } from "@google-cloud/cloud-sql-connector";
 import pg from "pg";
 
 import { RuntimeError } from "./errors.js";
+import {
+  expectedTablePrivileges,
+  observedTablePrivileges,
+} from "./table-privileges.js";
 
 const { Pool } = pg;
 const FIREBASE_UID_LIMIT = 128;
@@ -64,7 +68,7 @@ export async function createDatabaseRuntime({
   });
 }
 
-export function assertDmlOnlyRoleRow(row, expectedUser) {
+export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   const inheritedPrivilegedRoleCount = Number(
     row?.inherited_privileged_role_count,
   );
@@ -75,6 +79,34 @@ export function assertDmlOnlyRoleRow(row, expectedUser) {
   const applicationSchemaCreateCount = Number(
     row?.application_schema_create_count,
   );
+  const accessibleTableRlsDisabledCount = Number(
+    row?.accessible_table_rls_disabled_count,
+  );
+  const accessibleTableRlsNotForcedCount = Number(
+    row?.accessible_table_rls_not_forced_count,
+  );
+  const ownedApplicationSchemaCount = Number(
+    row?.owned_application_schema_count,
+  );
+  const ownedApplicationTableCount = Number(
+    row?.owned_application_table_count,
+  );
+  const ownedApplicationSequenceCount = Number(
+    row?.owned_application_sequence_count,
+  );
+  const ownedApplicationRoutineCount = Number(
+    row?.owned_application_routine_count,
+  );
+  const expectedPrivileges = expectedTablePrivileges(serviceOwner);
+  const observedPrivileges = observedTablePrivileges(
+    row?.effective_table_dml_privileges,
+  );
+  const exactTablePrivileges =
+    observedPrivileges !== null &&
+    observedPrivileges.length === expectedPrivileges.length &&
+    observedPrivileges.every(
+      (privilege, index) => privilege === expectedPrivileges[index],
+    );
   if (
     !row ||
     row.current_user !== expectedUser ||
@@ -92,7 +124,20 @@ export function assertDmlOnlyRoleRow(row, expectedUser) {
     !Number.isSafeInteger(nonDmlTablePrivilegeCount) ||
     nonDmlTablePrivilegeCount !== 0 ||
     !Number.isSafeInteger(executableApplicationRoutineCount) ||
-    executableApplicationRoutineCount !== 0
+    executableApplicationRoutineCount !== 0 ||
+    !Number.isSafeInteger(accessibleTableRlsDisabledCount) ||
+    accessibleTableRlsDisabledCount !== 0 ||
+    !Number.isSafeInteger(accessibleTableRlsNotForcedCount) ||
+    accessibleTableRlsNotForcedCount !== 0 ||
+    !Number.isSafeInteger(ownedApplicationSchemaCount) ||
+    ownedApplicationSchemaCount !== 0 ||
+    !Number.isSafeInteger(ownedApplicationTableCount) ||
+    ownedApplicationTableCount !== 0 ||
+    !Number.isSafeInteger(ownedApplicationSequenceCount) ||
+    ownedApplicationSequenceCount !== 0 ||
+    !Number.isSafeInteger(ownedApplicationRoutineCount) ||
+    ownedApplicationRoutineCount !== 0 ||
+    !exactTablePrivileges
   ) {
     throw new RuntimeError(
       "DATABASE_ROLE_UNSAFE",
@@ -103,7 +148,7 @@ export function assertDmlOnlyRoleRow(row, expectedUser) {
   return true;
 }
 
-export async function verifyDmlOnlyRuntime(pool, expectedUser) {
+export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
   const client = await pool.connect();
   let destroy = false;
   try {
@@ -124,6 +169,45 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
         FROM pg_roles AS roles
         INNER JOIN effective_role_oids AS effective
           ON effective.oid = roles.oid
+      ),
+      application_relations AS (
+        SELECT
+          relations.oid,
+          schemas.nspname AS schema_name,
+          relations.relname AS table_name,
+          relations.relkind,
+          relations.relowner,
+          relations.relrowsecurity,
+          relations.relforcerowsecurity
+        FROM pg_class AS relations
+        INNER JOIN pg_namespace AS schemas
+          ON schemas.oid = relations.relnamespace
+        WHERE schemas.nspname <> 'information_schema'
+          AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND relations.relkind IN ('r', 'p', 'v', 'm', 'f')
+      ),
+      effective_table_dml_privileges AS (
+        SELECT DISTINCT
+          relations.oid AS relation_oid,
+          relations.schema_name,
+          relations.table_name,
+          relations.relkind,
+          relations.relrowsecurity,
+          relations.relforcerowsecurity,
+          privilege_types.privilege_type
+        FROM application_relations AS relations
+        CROSS JOIN (
+          VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')
+        ) AS privilege_types(privilege_type)
+        WHERE EXISTS (
+          SELECT 1
+          FROM effective_roles AS inherited
+          WHERE has_table_privilege(
+            inherited.rolname,
+            relations.oid,
+            privilege_types.privilege_type
+          )
+        )
       )
       SELECT
         current_user,
@@ -134,6 +218,80 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
         roles.rolbypassrls,
         has_database_privilege(current_user, current_database(), 'CREATE') AS can_create_database,
         has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_public_schema,
+        COALESCE(
+          (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'schema', privileges.schema_name,
+                'table', privileges.table_name,
+                'privilege', privileges.privilege_type,
+                'kind', privileges.relkind
+              )
+              ORDER BY
+                privileges.schema_name,
+                privileges.table_name,
+                privileges.privilege_type
+            )
+            FROM effective_table_dml_privileges AS privileges
+          ),
+          '[]'::jsonb
+        ) AS effective_table_dml_privileges,
+        (
+          SELECT count(DISTINCT privileges.relation_oid)
+          FROM effective_table_dml_privileges AS privileges
+          WHERE privileges.relkind IN ('r', 'p')
+            AND privileges.relrowsecurity IS NOT TRUE
+        ) AS accessible_table_rls_disabled_count,
+        (
+          SELECT count(DISTINCT privileges.relation_oid)
+          FROM effective_table_dml_privileges AS privileges
+          WHERE privileges.relkind IN ('r', 'p')
+            AND privileges.relforcerowsecurity IS NOT TRUE
+        ) AS accessible_table_rls_not_forced_count,
+        (
+          SELECT count(*)
+          FROM pg_namespace AS owned_schemas
+          WHERE owned_schemas.nspname <> 'information_schema'
+            AND owned_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+            AND owned_schemas.nspowner IN (
+              SELECT oid FROM effective_role_oids
+            )
+        ) AS owned_application_schema_count,
+        (
+          SELECT count(*)
+          FROM pg_class AS owned_tables
+          INNER JOIN pg_namespace AS owned_table_schemas
+            ON owned_table_schemas.oid = owned_tables.relnamespace
+          WHERE owned_table_schemas.nspname <> 'information_schema'
+            AND owned_table_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+            AND owned_tables.relkind IN ('r', 'p', 'v', 'm', 'f')
+            AND owned_tables.relowner IN (
+              SELECT oid FROM effective_role_oids
+            )
+        ) AS owned_application_table_count,
+        (
+          SELECT count(*)
+          FROM pg_class AS owned_sequences
+          INNER JOIN pg_namespace AS owned_sequence_schemas
+            ON owned_sequence_schemas.oid = owned_sequences.relnamespace
+          WHERE owned_sequence_schemas.nspname <> 'information_schema'
+            AND owned_sequence_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+            AND owned_sequences.relkind = 'S'
+            AND owned_sequences.relowner IN (
+              SELECT oid FROM effective_role_oids
+            )
+        ) AS owned_application_sequence_count,
+        (
+          SELECT count(*)
+          FROM pg_proc AS owned_routines
+          INNER JOIN pg_namespace AS owned_routine_schemas
+            ON owned_routine_schemas.oid = owned_routines.pronamespace
+          WHERE owned_routine_schemas.nspname <> 'information_schema'
+            AND owned_routine_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+            AND owned_routines.proowner IN (
+              SELECT oid FROM effective_role_oids
+            )
+        ) AS owned_application_routine_count,
         (
           SELECT count(*)
           FROM effective_roles AS inherited
@@ -158,7 +316,7 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
                 SELECT 1
                 FROM pg_namespace AS application_schemas
                 WHERE application_schemas.nspname <> 'information_schema'
-                  AND application_schemas.nspname NOT LIKE 'pg\_%' ESCAPE '\'
+                  AND application_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
                   AND has_schema_privilege(
                     inherited.rolname,
                     application_schemas.oid,
@@ -171,7 +329,7 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
           SELECT count(*)
           FROM pg_namespace AS application_schemas
           WHERE application_schemas.nspname <> 'information_schema'
-            AND application_schemas.nspname NOT LIKE 'pg\_%' ESCAPE '\'
+            AND application_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
             AND has_schema_privilege(
               current_user,
               application_schemas.oid,
@@ -185,7 +343,7 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
             'SELECT', 'INSERT', 'UPDATE', 'DELETE'
           )
             AND grants.table_schema <> 'information_schema'
-            AND grants.table_schema NOT LIKE 'pg\_%' ESCAPE '\'
+            AND grants.table_schema NOT LIKE 'pg\\_%' ESCAPE '\\'
             AND (
               grants.grantee = 'PUBLIC'
               OR grants.grantee IN (
@@ -220,7 +378,7 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser) {
         503,
       );
     }
-    return assertDmlOnlyRoleRow(result.rows[0], expectedUser);
+    return assertDmlOnlyRoleRow(result.rows[0], expectedUser, serviceOwner);
   } catch (error) {
     destroy = true;
     throw error;

@@ -8,6 +8,7 @@ import {
   withFirebaseTransaction,
 } from "../src/database.js";
 import { RuntimeError } from "../src/errors.js";
+import { SERVICE_TABLE_PRIVILEGE_ALLOWLISTS } from "../src/table-privileges.js";
 
 function runtimeCode(error, code) {
   assert.ok(error instanceof RuntimeError);
@@ -112,6 +113,7 @@ test("a leaked transaction context destroys the pooled connection", async () => 
 });
 
 test("runtime role verification allows DML-only and destroys unsafe clients", async () => {
+  const serviceOwner = "worker";
   const expectedUser =
     "hushh-tech-worker-uat@hushh-tech-uat.iam";
   const safeRow = {
@@ -127,10 +129,33 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     inherited_privileged_role_count: "0",
     non_dml_table_privilege_count: "0",
     executable_application_routine_count: "0",
+    effective_table_dml_privileges: [],
+    accessible_table_rls_disabled_count: "0",
+    accessible_table_rls_not_forced_count: "0",
+    owned_application_schema_count: "0",
+    owned_application_table_count: "0",
+    owned_application_sequence_count: "0",
+    owned_application_routine_count: "0",
   };
-  assert.equal(assertDmlOnlyRoleRow(safeRow, expectedUser), true);
+  assert.equal(
+    assertDmlOnlyRoleRow(safeRow, expectedUser, serviceOwner),
+    true,
+  );
+  assert.equal(
+    assertDmlOnlyRoleRow(
+      { ...safeRow, effective_table_dml_privileges: "[]" },
+      expectedUser,
+      serviceOwner,
+    ),
+    true,
+  );
   assert.throws(
-    () => assertDmlOnlyRoleRow({ ...safeRow, rolsuper: true }, expectedUser),
+    () =>
+      assertDmlOnlyRoleRow(
+        { ...safeRow, rolsuper: true },
+        expectedUser,
+        serviceOwner,
+      ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
   assert.throws(
@@ -138,12 +163,17 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
       assertDmlOnlyRoleRow(
         { ...safeRow, application_schema_create_count: "1" },
         expectedUser,
+        serviceOwner,
       ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
   assert.throws(
     () =>
-      assertDmlOnlyRoleRow({ ...safeRow, rolbypassrls: true }, expectedUser),
+      assertDmlOnlyRoleRow(
+        { ...safeRow, rolbypassrls: true },
+        expectedUser,
+        serviceOwner,
+      ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
   assert.throws(
@@ -151,6 +181,7 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
       assertDmlOnlyRoleRow(
         { ...safeRow, inherited_privileged_role_count: "1" },
         expectedUser,
+        serviceOwner,
       ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
@@ -159,6 +190,7 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
       assertDmlOnlyRoleRow(
         { ...safeRow, non_dml_table_privilege_count: "1" },
         expectedUser,
+        serviceOwner,
       ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
@@ -178,7 +210,11 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     },
   };
   assert.equal(
-    await verifyDmlOnlyRuntime({ connect: async () => safeClient }, expectedUser),
+    await verifyDmlOnlyRuntime(
+      { connect: async () => safeClient },
+      expectedUser,
+      serviceOwner,
+    ),
     true,
   );
   assert.match(roleQuery, /WITH RECURSIVE effective_role_oids/);
@@ -187,6 +223,18 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
   assert.match(roleQuery, /non_dml_table_privilege_count/);
   assert.match(roleQuery, /application_schema_create_count/);
   assert.match(roleQuery, /pg_namespace AS application_schemas/);
+  assert.match(roleQuery, /effective_table_dml_privileges/);
+  assert.match(roleQuery, /has_table_privilege/);
+  assert.match(roleQuery, /relrowsecurity/);
+  assert.match(roleQuery, /relforcerowsecurity/);
+  assert.match(roleQuery, /owned_application_schema_count/);
+  assert.match(roleQuery, /owned_application_table_count/);
+  assert.match(roleQuery, /owned_application_sequence_count/);
+  assert.match(roleQuery, /owned_application_routine_count/);
+  assert.equal(
+    roleQuery.includes("NOT LIKE 'pg\\_%' ESCAPE '\\'"),
+    true,
+  );
   assert.equal(safeClient.releasedWith, null);
 
   const unsafeClient = {
@@ -198,10 +246,107 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
         : { rows: [] },
   };
   await assert.rejects(
-    verifyDmlOnlyRuntime({ connect: async () => unsafeClient }, expectedUser),
+    verifyDmlOnlyRuntime(
+      { connect: async () => unsafeClient },
+      expectedUser,
+      serviceOwner,
+    ),
     (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
   );
   assert.ok(unsafeClient.releasedWith instanceof Error);
+});
+
+test("runtime readiness rejects broad DML, weak RLS, and application ownership", () => {
+  const serviceOwner = "worker";
+  const expectedUser = "hushh-tech-worker-uat@hushh-tech-uat.iam";
+  const safeRow = {
+    current_user: expectedUser,
+    rolsuper: false,
+    rolcreaterole: false,
+    rolcreatedb: false,
+    rolreplication: false,
+    rolbypassrls: false,
+    can_create_database: false,
+    can_create_public_schema: false,
+    application_schema_create_count: "0",
+    inherited_privileged_role_count: "0",
+    non_dml_table_privilege_count: "0",
+    executable_application_routine_count: "0",
+    effective_table_dml_privileges: [],
+    accessible_table_rls_disabled_count: "0",
+    accessible_table_rls_not_forced_count: "0",
+    owned_application_schema_count: "0",
+    owned_application_table_count: "0",
+    owned_application_sequence_count: "0",
+    owned_application_routine_count: "0",
+  };
+  const unsafeCases = [
+    {
+      name: "broad table DML",
+      change: {
+        effective_table_dml_privileges: [
+          {
+            schema: "public",
+            table: "profiles",
+            privilege: "SELECT",
+            kind: "r",
+          },
+        ],
+      },
+    },
+    {
+      name: "disabled RLS",
+      change: { accessible_table_rls_disabled_count: "1" },
+    },
+    {
+      name: "unforced RLS",
+      change: { accessible_table_rls_not_forced_count: "1" },
+    },
+    {
+      name: "schema ownership",
+      change: { owned_application_schema_count: "1" },
+    },
+    {
+      name: "table ownership",
+      change: { owned_application_table_count: "1" },
+    },
+    {
+      name: "sequence ownership",
+      change: { owned_application_sequence_count: "1" },
+    },
+    {
+      name: "routine ownership",
+      change: { owned_application_routine_count: "1" },
+    },
+  ];
+  for (const { name, change } of unsafeCases) {
+    assert.throws(
+      () =>
+        assertDmlOnlyRoleRow(
+          { ...safeRow, ...change },
+          expectedUser,
+          serviceOwner,
+        ),
+      (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
+      name,
+    );
+  }
+});
+
+test("every disabled service starts with an exact empty table allowlist", () => {
+  assert.deepEqual(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(), [
+    "content-api",
+    "engagement-api-worker",
+    "financial-api",
+    "identity-api",
+    "investor-api",
+    "signed-webhook-service",
+    "worker",
+  ]);
+  for (const privileges of Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS)) {
+    assert.deepEqual(privileges, []);
+    assert.equal(Object.isFrozen(privileges), true);
+  }
 });
 
 test("Cloud SQL connector is private, IAM-authenticated, bounded, and passwordless", async () => {

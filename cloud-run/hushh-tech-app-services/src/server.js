@@ -29,7 +29,11 @@ const app = createApp({
   verifyFirebaseProductRequest: createFirebaseProductVerifier({ config }),
   verifyWebhookRequest: createWebhookVerifier({ verifiers: {} }),
   verifyReadiness: () =>
-    verifyDmlOnlyRuntime(database.pool, config.databaseUser),
+    verifyDmlOnlyRuntime(
+      database.pool,
+      config.databaseUser,
+      config.serviceOwner,
+    ),
   handlers: Object.freeze({}),
   log: (record) => console.log(JSON.stringify(record)),
 });

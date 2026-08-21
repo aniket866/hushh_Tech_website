@@ -9,6 +9,7 @@ import {
   validateRegistry,
 } from "../src/registry.js";
 import { FUNCTION_CONTRACTS } from "../src/contracts.js";
+import { SERVICE_TABLE_PRIVILEGE_ALLOWLISTS } from "../src/table-privileges.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const registryOnly = process.argv.includes("--registry-only");
@@ -49,6 +50,13 @@ assert.equal(
   false,
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS), []);
+assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
+assert.equal(
+  Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).every(
+    (privileges) => privileges.length === 0,
+  ),
+  true,
+);
 
 if (!registryOnly) {
   const packageJson = JSON.parse(
