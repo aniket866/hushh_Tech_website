@@ -11,6 +11,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 5. [Skill Taxonomy](./skill-taxonomy.md) for the first-wave owner and spoke skill layout behind this flow
 6. [Supabase Retirement Contract](./supabase-retirement-contract.md) for the
    frozen no-hybrid migration inventory and its blocking CI contract
+7. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
 
 ## Canonical workflow and governance
 
