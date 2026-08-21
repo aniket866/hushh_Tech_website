@@ -156,6 +156,68 @@ function compileSynthetic(overrides: { dump?: string; identity?: string } = {}) 
 }
 
 describe('offline target schema compiler', () => {
+  it('normalizes the PostgreSQL 17 CREATE OR REPLACE TRIGGER dump form to fail closed', () => {
+    const dump = syntheticSchemaDump().replaceAll(
+      'CREATE TRIGGER',
+      'CREATE OR REPLACE TRIGGER',
+    );
+    const result = compileSynthetic({ dump });
+
+    expect(result.report.counts.triggers).toBe(24);
+    expect(
+      result.phases['30_constraints_triggers_indexes.sql.plan'].match(
+        /CREATE TRIGGER/g,
+      ),
+    ).toHaveLength(24);
+    expect(result.phases['30_constraints_triggers_indexes.sql.plan']).not.toMatch(
+      /CREATE\s+OR\s+REPLACE(?:\s+CONSTRAINT)?\s+TRIGGER/i,
+    );
+    expect(validateCompiledTargetSchema({ phases: result.phases })).toBe(true);
+  });
+
+  it('normalizes safe quote-all-identifiers function return and language tokens', () => {
+    const dump = syntheticSchemaDump()
+      .replace(/RETURNS\s+([a-z_][a-z0-9_]*)\nLANGUAGE/gi, 'RETURNS "$1"\nLANGUAGE')
+      .replaceAll('RETURNS "trigger"\nLANGUAGE', 'RETURNS "public"."trigger"\nLANGUAGE')
+      .replaceAll('LANGUAGE plpgsql', 'LANGUAGE "plpgsql"');
+    const result = compileSynthetic({ dump });
+
+    expect(result.report.counts.sourceCustomFunctionsDispositioned).toBe(24);
+    expect(validateCompiledTargetSchema({ phases: result.phases })).toBe(true);
+  });
+
+  it('rejects an uppercase quoted function language token', () => {
+    const dump = syntheticSchemaDump().replace('LANGUAGE plpgsql', 'LANGUAGE "PLPGSQL"');
+
+    expect(() => compileSynthetic({ dump })).toThrow(
+      expect.objectContaining({ code: 'FUNCTION_SIGNATURE_DRIFT' }),
+    );
+  });
+
+  it('preserves a single quoted identifier containing a dot as one return-type token', () => {
+    const dump = syntheticSchemaDump().replace(
+      'RETURNS trigger\nLANGUAGE',
+      'RETURNS "public.trigger"\nLANGUAGE',
+    );
+
+    expect(() => compileSynthetic({ dump })).toThrow(
+      expect.objectContaining({ code: 'FUNCTION_SIGNATURE_DRIFT' }),
+    );
+  });
+
+  it('turns source IF NOT EXISTS tables into fail-closed target DDL', () => {
+    const dump = syntheticSchemaDump().replaceAll(
+      'CREATE TABLE public.',
+      'CREATE TABLE IF NOT EXISTS "public".',
+    );
+    const result = compileSynthetic({ dump });
+    const parity = result.phases['20_raw_parity_schema.sql.plan'];
+
+    expect(parity.match(/CREATE TABLE public\./g)).toHaveLength(70);
+    expect(parity).not.toMatch(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS/i);
+    expect(validateCompiledTargetSchema({ phases: result.phases })).toBe(true);
+  });
+
   it('compiles all 70 parity tables into seven guarded, Firebase-aware private phases', () => {
     const result = compileSynthetic();
     expect(Object.keys(result.phases)).toEqual(TARGET_SCHEMA_PHASES);
@@ -290,6 +352,14 @@ describe('offline target schema compiler', () => {
     );
     expect(() => validateCompiledTargetSchema({ phases: guardBypass })).toThrow(
       expect.objectContaining({ code: 'PLAN_GUARD_BYPASS' }),
+    );
+
+    const replaceTrigger = { ...result.phases };
+    replaceTrigger['30_constraints_triggers_indexes.sql.plan'] = replaceTrigger[
+      '30_constraints_triggers_indexes.sql.plan'
+    ].replace('CREATE TRIGGER', 'CREATE OR REPLACE TRIGGER');
+    expect(() => validateCompiledTargetSchema({ phases: replaceTrigger })).toThrow(
+      expect.objectContaining({ code: 'TRIGGER_REPLACE_NOT_ALLOWED' }),
     );
   });
 

@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "state": "EXACT_PRIVATE_DUMP_OFFLINE_COMPILE_VERIFIED",
+  "baseHeadSha": "db16ad242cd3bff6164af401bb582862fdaf4e3e",
+  "bindings": {
+    "compilerSha256": "a1c96dbffed3189f55d8f215b64c0fe378ef9646a3a6819b863621e44cf7768e",
+    "validatorSha256": "979ec9156adc1eec9f18c4a1b0293feec0b5a57788487cdd91ae864464bf7843",
+    "foundationSha256": "55d999942ef578e88b517134fd5ec69f34e88e16a849f1d45666795fa3767ad4",
+    "encryptedEvidenceArtifactSha256": "b8db2d2501329934c243e41b8e77d5509507f10519d23e72c8a4b22abf302e86",
+    "sourceLocatorSha256": "4918ebd144edf9826f2f4b42a5c4a2811a39edcd85f27a1b02157acc52c80c43",
+    "kmsLocatorSha256": "900ad60171ae745e516dcf8c071ba9586f3fcc6a2ffd1b21d8edac21a47c24aa",
+    "ciphertextSha256": "da99ca16a8cee1646814f05087db9487555180ae653770b298467ddd63c606d7",
+    "ciphertextBytes": 25971,
+    "compressedPlaintextSha256": "8f9a5bf29e5cfbf58f71dcf2510f16bb9abff835f76017f8475050daaf4bb4b2",
+    "compressedPlaintextBytes": 25886,
+    "plaintextSha256": "330de0785b3d8c109b538f9ffb75886c255e14bdbcfb8ecffa02e94ddaa7c570",
+    "plaintextBytes": 210601,
+    "plaintextLines": 6203
+  },
+  "plan": {
+    "version": 1,
+    "state": "COMPILED_PRIVATE_PLAN_ONLY",
+    "sourceEvidence": {
+      "plaintextSha256": "330de0785b3d8c109b538f9ffb75886c255e14bdbcfb8ecffa02e94ddaa7c570",
+      "encryptedEvidenceArtifactSha256": "b8db2d2501329934c243e41b8e77d5509507f10519d23e72c8a4b22abf302e86",
+      "sanitizedFactsArtifactSha256": "a761d9425314f7acaa0bad1afd477cf0c4c2876b0e11c66f8664e5dd7415d163",
+      "captureHashesArtifactSha256": "01855cc14bc4edd59ecb852e95999aee5e5867c4ddb26287276b8e82f8fca280",
+      "firebasePolicyMappingArtifactSha256": "8734dc78c6c32936c9a168b080da88c4fe32108b1e72eb3f192a9000f1270ecb",
+      "bodyProof": "MONOLITHIC_REVIEWED_PLAINTEXT_SHA256",
+      "independentCaptureHashes": "LOADED_AND_ARTIFACT_BOUND_NOT_REDERIVED"
+    },
+    "counts": {
+      "rawParityTables": 70,
+      "sourcePublicPoliciesDispositioned": 118,
+      "publicPoliciesTranslated": 70,
+      "publicPoliciesBlocked": 48,
+      "storagePoliciesExcludedForGcs": 10,
+      "sourceCustomFunctionsDispositioned": 24,
+      "legacyRpcsWithheld": 16,
+      "triggerFunctionsRetained": 8,
+      "genericDeleteFunctionsWithheld": 4,
+      "triggers": 24,
+      "explicitIndexes": 121,
+      "authUsersForeignKeysTranslated": 37
+    },
+    "identity": {
+      "canonicalIdentifier": "FIREBASE_UID",
+      "legacyUuidProvenance": "PRESERVED",
+      "requestContext": "TRANSACTION_LOCAL_APP_FIREBASE_UID",
+      "unclaimedLegacyPrincipalAccess": "DENIED",
+      "emailOnlyMapping": "FORBIDDEN",
+      "unclaimedLegacyPrincipals": 65
+    },
+    "dispositions": {
+      "blockedPolicyKeyHashes": [
+        "0749e8039b73da312db83e22aee52ea6fad5446fc3c963937f5a2c4d23dc40bc",
+        "10298362112b3bc64a663bc0630b5834327f345664123408a47fad562a669aa3",
+        "13a1b74eeb5132602a8d7fccd3c925bd14fa81ab0228cbc25e9d471a649e075b",
+        "152a2287a8f2d6062323bfd44a91f46488b92dfd30483c098ee5b3dc7f11987f",
+        "163d3b9d44c12c1c5b5b431bbfbf1f0c92f4bbb932b7adf31ccd6f4fc9ded0cf",
+        "167d51782c0b7ea627c6db6a744a0d885ec775bf983996643497f18ab7acb115",
+        "198b5dedaf4fe9ae9e70c355a665be2d41315c1a29e71a26e862a0abda2160d4",
+        "1ce4220c6b593a4ef10749b1fcbaa447a5495d6dd7422de4364ac25467405f3f",
+        "1fb82f879ecce4ec555dd112dfde4a7e00656db0aeab56405a2a018828744c59",
+        "20db717bbfded17ec403d3cabad9858c054322a1e80e478c12a2d8ad5abc98a0",
+        "282762aa1a220ab4c3f571e411071027ad1abe62b8fd5adc5c19107f6c231ceb",
+        "2d33b7c6299bc40053469e65abfb837a6a477669600acc6225a9f8bedd64b9c3",
+        "38187e4a110d676553d474f9ccb392e6c99b2957dddc620268aaad97e3d94246",
+        "41608acf6e39e8bb8b98e0c5449922554f068aa6cf92299bcae253da0034010f",
+        "4464ca0d94c55cf696ae31452505692591cf241817f3c21c6351049bdc9551bf",
+        "473fa55bbdff153b60abf747d6c21268e4612cae1a6b999ca71dbfcb6489dc83",
+        "48f24eb8ac25737e45f3b33e3cff185128dea1fcfd451488311f218f72d1230c",
+        "4dcc4dfcf6afe8b4b9066b320cb7531109e7a8233c62cf76d858e5c03d6fe58b",
+        "5384497964cfa44bfc0b0def0d163b2d1b23140b2a1323a920e69eb807b26baf",
+        "574d099aeda35c10dcd596c59829be9bfb2617f73b1b9248f9fdff6ca864a810",
+        "61d6215839a4943c985cc970579d5f5a3d2efb2a491fb086e599941523965646",
+        "67876a61bfb989d684f305b6d7ed994782c187361d2d2b44a825c22c81808ceb",
+        "6a6d6ed1870017a0b81d10d5f8426e993c60af46e21da1eb9656c4070bb51de5",
+        "6c326b88eee786a7ff3582c2d1ba789ae9db5a7da2e27c6855f47abc026c0e2d",
+        "7c6301543bd15e9a0d49bbdeb5fb5e9fa1789616a2ec1079c32ef87a3018abd1",
+        "7f02d2994f3bfe6330ea8d8405dd9039a7c9d4bcf51be402775fabe35f97d2c1",
+        "86e4895ce85e4611689c7a23c0794f84973b78a246f14689fcca146d9831630d",
+        "927e1bc26650d75e2d40dca399c8287eaf5823611fbfc0a1771ab68a97e46a79",
+        "9488772d8abbd4c6f9350f9648a4e79b018b0f37fe31e64386f44d4eb239cbf6",
+        "982988458e89e59bf14995b2188fde518c51b82376346ec77f00b125589279b2",
+        "9b0e5a48de06b2721c9e595f38a8c74af5063fd6e1d23fff6b4e81e1496db51b",
+        "9fc5e10a88660c111ac4a44bccdd1d8ce73560d46d5b0317947838da3d7b07ff",
+        "a13c618110723bde1b8fba20fc65f98ff69f933a0060fdbe7b2a0f7d0829a11c",
+        "a3d508d96df228cad722c9d0c90b6b971dc771e4bbfb110c4a2b1d119c2abfd2",
+        "a45d2d196cac4e95c8e94bab08a9d4dfebf9e9daf48f9b73d9e8b39f5618e9d4",
+        "a72ff30e9b2737bcd4336d931df61988bf507bbf14a2015cf2b26819311f98ca",
+        "b92506d6f9873b48c672f1c1023fc41b4401532ed2695eb8633508dd00d6c34d",
+        "bef9b5b2a8bde634e1e5c00376db2daec0eb46e65ef291e96d647ac7bcaccbc9",
+        "d000058343b3e293666129500e9ca1e12c2e51d9c173a1e1ee3a8099222d94f6",
+        "d43c30b2d29f07851ae0815def7e0ac29db12fee8905b765a2b1acf4bdec9e5f",
+        "d6516d15d87b35df3a952720de8778375de7e1b1c208175bff5f9d24b3db61eb",
+        "dda762dc9d6ba8b629bbedd50223fb2b4b25c0bce9278c44da4189a5c128d1fe",
+        "e35db533343789ca971a0428f6891d05d842c099682bdee38f6cfab8923e7449",
+        "ebe5606750e731df4cfbcf6dd4b8d57ea4aded48c60a9b67d0d009fae87bf139",
+        "f3be57b7f68a0e1d53cfdc5992766700a13cc9fc61b2c527bafb46a8b2bef34f",
+        "f84006ad09321b0d2eae67001b30fe54f7e0b6147f31839f978d02b86f0f4d3b",
+        "fb78ae2aab3a18c04ef007b8519468ae04d458fbf965827da3ae2a12620efc54",
+        "fcfc6cd21c4c9bf9ba71eae01c60073c9bfadfb572f786671f7024ba2a785aaa"
+      ],
+      "withheldRpcKeyHashes": [
+        "02b930df8e2aae8c17ecd143c829caf4c58685ddcde68be86697a141f84f7d46",
+        "0a858e81bb52ce9db04ecad791ab4e182b4bb6aebfb9ffb420fd3f518ff08f73",
+        "0c7b98fe7ddce19c8945e906fd1545370d60dc5fc62897b53850301578d4a66d",
+        "1d332aef3bfb0b4ec0d7ddd31484f52e84076e60ce292b6d3601c400eac36d19",
+        "244158674676fd6b1bad0656ec359267eb49a627ec10a89523f6503927dc6b02",
+        "2ef2597d1c19fbd872dda71c2cbc07bfc33aa899092661fea4dfea517faaec44",
+        "4aecc69097d87f7a0c841a8f4b0e311b887c8d2b352e90e611f188ef7100e7f1",
+        "68448124cc6cda610490c7c225677cf0737a2dd782e3652c5a02e402cb6d02ab",
+        "689589e91b5339b199a867a94482afdefbd6b40f89fe07d128351dc3ba2bbdd4",
+        "78b6ee9796c659939ba03bc795ef6838ec4cbce3961e2517e2158d1f6b9a7100",
+        "bf3a9fe8d6087a97d0351262200721f867dd2beef4b923deaa15cc215008ca92",
+        "c2d04c793708e6c474d6422a30137b524db54d4c631629db1e7eae70a8f14721",
+        "c9e13d21d81f615497d6a3c951e17c69b412748b49d21ae75cb295e5b04ed35d",
+        "cf84cbc14d5ee4ed453fc1b27dd861fa4cf630cdca026643f67d5e17781b9b4e",
+        "e52e093e21f33c7dee4b66be4107bd51350d0014a4014f3dda990f32863b535a",
+        "ffbc06cdb9cf1d6ed21a1f3abacb72837a3187993eb2517c8ec6c2f3f344344d"
+      ],
+      "legacyRpcRuntimeAllowlist": "EMPTY",
+      "sourceExtensionSet": "BLOCKED_PENDING_EXACT_SIX_EXTENSION_REVIEW"
+    },
+    "phases": [
+      {
+        "name": "00_extension_and_role_preflight.sql.plan",
+        "sha256": "1584f2c0e4a674d40b92dbe234eafc99da8a97f982fa0c5fba846a96bf5ca663",
+        "bytes": 5311,
+        "planGuard": true
+      },
+      {
+        "name": "10_firebase_identity_context.sql.plan",
+        "sha256": "fe147e5db9e05d2c6159b0f43fa53a849bf3ce2ae6566581924a1f781833f381",
+        "bytes": 18914,
+        "planGuard": true
+      },
+      {
+        "name": "20_raw_parity_schema.sql.plan",
+        "sha256": "4aa4b0f9007bae103983d2b13280e55ed1e5569fae5cb6ef7827fa41d49c1aa3",
+        "bytes": 63875,
+        "planGuard": true
+      },
+      {
+        "name": "30_constraints_triggers_indexes.sql.plan",
+        "sha256": "2820ab3415d769aced2eb2ed1a4ede9a35137fa1c76c580b195aea0b34a8788b",
+        "bytes": 60335,
+        "planGuard": true
+      },
+      {
+        "name": "40_firebase_rls_policies.sql.plan",
+        "sha256": "d9e7f114f50e8856d076f552b64ccbd1d7148fed168bdb0504b772945d44a244",
+        "bytes": 71979,
+        "planGuard": true
+      },
+      {
+        "name": "50_target_privileges.sql.plan",
+        "sha256": "e2b3f3e16e12c09dbdf7a4776ea2c65280ad144a0f23dd6cac335b5f55eb4358",
+        "bytes": 36934,
+        "planGuard": true
+      },
+      {
+        "name": "60_catalog_validation.sql.plan",
+        "sha256": "c8527a91dc1849845e501f6ef82d2262f8b69822f50aa43c1ee6224e707aef41",
+        "bytes": 29184,
+        "planGuard": true
+      }
+    ],
+    "execution": {
+      "mode": "PLAN_ONLY",
+      "applyReady": false,
+      "liveConnectionsAvailable": false,
+      "blockers": [
+        "PLAN_ONLY_EXECUTION",
+        "GOVERNED_EXECUTOR_NOT_PRESENT",
+        "SEALED_SCHEMA_OWNER_EXECUTOR_BINDING_REQUIRED",
+        "LIVE_TARGET_ATTESTATION_REQUIRED",
+        "48_SOURCE_POLICY_CONTRACTS_BLOCKED",
+        "16_LEGACY_RPC_CONTRACTS_BLOCKED",
+        "SOURCE_EXTENSION_SET_REVIEW_REQUIRED"
+      ]
+    },
+    "planSha256": "41d67d038b8d142f35b90c4891c51b1bd89d8d9e7529bdebce407c769a7f3a7a"
+  },
+  "scan": {
+    "engine": "gitleaks",
+    "findingCount": 0,
+    "scope": "DECRYPTED_AND_COMPILED_TEMP"
+  },
+  "retention": {
+    "repositoryPlaintext": "FORBIDDEN",
+    "repositoryCompiledSql": "FORBIDDEN",
+    "repositoryCiphertext": "FORBIDDEN",
+    "temporaryMaterial": "OPERATOR_VERIFIED_REMOVED_BEFORE_REVIEW",
+    "retainedContents": "HASHES_COUNTS_AND_CONTROL_STATE_ONLY"
+  },
+  "evidenceSha256": "de704046cafa70f73ebc5389299d585d6c4eccf27ffc45f4c8ac35a567579668"
+}

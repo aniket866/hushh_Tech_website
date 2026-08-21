@@ -27,7 +27,7 @@
   },
   "frozenEncryptedSchemaDumpEvidenceArtifact": {
     "path": "migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json",
-    "sha256": "5895170f023d1cd9c4e376cb7d566ac35f536555209a14d53cc28c2c952e89a4"
+    "sha256": "b8db2d2501329934c243e41b8e77d5509507f10519d23e72c8a4b22abf302e86"
   },
   "firebasePolicyMappingArtifact": {
     "path": "migration/contracts/firebase-policy-mapping.v1.json",

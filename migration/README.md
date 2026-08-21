@@ -247,9 +247,10 @@ it contains no default literals or function bodies. The separate
 repeatable-read capture, 24 per-function definition hashes, aggregate collection
 hashes, and capture-query hash. The
 `frozen-encrypted-schema-dump-evidence.v1.json` artifact separately binds the
-reviewed schema-only dump, Cloud Key Management Service key version, ciphertext
-hash, exact Cloud Storage generations, bucket controls, round-trip verification,
-and zero-finding secret scan. Plaintext, compressed plaintext, ciphertext, the
+reviewed schema-only dump, the exact 25,886-byte compressed plaintext and its
+hash, Cloud Key Management Service key version, ciphertext hash, exact Cloud
+Storage generations, bucket controls, round-trip verification, and zero-finding
+secret scan. Plaintext, compressed plaintext, ciphertext, the
 source capture, and the raw query envelope remain outside Git and are explicitly
 forbidden from repository storage. Raw emails are not required. Password
 hashes, sessions, refresh/access tokens, one-time passwords, magic links, keys,
@@ -364,6 +365,27 @@ extension support, and catalog before it can produce executable SQL. Never
 commit the decrypted dump or compiled private phases. The exact 210,601-byte
 offline compile is a required operator gate because the decrypted input is
 intentionally absent from the repository.
+
+After that exact private compile and a zero-finding gitleaks scan, generate the
+checked-in hash/count-only evidence before removing the private temporary
+directory:
+
+```bash
+node scripts/gcp/migration/target-schema-compile-evidence.mjs \
+  --generate \
+  --private-output-dir=/secure-temporary-path/compiled-target-schema \
+  --scan-findings=0 \
+  --dry-run
+npm run --silent gcp:migration:validate-target-schema-evidence
+```
+
+The evidence binds the reviewed compiler and validator bytes, the identity
+foundation, the encrypted-dump manifest, opaque source/KMS locator digests,
+all seven phase hashes and counts, and the plan-only blocker set. It contains
+no source SQL, function bodies, defaults, identities, absolute paths, object
+names, key resource names, or credentials. It closes only the exact private
+dump offline-compile gate; target catalog attestation and apply authority stay
+blocked.
 
 Validate an encrypted-workspace snapshot without printing identities:
 

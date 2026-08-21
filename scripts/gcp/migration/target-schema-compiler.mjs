@@ -641,7 +641,10 @@ function extractPublicTable(statement, prefix) {
 }
 
 function extractCreatedTable(statement) {
-  return extractPublicTable(statement, "CREATE\\s+TABLE(?:\\s+ONLY)?");
+  return extractPublicTable(
+    statement,
+    "CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?(?:\\s+ONLY)?"
+  );
 }
 
 function extractFunctionName(statement) {
@@ -720,17 +723,110 @@ function splitTopLevelArguments(text) {
 
 function normalizeIdentityArguments(text) {
   return splitTopLevelArguments(text)
-    .map((argument) =>
-      argument
-        .replace(/\s+DEFAULT\s+[\s\S]*$/i, "")
-        .replace(/\s+/g, " ")
-        .trim()
-    )
+    .map((argument) => normalizeSqlContractFragment(stripArgumentDefault(argument)))
     .join(", ");
 }
 
+function tokenizeSqlContractFragment(text) {
+  const tokens = [];
+  for (let index = 0; index < text.length; index += 1) {
+    const start = index;
+    const char = text[index];
+    if (/\s/.test(char)) {
+      while (/\s/.test(text[index + 1] ?? "")) index += 1;
+      tokens.push({ kind: "space", raw: text.slice(start, index + 1), start });
+      continue;
+    }
+    if (char === '"') {
+      let value = "";
+      for (index += 1; index < text.length; index += 1) {
+        if (text[index] === '"' && text[index + 1] === '"') {
+          value += '"';
+          index += 1;
+        } else if (text[index] === '"') {
+          break;
+        } else {
+          value += text[index];
+        }
+      }
+      if (text[index] !== '"') {
+        fail("FUNCTION_SIGNATURE_DRIFT", "A quoted function contract identifier is unterminated.");
+      }
+      tokens.push({
+        kind: "identifier",
+        quoted: true,
+        raw: text.slice(start, index + 1),
+        start,
+        value,
+      });
+      continue;
+    }
+    if (char === "'") {
+      for (index += 1; index < text.length; index += 1) {
+        if (text[index] === "'" && text[index + 1] === "'") index += 1;
+        else if (text[index] === "'") break;
+      }
+      if (text[index] !== "'") {
+        fail("FUNCTION_SIGNATURE_DRIFT", "A function contract literal is unterminated.");
+      }
+      tokens.push({ kind: "literal", raw: text.slice(start, index + 1), start });
+      continue;
+    }
+    if (/[A-Za-z_]/.test(char)) {
+      while (/[A-Za-z0-9_$]/.test(text[index + 1] ?? "")) index += 1;
+      const raw = text.slice(start, index + 1);
+      tokens.push({ kind: "identifier", quoted: false, raw, start, value: raw });
+      continue;
+    }
+    tokens.push({ kind: "punctuation", raw: char, start });
+  }
+  return tokens;
+}
+
+function stripArgumentDefault(argument) {
+  const defaultToken = tokenizeSqlContractFragment(argument).find(
+    (token) =>
+      token.kind === "identifier" &&
+      token.quoted === false &&
+      token.value.toUpperCase() === "DEFAULT"
+  );
+  return defaultToken ? argument.slice(0, defaultToken.start) : argument;
+}
+
+function normalizeSqlContractFragment(text, { stripPublicSchema = false } = {}) {
+  const tokens = tokenizeSqlContractFragment(text);
+  const skipped = new Set();
+  if (stripPublicSchema) {
+    for (let index = 0; index < tokens.length; index += 1) {
+      const schema = tokens[index];
+      if (
+        schema.kind !== "identifier" ||
+        (schema.quoted ? schema.value !== "public" : schema.value.toLowerCase() !== "public")
+      ) {
+        continue;
+      }
+      let dotIndex = index + 1;
+      while (tokens[dotIndex]?.kind === "space") dotIndex += 1;
+      if (tokens[dotIndex]?.kind !== "punctuation" || tokens[dotIndex].raw !== ".") continue;
+      let typeIndex = dotIndex + 1;
+      while (tokens[typeIndex]?.kind === "space") typeIndex += 1;
+      if (tokens[typeIndex]?.kind !== "identifier") continue;
+      for (let skip = index; skip <= dotIndex; skip += 1) skipped.add(skip);
+    }
+  }
+  return tokens
+    .map((token, index) => {
+      if (skipped.has(index)) return "";
+      if (token.kind !== "identifier" || token.quoted === false) return token.raw;
+      return /^[a-z_][a-z0-9_$]*$/.test(token.value) ? token.value : token.raw;
+    })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeResultType(text) {
-  return text.replace(/\bpublic\./gi, "").replace(/\s+/g, " ").trim();
+  return normalizeSqlContractFragment(text, { stripPublicSchema: true });
 }
 
 function splitDollarQuotedFunctionDefinition(statement) {
@@ -842,13 +938,19 @@ function parseFunctionContract(statement, contract) {
   const identityArguments = normalizeIdentityArguments(
     statement.slice(openingIndex + 1, closingIndex)
   );
-  const returnMatch = /^\s*RETURNS\s+([^\n]+?)\s*(?:\n|\r\n?)\s*LANGUAGE\s+([a-z_][a-z0-9_]*)\b/i.exec(
+  const returnMatch = /^\s*RETURNS\s+([^\n]+?)\s*(?:\n|\r\n?)\s*LANGUAGE\s+("(?:""|[^"])+"|[a-z_][a-z0-9_]*)(?=\s)/i.exec(
     statement.slice(closingIndex + 1)
   );
   if (!returnMatch) {
     fail("FUNCTION_SIGNATURE_DRIFT", "A frozen function return type or language could not be parsed.");
   }
   const result = normalizeResultType(returnMatch[1]);
+  const quotedLanguage = returnMatch[2].startsWith('"');
+  const languageToken = unquoteIdentifier(returnMatch[2]);
+  const language = quotedLanguage ? languageToken : languageToken.toLowerCase();
+  if (!new Set(["plpgsql", "sql"]).has(language)) {
+    fail("FUNCTION_SIGNATURE_DRIFT", "A frozen function language is outside the reviewed set.");
+  }
   const signature = `${name}(${identityArguments})->${result}`;
   const expectedSignature = contract.customPublicFunctionSignatures.find((entry) =>
     entry.startsWith(`${name}(`)
@@ -879,7 +981,7 @@ function parseFunctionContract(statement, contract) {
   }
   return {
     identityArguments,
-    language: returnMatch[2].toLowerCase(),
+    language,
     name,
     result,
     securityDefiner,
@@ -896,7 +998,7 @@ function extractPolicyKey(statement) {
 }
 
 function extractTriggerTable(statement) {
-  const match = /^CREATE(?:\s+CONSTRAINT)?\s+TRIGGER\b[\s\S]*?\sON\s+(?:ONLY\s+)?public\.("(?:""|[^"])+"|[a-z_][a-z0-9_]*)(?=\s|;)/i.exec(
+  const match = /^CREATE(?:\s+OR\s+REPLACE)?(?:\s+CONSTRAINT)?\s+TRIGGER\b[\s\S]*?\sON\s+(?:ONLY\s+)?public\.("(?:""|[^"])+"|[a-z_][a-z0-9_]*)(?=\s|;)/i.exec(
     statement
   );
   return match ? unquoteIdentifier(match[1]) : null;
@@ -1853,7 +1955,12 @@ function classifySourceStatements(statements, contract, dumpEvidence) {
   let explicitIndexCount = 0;
   let crossSchemaAuthForeignKeysTranslated = 0;
 
-  for (const statement of statements) {
+  for (const sourceStatement of statements) {
+    // pg_dump quotes canonical schemas and roles when --quote-all-identifiers is
+    // active. Normalize only the reviewed identifier set before dispatching the
+    // statement; literals, comments, and every application identifier stay
+    // byte-for-byte quoted.
+    const statement = canonicalizeSourceIdentifiers(sourceStatement);
     if (TRANSACTION_CONTROL_PATTERN.test(statement)) {
       fail("TRANSACTION_CONTROL_FORBIDDEN", "The source dump contains transaction control.");
     }
@@ -1875,7 +1982,11 @@ function classifySourceStatements(statements, contract, dumpEvidence) {
       assertAllowlistedTable(table, "CREATE TABLE", tableSet);
       if (seenTables.has(table)) fail("TABLE_DRIFT", "The schema dump defines a table more than once.");
       seenTables.add(table);
-      const principalTransform = transformLegacyPrincipalReferences(statement);
+      const normalizedCreateTable = statement.replace(
+        /^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\b/i,
+        "CREATE TABLE"
+      );
+      const principalTransform = transformLegacyPrincipalReferences(normalizedCreateTable);
       crossSchemaAuthForeignKeysTranslated += principalTransform.count;
       const transformed = transformLegacyAuthCalls(principalTransform.statement);
       if (
@@ -1966,7 +2077,11 @@ function classifySourceStatements(statements, contract, dumpEvidence) {
         fail("TRIGGER_DRIFT", "A trigger invokes a function outside the frozen trigger set.");
       }
       triggerCount += 1;
-      const transformed = transformLegacyAuthCalls(statement);
+      const normalizedTrigger = statement.replace(
+        /^CREATE\s+OR\s+REPLACE(?=\s+(?:CONSTRAINT\s+)?TRIGGER\b)/i,
+        "CREATE"
+      );
+      const transformed = transformLegacyAuthCalls(normalizedTrigger);
       if (
         executablePatternTest(transformed, SOURCE_STORAGE_SCHEMA_PATTERN) ||
         executablePatternTest(transformed, SOURCE_ROLE_PATTERN)
@@ -1975,6 +2090,9 @@ function classifySourceStatements(statements, contract, dumpEvidence) {
       }
       dependentObjects.push(transformed);
       continue;
+    }
+    if (/^CREATE(?:\s+OR\s+REPLACE)?(?:\s+CONSTRAINT)?\s+TRIGGER\b/i.test(statement)) {
+      fail("TRIGGER_DRIFT", "The schema dump defines a trigger outside the frozen public set.");
     }
 
     const indexTable = extractIndexTable(statement);
@@ -2295,6 +2413,12 @@ export function validateCompiledTargetSchema({ phases, contract = SOURCE_CONTRAC
   assertTrustedSecurityDefinerConfiguration(identityHelper, true);
 
   const functionPhase = phases["30_constraints_triggers_indexes.sql.plan"];
+  if (/\bCREATE\s+OR\s+REPLACE(?:\s+CONSTRAINT)?\s+TRIGGER\b/i.test(functionPhase)) {
+    fail(
+      "TRIGGER_REPLACE_NOT_ALLOWED",
+      "Compiled trigger DDL must fail closed instead of replacing an existing trigger."
+    );
+  }
   const functionStatements = splitPostgresStatements(functionPhase);
   const retainedFunctionNames = [];
   for (let index = 0; index < functionStatements.length; index += 1) {
@@ -2488,6 +2612,7 @@ export function compileTargetSchema({
     [
       "plaintextSha256",
       "compressedPlaintextSha256",
+      "compressedPlaintextBytes",
       "bytes",
       "lines",
       "tables",
@@ -2644,6 +2769,7 @@ export function compileTargetSchema({
 }
 
 function validatePlanReport(report, phases, contract) {
+  const hasPrivatePhaseBytes = phases !== null && phases !== undefined;
   assertExactKeys(
     report,
     [
@@ -2809,8 +2935,12 @@ function validatePlanReport(report, phases, contract) {
       return (
         entry?.name !== name ||
         entry?.planGuard !== true ||
-        entry?.sha256 !== sha256(Buffer.from(phases[name], "utf8")) ||
-        entry?.bytes !== Buffer.byteLength(phases[name], "utf8")
+        !/^[0-9a-f]{64}$/.test(entry?.sha256 ?? "") ||
+        !Number.isSafeInteger(entry?.bytes) ||
+        entry.bytes <= 0 ||
+        (hasPrivatePhaseBytes &&
+          (entry.sha256 !== sha256(Buffer.from(phases[name], "utf8")) ||
+            entry.bytes !== Buffer.byteLength(phases[name], "utf8")))
       );
     })
   ) {
@@ -2820,6 +2950,24 @@ function validatePlanReport(report, phases, contract) {
     fail("PLAN_REPORT_INVALID", "The report aggregate envelope digest has drifted.");
   }
   assertSafeForStdout(report);
+}
+
+export function validateTargetSchemaPlanEvidence({
+  report,
+  contract = SOURCE_CONTRACT,
+}) {
+  validatePlanReport(report, null, contract);
+  return true;
+}
+
+export function validatePrivateTargetSchemaPlan({
+  report,
+  phases,
+  contract = SOURCE_CONTRACT,
+}) {
+  validateCompiledTargetSchema({ phases, contract });
+  validatePlanReport(report, phases, contract);
+  return true;
 }
 
 export function writePrivateTargetSchemaPlan({
