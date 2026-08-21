@@ -21,6 +21,8 @@
     "build:community": "node scripts/community/generate-community-snapshot.mjs",
     "verify:sensitive-nda-gate": "node scripts/community/verify-sensitive-nda-gate.mjs",
     "build:assets": "npm run build:community && node scripts/generate-sitemap.js && node scripts/generate-robots.js",
+    "migration:storage:contract": "node scripts/migration/storage-cutover-plan.mjs --mode contract",
+    "migration:storage:test": "vitest run tests/storageCutoverPlan.test.ts",
     "gcp:secrets:audit": "node scripts/gcp/audit-hushh-tech-secret-manager.mjs",
     "gcp:secrets:migrate-uat": "node scripts/gcp/migrate-hushh-tech-uat-env-to-secrets.mjs",
     "build:web": "npm run build:assets && vite build",
