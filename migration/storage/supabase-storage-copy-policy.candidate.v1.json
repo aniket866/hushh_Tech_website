@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "storage-copy-policy-candidate-v1",
+  "candidateState": "CODE_AND_INDEPENDENT_REVIEW_REQUIRED",
+  "baseContractCanonicalDigestSha256": "e1a81688f956419224332fde1a04e4c0c9ba0ad9c948f38224f8009cd849e153",
+  "baseContractFileDigestSha256": "2dc544e786df5c640b631a24e5bd43b7e3d5e06c60715f23ab5a872d69fa39ac",
+  "environment": "uat",
+  "project": "hushh-tech-uat",
+  "region": "us-central1",
+  "productionProject": "hushh-tech-prod",
+  "readOnlyCollectorsAllowedWithExplicitFlag": true,
+  "executionActivated": false,
+  "copyExecutionAllowed": false,
+  "productionExecutionAllowed": false,
+  "sourceMutationAllowed": false,
+  "targetOverwriteAllowed": false,
+  "targetDeleteAllowed": false,
+  "activationRequires": [
+    "INDEPENDENT_SECURITY_REVIEW",
+    "PARENT_EXPLICIT_ADVANCE",
+    "REVIEWED_POLICY_ACTIVATION_COMMIT"
+  ],
+  "copyPolicy": {
+    "schemaVersion": "gcs-create-only-copy-v1",
+    "migrationNamespace": "_hushh_migrations/supabase-cutover-v1",
+    "targetObjectKeyAlgorithm": "migrationNamespace + '/' + sourceBucket + '/' + sha256(bucketId + NUL + objectKey) + '/' + sourceFingerprintSha256",
+    "sourceFingerprintAlgorithm": "sha256(canonicalJson({bucketId,objectKey,sizeBytes,mimeType,sourceUpdatedAt,cacheControl,sha256}))",
+    "immutableVersionedKeys": true,
+    "deltaReplayPolicy": "NEW_FINGERPRINT_CREATE_ONLY_UNCHANGED_NOOP_TOMBSTONE_RETAIN_NO_DELETE",
+    "targetMetadataScope": "IMMUTABLE_SOURCE_VERSION_ONLY_SNAPSHOT_BINDINGS_IN_RESULT_EVIDENCE",
+    "databasePointerManifestRequired": true,
+    "tombstoneDisposition": "RETAIN_IMMUTABLE_TARGET_NO_DELETE",
+    "dryRunDefault": true,
+    "explicitExecuteFlagRequired": true,
+    "exactArtifactDigestsRequired": true,
+    "reviewedGitHubApprovalRequired": true,
+    "createOnly": true,
+    "ifGenerationMatch": 0,
+    "overwriteAllowed": false,
+    "deleteAllowed": false,
+    "maximumApprovalLifetimeSeconds": 7200,
+    "writerServiceAccount": "hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "approvalRepository": "hushh-labs/hushh_Tech_website",
+    "approvalReviewerAllowlist": [
+      "ankitkumarsingh1702",
+      "Jhumma-hushh"
+    ],
+    "approvalReviewMarkerPrefix": "HUSHH_STORAGE_UAT_COPY_APPROVAL:"
+  }
+}

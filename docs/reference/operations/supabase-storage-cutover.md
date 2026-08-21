@@ -1,6 +1,6 @@
 # Supabase Storage Cutover Foundation
 
-This foundation describes the offline, fail-closed storage migration contract for issue #1950. It does not connect to Supabase or Google Cloud, copy or delete objects, create signed URLs, or enable production execution.
+This foundation describes the fail-closed storage migration contract for issue #1950. The base contract remains `PLANNING_ONLY_NO_LIVE_IO`: it does not authorize a copy, deletion, signed URL, or production execution. A separate candidate policy permits only explicitly requested read-only UAT inventory collection. Copy execution remains hard-blocked pending independent security review and a separate parent-approved activation commit.
 
 ## Frozen source and UAT targets
 
@@ -51,7 +51,7 @@ Every checkpoint carries the complete prior source object-ID and fingerprint set
 {"recordType":"sourceTombstone","objectId":"<lowercase-sha256>","priorSourceFingerprintSha256":"<lowercase-sha256>","deletedAt":"<timestamp inside delta window>","deletionReason":"<reviewed reason>","previousSourceInventoryDigestSha256":"<prior digest>","deltaEvidenceDigestSha256":"<current evidence digest>","sourceArtifactDigestSha256":"<current artifact digest>"}
 ```
 
-The tombstone must match the prior fingerprint and current evidence/artifact. Missing, unknown, duplicated, forged, replayed, or resurrected objects stop delta planning, checkpointing, and reconciliation. A target-present tombstone produces only a dry-run generation-matched delete action; a target-absent tombstone produces a no-op.
+The tombstone must match the prior fingerprint and current evidence/artifact. Missing, unknown, duplicated, forged, replayed, or resurrected objects stop delta planning, checkpointing, and reconciliation. The older offline planner can describe a non-executable generation-matched delete, but the live-copy candidate does not accept that action: it removes the later database pointer, retains immutable target bytes, and never calls a Google Cloud Storage delete or metadata-update endpoint.
 
 ## Target inventory input
 
@@ -111,6 +111,94 @@ node scripts/migration/storage-cutover-plan.mjs --mode delta-plan --source tmp/p
 
 The delta planner never overwrites blindly. New objects use a does-not-exist precondition. Changed objects and reviewed tombstones require the exact prior target generation. The checkpoint also binds the full target inventory digest and the aggregate signed-URL issuer evidence digest; both must match before a delta plan is produced. Missing or forged tombstones, changed target generations, untracked target objects, stale snapshots, evidence swaps, and unrecorded source deletions stop the plan.
 
+## Read-only live inventory candidate
+
+`migration/storage/supabase-storage-copy-policy.candidate.v1.json` is separate from the base contract. It keeps `executionActivated` and `copyExecutionAllowed` false. The collector is a no-network dry run unless `--allow-read-only-live` is present, and it is restricted to UAT project `hushh-tech-uat` in `us-central1`.
+
+Check the source collector without making a provider request:
+
+```bash
+npm run migration:storage:inventory -- --mode source
+```
+
+An authorized operator can create private, create-only source evidence after providing the existing server-side source credential through the process environment:
+
+```bash
+npm run migration:storage:inventory -- \
+  --mode source \
+  --environment uat \
+  --project hushh-tech-uat \
+  --allow-read-only-live \
+  --output tmp/private-source-live.jsonl \
+  --evidence-output tmp/private-source-live-evidence.json
+```
+
+The collector permits only `GET` requests plus the Supabase object-list `POST` contract. It performs two metadata passes and hashes bytes from the download stream. It accepts only the frozen six-bucket set and completes only at exactly 124 objects and 111,078,397 bytes. Source credentials, URLs, and object names are not written to console evidence.
+
+After a reviewed checkpoint exists, the same read-only collector can emit the next complete `RECORDED_DELTA`. Both checkpoint arguments are required together and are verified before any provider read:
+
+```bash
+npm run migration:storage:inventory -- \
+  --mode source \
+  --environment uat \
+  --project hushh-tech-uat \
+  --allow-read-only-live \
+  --previous-checkpoint tmp/private-checkpoint.json \
+  --previous-checkpoint-file-digest-sha256 '<exact-checkpoint-file-sha256>' \
+  --output tmp/private-source-delta.jsonl \
+  --evidence-output tmp/private-source-delta-evidence.json
+```
+
+The delta binds the prior checkpoint and exact checkpoint-file digest, uses the next sequence and a new export run, rehashes every current object, and emits a typed tombstone for each prior object absent from both stable metadata passes. A prior tombstone cannot reappear. The source remains read-only.
+
+Use the exact source file digest returned by that command to inspect the six UAT target buckets:
+
+```bash
+npm run migration:storage:inventory -- \
+  --mode target \
+  --environment uat \
+  --project hushh-tech-uat \
+  --allow-read-only-live \
+  --source-inventory tmp/private-source-live.jsonl \
+  --source-file-digest-sha256 '<exact-lowercase-sha256>' \
+  --output tmp/private-target-preflight.json
+```
+
+For a `RECORDED_DELTA`, add the same exact `--previous-checkpoint` and `--previous-checkpoint-file-digest-sha256` pair. The target preflight will not accept a delta without both bindings.
+
+The target preflight hashes unmanaged object names in its evidence and never emits them. It treats every object outside `_hushh_migrations/supabase-cutover-v1/` as unmanaged and read-only. This preserves the 563 unrelated objects already observed in `hushh-tech-community-content-uat`. Any unknown object inside the migration namespace, non-matching preexisting destination, unsafe bucket setting, or Identity and Access Management drift is a blocker.
+
+The candidate destination mapping is deterministic and prefix-safe:
+
+```text
+_hushh_migrations/supabase-cutover-v1/<source-bucket>/<sha256(source-bucket + NUL + exact-UTF-8-source-key)>/<source-fingerprint-sha256>
+```
+
+The source fingerprint binds source bucket, exact key, bytes, MIME type, source timestamp, legacy cache directive, and SHA-256. An in-place source update therefore creates a different target name with `ifGenerationMatch=0`; it never overwrites the earlier immutable version. An unchanged version is an exact generation-bound no-op. A deletion retains every prior immutable version and produces only a typed database-pointer removal.
+
+Source keys are bounded to 1,024 UTF-8 bytes, must round-trip exactly, and cannot contain dot segments. The private, version-stable target metadata retains the exact source key, source fingerprint, source timestamp, legacy cache directive, source SHA-256, and access mode. The copy/result evidence—not mutable object metadata—binds the exact source inventory, source artifact, checkpoint, preflight, plan, approval, and reviewed commit. Target serving cache control remains `private, no-store`.
+
+Create a digest-bound review plan without writing to Google Cloud:
+
+```bash
+npm run migration:storage:copy -- \
+  --source-inventory tmp/private-source-live.jsonl \
+  --source-file-digest-sha256 '<exact-source-file-sha256>' \
+  --target-preflight tmp/private-target-preflight.json \
+  --target-preflight-file-digest-sha256 '<exact-preflight-file-sha256>' \
+  --plan-output tmp/private-create-only-plan.json
+```
+
+For a delta, the plan command also requires the exact checkpoint path and file digest used by both collectors.
+
+The plan contains only `CREATE_IF_ABSENT` actions with `ifGenerationMatch=0`, generation-bound `NOOP_PRESENT_EXACT` actions, or `RETAIN_TOMBSTONED_VERSIONS` actions that forbid target mutation and require a separate database-pointer removal. It contains no source keys, deletes, overwrites, or production path. Passing `--execute` currently fails with `COPY_EXECUTION_BLOCKED_PENDING_REVIEW` before reading artifacts or credentials or calling GitHub, Supabase, or Google Cloud.
+
+Any later activation must be a separate reviewed change. It must bind the exact source, checkpoint (for deltas), preflight, plan, approval, pull request head, every pull-request commit author/committer, GitHub review, UAT project, and migration namespace; require a blocker-free fresh preflight; and retain create-only generation preconditions. The source download is hashed into an unlinked read-only file descriptor before any Google request, rehashed after resumable-session initiation, and sent with server-validated CRC32C and MD5 digests. The write primitive itself accepts only the six UAT buckets and the exact two-digest namespace.
+
+The future activated path reserves a create-only private result file before its first target write. It then re-lists and rehashes the complete current source set, reconciles each current target generation and digest, rechecks every retained historical generation, and emits a digest-bound database-pointer manifest. For the frozen baseline this is 124 live source objects and 124 current target versions. A delta records live objects, typed tombstones, and retained immutable history separately; for example, one changed object plus one deletion remains 124 dispositions while producing 123 live pointers and 125 immutable target versions. No count-only result is accepted.
+
+Supabase deletion and every production storage action remain outside this candidate.
+
 ## Secondary Supabase gates
 
 The zero-dependency gate tracks exactly six references:
@@ -139,7 +227,7 @@ The later production archive remains planning-only here. It requires Cloud Key M
 
 ```bash
 npm run migration:storage:test
-npx eslint scripts/migration/storage-cutover-contract.mjs scripts/migration/storage-cutover-plan.mjs tests/storageCutoverPlan.test.ts
+npx eslint scripts/migration/storage-cutover-contract.mjs scripts/migration/storage-cutover-plan.mjs scripts/migration/storage-live-common.mjs scripts/migration/storage-live-policy.mjs scripts/migration/storage-live-inventory.mjs scripts/migration/storage-copy-executor.mjs tests/storageCutoverPlan.test.ts tests/storageLiveCopy.test.ts
 npx tsc --noEmit
 git diff --check
 ```
