@@ -1,0 +1,724 @@
+{
+  "version": 1,
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "database": "postgres",
+  "schema": "public",
+  "mappingRule": "EXACT_REVIEWED_POLICY_KEYS_WITH_LEGACY_UUID_OWNERSHIP_ONLY",
+  "expected": {
+    "sourcePublicPolicies": 118,
+    "firebaseOwnershipPolicies": 70,
+    "blockedPolicies": 48
+  },
+  "firebaseOwnershipPolicies": [
+    [
+      "agent_reviews",
+      "Users can create reviews",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "blocked_agents",
+      "Users block agents",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "blocked_agents",
+      "Users own blocked list",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "blocked_agents",
+      "Users unblock agents",
+      "DELETE",
+      "{public}"
+    ],
+    [
+      "ceo_meeting_payments",
+      "Users can insert own meeting payments",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "ceo_meeting_payments",
+      "Users can update own meeting payments",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "ceo_meeting_payments",
+      "Users can view own meeting payments",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "community_registrations",
+      "Users can read own registrations",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "consents",
+      "Users read own consents",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "consumer_profiles",
+      "Users read own consumer profile",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "consumer_profiles",
+      "Users update own consumer profile",
+      "UPDATE",
+      "{public}"
+    ],
+    [
+      "consumer_profiles",
+      "Users upsert own consumer profile",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "conversations",
+      "Users can view own conversations",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "delete_requests",
+      "Users can view own delete requests",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "devices",
+      "Users can manage own devices",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "fund_investment_plans",
+      "Users can view own fund plans",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_payment_notifications",
+      "Users can view own fund payment notifications",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_payment_reviews",
+      "Users can view own fund payment reviews",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_recurring_transfers",
+      "Users can view own recurring fund transfers",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_stripe_payment_requests",
+      "Users can view own fund payment requests",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_stripe_payments",
+      "Users can view own fund Stripe payments",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_stripe_subscriptions",
+      "Users can view own fund Stripe subscriptions",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "fund_transfers",
+      "Users can view own fund transfers",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "identity_verifications",
+      "Users can insert own verifications",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "identity_verifications",
+      "Users can update own verifications",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "identity_verifications",
+      "Users can view own verifications",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "investor_profiles",
+      "Users can delete own investor profile",
+      "DELETE",
+      "{authenticated}"
+    ],
+    [
+      "investor_profiles",
+      "Users can insert own investor profile",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "investor_profiles",
+      "Users can update own investor profile",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "investor_profiles",
+      "Users can view own investor profile",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "lead_events",
+      "Users view own lead events",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "lead_requests",
+      "Users create leads",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "lead_requests",
+      "Users own lead requests",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "lead_requests",
+      "Users update own leads",
+      "UPDATE",
+      "{public}"
+    ],
+    [
+      "messages",
+      "Users can insert messages in own conversations",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "messages",
+      "Users can view messages in own conversations",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "nda_signatures",
+      "Users can insert own NDA signature",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "nda_signatures",
+      "Users can insert their own NDA",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "nda_signatures",
+      "Users can update own NDA signature",
+      "UPDATE",
+      "{public}"
+    ],
+    [
+      "nda_signatures",
+      "Users can view own NDA signature",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "nda_signatures",
+      "Users can view their own NDA",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "notifications",
+      "Users view own notifications",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "onboarding_data",
+      "Users can delete their own onboarding data",
+      "DELETE",
+      "{authenticated}"
+    ],
+    [
+      "onboarding_data",
+      "Users can insert their own onboarding data",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "onboarding_data",
+      "Users can update their own onboarding data",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "onboarding_data",
+      "Users can view their own onboarding data",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "onboarding_invites",
+      "Primary investor can view own onboarding invites",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "onboarding_parties",
+      "Primary investor can view own onboarding parties",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "plaid_link_diagnostics",
+      "Users read own Plaid diagnostics",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "plaid_product_sync_statuses",
+      "Users can view own Plaid product sync statuses",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "plaid_statement_metadata",
+      "Users can view own Plaid statement metadata",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "plaid_transfer_accounts",
+      "Users can view own Plaid transfer accounts",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "swipe_actions",
+      "Users create swipe actions",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "swipe_actions",
+      "Users own swipe actions",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "transfer_email_notifications",
+      "Users can view own transfer emails",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "user_agent_selections",
+      "Users manage own selections",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "user_enriched_profiles",
+      "Users can insert own enriched profile",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "user_enriched_profiles",
+      "Users can update own enriched profile",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "user_enriched_profiles",
+      "Users can view own enriched profile",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "user_financial_data",
+      "Users can insert their own financial data",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "user_financial_data",
+      "Users can update their own financial data",
+      "UPDATE",
+      "{public}"
+    ],
+    [
+      "user_financial_data",
+      "Users can view their own financial data",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "user_product_usage",
+      "Users can insert own product usage",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "user_product_usage",
+      "Users can update own product usage",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "user_product_usage",
+      "Users can view own product usage",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "users",
+      "Users can insert own profile",
+      "INSERT",
+      "{authenticated}"
+    ],
+    [
+      "users",
+      "Users can update own profile",
+      "UPDATE",
+      "{authenticated}"
+    ],
+    [
+      "users",
+      "Users can view own profile",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "users",
+      "Users read own profile",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "users",
+      "Users update own profile",
+      "UPDATE",
+      "{public}"
+    ]
+  ],
+  "blockedPolicies": [
+    [
+      "agent_profiles",
+      "Anyone can view active agents",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "agent_reviews",
+      "Anyone can read reviews",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "app_config",
+      "Anyone can read app_config",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "ceo_meeting_payments",
+      "Service role full access on ceo_meeting_payments",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "community_registrations",
+      "Anyone can register",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "consents",
+      "Service inserts consents",
+      "INSERT",
+      "{public}"
+    ],
+    [
+      "fund_admin_access_log",
+      "Service role full access fund_admin_access_log",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_investment_plans",
+      "Service role full access fund plans",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_investor_notes",
+      "Service role full access fund_investor_notes",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_investor_tags",
+      "Service role full access fund_investor_tags",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_payment_notifications",
+      "Service role full access fund payment notifications",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_payment_reviews",
+      "Service role full access fund payment reviews",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_recurring_transfers",
+      "Service role full access recurring fund transfers",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_stripe_events",
+      "Service role full access fund Stripe events",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_stripe_payment_requests",
+      "Service role full access fund payment requests",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_stripe_payments",
+      "Service role full access fund Stripe payments",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_stripe_subscriptions",
+      "Service role full access fund Stripe subscriptions",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "fund_transfers",
+      "Service role full access fund transfers",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "identity_verifications",
+      "Service role full access on identity_verifications",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "investor_profiles",
+      "Public profiles are viewable by anyone",
+      "SELECT",
+      "{public}"
+    ],
+    [
+      "investor_profiles",
+      "Service role full access on investor_profiles",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "kirkland_agents",
+      "Anon users can read kirkland agents",
+      "SELECT",
+      "{anon}"
+    ],
+    [
+      "kirkland_agents",
+      "Authenticated users can read kirkland agents",
+      "SELECT",
+      "{authenticated}"
+    ],
+    [
+      "kyc_profiles",
+      "Allow all for service role",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "nda_signatures",
+      "Service role has full access to NDA",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "onboarding_invites",
+      "Service role full access onboarding invites",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "onboarding_parties",
+      "Service role full access onboarding parties",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "otp_codes",
+      "Service role full access on otp_codes",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "plaid_accounts",
+      "Service role full access Plaid accounts",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_accounts",
+      "service_role_all_plaid_accounts",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "plaid_data_events",
+      "Service role full access Plaid data events",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_items",
+      "Service role full access Plaid items",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_items",
+      "service_role_all_plaid_items",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "plaid_link_diagnostics",
+      "Service role full access Plaid diagnostics",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_product_sync_statuses",
+      "Service role full access Plaid product sync statuses",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_statement_metadata",
+      "Service role full access Plaid statement metadata",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_sync_cursors",
+      "Service role full access Plaid sync cursors",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_sync_cursors",
+      "service_role_all_plaid_sync_cursors",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "plaid_transactions",
+      "Service role full access Plaid transactions",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_transactions",
+      "service_role_all_plaid_transactions",
+      "ALL",
+      "{public}"
+    ],
+    [
+      "plaid_transfer_accounts",
+      "Service role full access Plaid transfer accounts",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "plaid_transfer_events",
+      "Service role full access Plaid transfer events",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "site_analytics_events",
+      "Service role can manage site analytics events",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "site_analytics_sessions",
+      "Service role can manage site analytics sessions",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "transfer_email_notifications",
+      "Service role full access transfer emails",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "user_enriched_profiles",
+      "Service role full access on user_enriched_profiles",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "user_financial_data",
+      "Service role full access on financial data",
+      "ALL",
+      "{service_role}"
+    ],
+    [
+      "user_product_usage",
+      "Service role full access on user_product_usage",
+      "ALL",
+      "{service_role}"
+    ]
+  ]
+}

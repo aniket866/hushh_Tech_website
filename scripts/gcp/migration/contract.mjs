@@ -17,6 +17,10 @@ const frozenEncryptedSchemaDumpEvidenceUrl = new URL(
   "../../../migration/contracts/frozen-encrypted-schema-dump-evidence.v1.json",
   import.meta.url
 );
+const firebasePolicyMappingUrl = new URL(
+  "../../../migration/contracts/firebase-policy-mapping.v1.json",
+  import.meta.url
+);
 const schemaCaptureSqlUrl = new URL(
   "../../../migration/sql/source_schema_capture_read_only.sql",
   import.meta.url
@@ -60,6 +64,7 @@ function readContract() {
   const frozenEncryptedSchemaDumpEvidenceBytes = readFileSync(
     frozenEncryptedSchemaDumpEvidenceUrl
   );
+  const firebasePolicyMappingBytes = readFileSync(firebasePolicyMappingUrl);
   const schemaCaptureSqlBytes = readFileSync(schemaCaptureSqlUrl);
   const tables = parsed.publicTables;
   if (!Array.isArray(tables) || tables.length !== parsed.expected.publicTables) {
@@ -282,6 +287,78 @@ function readContract() {
     );
   }
 
+  const policyMappingArtifact = parsed.firebasePolicyMappingArtifact;
+  const policyMappingArtifactHash = createHash("sha256")
+    .update(firebasePolicyMappingBytes)
+    .digest("hex");
+  if (
+    policyMappingArtifact?.path !==
+      "migration/contracts/firebase-policy-mapping.v1.json" ||
+    policyMappingArtifact?.sha256 !== policyMappingArtifactHash
+  ) {
+    fail("INVALID_CONTRACT", "The explicit Firebase policy-mapping artifact hash has drifted.");
+  }
+  const firebasePolicyMapping = JSON.parse(firebasePolicyMappingBytes.toString("utf8"));
+  const mappingExpected = firebasePolicyMapping.expected ?? {};
+  const ownershipMappings = firebasePolicyMapping.firebaseOwnershipPolicies;
+  const blockedMappings = firebasePolicyMapping.blockedPolicies;
+  const mappingKey = (entry) => JSON.stringify(entry);
+  const sourcePublicPolicyMappings = frozenSchemaFacts.policies
+    .filter((policy) => policy.schemaname === "public")
+    .map((policy) => [policy.tablename, policy.policyname, policy.cmd, policy.roles]);
+  const sourcePolicySet = new Set(sourcePublicPolicyMappings.map(mappingKey));
+  const ownershipSet = new Set((ownershipMappings ?? []).map(mappingKey));
+  const blockedSet = new Set((blockedMappings ?? []).map(mappingKey));
+  if (
+    firebasePolicyMapping.version !== 1 ||
+    firebasePolicyMapping.sourceProjectRef !== parsed.source.projectRef ||
+    firebasePolicyMapping.database !== parsed.source.database ||
+    firebasePolicyMapping.schema !== "public" ||
+    firebasePolicyMapping.mappingRule !==
+      "EXACT_REVIEWED_POLICY_KEYS_WITH_LEGACY_UUID_OWNERSHIP_ONLY" ||
+    mappingExpected.sourcePublicPolicies !== 118 ||
+    mappingExpected.firebaseOwnershipPolicies !== 70 ||
+    mappingExpected.blockedPolicies !== 48 ||
+    !Array.isArray(ownershipMappings) ||
+    ownershipMappings.length !== 70 ||
+    !Array.isArray(blockedMappings) ||
+    blockedMappings.length !== 48 ||
+    ownershipSet.size !== ownershipMappings.length ||
+    blockedSet.size !== blockedMappings.length ||
+    [...ownershipSet].some((key) => blockedSet.has(key) || !sourcePolicySet.has(key)) ||
+    [...blockedSet].some((key) => !sourcePolicySet.has(key)) ||
+    [...sourcePolicySet].some((key) => !ownershipSet.has(key) && !blockedSet.has(key)) ||
+    ownershipMappings.some(
+      (entry) =>
+        !Array.isArray(entry) ||
+        entry.length !== 4 ||
+        entry.some((value) => typeof value !== "string" || value.length === 0)
+    ) ||
+    blockedMappings.some(
+      (entry) =>
+        !Array.isArray(entry) ||
+        entry.length !== 4 ||
+        entry.some((value) => typeof value !== "string" || value.length === 0)
+    )
+  ) {
+    fail("INVALID_CONTRACT", "The explicit Firebase policy mapping is incomplete or overlaps.");
+  }
+  for (const policy of frozenSchemaFacts.policies.filter((entry) => entry.schemaname === "public")) {
+    const key = mappingKey([policy.tablename, policy.policyname, policy.cmd, policy.roles]);
+    const expressions = `${policy.qual ?? ""} ${policy.with_check ?? ""}`;
+    if (
+      ownershipSet.has(key) !==
+      (/auth\.uid\(\)/i.test(expressions) &&
+        !/auth\.jwt\(\)/i.test(expressions) &&
+        !/service_role/i.test(policy.roles))
+    ) {
+      fail(
+        "INVALID_CONTRACT",
+        "Firebase ownership mappings must be exact auth.uid policies without service-role access."
+      );
+    }
+  }
+
   const expected = parsed.expected ?? {};
   const lockedExpectedCounts = {
     publicTables: 70,
@@ -436,6 +513,7 @@ function readContract() {
   parsed.frozenSchemaFacts = frozenSchemaFacts;
   parsed.frozenSchemaCaptureHashes = frozenSchemaCaptureHashes;
   parsed.frozenEncryptedSchemaDumpEvidence = frozenEncryptedSchemaDumpEvidence;
+  parsed.firebasePolicyMapping = firebasePolicyMapping;
   return deepFreeze(parsed);
 }
 

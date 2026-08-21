@@ -12,8 +12,9 @@ BEGIN
 END
 $migration_boundary$;
 
--- A one-shot migration role must own this extension step. The runtime role is
--- DML-only and must not retain database CREATE or extension-management rights.
+-- A governed executor must own this extension step. The sealed schema owner is
+-- NOLOGIN, and the runtime role is
+-- DML-only. No operational role may retain extension-management rights.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DO $pgcrypto_precondition$
@@ -104,6 +105,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS identity_links_active_legacy_uidx
   ON hushh_identity.identity_links (legacy_project, legacy_user_uuid)
   WHERE status = 'ACTIVE';
 
+-- Hushh Tech has one locked legacy source project. This global key is the
+-- target home for every former source-identity foreign key, including the 65
+-- principals that remain unclaimed and denied.
+CREATE UNIQUE INDEX IF NOT EXISTS identity_links_legacy_principal_uidx
+  ON hushh_identity.identity_links (legacy_user_uuid);
+
 CREATE UNIQUE INDEX IF NOT EXISTS identity_links_active_firebase_uidx
   ON hushh_identity.identity_links (legacy_project, firebase_uid)
   WHERE status = 'ACTIVE';
@@ -118,23 +125,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS identity_links_unclaimed_legacy_uidx
 
 ALTER TABLE hushh_identity.identity_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hushh_identity.identity_links FORCE ROW LEVEL SECURITY;
-
-DO $identity_links_self_read_policy$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_policies
-    WHERE schemaname = 'hushh_identity'
-      AND tablename = 'identity_links'
-      AND policyname = 'identity_links_self_read'
-  ) THEN
-    CREATE POLICY identity_links_self_read
-      ON hushh_identity.identity_links
-      FOR SELECT
-      USING (firebase_uid = nullif(current_setting('app.firebase_uid', true), ''));
-  END IF;
-END
-$identity_links_self_read_policy$;
 
 CREATE TABLE IF NOT EXISTS hushh_migration.migration_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

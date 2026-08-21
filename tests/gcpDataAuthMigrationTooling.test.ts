@@ -1089,7 +1089,8 @@ describe('CDC plan and secret-safe output', () => {
     expect(sql).toContain('LEGALLY_RETAINED_NO_LOGIN');
     expect(sql).toContain('INTENTIONALLY_DELETED');
     expect(sql).toContain('FORCE ROW LEVEL SECURITY');
-    expect(sql).toContain("current_setting('app.firebase_uid', true)");
+    expect(sql).toContain('identity_links_legacy_principal_uidx');
+    expect(sql).not.toContain('identity_links_self_read');
     expect(sql).toContain('hushh_migration.migration_checkpoints');
     expect(sql).toContain('hushh_migration.migration_audit_events');
     expect(sql).toContain('migration audit events are append-only');
