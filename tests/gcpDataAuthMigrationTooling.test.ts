@@ -804,7 +804,7 @@ describe('identity mapping', () => {
     expect(emailChanged.authMappings).toEqual(first.authMappings);
   });
 
-  it('fails closed to manual recovery when one provider subject maps to two Firebase UIDs', () => {
+  it('rejects a provider subject owned by two Firebase UIDs', () => {
     const inputs = syntheticInputs();
     inputs.firebaseAuthority.users.push({
       firebaseUid: 'conflicting_firebase_uid',
@@ -812,18 +812,11 @@ describe('identity mapping', () => {
         { providerId: 'google.com', subject: 'synthetic-google-0' },
       ],
     });
-    const plan = buildIdentityMappingPlan({ ...inputs, boundary: uatBoundary() });
-    expect(plan.authMappings[0]).toMatchObject({
-      status: 'MANUAL_RECOVERY',
-      firebaseUid: null,
-      accessAllowed: false,
-    });
-    expect(validateTerminalDispositions(plan, { enforceLockedBaseline: false })).toMatchObject({
-      manualRecovery: 1,
-      emailOnlyLinks: 0,
-      authTerminalCount: 369,
-    });
-    expect(() => validateTerminalDispositions(plan)).toThrow(/frozen 165\/204\/3\/4\/65/);
+    expect(() =>
+      buildIdentityMappingPlan({ ...inputs, boundary: uatBoundary() }),
+    ).toThrow(
+      expect.objectContaining({ code: 'DUPLICATE_FIREBASE_PROVIDER_SUBJECT' }),
+    );
   });
 
   it('rejects wrong Firebase authority and generated UID collisions', () => {

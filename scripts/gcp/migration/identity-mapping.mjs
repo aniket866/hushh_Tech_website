@@ -44,6 +44,19 @@ function evidenceHash(key) {
   return createHash("sha256").update(key, "utf8").digest("hex");
 }
 
+function mappingOutputHash(authMappings, unclaimedMappings) {
+  const byLegacyUuid = (left, right) =>
+    left.legacyUserUuid < right.legacyUserUuid
+      ? -1
+      : left.legacyUserUuid > right.legacyUserUuid
+        ? 1
+        : 0;
+  return canonicalHash({
+    authMappings: [...authMappings].sort(byLegacyUuid),
+    unclaimedMappings: [...unclaimedMappings].sort(byLegacyUuid),
+  });
+}
+
 function deterministicFirebaseUid(user) {
   const providerKeys = user.providerSubjects.map(providerKey).sort();
   const seed =
@@ -103,9 +116,13 @@ function buildFirebaseProviderIndex(firebaseAuthority) {
     firebaseUids.add(user.firebaseUid);
     for (const provider of user.providerSubjects) {
       const key = providerKey(provider);
-      const matches = index.get(key) ?? new Set();
-      matches.add(user.firebaseUid);
-      index.set(key, matches);
+      if (index.has(key)) {
+        throw new MigrationContractError(
+          "DUPLICATE_FIREBASE_PROVIDER_SUBJECT",
+          "One immutable provider subject cannot belong to multiple Firebase identities."
+        );
+      }
+      index.set(key, new Set([user.firebaseUid]));
     }
   }
   return Object.freeze({ index, firebaseUids, firebaseUsers });
@@ -184,6 +201,7 @@ export function buildIdentityMappingPlan({
       legacyUserUuid: user.legacyUserUuid.toLowerCase(),
       providerEvidenceHashes: keys.map(evidenceHash),
       emailWasUsed: false,
+      emailPresent: user.emailPresent,
       appleNoEmail,
       isEmailPasswordUser,
       passwordAction: passwordAction(user),
@@ -250,6 +268,7 @@ export function buildIdentityMappingPlan({
       },
       unclaimedLegacyPrincipals: normalizedUnclaimed,
     }),
+    mappingOutputHash: mappingOutputHash(authMappings, unclaimedMappings),
     authMappings,
     unclaimedMappings,
   };
@@ -260,6 +279,15 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
   if (!plan || !Array.isArray(plan.authMappings) || !Array.isArray(plan.unclaimedMappings)) {
     throw new MigrationContractError("INVALID_MAPPING_PLAN", "Identity mapping plan is invalid.");
   }
+  if (
+    !/^[a-f0-9]{64}$/.test(plan.mappingOutputHash ?? "") ||
+    plan.mappingOutputHash !== mappingOutputHash(plan.authMappings, plan.unclaimedMappings)
+  ) {
+    throw new MigrationContractError(
+      "MAPPING_OUTPUT_INTEGRITY_FAILURE",
+      "Identity mapping dispositions do not match their canonical output hash."
+    );
+  }
   if (plan.authMappings.length !== SOURCE_CONTRACT.expected.authUsers) {
     throw new MigrationContractError(
       "AUTH_TERMINAL_COUNT_MISMATCH",
@@ -269,6 +297,7 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
 
   const legacyUuids = new Set();
   const activeFirebaseUids = new Set();
+  const providerEvidenceOwners = new Map();
   const counts = {
     linkedExistingFirebase: 0,
     importedFirebase: 0,
@@ -309,6 +338,22 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
         "Provider evidence must contain SHA-256 fingerprints only."
       );
     }
+    if (new Set(mapping.providerEvidenceHashes).size !== mapping.providerEvidenceHashes.length) {
+      throw new MigrationContractError(
+        "DUPLICATE_PROVIDER_EVIDENCE",
+        "An identity mapping cannot repeat immutable provider evidence."
+      );
+    }
+    for (const hash of mapping.providerEvidenceHashes) {
+      const owner = providerEvidenceOwners.get(hash);
+      if (owner !== undefined && owner !== mapping.legacyUserUuid) {
+        throw new MigrationContractError(
+          "DUPLICATE_PROVIDER_EVIDENCE",
+          "One immutable provider subject cannot belong to multiple source identities."
+        );
+      }
+      providerEvidenceOwners.set(hash, mapping.legacyUserUuid);
+    }
     if (
       mapping.status === "LINKED_EXISTING_FIREBASE" &&
       (mapping.mappingBasis !== "PROVIDER_SUBJECT" || mapping.providerEvidenceHashes.length === 0)
@@ -336,6 +381,32 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
         "Email/password identities require bcrypt import or password setup."
       );
     }
+    if (
+      mapping.isEmailPasswordUser &&
+      (mapping.mappingBasis !== "LEGACY_UUID" || mapping.providerEvidenceHashes.length !== 0)
+    ) {
+      throw new MigrationContractError(
+        "EMAIL_MAPPING_BASIS_INVALID",
+        "Email sign-in identities must use legacy UUID provenance, never email evidence."
+      );
+    }
+    if (!mapping.isEmailPasswordUser && mapping.passwordAction !== "NOT_APPLICABLE") {
+      throw new MigrationContractError(
+        "INVALID_PASSWORD_ACTION",
+        "Non-email identities cannot carry a password migration action."
+      );
+    }
+    if (
+      mapping.appleNoEmail &&
+      (mapping.emailPresent !== false ||
+        mapping.mappingBasis !== "PROVIDER_SUBJECT" ||
+        mapping.providerEvidenceHashes.length === 0)
+    ) {
+      throw new MigrationContractError(
+        "INVALID_APPLE_NO_EMAIL_MAPPING",
+        "Apple identities without email require distinct immutable provider-subject evidence."
+      );
+    }
     if (legacyUuids.has(mapping.legacyUserUuid)) {
       throw new MigrationContractError("DUPLICATE_LEGACY_UUID", "Legacy UUID is duplicated.");
     }
@@ -359,7 +430,11 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
       );
     }
     if (mapping.accessAllowed) {
-      if (!mapping.firebaseUid) {
+      if (
+        typeof mapping.firebaseUid !== "string" ||
+        mapping.firebaseUid.length === 0 ||
+        mapping.firebaseUid.length > 128
+      ) {
         throw new MigrationContractError(
           "ACTIVE_UID_REQUIRED",
           "An accessible identity must have a Firebase UID."
@@ -378,7 +453,10 @@ export function validateTerminalDispositions(plan, { enforceLockedBaseline = tru
   for (const mapping of plan.unclaimedMappings) {
     if (
       mapping.status !== "UNCLAIMED_LEGACY_PRINCIPAL" ||
+      mapping.legacyProject !== SOURCE_CONTRACT.source.projectRef ||
+      !UUID_PATTERN.test(mapping.legacyUserUuid ?? "") ||
       mapping.firebaseUid !== null ||
+      mapping.mappingBasis !== "UNCLAIMED" ||
       mapping.accessAllowed !== false ||
       mapping.emailWasUsed !== false ||
       mapping.terminal !== true
