@@ -12,6 +12,11 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import {
+  createLegacyFunctionRawBodyParser,
+  legacyFunctionParserError,
+  preserveLegacyFunctionRawBody,
+} from './api/shared/legacyFunctionRawBody.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,10 +28,6 @@ const DIST_DIR = join(__dirname, 'dist');
 // ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
-
-// Parse JSON & URL-encoded bodies
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
 
 // Global security headers for Cloud Run. This file is the authoritative runtime config.
 app.use((_req, res, next) => {
@@ -58,6 +59,17 @@ app.use((_req, res, next) => {
   res.setHeader('X-DNS-Prefetch-Control', 'on');
   next();
 });
+
+// Preserve exact bytes for every explicit legacy-function contract before any
+// general body parser runs. Signed webhook verification must use these bytes,
+// and ordinary JSON contracts validate syntax without changing the payload.
+app.use('/functions/v1', createLegacyFunctionRawBodyParser({ limit: '10mb' }));
+app.use('/functions/v1', preserveLegacyFunctionRawBody);
+
+// Parse non-compatibility JSON and form bodies.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(legacyFunctionParserError);
 
 // ---------------------------------------------------------------------------
 // API Routes — adapt Vercel handler(req, res) → Express route
@@ -99,6 +111,11 @@ app.all('/api/send-email-notification', async (req, res) => wrapHandler(await lo
 app.all('/api/contact-notification', async (req, res) => wrapHandler(await loadApi('contact-notification'))(req, res));
 app.all('/api/wallet-pass', async (req, res) => wrapHandler(await loadApi('wallet-pass'))(req, res));
 app.all('/api/google-wallet-pass', async (req, res) => wrapHandler(await loadApi('google-wallet-pass'))(req, res));
+
+// Explicit legacy Edge Function compatibility surface. The generated
+// retirement registry contains exactly 112 known slugs; unknown, retired, and
+// not-yet-verified entries fail closed and never proxy back to Supabase.
+app.all('/functions/v1/*', async (req, res) => wrapHandler(await loadApi('legacy-functions'))(req, res));
 app.all('/api/hushh-research/config', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
 app.all('/api/hushh-research/*', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
 
