@@ -9,6 +9,8 @@
     "dev:vercel": "vercel dev --listen 3000",
     "dco:check": "bash scripts/ci/check-dco.sh",
     "env:check": "node scripts/ci/check-env-contract.mjs",
+    "migration:retirement:check": "node scripts/ci/check-supabase-retirement-manifest.mjs",
+    "migration:retirement:generate": "node scripts/ci/generate-supabase-retirement-function-registry.mjs --write",
     "lint:ci": "bash scripts/ci/lint-ci.sh",
     "pr:hygiene": "node scripts/ci/check-pr-hygiene.mjs",
     "security:gitleaks": "bash scripts/security/run-gitleaks.sh",
