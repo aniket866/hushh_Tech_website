@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "database": "postgres",
+  "postgresMajor": 17,
+  "contents": "HASHES_COUNTS_AND_FUNCTION_SIGNATURES_ONLY",
+  "captureMode": "READ_ONLY_REPEATABLE_READ_ROLLBACK",
+  "sourceArtifacts": {
+    "normalizedCaptureSha256": "869a987dcc17a55346686490a85e93dadc5102d313799817dc78a2c74cb7cbd3",
+    "canonicalCaptureSha256": "78580ea2d4560e551d17e75d25354b0e13ea83f9c28bb78751c3fdda16c4698b",
+    "rawQueryEnvelopeSha256": "4591ec69ddbdca9753b4fc107b1f1e81980576ad2ee62e3cff0b535443047107",
+    "captureQuerySha256": "5db9cfd39066bbd8841f0e69c7b879a83fd58575b5e8e7784510e327cb3fe6d5",
+    "repositoryStorage": "FORBIDDEN",
+    "encryptedSchemaDumpState": "CAPTURED_ENCRYPTED_REVIEWED"
+  },
+  "counts": {
+    "tables": 70,
+    "columns": 1061,
+    "constraints": 270,
+    "indexes": 232,
+    "triggers": 24,
+    "policies": 118,
+    "custom_functions": 24,
+    "sequences": 0,
+    "enums": 12,
+    "extensions": 6,
+    "table_grants": 1929,
+    "routine_grants": 585,
+    "publication_tables": 3
+  },
+  "collectionHashes": {
+    "tables": "7f14b50f85eae9c3fd34c0d930e33ac835332d30633dd1627d2e6ed441a0e9c8",
+    "columns": "d2c6a0f36c54e5a52ae255916564d1a11af47f4f830b583a5706d1dee8387607",
+    "constraints": "30e399d5dacec2366cc09bd3f16c25eb13727d808d99bbd7e37e07492f549c6f",
+    "indexes": "0f8de88130ec7c45a2f57d54b4dd7c70a160c0ea7fa25f626985119040ba7d24",
+    "triggers": "09f17b4ad7e9e32cd3505879f2f634b2b5f294bbc3e618790409876331c64851",
+    "policies": "68a9a25183b80734d6f13764d69e4c195cc7e3b5d0fe80b6ee4a3d0ef329efe1",
+    "customFunctions": "16f348f2ce431ea444a8e23cf4736bb0e3126afef6b85a042fc8f623c517e9e6",
+    "sequences": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "enums": "e311eb9cb2d6cc70d1c8040400038d133c0ce41f89220ccaf03f36988b46d179",
+    "extensions": "8bcfd0808972bdce80b46d8454949b34ea5c98b8a0aa3c1fecd6352a7670ab4d",
+    "tableGrants": "be7303f1c912ed436c2d44eb7ac0ba2cc1efee4a7ef262ad32dbae5bd0e8ac88",
+    "routineGrants": "8ccb3023a4a925857cd35ff7ab855e6824d44f00eb5f070b2c3f02c9796ba764",
+    "publicationTables": "16e73d4708aa161a095dd0f7b7265bb5243285df6b4b21d51cf13206b9bda5f3"
+  },
+  "customFunctionDefinitionHashes": [
+    {
+      "signature": "batch_agent_selections(p_user_id uuid, p_selections jsonb)->void",
+      "definitionHash": "e60573cfe84051eba0e545bfeb05d783bc2df80ab9aa11055d4420dd6ebf7783"
+    },
+    {
+      "signature": "check_user_nda_status(p_user_id uuid)->jsonb",
+      "definitionHash": "5af8ce11415ef51b5c855ee616aaf2559c12c7a917efd7059187ef833f78b255"
+    },
+    {
+      "signature": "claim_wa_job(p_types text[])->wa_jobs",
+      "definitionHash": "02d358e68ffc7e68887650b5e4732f4abcc854d89f08b84f62829c5e2a77f251"
+    },
+    {
+      "signature": "delete_rows_by_text_array_if_exists(p_table_name text, p_column_name text, p_values text[])->void",
+      "definitionHash": "3cb73feb2c27f0a3c24bee2be7a09d24da3c83d7f00bafcd841f52a92049475b"
+    },
+    {
+      "signature": "delete_rows_by_text_if_exists(p_table_name text, p_column_name text, p_value text)->void",
+      "definitionHash": "6cc34b7ba3296b6d8cb5c5c3767595c4e222f263ab7f75e0cf186ec8938fea49"
+    },
+    {
+      "signature": "delete_rows_by_uuid_array_if_exists(p_table_name text, p_column_name text, p_values uuid[])->void",
+      "definitionHash": "ed023e74bee2bff72586fac41e1c15e019118454c1d8165366b89723be6dc5aa"
+    },
+    {
+      "signature": "delete_rows_by_uuid_if_exists(p_table_name text, p_column_name text, p_value uuid)->void",
+      "definitionHash": "8e61670d745657a05236636d522845b3ea6fd6060b02cc9f75650e022e2b65bc"
+    },
+    {
+      "signature": "generate_investor_slug()->trigger",
+      "definitionHash": "638140b9fdeab12d667212511ca87ac903d18fd7a9289d6e99f89c6fc81c0915"
+    },
+    {
+      "signature": "get_metrics_summary(window_days integer)->jsonb",
+      "definitionHash": "3b8595e39631e6474cbba70a0fe264d307f7aa69968ae96833b650ce1e89c366"
+    },
+    {
+      "signature": "get_nda_metadata_v2(p_current_gmt text, p_ip text)->jsonb",
+      "definitionHash": "e465e8ef98eb74a6b326b621c3477a4c4f3e123d3390fd396f594afc252d03a1"
+    },
+    {
+      "signature": "get_public_investor_profile(p_slug text)->jsonb",
+      "definitionHash": "092b4569b9970b1514371a651e7b3bc10a95ab8b0dbd1747d199a2677bc9a5f3"
+    },
+    {
+      "signature": "handle_new_user()->trigger",
+      "definitionHash": "e96e171acc09be10e27c145dab643205a1998569119464890f5944fdf37c3e16"
+    },
+    {
+      "signature": "hushh_agents_delete_user_account()->void",
+      "definitionHash": "0d4befe480bb732bd9ec0481a1bbdd20fcc1dbe3258741c1585df00b817bb859"
+    },
+    {
+      "signature": "hushh_agents_set_updated_at()->trigger",
+      "definitionHash": "e0de8a43c05838f954a055eb86531ee944946cb49290adb4666cd95008acf94b"
+    },
+    {
+      "signature": "hushh_agents_sync_conversation_preview()->trigger",
+      "definitionHash": "cae82d02d1a55dbc86d39bfe366530cbdbe7bc299b7f90ec7869f2154b6a817c"
+    },
+    {
+      "signature": "hushh_agents_sync_match_from_swipe()->trigger",
+      "definitionHash": "b4e7adbb80a0144c32ff9cdaf3e6c3e82d6f8790e3a4160b2ba0816b36b53efc"
+    },
+    {
+      "signature": "is_public_profile_field_visible(p_privacy_settings jsonb, p_section text, p_field text)->boolean",
+      "definitionHash": "c486871c474a20424b3c6d9f8122f0384320b8e9cd77e6e664fa89810f3677f4"
+    },
+    {
+      "signature": "mask_public_email(p_email text)->text",
+      "definitionHash": "c6224f2e34e8ee4667d1dd736d86f82ac1f0be11dfebdacd994b585f99234ec3"
+    },
+    {
+      "signature": "purge_user_account(p_user_id uuid)->jsonb",
+      "definitionHash": "dc8632de6ca2b049d904519339e2b523a38c4c71084b716f2d500f8f4b7bbc7a"
+    },
+    {
+      "signature": "set_current_timestamp_updated_at()->trigger",
+      "definitionHash": "bf401d76233446937b500c58fb01170d0b80153d911b0667968c22c3e648b4ab"
+    },
+    {
+      "signature": "sign_global_nda(p_signer_name text, p_nda_version text, p_pdf_url text, p_signer_ip text, p_documents_acknowledged jsonb, p_consent_version text)->jsonb",
+      "definitionHash": "1d8c06b56254e5a4a9aeccfa418b74e74d70e3e7294db6a373a5f88b7a542b1a"
+    },
+    {
+      "signature": "track_product_usage(p_product_name text, p_metadata jsonb)->jsonb",
+      "definitionHash": "2e624e4755de6ba8647a2d7b92cb60d2e4ec02bdb982d45e34027edc43da2556"
+    },
+    {
+      "signature": "update_onboarding_data_timestamp()->trigger",
+      "definitionHash": "a72641e7e03044850a608be5d8087e2a39752856429bb1db2306791a8987873a"
+    },
+    {
+      "signature": "wa_set_updated_at()->trigger",
+      "definitionHash": "cadcbee4f4d3e4612ea6d96e6b5333d8ef247cb647683238d73b380fc2db92fe"
+    }
+  ],
+  "customFunctionDefinitionsHash": "dbd929145b352378d0095283b49f8dddeef5898c9606c37616c3bb50760e7d17"
+}

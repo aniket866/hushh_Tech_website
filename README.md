@@ -96,6 +96,7 @@ See:
 - `api/`: Serverless wrapper endpoints
 - `supabase/`: Edge functions, migrations, and local Supabase assets
 - `cloud-run/`: Standalone service deployments
+- `migration/`: Plan-only Supabase retirement and GCP data-contract artifacts
 - `scripts/`: Operational and repo-maintenance scripts
 - `docs/`: Architecture, runbooks, and contributor-facing documentation
 - `tests/`: Vitest coverage and route-level verification
