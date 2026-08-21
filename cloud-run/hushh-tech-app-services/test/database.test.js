@@ -8,7 +8,14 @@ import {
   withFirebaseTransaction,
 } from "../src/database.js";
 import { RuntimeError } from "../src/errors.js";
-import { SERVICE_TABLE_PRIVILEGE_ALLOWLISTS } from "../src/table-privileges.js";
+import {
+  observedColumnPrivileges,
+  observedSequencePrivileges,
+  observedTablePrivileges,
+  SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
+  SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
+  SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,
+} from "../src/table-privileges.js";
 
 function runtimeCode(error, code) {
   assert.ok(error instanceof RuntimeError);
@@ -77,7 +84,10 @@ test("database transactions install a transaction-local Firebase UID and clear i
   );
   assert.deepEqual(calls[2].parameters, ["1500ms"]);
   assert.deepEqual(calls[3].parameters, ["firebase-user-1"]);
-  assert.equal(calls.some(({ sql }) => sql === "COMMIT"), true);
+  assert.equal(
+    calls.some(({ sql }) => sql === "COMMIT"),
+    true,
+  );
   assert.equal(
     calls.filter(({ sql }) => sql === "RESET app.firebase_uid").length,
     2,
@@ -94,9 +104,45 @@ test("database transactions roll back failures and never carry user context", as
     }),
     failure,
   );
-  assert.equal(calls.some(({ sql }) => sql === "ROLLBACK"), true);
-  assert.equal(calls.some(({ sql }) => sql === "COMMIT"), false);
+  assert.equal(
+    calls.some(({ sql }) => sql === "ROLLBACK"),
+    true,
+  );
+  assert.equal(
+    calls.some(({ sql }) => sql === "COMMIT"),
+    false,
+  );
   assert.equal(client.releasedWith, null);
+});
+
+test("an aborted handler can never commit its database transaction", async () => {
+  const { client, calls } = transactionClient();
+  const controller = new AbortController();
+  const deadline = new RuntimeError(
+    "HANDLER_DEADLINE_EXCEEDED",
+    "Service unavailable.",
+    504,
+  );
+  await assert.rejects(
+    withFirebaseTransaction(
+      { connect: async () => client },
+      "firebase-user-abort",
+      async () => {
+        controller.abort(deadline);
+        return "must-not-commit";
+      },
+      { statementTimeoutMs: 1_000, signal: controller.signal },
+    ),
+    (error) => runtimeCode(error, "HANDLER_DEADLINE_EXCEEDED"),
+  );
+  assert.equal(
+    calls.some(({ sql }) => sql === "ROLLBACK"),
+    true,
+  );
+  assert.equal(
+    calls.some(({ sql }) => sql === "COMMIT"),
+    false,
+  );
 });
 
 test("a leaked transaction context destroys the pooled connection", async () => {
@@ -114,8 +160,7 @@ test("a leaked transaction context destroys the pooled connection", async () => 
 
 test("runtime role verification allows DML-only and destroys unsafe clients", async () => {
   const serviceOwner = "worker";
-  const expectedUser =
-    "hushh-tech-worker-uat@hushh-tech-uat.iam";
+  const expectedUser = "hushh-tech-worker-uat@hushh-tech-uat.iam";
   const safeRow = {
     current_user: expectedUser,
     rolsuper: false,
@@ -124,12 +169,15 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     rolreplication: false,
     rolbypassrls: false,
     can_create_database: false,
+    can_create_temporary_tables: false,
     can_create_public_schema: false,
     application_schema_create_count: "0",
     inherited_privileged_role_count: "0",
     non_dml_table_privilege_count: "0",
     executable_application_routine_count: "0",
     effective_table_dml_privileges: [],
+    effective_column_privileges: [],
+    effective_sequence_privileges: [],
     accessible_table_rls_disabled_count: "0",
     accessible_table_rls_not_forced_count: "0",
     owned_application_schema_count: "0",
@@ -137,10 +185,7 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     owned_application_sequence_count: "0",
     owned_application_routine_count: "0",
   };
-  assert.equal(
-    assertDmlOnlyRoleRow(safeRow, expectedUser, serviceOwner),
-    true,
-  );
+  assert.equal(assertDmlOnlyRoleRow(safeRow, expectedUser, serviceOwner), true);
   assert.equal(
     assertDmlOnlyRoleRow(
       { ...safeRow, effective_table_dml_privileges: "[]" },
@@ -153,6 +198,15 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     () =>
       assertDmlOnlyRoleRow(
         { ...safeRow, rolsuper: true },
+        expectedUser,
+        serviceOwner,
+      ),
+    (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
+  );
+  assert.throws(
+    () =>
+      assertDmlOnlyRoleRow(
+        { ...safeRow, can_create_temporary_tables: true },
         expectedUser,
         serviceOwner,
       ),
@@ -221,20 +275,27 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
   assert.match(roleQuery, /pg_auth_members/);
   assert.match(roleQuery, /rolbypassrls/);
   assert.match(roleQuery, /non_dml_table_privilege_count/);
+  assert.match(roleQuery, /'TEMPORARY'\) AS can_create_temporary_tables/);
+  assert.match(roleQuery, /WITH GRANT OPTION/);
+  assert.match(roleQuery, /'grantable'/);
   assert.match(roleQuery, /application_schema_create_count/);
   assert.match(roleQuery, /pg_namespace AS application_schemas/);
   assert.match(roleQuery, /effective_table_dml_privileges/);
   assert.match(roleQuery, /has_table_privilege/);
+  assert.match(roleQuery, /effective_column_privileges/);
+  assert.match(roleQuery, /pg_attribute/);
+  assert.match(roleQuery, /aclexplode/);
+  assert.match(roleQuery, /column_acl\.grantee = 0/);
+  assert.match(roleQuery, /effective_sequence_privileges/);
+  assert.match(roleQuery, /has_sequence_privilege/);
+  assert.match(roleQuery, /accessible_base_relations/);
   assert.match(roleQuery, /relrowsecurity/);
   assert.match(roleQuery, /relforcerowsecurity/);
   assert.match(roleQuery, /owned_application_schema_count/);
   assert.match(roleQuery, /owned_application_table_count/);
   assert.match(roleQuery, /owned_application_sequence_count/);
   assert.match(roleQuery, /owned_application_routine_count/);
-  assert.equal(
-    roleQuery.includes("NOT LIKE 'pg\\_%' ESCAPE '\\'"),
-    true,
-  );
+  assert.equal(roleQuery.includes("NOT LIKE 'pg\\_%' ESCAPE '\\'"), true);
   assert.equal(safeClient.releasedWith, null);
 
   const unsafeClient = {
@@ -267,12 +328,15 @@ test("runtime readiness rejects broad DML, weak RLS, and application ownership",
     rolreplication: false,
     rolbypassrls: false,
     can_create_database: false,
+    can_create_temporary_tables: false,
     can_create_public_schema: false,
     application_schema_create_count: "0",
     inherited_privileged_role_count: "0",
     non_dml_table_privilege_count: "0",
     executable_application_routine_count: "0",
     effective_table_dml_privileges: [],
+    effective_column_privileges: [],
+    effective_sequence_privileges: [],
     accessible_table_rls_disabled_count: "0",
     accessible_table_rls_not_forced_count: "0",
     owned_application_schema_count: "0",
@@ -297,6 +361,32 @@ test("runtime readiness rejects broad DML, weak RLS, and application ownership",
     {
       name: "disabled RLS",
       change: { accessible_table_rls_disabled_count: "1" },
+    },
+    {
+      name: "column-level access",
+      change: {
+        effective_column_privileges: [
+          {
+            schema: "public",
+            table: "profiles",
+            column: "email",
+            privilege: "SELECT",
+            kind: "r",
+          },
+        ],
+      },
+    },
+    {
+      name: "sequence access",
+      change: {
+        effective_sequence_privileges: [
+          {
+            schema: "public",
+            sequence: "profiles_id_seq",
+            privilege: "USAGE",
+          },
+        ],
+      },
     },
     {
       name: "unforced RLS",
@@ -333,6 +423,44 @@ test("runtime readiness rejects broad DML, weak RLS, and application ownership",
   }
 });
 
+test("effective DML observations preserve and reject every grant option", () => {
+  const table = {
+    schema: "public",
+    table: "profiles",
+    privilege: "SELECT",
+    kind: "r",
+    grantable: false,
+  };
+  const column = {
+    ...table,
+    column: "email",
+  };
+  const sequence = {
+    schema: "public",
+    sequence: "profiles_id_seq",
+    privilege: "USAGE",
+    grantable: false,
+  };
+  assert.deepEqual(observedTablePrivileges([table]), [
+    "public.profiles:SELECT",
+  ]);
+  assert.deepEqual(observedColumnPrivileges([column]), [
+    "public.profiles.email:SELECT",
+  ]);
+  assert.deepEqual(observedSequencePrivileges([sequence]), [
+    "public.profiles_id_seq:USAGE",
+  ]);
+  for (const [observe, entry] of [
+    [observedTablePrivileges, table],
+    [observedColumnPrivileges, column],
+    [observedSequencePrivileges, sequence],
+  ]) {
+    assert.equal(observe([{ ...entry, grantable: true }]), null);
+    assert.equal(observe([{ ...entry, grantable: "false" }]), null);
+    assert.equal(observe([{ ...entry, grantable: undefined }]), null);
+  }
+});
+
 test("every disabled service starts with an exact empty table allowlist", () => {
   assert.deepEqual(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(), [
     "content-api",
@@ -346,6 +474,23 @@ test("every disabled service starts with an exact empty table allowlist", () => 
   for (const privileges of Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS)) {
     assert.deepEqual(privileges, []);
     assert.equal(Object.isFrozen(privileges), true);
+  }
+  assert.deepEqual(
+    Object.keys(SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS).sort(),
+    Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(),
+  );
+  assert.deepEqual(
+    Object.keys(SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS).sort(),
+    Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(),
+  );
+  for (const allowlists of [
+    SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
+    SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
+  ]) {
+    for (const privileges of Object.values(allowlists)) {
+      assert.deepEqual(privileges, []);
+      assert.equal(Object.isFrozen(privileges), true);
+    }
   }
 });
 
@@ -375,8 +520,7 @@ test("Cloud SQL connector is private, IAM-authenticated, bounded, and passwordle
     }
   }
   const config = {
-    instanceConnectionName:
-      "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
+    instanceConnectionName: "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
     databaseUser: "hushh-tech-worker-uat@hushh-tech-uat.iam",
     database: "hushh_tech_app",
     databasePoolMax: 5,
@@ -399,6 +543,8 @@ test("Cloud SQL connector is private, IAM-authenticated, bounded, and passwordle
   assert.equal(FakePool.instance.options.user, config.databaseUser);
   assert.equal(FakePool.instance.options.database, "hushh_tech_app");
   assert.equal(FakePool.instance.options.max, 5);
+  assert.equal(FakePool.instance.options.query_timeout, 15_000);
+  assert.equal(FakePool.instance.options.statement_timeout, 15_000);
   assert.equal("password" in FakePool.instance.options, false);
   await runtime.close();
   assert.equal(FakePool.instance.ended, true);

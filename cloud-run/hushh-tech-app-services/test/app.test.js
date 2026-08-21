@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
+import http from "node:http";
 import test from "node:test";
 
 import { createApp } from "../src/app.js";
@@ -25,6 +27,7 @@ function config(serviceOwner = "identity-api", overrides = {}) {
     requestBodyLimitBytes: 16_384,
     requestRateLimit: 10,
     databaseStatementTimeoutMs: 15_000,
+    handlerDeadlineMs: 20_000,
     ...overrides,
   };
 }
@@ -41,6 +44,39 @@ function dependencies(overrides = {}) {
       eventId: "event-1",
     }),
     verifyReadiness: async () => true,
+    sharedRateLimiter: {
+      consume: async () => ({ allowed: true }),
+      verifyReady: async () => true,
+    },
+    webhookLedger: {
+      claim: async ({ eventKeyHash, payloadHash }) => ({
+        state: "PROCESSING",
+        acquired: true,
+        eventKeyHash,
+        payloadHash,
+        claimToken: "claim-token-default",
+        attempt: 1,
+        leaseExpiresAtMs: Date.now() + 30_000,
+      }),
+      complete: async ({
+        eventKeyHash,
+        payloadHash,
+        responseHash,
+        outbox,
+      }) => ({
+        state: "COMPLETED",
+        eventKeyHash,
+        payloadHash,
+        responseHash,
+        outboxCount: outbox.length,
+      }),
+      markRetryable: async ({ eventKeyHash, payloadHash }) => ({
+        state: "RETRYABLE",
+        eventKeyHash,
+        payloadHash,
+      }),
+      verifyReady: async () => true,
+    },
     ...overrides,
   };
 }
@@ -88,7 +124,10 @@ test("health and readiness expose only bounded scaffold metadata", async () => {
     registry_count: 112,
   });
   assert.equal(health.response.headers.get("x-powered-by"), null);
-  assert.equal(health.response.headers.get("cache-control"), "private, no-store");
+  assert.equal(
+    health.response.headers.get("cache-control"),
+    "private, no-store",
+  );
 
   const ready = await request(app, "/readyz");
   assert.equal(ready.response.status, 200);
@@ -96,7 +135,9 @@ test("health and readiness expose only bounded scaffold metadata", async () => {
   assert.equal(internalAuthCalls, 0);
 
   const unavailable = createApp(
-    dependencies({ verifyReadiness: async () => Promise.reject(new Error("down")) }),
+    dependencies({
+      verifyReadiness: async () => Promise.reject(new Error("down")),
+    }),
   );
   const notReady = await request(unavailable, "/readyz");
   assert.equal(notReady.response.status, 503);
@@ -255,15 +296,11 @@ test("worker accepts direct private Google OIDC actor without Firebase", async (
       },
     }),
   );
-  const result = await request(
-    app,
-    `/api/v1/legacy-functions/${entry.slug}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: Buffer.from("{}"),
-    },
-  );
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from("{}"),
+  });
   assert.equal(result.response.status, 202);
   assert.equal(result.body.kind, "google-service");
   assert.equal(googleCalls, 1);
@@ -278,6 +315,8 @@ test("signed webhook owner preserves raw bytes for its verification seam", async
   });
   const rawBody = Buffer.from('{"raw":"a  b"}', "utf8");
   let verifiedBody = null;
+  let ledgerClaim = null;
+  let ledgerCompletion = null;
   const app = createApp(
     dependencies({
       config: config("signed-webhook-service"),
@@ -291,25 +330,64 @@ test("signed webhook owner preserves raw bytes for its verification seam", async
           eventId: "event-1",
         };
       },
-      handlers: {
-        [entry.slug]: async ({ actor }) => ({
-          status: 204,
-          body: null,
+      webhookLedger: {
+        verifyReady: async () => true,
+        claim: async ({ version, eventKeyHash, payloadHash, leaseMs }) => {
+          ledgerClaim = { version, eventKeyHash, payloadHash };
+          return {
+            state: "PROCESSING",
+            acquired: true,
+            eventKeyHash,
+            payloadHash,
+            claimToken: "claim-token-raw-body",
+            attempt: 1,
+            leaseExpiresAtMs: Date.now() + leaseMs,
+          };
+        },
+        complete: async ({
+          eventKeyHash,
+          payloadHash,
+          responseHash,
+          outbox,
+        }) => {
+          ledgerCompletion = { responseHash, outbox };
+          return {
+            state: "COMPLETED",
+            eventKeyHash,
+            payloadHash,
+            responseHash,
+            outboxCount: outbox.length,
+          };
+        },
+        markRetryable: async ({ eventKeyHash, payloadHash }) => ({
+          state: "RETRYABLE",
+          eventKeyHash,
+          payloadHash,
         }),
+      },
+      handlers: {
+        [entry.slug]: async ({ actor, database, webhookClaim }) => {
+          assert.equal(actor.eventId, "event-1");
+          assert.deepEqual(Object.keys(database), []);
+          assert.equal(webhookClaim.eventKeyHash, ledgerClaim.eventKeyHash);
+          assert.equal(webhookClaim.payloadHash, ledgerClaim.payloadHash);
+          assert.equal(webhookClaim.claimToken, "claim-token-raw-body");
+          return { status: 204, body: null };
+        },
       },
     }),
   );
-  const result = await request(
-    app,
-    `/api/v1/legacy-functions/${entry.slug}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: rawBody,
-    },
-  );
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: rawBody,
+  });
   assert.equal(result.response.status, 204);
   assert.equal(verifiedBody.equals(rawBody), true);
+  assert.match(ledgerClaim.eventKeyHash, /^[a-f0-9]{64}$/);
+  assert.match(ledgerClaim.payloadHash, /^[a-f0-9]{64}$/);
+  assert.match(ledgerCompletion.responseHash, /^[a-f0-9]{64}$/);
+  assert.deepEqual(ledgerCompletion.outbox, []);
 });
 
 test("a handler cannot run without an exact local request contract", async () => {
@@ -521,15 +599,11 @@ test("database facade rejects userless work and never exposes the pool", async (
       },
     }),
   );
-  const result = await request(
-    app,
-    `/api/v1/legacy-functions/${entry.slug}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: Buffer.from("{}"),
-    },
-  );
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from("{}"),
+  });
   assert.equal(result.response.status, 403);
   assert.equal(errorCode(result), "OWNERSHIP_CONTEXT_REQUIRED");
 });
@@ -562,4 +636,497 @@ test("malformed and traversal-like routes never reach handlers", async () => {
     assert.equal(result.response.status, 404);
   }
   assert.equal(calls, 0);
+});
+
+test("ported routes require a ready shared limiter before handlers or readiness", async () => {
+  const entry = portedEntry();
+  let handlerCalls = 0;
+  const deps = dependencies({
+    registry: { [entry.slug]: entry },
+    contracts: contractsFor(entry),
+    handlers: {
+      [entry.slug]: async () => {
+        handlerCalls += 1;
+        return { status: 200, body: { unsafe: true } };
+      },
+    },
+  });
+  delete deps.sharedRateLimiter;
+  const app = createApp(deps);
+
+  const ready = await request(app, "/readyz");
+  assert.equal(ready.response.status, 503);
+  assert.equal(ready.body.status, "not_ready");
+
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from("{}"),
+  });
+  assert.equal(result.response.status, 503);
+  assert.equal(errorCode(result), "SHARED_RATE_LIMIT_UNAVAILABLE");
+  assert.equal(handlerCalls, 0);
+});
+
+test("ported webhooks require a durable ledger before handlers or readiness", async () => {
+  const entry = portedEntry({
+    slug: "fund-stripe-webhook",
+    owner_group: "signed-webhook-service",
+    auth_mode: "provider_signature_raw_body",
+  });
+  let handlerCalls = 0;
+  const deps = dependencies({
+    config: config("signed-webhook-service"),
+    registry: { [entry.slug]: entry },
+    contracts: contractsFor(entry),
+    verifyWebhookRequest: async () => ({
+      kind: "provider-webhook",
+      provider: "stripe",
+      eventId: "evt_missing_ledger",
+    }),
+    handlers: {
+      [entry.slug]: async () => {
+        handlerCalls += 1;
+        return { status: 200, body: { unsafe: true } };
+      },
+    },
+  });
+  delete deps.webhookLedger;
+  const app = createApp(deps);
+
+  const ready = await request(app, "/readyz");
+  assert.equal(ready.response.status, 503);
+
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from("{}"),
+  });
+  assert.equal(result.response.status, 503);
+  assert.equal(errorCode(result), "WEBHOOK_LEDGER_UNAVAILABLE");
+  assert.equal(handlerCalls, 0);
+});
+
+test("concurrent webhook replays are claimed once before handler execution", async () => {
+  const entry = portedEntry({
+    slug: "fund-stripe-webhook",
+    owner_group: "signed-webhook-service",
+    auth_mode: "provider_signature_raw_body",
+  });
+  const claims = new Map();
+  let handlerCalls = 0;
+  let markHandlerStarted;
+  const handlerStarted = new Promise((resolve) => {
+    markHandlerStarted = resolve;
+  });
+  let releaseHandler;
+  const handlerRelease = new Promise((resolve) => {
+    releaseHandler = resolve;
+  });
+  const webhookLedger = {
+    verifyReady: async () => true,
+    claim: async ({ eventKeyHash, payloadHash, leaseMs }) => {
+      const existing = claims.get(eventKeyHash);
+      if (existing) {
+        return {
+          state: existing.state,
+          acquired: false,
+          eventKeyHash,
+          payloadHash: existing.payloadHash,
+          responseHash: existing.responseHash,
+        };
+      }
+      const record = {
+        state: "PROCESSING",
+        payloadHash,
+        claimToken: "claim-token-concurrent",
+        attempt: 1,
+      };
+      claims.set(eventKeyHash, record);
+      await Promise.resolve();
+      return {
+        state: record.state,
+        acquired: true,
+        eventKeyHash,
+        payloadHash,
+        claimToken: record.claimToken,
+        attempt: record.attempt,
+        leaseExpiresAtMs: Date.now() + leaseMs,
+      };
+    },
+    complete: async ({
+      eventKeyHash,
+      payloadHash,
+      claimToken,
+      responseHash,
+      outbox,
+    }) => {
+      const record = claims.get(eventKeyHash);
+      assert.equal(record.claimToken, claimToken);
+      record.state = "COMPLETED";
+      record.responseHash = responseHash;
+      return {
+        state: record.state,
+        eventKeyHash,
+        payloadHash,
+        responseHash,
+        outboxCount: outbox.length,
+      };
+    },
+    markRetryable: async ({ eventKeyHash, payloadHash }) => {
+      const record = claims.get(eventKeyHash);
+      record.state = "RETRYABLE";
+      return { state: record.state, eventKeyHash, payloadHash };
+    },
+  };
+  const app = createApp(
+    dependencies({
+      config: config("signed-webhook-service"),
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry),
+      verifyWebhookRequest: async () => ({
+        kind: "provider-webhook",
+        provider: "stripe",
+        eventId: "evt_concurrent_1",
+      }),
+      webhookLedger,
+      handlers: {
+        [entry.slug]: async () => {
+          handlerCalls += 1;
+          markHandlerStarted();
+          await handlerRelease;
+          return { status: 200, body: { ok: true } };
+        },
+      },
+    }),
+  );
+  const send = (body) =>
+    request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: Buffer.from(body),
+    });
+  const firstPromise = send('{"value":1}');
+  await handlerStarted;
+  const inProgress = await send('{"value":1}');
+  assert.equal(inProgress.response.status, 409);
+  assert.equal(errorCode(inProgress), "WEBHOOK_IN_PROGRESS");
+  releaseHandler();
+  const first = await firstPromise;
+  assert.equal(first.response.status, 200);
+  assert.equal(handlerCalls, 1);
+
+  const completedReplay = await send('{"value":1}');
+  assert.equal(completedReplay.response.status, 204);
+  assert.equal(handlerCalls, 1);
+
+  const altered = await send('{"value":2}');
+  assert.equal(altered.response.status, 409);
+  assert.equal(errorCode(altered), "WEBHOOK_REPLAY_CONFLICT");
+  assert.equal(handlerCalls, 1);
+});
+
+test("webhook handler failure is released for retry and completion is idempotent", async () => {
+  const entry = portedEntry({
+    slug: "fund-stripe-webhook",
+    owner_group: "signed-webhook-service",
+    auth_mode: "provider_signature_raw_body",
+  });
+  let record = null;
+  let handlerCalls = 0;
+  const webhookLedger = {
+    verifyReady: async () => true,
+    claim: async ({ eventKeyHash, payloadHash, leaseMs }) => {
+      if (record?.state === "COMPLETED") {
+        return {
+          state: record.state,
+          acquired: false,
+          eventKeyHash,
+          payloadHash: record.payloadHash,
+          responseHash: record.responseHash,
+        };
+      }
+      const attempt = (record?.attempt ?? 0) + 1;
+      record = {
+        state: "PROCESSING",
+        payloadHash,
+        attempt,
+        claimToken: `claim-token-retry-${attempt}`,
+      };
+      return {
+        state: record.state,
+        acquired: true,
+        eventKeyHash,
+        payloadHash,
+        attempt,
+        claimToken: record.claimToken,
+        leaseExpiresAtMs: Date.now() + leaseMs,
+      };
+    },
+    complete: async ({
+      eventKeyHash,
+      payloadHash,
+      claimToken,
+      responseHash,
+      outbox,
+    }) => {
+      assert.equal(record.claimToken, claimToken);
+      record.state = "COMPLETED";
+      record.responseHash = responseHash;
+      return {
+        state: record.state,
+        eventKeyHash,
+        payloadHash,
+        responseHash,
+        outboxCount: outbox.length,
+      };
+    },
+    markRetryable: async ({
+      eventKeyHash,
+      payloadHash,
+      claimToken,
+      failureCode,
+    }) => {
+      assert.equal(record.claimToken, claimToken);
+      record.state = "RETRYABLE";
+      record.failureCode = failureCode;
+      return { state: record.state, eventKeyHash, payloadHash };
+    },
+  };
+  const app = createApp(
+    dependencies({
+      config: config("signed-webhook-service"),
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry),
+      verifyWebhookRequest: async () => ({
+        kind: "provider-webhook",
+        provider: "stripe",
+        eventId: "evt_retryable_1",
+      }),
+      webhookLedger,
+      handlers: {
+        [entry.slug]: async () => {
+          handlerCalls += 1;
+          if (handlerCalls === 1) {
+            throw new RuntimeError(
+              "UPSTREAM_UNAVAILABLE",
+              "Service unavailable.",
+              503,
+            );
+          }
+          return {
+            status: 200,
+            body: { ok: true },
+            outbox: [
+              {
+                topic: "webhook.processed",
+                idempotencyKey: "evt-retryable-1",
+                payload: { ok: true },
+              },
+            ],
+          };
+        },
+      },
+    }),
+  );
+  const send = () =>
+    request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: Buffer.from("{}"),
+    });
+
+  const failed = await send();
+  assert.equal(failed.response.status, 503);
+  assert.equal(errorCode(failed), "UPSTREAM_UNAVAILABLE");
+  assert.equal(record.state, "RETRYABLE");
+  assert.equal(record.failureCode, "UPSTREAM_UNAVAILABLE");
+
+  const retried = await send();
+  assert.equal(retried.response.status, 200);
+  assert.equal(record.state, "COMPLETED");
+  assert.equal(record.attempt, 2);
+  assert.equal(handlerCalls, 2);
+
+  const duplicate = await send();
+  assert.equal(duplicate.response.status, 204);
+  assert.equal(handlerCalls, 2);
+});
+
+test("webhook deadline records retryable state without completing", async () => {
+  const entry = portedEntry({
+    slug: "fund-stripe-webhook",
+    owner_group: "signed-webhook-service",
+    auth_mode: "provider_signature_raw_body",
+  });
+  let state = "NEW";
+  let completedCalls = 0;
+  let resolveRetryable;
+  const retryable = new Promise((resolve) => {
+    resolveRetryable = resolve;
+  });
+  const webhookLedger = {
+    verifyReady: async () => true,
+    claim: async ({ eventKeyHash, payloadHash, leaseMs }) => {
+      state = "PROCESSING";
+      return {
+        state,
+        acquired: true,
+        eventKeyHash,
+        payloadHash,
+        attempt: 1,
+        claimToken: "claim-token-timeout",
+        leaseExpiresAtMs: Date.now() + leaseMs,
+      };
+    },
+    complete: async () => {
+      completedCalls += 1;
+      throw new Error("must not complete");
+    },
+    markRetryable: async ({ eventKeyHash, payloadHash, failureCode }) => {
+      state = "RETRYABLE";
+      resolveRetryable(failureCode);
+      return { state, eventKeyHash, payloadHash };
+    },
+  };
+  const app = createApp(
+    dependencies({
+      config: config("signed-webhook-service", {
+        handlerDeadlineMs: 25,
+        databaseStatementTimeoutMs: 10,
+      }),
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry),
+      verifyWebhookRequest: async () => ({
+        kind: "provider-webhook",
+        provider: "stripe",
+        eventId: "evt_timeout_1",
+      }),
+      webhookLedger,
+      handlers: {
+        [entry.slug]: async ({ signal }) =>
+          new Promise((resolve) => {
+            signal.addEventListener(
+              "abort",
+              () => resolve({ status: 200, body: { too_late: true } }),
+              { once: true },
+            );
+          }),
+      },
+    }),
+  );
+
+  const result = await request(
+    app,
+    `/api/v1/legacy-functions/${entry.slug}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: Buffer.from("{}"),
+    },
+  );
+  assert.equal(result.response.status, 504);
+  assert.equal(errorCode(result), "HANDLER_DEADLINE_EXCEEDED");
+  assert.equal(await retryable, "HANDLER_DEADLINE_EXCEEDED");
+  assert.equal(state, "RETRYABLE");
+  assert.equal(completedCalls, 0);
+});
+
+test("handler deadline aborts work and returns a typed timeout", async () => {
+  const entry = portedEntry();
+  let observedAbort = false;
+  const app = createApp(
+    dependencies({
+      config: config("identity-api", {
+        handlerDeadlineMs: 25,
+        databaseStatementTimeoutMs: 10,
+      }),
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry),
+      handlers: {
+        [entry.slug]: async ({ signal }) =>
+          new Promise((resolve) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                observedAbort = true;
+                resolve({ status: 200, body: { must_not_send: true } });
+              },
+              { once: true },
+            );
+          }),
+      },
+    }),
+  );
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from("{}"),
+  });
+  assert.equal(result.response.status, 504);
+  assert.equal(errorCode(result), "HANDLER_DEADLINE_EXCEEDED");
+  assert.equal(observedAbort, true);
+});
+
+test("client close aborts a handler and no response is produced afterward", async () => {
+  const entry = portedEntry();
+  let markStarted;
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
+  let markAborted;
+  const aborted = new Promise((resolve) => {
+    markAborted = resolve;
+  });
+  let responseReads = 0;
+  const app = createApp(
+    dependencies({
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry),
+      handlers: {
+        [entry.slug]: async ({ signal }) => {
+          markStarted();
+          return new Promise((resolve) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                markAborted();
+                const output = { body: null };
+                Object.defineProperty(output, "status", {
+                  get() {
+                    responseReads += 1;
+                    return 204;
+                  },
+                });
+                resolve(output);
+              },
+              { once: true },
+            );
+          });
+        },
+      },
+    }),
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const client = http.request({
+    host: "127.0.0.1",
+    port: server.address().port,
+    path: `/api/v1/legacy-functions/${entry.slug}`,
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "content-length": "2",
+    },
+  });
+  client.on("error", () => {});
+  client.end("{}");
+  await started;
+  client.destroy();
+  await aborted;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(responseReads, 0);
+  await new Promise((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
 });

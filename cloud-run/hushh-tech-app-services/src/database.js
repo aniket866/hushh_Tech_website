@@ -3,7 +3,11 @@ import pg from "pg";
 
 import { RuntimeError } from "./errors.js";
 import {
+  expectedColumnPrivileges,
+  expectedSequencePrivileges,
   expectedTablePrivileges,
+  observedColumnPrivileges,
+  observedSequencePrivileges,
   observedTablePrivileges,
 } from "./table-privileges.js";
 
@@ -17,6 +21,12 @@ function validFirebaseUid(value) {
     value.length <= FIREBASE_UID_LIMIT &&
     !/[\u0000-\u001f\u007f]/.test(value)
   );
+}
+
+function throwIfAborted(signal) {
+  if (!signal?.aborted) return;
+  if (signal.reason instanceof RuntimeError) throw signal.reason;
+  throw new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503);
 }
 
 export async function createDatabaseRuntime({
@@ -52,7 +62,7 @@ export async function createDatabaseRuntime({
     min: 0,
     connectionTimeoutMillis: config.databaseConnectTimeoutMs,
     idleTimeoutMillis: 30_000,
-    query_timeout: config.databaseStatementTimeoutMs + 1_000,
+    query_timeout: config.databaseStatementTimeoutMs,
     statement_timeout: config.databaseStatementTimeoutMs,
     application_name: `hushh-tech-${config.serviceOwner}`,
   });
@@ -79,6 +89,7 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   const applicationSchemaCreateCount = Number(
     row?.application_schema_create_count,
   );
+  const canCreateTemporaryTables = row?.can_create_temporary_tables;
   const accessibleTableRlsDisabledCount = Number(
     row?.accessible_table_rls_disabled_count,
   );
@@ -88,24 +99,44 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   const ownedApplicationSchemaCount = Number(
     row?.owned_application_schema_count,
   );
-  const ownedApplicationTableCount = Number(
-    row?.owned_application_table_count,
-  );
+  const ownedApplicationTableCount = Number(row?.owned_application_table_count);
   const ownedApplicationSequenceCount = Number(
     row?.owned_application_sequence_count,
   );
   const ownedApplicationRoutineCount = Number(
     row?.owned_application_routine_count,
   );
-  const expectedPrivileges = expectedTablePrivileges(serviceOwner);
-  const observedPrivileges = observedTablePrivileges(
+  const expectedTablePrivilegeList = expectedTablePrivileges(serviceOwner);
+  const observedTablePrivilegeList = observedTablePrivileges(
     row?.effective_table_dml_privileges,
   );
+  const expectedColumnPrivilegeList = expectedColumnPrivileges(serviceOwner);
+  const observedColumnPrivilegeList = observedColumnPrivileges(
+    row?.effective_column_privileges,
+  );
+  const expectedSequencePrivilegeList =
+    expectedSequencePrivileges(serviceOwner);
+  const observedSequencePrivilegeList = observedSequencePrivileges(
+    row?.effective_sequence_privileges,
+  );
   const exactTablePrivileges =
-    observedPrivileges !== null &&
-    observedPrivileges.length === expectedPrivileges.length &&
-    observedPrivileges.every(
-      (privilege, index) => privilege === expectedPrivileges[index],
+    observedTablePrivilegeList !== null &&
+    observedTablePrivilegeList.length === expectedTablePrivilegeList.length &&
+    observedTablePrivilegeList.every(
+      (privilege, index) => privilege === expectedTablePrivilegeList[index],
+    );
+  const exactColumnPrivileges =
+    observedColumnPrivilegeList !== null &&
+    observedColumnPrivilegeList.length === expectedColumnPrivilegeList.length &&
+    observedColumnPrivilegeList.every(
+      (privilege, index) => privilege === expectedColumnPrivilegeList[index],
+    );
+  const exactSequencePrivileges =
+    observedSequencePrivilegeList !== null &&
+    observedSequencePrivilegeList.length ===
+      expectedSequencePrivilegeList.length &&
+    observedSequencePrivilegeList.every(
+      (privilege, index) => privilege === expectedSequencePrivilegeList[index],
     );
   if (
     !row ||
@@ -116,6 +147,7 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     row.rolreplication !== false ||
     row.rolbypassrls !== false ||
     row.can_create_database !== false ||
+    canCreateTemporaryTables !== false ||
     row.can_create_public_schema !== false ||
     !Number.isSafeInteger(applicationSchemaCreateCount) ||
     applicationSchemaCreateCount !== 0 ||
@@ -137,7 +169,9 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     ownedApplicationSequenceCount !== 0 ||
     !Number.isSafeInteger(ownedApplicationRoutineCount) ||
     ownedApplicationRoutineCount !== 0 ||
-    !exactTablePrivileges
+    !exactTablePrivileges ||
+    !exactColumnPrivileges ||
+    !exactSequencePrivileges
   ) {
     throw new RuntimeError(
       "DATABASE_ROLE_UNSAFE",
@@ -194,7 +228,16 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
           relations.relkind,
           relations.relrowsecurity,
           relations.relforcerowsecurity,
-          privilege_types.privilege_type
+          privilege_types.privilege_type,
+          EXISTS (
+            SELECT 1
+            FROM effective_roles AS inherited
+            WHERE has_table_privilege(
+              inherited.rolname,
+              relations.oid,
+              privilege_types.privilege_type || ' WITH GRANT OPTION'
+            )
+          ) AS is_grantable
         FROM application_relations AS relations
         CROSS JOIN (
           VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')
@@ -208,6 +251,94 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
             privilege_types.privilege_type
           )
         )
+      ),
+      effective_column_privileges AS (
+        SELECT
+          relations.oid AS relation_oid,
+          relations.schema_name,
+          relations.table_name,
+          relations.relkind,
+          relations.relrowsecurity,
+          relations.relforcerowsecurity,
+          attributes.attname AS column_name,
+          upper(column_acl.privilege_type) AS privilege_type,
+          bool_or(column_acl.is_grantable) AS is_grantable
+        FROM application_relations AS relations
+        INNER JOIN pg_attribute AS attributes
+          ON attributes.attrelid = relations.oid
+          AND attributes.attnum > 0
+          AND attributes.attisdropped IS NOT TRUE
+        CROSS JOIN LATERAL aclexplode(attributes.attacl) AS column_acl
+        WHERE column_acl.grantee = 0
+          OR column_acl.grantee IN (
+            SELECT oid FROM effective_role_oids
+          )
+        GROUP BY
+          relations.oid,
+          relations.schema_name,
+          relations.table_name,
+          relations.relkind,
+          relations.relrowsecurity,
+          relations.relforcerowsecurity,
+          attributes.attname,
+          upper(column_acl.privilege_type)
+      ),
+      application_sequences AS (
+        SELECT
+          sequences.oid,
+          schemas.nspname AS schema_name,
+          sequences.relname AS sequence_name,
+          sequences.relowner
+        FROM pg_class AS sequences
+        INNER JOIN pg_namespace AS schemas
+          ON schemas.oid = sequences.relnamespace
+        WHERE schemas.nspname <> 'information_schema'
+          AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND sequences.relkind = 'S'
+      ),
+      effective_sequence_privileges AS (
+        SELECT DISTINCT
+          sequences.oid AS sequence_oid,
+          sequences.schema_name,
+          sequences.sequence_name,
+          privilege_types.privilege_type,
+          EXISTS (
+            SELECT 1
+            FROM effective_roles AS inherited
+            WHERE has_sequence_privilege(
+              inherited.rolname,
+              sequences.oid,
+              privilege_types.privilege_type || ' WITH GRANT OPTION'
+            )
+          ) AS is_grantable
+        FROM application_sequences AS sequences
+        CROSS JOIN (
+          VALUES ('SELECT'), ('UPDATE'), ('USAGE')
+        ) AS privilege_types(privilege_type)
+        WHERE EXISTS (
+          SELECT 1
+          FROM effective_roles AS inherited
+          WHERE has_sequence_privilege(
+            inherited.rolname,
+            sequences.oid,
+            privilege_types.privilege_type
+          )
+        )
+      ),
+      accessible_base_relations AS (
+        SELECT DISTINCT
+          privileges.relation_oid,
+          privileges.relrowsecurity,
+          privileges.relforcerowsecurity
+        FROM effective_table_dml_privileges AS privileges
+        WHERE privileges.relkind IN ('r', 'p')
+        UNION
+        SELECT DISTINCT
+          privileges.relation_oid,
+          privileges.relrowsecurity,
+          privileges.relforcerowsecurity
+        FROM effective_column_privileges AS privileges
+        WHERE privileges.relkind IN ('r', 'p')
       )
       SELECT
         current_user,
@@ -217,6 +348,7 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
         roles.rolreplication,
         roles.rolbypassrls,
         has_database_privilege(current_user, current_database(), 'CREATE') AS can_create_database,
+        has_database_privilege(current_user, current_database(), 'TEMPORARY') AS can_create_temporary_tables,
         has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_public_schema,
         COALESCE(
           (
@@ -225,7 +357,8 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
                 'schema', privileges.schema_name,
                 'table', privileges.table_name,
                 'privilege', privileges.privilege_type,
-                'kind', privileges.relkind
+                'kind', privileges.relkind,
+                'grantable', privileges.is_grantable
               )
               ORDER BY
                 privileges.schema_name,
@@ -236,17 +369,54 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
           ),
           '[]'::jsonb
         ) AS effective_table_dml_privileges,
+        COALESCE(
+          (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'schema', privileges.schema_name,
+                'table', privileges.table_name,
+                'column', privileges.column_name,
+                'privilege', privileges.privilege_type,
+                'kind', privileges.relkind,
+                'grantable', privileges.is_grantable
+              )
+              ORDER BY
+                privileges.schema_name,
+                privileges.table_name,
+                privileges.column_name,
+                privileges.privilege_type
+            )
+            FROM effective_column_privileges AS privileges
+          ),
+          '[]'::jsonb
+        ) AS effective_column_privileges,
+        COALESCE(
+          (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'schema', privileges.schema_name,
+                'sequence', privileges.sequence_name,
+                'privilege', privileges.privilege_type,
+                'grantable', privileges.is_grantable
+              )
+              ORDER BY
+                privileges.schema_name,
+                privileges.sequence_name,
+                privileges.privilege_type
+            )
+            FROM effective_sequence_privileges AS privileges
+          ),
+          '[]'::jsonb
+        ) AS effective_sequence_privileges,
         (
-          SELECT count(DISTINCT privileges.relation_oid)
-          FROM effective_table_dml_privileges AS privileges
-          WHERE privileges.relkind IN ('r', 'p')
-            AND privileges.relrowsecurity IS NOT TRUE
+          SELECT count(*)
+          FROM accessible_base_relations AS privileges
+          WHERE privileges.relrowsecurity IS NOT TRUE
         ) AS accessible_table_rls_disabled_count,
         (
-          SELECT count(DISTINCT privileges.relation_oid)
-          FROM effective_table_dml_privileges AS privileges
-          WHERE privileges.relkind IN ('r', 'p')
-            AND privileges.relforcerowsecurity IS NOT TRUE
+          SELECT count(*)
+          FROM accessible_base_relations AS privileges
+          WHERE privileges.relforcerowsecurity IS NOT TRUE
         ) AS accessible_table_rls_not_forced_count,
         (
           SELECT count(*)
@@ -271,13 +441,8 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
         ) AS owned_application_table_count,
         (
           SELECT count(*)
-          FROM pg_class AS owned_sequences
-          INNER JOIN pg_namespace AS owned_sequence_schemas
-            ON owned_sequence_schemas.oid = owned_sequences.relnamespace
-          WHERE owned_sequence_schemas.nspname <> 'information_schema'
-            AND owned_sequence_schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
-            AND owned_sequences.relkind = 'S'
-            AND owned_sequences.relowner IN (
+          FROM application_sequences AS owned_sequences
+          WHERE owned_sequences.relowner IN (
               SELECT oid FROM effective_role_oids
             )
         ) AS owned_application_sequence_count,
@@ -383,7 +548,9 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
     destroy = true;
     throw error;
   } finally {
-    client.release(destroy ? new Error("Discard unsafe database client.") : undefined);
+    client.release(
+      destroy ? new Error("Discard unsafe database client.") : undefined,
+    );
   }
 }
 
@@ -398,12 +565,18 @@ export async function withFirebaseTransaction(
   pool,
   firebaseUid,
   work,
-  { statementTimeoutMs = 15_000 } = {},
+  { statementTimeoutMs = 15_000, signal } = {},
 ) {
-  if (!validFirebaseUid(firebaseUid) || typeof work !== "function") {
+  if (
+    !validFirebaseUid(firebaseUid) ||
+    typeof work !== "function" ||
+    !Number.isSafeInteger(statementTimeoutMs) ||
+    statementTimeoutMs < 1
+  ) {
     throw new RuntimeError("INVALID_REQUEST", "Invalid request.", 400);
   }
 
+  throwIfAborted(signal);
   const client = await pool.connect();
   let transactionOpen = false;
   let result;
@@ -411,13 +584,13 @@ export async function withFirebaseTransaction(
   let destroy = false;
 
   try {
+    throwIfAborted(signal);
     await client.query("RESET app.firebase_uid");
     await client.query("BEGIN");
     transactionOpen = true;
-    await client.query(
-      "SELECT set_config('statement_timeout', $1, true)",
-      [`${statementTimeoutMs}ms`],
-    );
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [
+      `${statementTimeoutMs}ms`,
+    ]);
     const context = await client.query(
       "SELECT set_config('app.firebase_uid', $1, true) AS firebase_uid",
       [firebaseUid],
@@ -430,7 +603,8 @@ export async function withFirebaseTransaction(
       );
     }
 
-    result = await work(client);
+    result = await work(client, signal);
+    throwIfAborted(signal);
     await client.query("COMMIT");
     transactionOpen = false;
     const leaked = await readFirebaseContext(client);
@@ -480,7 +654,9 @@ export async function withFirebaseTransaction(
       { cause: cleanupError },
     );
   } finally {
-    client.release(destroy ? new Error("Discard contaminated database client.") : undefined);
+    client.release(
+      destroy ? new Error("Discard contaminated database client.") : undefined,
+    );
   }
 
   if (failure) throw failure;

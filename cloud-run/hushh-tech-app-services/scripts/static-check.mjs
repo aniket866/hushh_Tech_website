@@ -9,7 +9,11 @@ import {
   validateRegistry,
 } from "../src/registry.js";
 import { FUNCTION_CONTRACTS } from "../src/contracts.js";
-import { SERVICE_TABLE_PRIVILEGE_ALLOWLISTS } from "../src/table-privileges.js";
+import {
+  SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
+  SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
+  SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,
+} from "../src/table-privileges.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const registryOnly = process.argv.includes("--registry-only");
@@ -40,7 +44,10 @@ const frozen = LEGACY_FUNCTIONS.filter(
 const replacementCandidates = LEGACY_FUNCTIONS.filter(
   ({ final_disposition }) => final_disposition === "PORT_TO_GCP",
 );
-assert.deepEqual(retired.map(({ slug }) => slug), ["get-secrets"]);
+assert.deepEqual(
+  retired.map(({ slug }) => slug),
+  ["get-secrets"],
+);
 assert.equal(frozen.length, 112);
 assert.equal(replacementCandidates.length, 111);
 assert.equal(
@@ -51,28 +58,37 @@ assert.equal(
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS), []);
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
-assert.equal(
-  Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).every(
-    (privileges) => privileges.length === 0,
-  ),
-  true,
-);
+for (const allowlists of [
+  SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,
+  SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
+  SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
+]) {
+  assert.equal(Object.keys(allowlists).length, 7);
+  assert.equal(
+    Object.values(allowlists).every((privileges) => privileges.length === 0),
+    true,
+  );
+}
 
 if (!registryOnly) {
   const packageJson = JSON.parse(
     await readFile(resolve(root, "package.json"), "utf8"),
   );
-  assert.deepEqual(
-    Object.keys(packageJson.dependencies).sort(),
-    [
-      "@google-cloud/cloud-sql-connector",
-      "express",
-      "firebase-admin",
-      "google-auth-library",
-      "pg",
-    ],
-  );
+  assert.deepEqual(Object.keys(packageJson.dependencies).sort(), [
+    "@google-cloud/cloud-sql-connector",
+    "express",
+    "firebase-admin",
+    "google-auth-library",
+    "pg",
+  ]);
   assert.deepEqual(packageJson.overrides, { uuid: "11.1.1" });
+
+  const dockerfile = await readFile(resolve(root, "Dockerfile"), "utf8");
+  assert.doesNotMatch(dockerfile, /^ARG\s+.*PLATFORM/m);
+  assert.match(
+    dockerfile,
+    /^FROM --platform=linux\/amd64 node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS production$/m,
+  );
 
   const scanTargets = [
     ...(await filesUnder(resolve(root, "src"))),

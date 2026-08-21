@@ -4,26 +4,44 @@ const TABLE_DML_PRIVILEGES = Object.freeze([
   "SELECT",
   "UPDATE",
 ]);
-const TABLE_DML_PRIVILEGE_SET = new Set(TABLE_DML_PRIVILEGES);
+const COLUMN_DML_PRIVILEGES = Object.freeze(["INSERT", "SELECT", "UPDATE"]);
+const OBSERVABLE_COLUMN_PRIVILEGES = new Set([
+  ...COLUMN_DML_PRIVILEGES,
+  "REFERENCES",
+]);
+const SEQUENCE_PRIVILEGES = Object.freeze(["SELECT", "UPDATE", "USAGE"]);
 const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/;
 
-const DEFINITIONS = Object.freeze({
-  "investor-api": Object.freeze([]),
-  "identity-api": Object.freeze([]),
-  "financial-api": Object.freeze([]),
-  "content-api": Object.freeze([]),
-  "engagement-api-worker": Object.freeze([]),
-  "signed-webhook-service": Object.freeze([]),
-  worker: Object.freeze([]),
-});
+const DEFINITIONS = Object.freeze(
+  Object.fromEntries(
+    [
+      "investor-api",
+      "identity-api",
+      "financial-api",
+      "content-api",
+      "engagement-api-worker",
+      "signed-webhook-service",
+      "worker",
+    ].map((owner) => [
+      owner,
+      Object.freeze({
+        tables: Object.freeze([]),
+        columns: Object.freeze([]),
+        sequences: Object.freeze([]),
+      }),
+    ]),
+  ),
+);
 
-function canonicalPrivilege(schema, table, privilege) {
-  return `${schema}.${table}:${privilege}`;
+function assertIdentifier(value) {
+  return typeof value === "string" && IDENTIFIER_PATTERN.test(value);
 }
 
-function compileServiceAllowlist(serviceOwner, entries) {
+function compileEntries(serviceOwner, kind, entries, privilegeSet, fields) {
   if (!Array.isArray(entries)) {
-    throw new Error(`Table privilege allowlist for ${serviceOwner} must be an array.`);
+    throw new Error(
+      `${kind} privilege allowlist for ${serviceOwner} must be an array.`,
+    );
   }
   const canonical = [];
   for (const entry of entries) {
@@ -31,57 +49,111 @@ function compileServiceAllowlist(serviceOwner, entries) {
       !entry ||
       typeof entry !== "object" ||
       Array.isArray(entry) ||
-      !IDENTIFIER_PATTERN.test(entry.schema) ||
-      !IDENTIFIER_PATTERN.test(entry.table) ||
+      fields.some((field) => !assertIdentifier(entry[field])) ||
       !Array.isArray(entry.privileges) ||
       entry.privileges.length < 1 ||
-      entry.privileges.some(
-        (privilege) => !TABLE_DML_PRIVILEGE_SET.has(privilege),
-      ) ||
+      entry.privileges.some((privilege) => !privilegeSet.has(privilege)) ||
       new Set(entry.privileges).size !== entry.privileges.length ||
-      Object.keys(entry).some(
-        (key) => !["schema", "table", "privileges"].includes(key),
-      )
+      Object.keys(entry).some((key) => ![...fields, "privileges"].includes(key))
     ) {
-      throw new Error(`Table privilege allowlist for ${serviceOwner} is invalid.`);
+      throw new Error(
+        `${kind} privilege allowlist for ${serviceOwner} is invalid.`,
+      );
     }
     for (const privilege of entry.privileges) {
-      canonical.push(canonicalPrivilege(entry.schema, entry.table, privilege));
+      canonical.push(
+        `${fields.map((field) => entry[field]).join(".")}:${privilege}`,
+      );
     }
   }
   canonical.sort();
   if (new Set(canonical).size !== canonical.length) {
-    throw new Error(`Table privilege allowlist for ${serviceOwner} is duplicated.`);
+    throw new Error(
+      `${kind} privilege allowlist for ${serviceOwner} is duplicated.`,
+    );
   }
   return Object.freeze(canonical);
 }
 
-export const SERVICE_TABLE_PRIVILEGE_ALLOWLISTS = Object.freeze(
-  Object.fromEntries(
-    Object.entries(DEFINITIONS).map(([serviceOwner, entries]) => [
-      serviceOwner,
-      compileServiceAllowlist(serviceOwner, entries),
-    ]),
-  ),
+function compileDefinitions(key, kind, privileges, fields) {
+  const privilegeSet = new Set(privileges);
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(DEFINITIONS).map(([serviceOwner, definition]) => [
+        serviceOwner,
+        compileEntries(
+          serviceOwner,
+          kind,
+          definition[key],
+          privilegeSet,
+          fields,
+        ),
+      ]),
+    ),
+  );
+}
+
+export const SERVICE_TABLE_PRIVILEGE_ALLOWLISTS = compileDefinitions(
+  "tables",
+  "Table",
+  TABLE_DML_PRIVILEGES,
+  ["schema", "table"],
+);
+export const SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS = compileDefinitions(
+  "columns",
+  "Column",
+  COLUMN_DML_PRIVILEGES,
+  ["schema", "table", "column"],
+);
+export const SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS = compileDefinitions(
+  "sequences",
+  "Sequence",
+  SEQUENCE_PRIVILEGES,
+  ["schema", "sequence"],
 );
 
-export function expectedTablePrivileges(serviceOwner) {
-  const privileges = SERVICE_TABLE_PRIVILEGE_ALLOWLISTS[serviceOwner];
+function expected(allowlists, serviceOwner, kind) {
+  const privileges = allowlists[serviceOwner];
   if (!privileges) {
-    throw new Error(`Table privilege allowlist for ${serviceOwner} is missing.`);
+    throw new Error(
+      `${kind} privilege allowlist for ${serviceOwner} is missing.`,
+    );
   }
   return privileges;
 }
 
-export function observedTablePrivileges(value) {
-  let entries = value;
-  if (typeof value === "string") {
-    try {
-      entries = JSON.parse(value);
-    } catch {
-      return null;
-    }
+export function expectedTablePrivileges(serviceOwner) {
+  return expected(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS, serviceOwner, "Table");
+}
+
+export function expectedColumnPrivileges(serviceOwner) {
+  return expected(SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS, serviceOwner, "Column");
+}
+
+export function expectedSequencePrivileges(serviceOwner) {
+  return expected(
+    SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
+    serviceOwner,
+    "Sequence",
+  );
+}
+
+function parseObserved(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
   }
+}
+
+function finalizeObserved(canonical) {
+  canonical.sort();
+  return new Set(canonical).size === canonical.length ? canonical : null;
+}
+
+export function observedTablePrivileges(value) {
+  const entries = parseObserved(value);
   if (!Array.isArray(entries)) return null;
   const canonical = [];
   for (const entry of entries) {
@@ -89,18 +161,61 @@ export function observedTablePrivileges(value) {
       !entry ||
       typeof entry !== "object" ||
       Array.isArray(entry) ||
-      !IDENTIFIER_PATTERN.test(entry.schema) ||
-      !IDENTIFIER_PATTERN.test(entry.table) ||
+      !assertIdentifier(entry.schema) ||
+      !assertIdentifier(entry.table) ||
       !["r", "p"].includes(entry.kind) ||
-      !TABLE_DML_PRIVILEGE_SET.has(entry.privilege)
+      entry.grantable !== false ||
+      !TABLE_DML_PRIVILEGES.includes(entry.privilege)
+    ) {
+      return null;
+    }
+    canonical.push(`${entry.schema}.${entry.table}:${entry.privilege}`);
+  }
+  return finalizeObserved(canonical);
+}
+
+export function observedColumnPrivileges(value) {
+  const entries = parseObserved(value);
+  if (!Array.isArray(entries)) return null;
+  const canonical = [];
+  for (const entry of entries) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      Array.isArray(entry) ||
+      !assertIdentifier(entry.schema) ||
+      !assertIdentifier(entry.table) ||
+      !assertIdentifier(entry.column) ||
+      !["r", "p"].includes(entry.kind) ||
+      entry.grantable !== false ||
+      !OBSERVABLE_COLUMN_PRIVILEGES.has(entry.privilege)
     ) {
       return null;
     }
     canonical.push(
-      canonicalPrivilege(entry.schema, entry.table, entry.privilege),
+      `${entry.schema}.${entry.table}.${entry.column}:${entry.privilege}`,
     );
   }
-  canonical.sort();
-  if (new Set(canonical).size !== canonical.length) return null;
-  return canonical;
+  return finalizeObserved(canonical);
+}
+
+export function observedSequencePrivileges(value) {
+  const entries = parseObserved(value);
+  if (!Array.isArray(entries)) return null;
+  const canonical = [];
+  for (const entry of entries) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      Array.isArray(entry) ||
+      !assertIdentifier(entry.schema) ||
+      !assertIdentifier(entry.sequence) ||
+      entry.grantable !== false ||
+      !SEQUENCE_PRIVILEGES.includes(entry.privilege)
+    ) {
+      return null;
+    }
+    canonical.push(`${entry.schema}.${entry.sequence}:${entry.privilege}`);
+  }
+  return finalizeObserved(canonical);
 }

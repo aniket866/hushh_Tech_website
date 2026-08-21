@@ -2,10 +2,9 @@ import { createApp } from "./app.js";
 import { createFirebaseProductVerifier } from "./auth/firebase.js";
 import { createGoogleServiceVerifier } from "./auth/google.js";
 import { readRuntimeConfig } from "./config.js";
-import {
-  createDatabaseRuntime,
-  verifyDmlOnlyRuntime,
-} from "./database.js";
+import { createDatabaseRuntime, verifyDmlOnlyRuntime } from "./database.js";
+import { createUnavailableSharedRateLimiter } from "./shared-rate-limit.js";
+import { createUnavailableWebhookLedger } from "./webhook-ledger.js";
 import { createWebhookVerifier } from "./webhooks.js";
 
 const config = readRuntimeConfig();
@@ -28,6 +27,8 @@ const app = createApp({
   verifyGoogleServiceRequest: createGoogleServiceVerifier({ config }),
   verifyFirebaseProductRequest: createFirebaseProductVerifier({ config }),
   verifyWebhookRequest: createWebhookVerifier({ verifiers: {} }),
+  sharedRateLimiter: createUnavailableSharedRateLimiter(),
+  webhookLedger: createUnavailableWebhookLedger(),
   verifyReadiness: () =>
     verifyDmlOnlyRuntime(
       database.pool,
@@ -49,7 +50,7 @@ const server = app.listen(config.port, "0.0.0.0", () => {
   );
 });
 
-server.requestTimeout = 30_000;
+server.requestTimeout = config.handlerDeadlineMs + 5_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
 server.maxRequestsPerSocket = 1_000;

@@ -85,6 +85,9 @@ test("all seven owners bind to their exact UAT and production identities", () =>
       assert.deepEqual(config.allowedGoogleCallers, [
         expectedCaller(serviceOwner, stage, project.id),
       ]);
+      assert.equal(config.handlerDeadlineMs, 20_000);
+      assert.equal(config.databaseStatementTimeoutMs, 15_000);
+      assert.ok(config.databaseStatementTimeoutMs < config.handlerDeadlineMs);
       assert.ok(serviceRule(serviceOwner));
     }
   }
@@ -147,9 +150,17 @@ test("configuration rejects environment, authority, ingress, and database drift"
     { DATABASE_URL: "postgresql://forbidden.invalid/database" },
     { PGPASSWORD: "not-allowed" },
     { ALLOWED_GOOGLE_CALLERS: "human@example.com" },
+    { HANDLER_DEADLINE_MS: "1000" },
+    {
+      HANDLER_DEADLINE_MS: "15000",
+      DB_STATEMENT_TIMEOUT_MS: "15000",
+    },
   ];
   for (const change of changes) {
-    assert.throws(() => readRuntimeConfig(runtimeEnv(change)), ConfigurationError);
+    assert.throws(
+      () => readRuntimeConfig(runtimeEnv(change)),
+      ConfigurationError,
+    );
   }
 });
 
@@ -190,7 +201,9 @@ test("frozen registry is exact and enables no function", () => {
 
 test("each registry entry belongs only to its locked service surface", () => {
   for (const entry of LEGACY_FUNCTIONS) {
-    const owners = SERVICE_OWNERS.filter((owner) => serviceOwnsEntry(owner, entry));
+    const owners = SERVICE_OWNERS.filter((owner) =>
+      serviceOwnsEntry(owner, entry),
+    );
     if (entry.owner_group === "financial-api-worker") {
       assert.deepEqual(owners.sort(), ["financial-api", "worker"]);
     } else if (entry.owner_group === "engagement-api-worker") {
@@ -201,7 +214,10 @@ test("each registry entry belongs only to its locked service surface", () => {
       assert.equal(owners.length, 1, entry.slug);
     }
   }
-  assert.equal(LEGACY_FUNCTION_REGISTRY["get-secrets"].auth_mode, "none_feature_retired");
+  assert.equal(
+    LEGACY_FUNCTION_REGISTRY["get-secrets"].auth_mode,
+    "none_feature_retired",
+  );
 });
 
 test("registry tampering fails digest validation", () => {

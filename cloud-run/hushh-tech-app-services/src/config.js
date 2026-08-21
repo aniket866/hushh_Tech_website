@@ -39,8 +39,7 @@ const PROJECT_CONTRACTS = Object.freeze({
     number: "175298245599",
     region: "us-central1",
     productAudience: "hushh-tech-uat",
-    instanceConnectionName:
-      "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
+    instanceConnectionName: "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
   }),
   "hushh-tech-prod": Object.freeze({
     stage: "prod",
@@ -161,7 +160,9 @@ export function readRuntimeConfig(env = process.env) {
     productAudience !== project.productAudience ||
     productClientAppId !== PRODUCT_CLIENT_APP_ID
   ) {
-    throw new ConfigurationError("Firebase product authority contract drifted.");
+    throw new ConfigurationError(
+      "Firebase product authority contract drifted.",
+    );
   }
 
   const instanceConnectionName = required(env, "INSTANCE_CONNECTION_NAME");
@@ -177,6 +178,25 @@ export function readRuntimeConfig(env = process.env) {
   }
   assertNoDatabasePassword(env);
   const expectedServiceAudience = `https://${CLOUD_RUN_SERVICE_NAMES[serviceOwner]}-${project.number}.${project.region}.run.app`;
+  const handlerDeadlineMs = boundedInteger(
+    env,
+    "HANDLER_DEADLINE_MS",
+    20_000,
+    2_000,
+    25_000,
+  );
+  const databaseStatementTimeoutMs = boundedInteger(
+    env,
+    "DB_STATEMENT_TIMEOUT_MS",
+    15_000,
+    1_000,
+    24_000,
+  );
+  if (databaseStatementTimeoutMs >= handlerDeadlineMs) {
+    throw new ConfigurationError(
+      "DB_STATEMENT_TIMEOUT_MS must be below HANDLER_DEADLINE_MS.",
+    );
+  }
 
   return Object.freeze({
     serviceOwner,
@@ -196,13 +216,7 @@ export function readRuntimeConfig(env = process.env) {
     productClient: PRODUCT_CLIENT_ID,
     productAudience,
     productClientAppId,
-    recentAuthSeconds: boundedInteger(
-      env,
-      "RECENT_AUTH_SECONDS",
-      300,
-      60,
-      900,
-    ),
+    recentAuthSeconds: boundedInteger(env, "RECENT_AUTH_SECONDS", 300, 60, 900),
     instanceConnectionName,
     database,
     databaseUser,
@@ -214,13 +228,8 @@ export function readRuntimeConfig(env = process.env) {
       500,
       15_000,
     ),
-    databaseStatementTimeoutMs: boundedInteger(
-      env,
-      "DB_STATEMENT_TIMEOUT_MS",
-      15_000,
-      1_000,
-      30_000,
-    ),
+    databaseStatementTimeoutMs,
+    handlerDeadlineMs,
     requestBodyLimitBytes: boundedInteger(
       env,
       "REQUEST_BODY_LIMIT_BYTES",
@@ -228,13 +237,7 @@ export function readRuntimeConfig(env = process.env) {
       16_384,
       1_048_576,
     ),
-    requestRateLimit: boundedInteger(
-      env,
-      "REQUEST_RATE_LIMIT",
-      120,
-      10,
-      600,
-    ),
+    requestRateLimit: boundedInteger(env, "REQUEST_RATE_LIMIT", 120, 10, 600),
   });
 }
 
