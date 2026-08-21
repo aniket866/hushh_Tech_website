@@ -3,7 +3,7 @@ import { createFirebaseProductVerifier } from "./auth/firebase.js";
 import { createGoogleServiceVerifier } from "./auth/google.js";
 import { readRuntimeConfig } from "./config.js";
 import { createDatabaseRuntime, verifyDmlOnlyRuntime } from "./database.js";
-import { createUnavailableSharedRateLimiter } from "./shared-rate-limit.js";
+import { createFirestoreSharedRateLimiter } from "./firestore-rate-limit.js";
 import { createUnavailableWebhookLedger } from "./webhook-ledger.js";
 import { createWebhookVerifier } from "./webhooks.js";
 
@@ -27,7 +27,7 @@ const app = createApp({
   verifyGoogleServiceRequest: createGoogleServiceVerifier({ config }),
   verifyFirebaseProductRequest: createFirebaseProductVerifier({ config }),
   verifyWebhookRequest: createWebhookVerifier({ verifiers: {} }),
-  sharedRateLimiter: createUnavailableSharedRateLimiter(),
+  sharedRateLimiter: createFirestoreSharedRateLimiter({ config }),
   webhookLedger: createUnavailableWebhookLedger(),
   verifyReadiness: () =>
     verifyDmlOnlyRuntime(

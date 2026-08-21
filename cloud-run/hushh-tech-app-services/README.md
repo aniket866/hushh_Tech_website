@@ -37,12 +37,25 @@ closed.
   direct database transaction, so every durable effect must be emitted through
   that outbox. No production ledger adapter is installed by this foundation.
 - Worker routes accept Google service identities only.
-- Every ported route requires a shared rate-limit adapter. The process-local
-  limiter is only a secondary bound; the production default fails closed until
-  a reviewed distributed adapter is installed.
+- Every ported route requires the checked-in Firestore transaction-backed
+  shared rate limiter. It stores only hashed bucket keys, fixed-window counts,
+  and expiry timestamps in one dedicated Firestore database per service owner.
+  Each runtime identity is conditionally authorized only for its own database;
+  a compromised service cannot read or alter another service's limits.
+  Readiness proves both read and write access, while the process-local limiter
+  remains a secondary bound. Enabling a route also requires the `expires_at`
+  Firestore time-to-live policy, the exact no-index field contract, and
+  database-scoped runtime service-account access to be live-verified.
+  Readiness returns unavailable after five seconds; a deterministic,
+  time-to-live-bound readiness marker already queued by Firestore may still
+  complete, but no application handler runs.
 - A bounded request deadline aborts disconnected or timed-out work and is
   passed to handlers. The database statement timeout must remain strictly below
   that deadline, and aborted transactions cannot commit.
+- A limiter increment already accepted by Firestore may complete after the
+  caller disconnects. It stores only a hashed bucket key and consumes one
+  conservative budget token; the handler and application database work remain
+  aborted.
 - Database work runs inside a transaction with transaction-local
   `app.firebase_uid`; pooled connections are reset before reuse.
 - Readiness requires exact per-service table, column, and sequence privilege
