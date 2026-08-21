@@ -29,6 +29,35 @@ const FIREBASE_ACTOR = Object.freeze({
   authTime: 1_999_999_999,
 });
 const FIXED_NOW = new Date("2026-08-21T12:00:00.000Z");
+const BROWSER_STOCK_SYMBOLS = Object.freeze([
+  "2222.SR",
+  "GOOG",
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "AMZN",
+  "BRK.B",
+  "META",
+  "JPM",
+  "1398.HK",
+  "601939.SS",
+  "XOM",
+  "601288.SS",
+  "TSM",
+  "601988.SS",
+  "TM",
+  "0857.HK",
+  "WMT",
+  "TCEHY",
+  "BAC",
+  "EQNR",
+  "JNJ",
+  "DTE.DE",
+  "CMCSA",
+  "UNH",
+  "HSBC",
+  "SHEL",
+]);
 
 function adapters(overrides = {}) {
   return {
@@ -366,6 +395,91 @@ test("Finnhub adapter encodes symbols and projects the exact quote fields", asyn
   assert.match(calls[0].url, /symbol=BRK\.B/);
   assert.equal(calls[0].options.signal, signal);
   assert.equal(calls[0].options.redirect, "error");
+});
+
+test("stock quote adapter and handler preserve the observed fixed response list while ignoring the browser list", async () => {
+  const providerSymbols = [];
+  const delays = [];
+  const stockQuotes = createFinnhubQuoteAdapter({
+    apiKey: "test-key-not-a-secret",
+    fetchImpl: async (url, options) => {
+      const symbol = new URL(url).searchParams.get("symbol");
+      providerSymbols.push(symbol);
+      assert.equal(options.redirect, "error");
+      return new Response(
+        JSON.stringify({
+          c: 10,
+          d: 1,
+          dp: 10,
+          h: 11,
+          l: 9,
+          o: 9.5,
+          pc: 9,
+          t: 1_700_000_000,
+        }),
+      );
+    },
+  });
+  const result = await handlers({
+    stockQuotes,
+    delay: async (milliseconds) => delays.push(milliseconds),
+  })["stock-quotes"](
+    directContext({ body: { symbols: BROWSER_STOCK_SYMBOLS } }),
+  );
+
+  assert.equal(
+    Buffer.byteLength(JSON.stringify({ symbols: BROWSER_STOCK_SYMBOLS })),
+    222,
+  );
+  assert.notDeepEqual(BROWSER_STOCK_SYMBOLS, LEGACY_STOCK_SYMBOLS);
+  assert.deepEqual(providerSymbols, LEGACY_STOCK_SYMBOLS);
+  assert.deepEqual(delays, [200, 200]);
+  assert.equal(result.status, 200);
+  assert.equal(result.headers["content-type"], "application/json");
+  assert.equal(result.headers["cache-control"], "private, no-store");
+  assert.deepEqual(Object.keys(result.body).sort(), [
+    "count",
+    "fetchedAt",
+    "quotes",
+    "success",
+  ]);
+  assert.equal(result.body.success, true);
+  assert.equal(result.body.count, 27);
+  assert.equal(result.body.quotes.length, 27);
+  assert.deepEqual(
+    result.body.quotes.map(({ symbol }) => symbol),
+    LEGACY_STOCK_SYMBOLS,
+  );
+  assert.deepEqual(Object.keys(result.body.quotes[0]).sort(), [
+    "change",
+    "currentPrice",
+    "high",
+    "low",
+    "open",
+    "percentChange",
+    "previousClose",
+    "symbol",
+    "timestamp",
+  ]);
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(result.body.quotes[0]).map(([key, value]) => [
+        key,
+        typeof value,
+      ]),
+    ),
+    {
+      symbol: "string",
+      currentPrice: "number",
+      change: "number",
+      percentChange: "number",
+      high: "number",
+      low: "number",
+      open: "number",
+      previousClose: "number",
+      timestamp: "number",
+    },
+  );
 });
 
 test("service boundary enforces the same exact body limits as the gateway", async () => {

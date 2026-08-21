@@ -69,7 +69,9 @@ describe("Hushh Research stock-quote boundary", () => {
       }),
     });
     vi.stubGlobal("fetch", legacyFetch);
-    const { useStockQuotes } = await import("../src/hooks/useStockQuotes");
+    const { STOCK_SYMBOLS, useStockQuotes } = await import(
+      "../src/hooks/useStockQuotes"
+    );
 
     const Probe = () => {
       const { loading } = useStockQuotes(0, true);
@@ -93,6 +95,12 @@ describe("Hushh Research stock-quote boundary", () => {
         }),
       }),
     );
+    const [, requestInit] = legacyFetch.mock.calls[0] as [string, RequestInit];
+    const requestBody = String(requestInit.body);
+    const parsedBody = JSON.parse(requestBody) as Record<string, unknown>;
+    expect(Object.keys(parsedBody)).toEqual(["symbols"]);
+    expect(parsedBody.symbols).toEqual(STOCK_SYMBOLS);
+    expect(new TextEncoder().encode(requestBody).byteLength).toBe(222);
     expect(container.textContent).toBe("false");
   });
 });
