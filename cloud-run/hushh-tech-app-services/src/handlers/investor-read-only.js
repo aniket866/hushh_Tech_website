@@ -199,3 +199,16 @@ export function createInvestorReadOnlyHandlers({
       stock({ ...context, stockQuotes: adapters.stockQuotes, now, delay }),
   });
 }
+
+export function createStockQuotesHandler({
+  stockQuotes,
+  now = () => new Date(),
+  delay = abortableDelay,
+} = {}) {
+  const adapter = requireAdapter("stockQuotes", stockQuotes);
+  if (typeof now !== "function" || typeof delay !== "function") {
+    throw new Error("Clock and delay adapters are required.");
+  }
+  return (context) =>
+    stock({ ...context, stockQuotes: adapter, now, delay });
+}

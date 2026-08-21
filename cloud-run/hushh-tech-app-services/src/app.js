@@ -30,8 +30,10 @@ import {
 } from "./webhook-ledger.js";
 
 const ROUTE_PREFIX = "/api/v1/legacy-functions/";
+const PUBLIC_STOCK_QUOTES_PATH = "/api/v1/public/stock-quotes";
 const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const PUBLIC_RATE_KEY_PATTERN = /^[a-f0-9]{64}$/;
 const ALLOWED_METHODS = new Set([
   "GET",
   "HEAD",
@@ -154,6 +156,44 @@ function rateLimitKey(googleCaller, actor, entry) {
       "utf8",
     )
     .digest("hex");
+}
+
+function providerRateLimitKey(googleCaller, entry) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        1,
+        googleCaller.email,
+        "provider-wide",
+        entry.slug,
+      ]),
+      "utf8",
+    )
+    .digest("hex");
+}
+
+function publicRateContext(request) {
+  const key = String(
+    request.headers?.["x-hushh-public-rate-key"] ?? "",
+  ).trim();
+  if (!PUBLIC_RATE_KEY_PATTERN.test(key)) {
+    throw new RuntimeError("INVALID_REQUEST", "Invalid request.", 400);
+  }
+  for (const name of [
+    "origin",
+    "access-control-request-headers",
+    "access-control-request-method",
+    "sec-fetch-site",
+  ]) {
+    if (request.headers?.[name] !== undefined) {
+      throw new RuntimeError(
+        "CROSS_ORIGIN_FORBIDDEN",
+        "Access denied.",
+        403,
+      );
+    }
+  }
+  return Object.freeze({ kind: "public", subject: key });
 }
 
 function createRequestDeadline(request, response, timeoutMs) {
@@ -380,10 +420,17 @@ export function createApp({
   sharedRateLimiter = createUnavailableSharedRateLimiter(),
   webhookLedger = createUnavailableWebhookLedger(),
   handlers = Object.freeze({}),
+  verifyPublicHandlerReadiness = async () => false,
   contracts = FUNCTION_CONTRACTS,
   registry = LEGACY_FUNCTION_REGISTRY,
   ownsEntry = serviceOwnsEntry,
   rateLimiter = createRateLimiter({ limit: config.requestRateLimit }),
+  publicRateLimiter = createRateLimiter({
+    limit: config.publicStockQuotesRateLimit ?? 30,
+  }),
+  publicProviderRateLimiter = createRateLimiter({
+    limit: config.publicStockQuotesProviderRequestRateLimit ?? 2,
+  }),
   log = () => {},
 } = {}) {
   if (
@@ -392,6 +439,7 @@ export function createApp({
     typeof verifyFirebaseProductRequest !== "function" ||
     typeof verifyWebhookRequest !== "function" ||
     typeof verifyReadiness !== "function" ||
+    typeof verifyPublicHandlerReadiness !== "function" ||
     !Number.isSafeInteger(config.handlerDeadlineMs) ||
     config.handlerDeadlineMs < 1 ||
     !Number.isSafeInteger(config.databaseStatementTimeoutMs) ||
@@ -408,6 +456,14 @@ export function createApp({
   );
   const requiresWebhookLedger = portedEntries.some(
     (entry) => entry.auth_mode === "provider_signature_raw_body",
+  );
+  const publicStockQuotesEntry = registry["stock-quotes"] ?? null;
+  const publicStockQuotesEnabled = config.publicStockQuotesEnabled === true;
+  const publicStockQuotesOwned = Boolean(
+    publicStockQuotesEnabled &&
+      config.serviceOwner === "investor-api" &&
+      publicStockQuotesEntry &&
+      ownsEntry(config.serviceOwner, publicStockQuotesEntry),
   );
 
   const app = express();
@@ -430,6 +486,16 @@ export function createApp({
       if (portedEntries.length > 0) {
         await verifySharedRateLimiter(sharedRateLimiter);
       }
+      if (publicStockQuotesEnabled) {
+        if (
+          !publicStockQuotesOwned ||
+          typeof handlers["stock-quotes"] !== "function" ||
+          (await verifyPublicHandlerReadiness("stock-quotes")) !== true
+        ) {
+          throw new Error("The public stock-quotes candidate is unavailable.");
+        }
+        await verifySharedRateLimiter(sharedRateLimiter);
+      }
       if (requiresWebhookLedger) {
         await verifyWebhookLedger(webhookLedger);
       }
@@ -440,6 +506,133 @@ export function createApp({
       response
         .status(503)
         .json({ status: "not_ready", service_owner: config.serviceOwner });
+    }
+  });
+
+  app.all(PUBLIC_STOCK_QUOTES_PATH, (request, response, next) => {
+    if (publicStockQuotesEnabled) return next();
+    response.setHeader("X-Request-Id", requestId(request));
+    return response.status(404).json({
+      detail: { code: "INVALID_ROUTE", message: "Not found." },
+    });
+  });
+
+  app.use(
+    PUBLIC_STOCK_QUOTES_PATH,
+    express.raw({
+      type: () => true,
+      limit: config.requestBodyLimitBytes,
+      inflate: false,
+    }),
+  );
+
+  app.all(PUBLIC_STOCK_QUOTES_PATH, async (request, response) => {
+    const id = requestId(request);
+    response.setHeader("X-Request-Id", id);
+    const deadline = createRequestDeadline(
+      request,
+      response,
+      config.handlerDeadlineMs,
+    );
+    const contract = contracts["stock-quotes"] ?? null;
+    try {
+      const execution = (async () => {
+        if (
+          !publicStockQuotesOwned ||
+          typeof handlers["stock-quotes"] !== "function"
+        ) {
+          throw new RuntimeError("INVALID_ROUTE", "Not found.", 404);
+        }
+        const method = String(request.method ?? "").toUpperCase();
+        const url = new URL(
+          request.originalUrl ?? request.url,
+          "https://local.invalid",
+        );
+        assertFunctionRequestContract(contract, {
+          method,
+          route: Object.freeze({
+            slug: "stock-quotes",
+            suffix: Object.freeze([]),
+            search: url.search,
+          }),
+          headers: request.headers,
+          rawBody: request.body,
+        });
+        const actor = publicRateContext(request);
+        const googleCaller = await verifyGoogleServiceRequest(request, {
+          signal: deadline.signal,
+        });
+        throwIfAborted(deadline.signal);
+        const limiterKey = rateLimitKey(
+          googleCaller,
+          actor,
+          publicStockQuotesEntry,
+        );
+        publicRateLimiter(limiterKey);
+        await consumeSharedRateLimit(sharedRateLimiter, {
+          key: limiterKey,
+          limit: config.publicStockQuotesRateLimit,
+          windowMs: 60_000,
+          signal: deadline.signal,
+        });
+        throwIfAborted(deadline.signal);
+        const providerLimiterKey = providerRateLimitKey(
+          googleCaller,
+          publicStockQuotesEntry,
+        );
+        publicProviderRateLimiter(providerLimiterKey);
+        await consumeSharedRateLimit(sharedRateLimiter, {
+          key: providerLimiterKey,
+          limit: config.publicStockQuotesProviderRequestRateLimit,
+          windowMs: 60_000,
+          signal: deadline.signal,
+        });
+        throwIfAborted(deadline.signal);
+        const output = await handlers["stock-quotes"]({
+          actor,
+          googleCaller,
+          request: Object.freeze({
+            method,
+            headers: handlerHeaders(request.headers),
+            route: Object.freeze({
+              slug: "stock-quotes",
+              suffix: Object.freeze([]),
+              search: url.search,
+            }),
+            requestId: id,
+            body: parsedHandlerBody(request),
+          }),
+          database: Object.freeze({}),
+          entry: publicStockQuotesEntry,
+          signal: deadline.signal,
+        });
+        throwIfAborted(deadline.signal);
+        return normalizeHandlerResponse(output, contract);
+      })();
+      const output = await deadline.race(execution);
+      if (deadline.deadlineExpired()) throw deadline.signal.reason;
+      if (deadline.clientClosed() || response.destroyed) return;
+      return sendHandlerResponse(response, output, contract);
+    } catch (error) {
+      if (deadline.clientClosed() || response.destroyed) {
+        log({
+          level: "info",
+          code: "CLIENT_CLOSED",
+          requestId: id,
+          serviceOwner: config.serviceOwner,
+        });
+        return;
+      }
+      const typed = asRuntimeError(error);
+      log({
+        level: typed.statusCode >= 500 ? "error" : "info",
+        code: typed.code,
+        requestId: id,
+        serviceOwner: config.serviceOwner,
+      });
+      return response.status(typed.statusCode).json(errorPayload(typed, id));
+    } finally {
+      deadline.cleanup();
     }
   });
 

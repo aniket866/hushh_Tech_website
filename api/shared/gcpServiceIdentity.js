@@ -51,7 +51,14 @@ export function createMetadataIdentityTokenProvider({
 } = {}) {
   const cache = new Map();
 
-  return async function getIdentityToken(audienceValue) {
+  return async function getIdentityToken(audienceValue, { signal } = {}) {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new GcpServiceIdentityError(
+            "Internal service identity is unavailable.",
+          );
+    }
     const audience = canonicalAudience(audienceValue);
     const cached = cache.get(audience);
     if (cached && cached.expiresAtMs - 60_000 > now()) {
@@ -64,13 +71,19 @@ export function createMetadataIdentityTokenProvider({
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const requestSignal = signal
+      ? AbortSignal.any([signal, controller.signal])
+      : controller.signal;
     let response;
     try {
       response = await fetchImpl(url, {
         headers: { "Metadata-Flavor": "Google" },
-        signal: controller.signal,
+        signal: requestSignal,
       });
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : error;
+      }
       throw new GcpServiceIdentityError(
         "Internal service identity is unavailable.",
       );

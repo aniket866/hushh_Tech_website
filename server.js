@@ -11,7 +11,7 @@
 
 import express from 'express';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import {
   createLegacyFunctionRawBodyParser,
   legacyFunctionParserError,
@@ -24,6 +24,21 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 const DIST_DIR = join(__dirname, 'dist');
+
+// Adapt Vercel-style handlers to the Cloud Run Express runtime.
+const wrapHandler = (handlerModule) => async (req, res) => {
+  try {
+    const handler = handlerModule.default || handlerModule;
+    await handler(req, res);
+  } catch (err) {
+    console.error('API route error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+};
+
+const loadApi = async (name) => import(`./api/${name}.js`);
 
 // ---------------------------------------------------------------------------
 // Middleware
@@ -66,6 +81,11 @@ app.use((_req, res, next) => {
 app.use('/functions/v1', createLegacyFunctionRawBodyParser({ limit: '10mb' }));
 app.use('/functions/v1', preserveLegacyFunctionRawBody);
 
+// This route owns its exact 8 KiB raw-byte boundary. Keep it before every
+// general parser so the default-off gate cannot consume a request body and a
+// whitespace-heavy payload cannot shrink through JSON reserialization.
+app.all('/api/stock-quotes', async (req, res) => wrapHandler(await loadApi('stock-quotes'))(req, res));
+
 // Parse non-compatibility JSON and form bodies.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -74,22 +94,6 @@ app.use(legacyFunctionParserError);
 // ---------------------------------------------------------------------------
 // API Routes — adapt Vercel handler(req, res) → Express route
 // ---------------------------------------------------------------------------
-
-// Helper: wrap a Vercel-style handler into an Express route
-const wrapHandler = (handlerModule) => async (req, res) => {
-  try {
-    const handler = handlerModule.default || handlerModule;
-    await handler(req, res);
-  } catch (err) {
-    console.error('API route error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-};
-
-// Lazy-import API handlers (keeps startup fast)
-const loadApi = async (name) => import(`./api/${name}.js`);
 
 app.all('/api/career-application', async (req, res) => wrapHandler(await loadApi('career-application'))(req, res));
 app.all('/api/enrich-preferences', async (req, res) => wrapHandler(await loadApi('enrich-preferences'))(req, res));
@@ -185,7 +189,11 @@ app.get('*', (req, res) => {
 // ---------------------------------------------------------------------------
 // Start Server
 // ---------------------------------------------------------------------------
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Hushh Tech Website running on port ${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+export { app };
+
+if (process.argv[1] && resolve(process.argv[1]) === __filename) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Hushh Tech Website running on port ${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}

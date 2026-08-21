@@ -4,6 +4,7 @@ import { createGoogleServiceVerifier } from "./auth/google.js";
 import { readRuntimeConfig } from "./config.js";
 import { createDatabaseRuntime, verifyDmlOnlyRuntime } from "./database.js";
 import { createFirestoreSharedRateLimiter } from "./firestore-rate-limit.js";
+import { createRuntimeHandlers } from "./runtime-handlers.js";
 import { createUnavailableWebhookLedger } from "./webhook-ledger.js";
 import { createWebhookVerifier } from "./webhooks.js";
 
@@ -20,6 +21,7 @@ const database = await createDatabaseRuntime({
     );
   },
 });
+const runtimeHandlers = createRuntimeHandlers({ config });
 
 const app = createApp({
   config,
@@ -35,7 +37,9 @@ const app = createApp({
       config.databaseUser,
       config.serviceOwner,
     ),
-  handlers: Object.freeze({}),
+  handlers: runtimeHandlers.handlers,
+  verifyPublicHandlerReadiness:
+    runtimeHandlers.verifyPublicHandlerReadiness,
   log: (record) => console.log(JSON.stringify(record)),
 });
 

@@ -164,6 +164,42 @@ test("configuration rejects environment, authority, ingress, and database drift"
   }
 });
 
+test("public stock quotes require exact investor ownership and provider coupling", () => {
+  const enabled = readRuntimeConfig(
+    ownerRuntimeEnv("investor-api", "uat", {
+      HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED: "true",
+      FINNHUB_API_KEY: "test-key-not-a-secret",
+      PUBLIC_STOCK_QUOTES_RATE_LIMIT: "17",
+      PUBLIC_STOCK_QUOTES_PROVIDER_REQUESTS_PER_MINUTE: "2",
+      FINNHUB_QUOTE_TIMEOUT_MS: "2500",
+    }),
+  );
+  assert.equal(enabled.publicStockQuotesEnabled, true);
+  assert.equal(enabled.publicStockQuotesRateLimit, 17);
+  assert.equal(enabled.publicStockQuotesProviderRequestRateLimit, 2);
+  assert.equal(enabled.finnhubQuoteTimeoutMs, 2500);
+  assert.equal(enabled.finnhubApiKey, "test-key-not-a-secret");
+
+  for (const invalid of [
+    ownerRuntimeEnv("investor-api", "uat", {
+      HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED: "true",
+    }),
+    ownerRuntimeEnv("investor-api", "uat", {
+      FINNHUB_API_KEY: "test-key-not-a-secret",
+    }),
+    ownerRuntimeEnv("identity-api", "uat", {
+      HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED: "true",
+      FINNHUB_API_KEY: "test-key-not-a-secret",
+    }),
+    ownerRuntimeEnv("investor-api", "uat", {
+      HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED: "yes",
+      FINNHUB_API_KEY: "test-key-not-a-secret",
+    }),
+  ]) {
+    assert.throws(() => readRuntimeConfig(invalid), ConfigurationError);
+  }
+});
+
 test("frozen registry is exact and enables no function", () => {
   assert.equal(validateRegistry(LEGACY_FUNCTIONS), true);
   assert.equal(LEGACY_FUNCTIONS.length, 112);

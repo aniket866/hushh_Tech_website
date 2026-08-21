@@ -3,6 +3,7 @@ const GOOGLE_GEOCODE_ENDPOINT =
 const NOMINATIM_REVERSE_ENDPOINT =
   "https://nominatim.openstreetmap.org/reverse";
 const FINNHUB_QUOTE_ENDPOINT = "https://finnhub.io/api/v1/quote";
+const DEFAULT_FINNHUB_TIMEOUT_MS = 5_000;
 
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -20,6 +21,53 @@ function requireFetch(fetchImpl) {
     throw new Error("A fetch implementation is required.");
   }
   return fetchImpl;
+}
+
+function boundedTimeout(value) {
+  if (!Number.isSafeInteger(value) || value < 100 || value > 15_000) {
+    throw new Error("A bounded Finnhub timeout is required.");
+  }
+  return value;
+}
+
+function providerDeadline(parentSignal, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error("Stock provider deadline exceeded.")),
+    timeoutMs,
+  );
+  return Object.freeze({
+    signal: parentSignal
+      ? AbortSignal.any([parentSignal, controller.signal])
+      : controller.signal,
+    cleanup: () => clearTimeout(timer),
+  });
+}
+
+function finiteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function validFinnhubQuote(data) {
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      finiteNumber(data.c) &&
+      data.c > 0 &&
+      finiteNumber(data.d) &&
+      finiteNumber(data.dp) &&
+      finiteNumber(data.h) &&
+      data.h >= 0 &&
+      finiteNumber(data.l) &&
+      data.l >= 0 &&
+      finiteNumber(data.o) &&
+      data.o >= 0 &&
+      finiteNumber(data.pc) &&
+      data.pc >= 0 &&
+      Number.isSafeInteger(data.t) &&
+      data.t >= 0,
+  );
 }
 
 function assertCoordinates(latitude, longitude) {
@@ -263,21 +311,29 @@ export function createGeocodingAdapter({
 export function createFinnhubQuoteAdapter({
   fetchImpl = globalThis.fetch,
   apiKey = "",
+  timeoutMs = DEFAULT_FINNHUB_TIMEOUT_MS,
 } = {}) {
   const request = requireFetch(fetchImpl);
   const key = clean(apiKey);
+  const deadlineMs = boundedTimeout(timeoutMs);
   return Object.freeze({
     configured: Boolean(key),
     async quote(symbol, { signal } = {}) {
       if (!key) throw new Error("Stock API not configured");
+      throwIfAborted(signal);
       const url = new URL(FINNHUB_QUOTE_ENDPOINT);
       url.searchParams.set("symbol", symbol);
       url.searchParams.set("token", key);
+      const deadline = providerDeadline(signal, deadlineMs);
       try {
-        const response = await request(url, { signal, redirect: "error" });
+        const response = await request(url, {
+          signal: deadline.signal,
+          redirect: "error",
+        });
         if (!response.ok) return null;
         const data = await response.json();
         if (data?.c === 0 && data?.d === 0) return null;
+        if (!validFinnhubQuote(data)) return null;
         return Object.freeze({
           symbol,
           currentPrice: data?.c,
@@ -292,6 +348,8 @@ export function createFinnhubQuoteAdapter({
       } catch {
         throwIfAborted(signal);
         return null;
+      } finally {
+        deadline.cleanup();
       }
     },
   });

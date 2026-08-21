@@ -18,19 +18,38 @@ secret-disclosure function has no handler.
 Unknown, wrong-owner, retired, unverified, and unimplemented routes fail
 closed.
 
-Two investor read-only contracts and handlers are compiled but deliberately
-unwired: `hushh-location-geocode` and `stock-quotes`. `get-locations`,
-`hushh-dob-inference`, and `investor-og-image` remain unimplemented and frozen
-behind licensing, privacy, and public-media contract blockers. The source map,
-exact wire behavior, blockers, and live-verification checklist are documented in
-`docs/reference/architecture/gcp-investor-read-only-function-batch.md`. Contract
-presence does not change the frozen registry or make a route reachable.
+`hushh-location-geocode` remains compiled but deliberately unwired.
+`stock-quotes` is the first wired GCP candidate, but it does not enable the
+legacy compatibility route. Its separate private path,
+`/api/v1/public/stock-quotes`, is default-off, belongs only to `investor-api`,
+accepts only the pinned web-gateway identity, and requires both process-local
+and Firestore transaction-backed per-client and provider-wide limits before
+the provider handler can run. The provider-wide default permits two 27-symbol
+fan-outs per minute across all service instances.
+The public website candidate is the same-origin `/api/stock-quotes` route. It
+accepts exactly the trusted two-address load-balancer forwarding contract and
+sends only a server-salted HMAC client key to the private service. It never
+forwards a raw client address, browser credential, or CORS header. The existing
+browser hook remains unchanged until live readiness is proven. Enabling is
+blocked until the website Cloud Run service is verified as
+`internal-and-cloud-load-balancing`, its default URL rejects public traffic,
+the external load balancer produces the exact two-address forwarding header,
+and hosted tests prove spoofed chains and direct `run.app` requests fail.
+
+`get-locations`, `hushh-dob-inference`, and `investor-og-image` remain
+unimplemented and frozen behind licensing, privacy, and public-media contract
+blockers. The source map, exact wire behavior, blockers, and live-verification
+checklist are documented in
+`docs/reference/architecture/gcp-investor-read-only-function-batch.md`. All 112
+legacy registry entries, including `stock-quotes`, remain
+`INVENTORY_FROZEN`.
 
 ## Runtime boundary
 
 - Cloud Run ingress and Invoker IAM remain infrastructure controls. Readiness
   also requires an explicit private-ingress contract.
-- Every compatibility request requires a Google-signed caller token.
+- Every compatibility or private candidate request requires a Google-signed
+  caller token.
 - User-facing and webhook services accept only the checked-in
   `hushh-tech-web-gateway-{stage}` caller. The worker accepts only the
   checked-in `hushh-tech-task-runner-{stage}` caller.
@@ -70,8 +89,8 @@ presence does not change the frozen registry or make a route reachable.
   allowlists, no grant options or database temporary-table privilege, forced
   row-level security on every table reachable through table or column grants,
   and zero application object ownership by the runtime role or any role it can
-  assume. Every privilege allowlist is empty while all handlers remain
-  disabled.
+  assume. Every privilege allowlist stays empty; the stock quote candidate has
+  no database facade.
 - Cloud SQL uses IAM database authentication over private IP. Password and
   connection-string configuration is rejected.
 
@@ -82,6 +101,14 @@ presence does not change the frozen registry or make a route reachable.
 `PRIVATE_INGRESS_ENFORCED`, `FIREBASE_PROJECT_ID`, `PRODUCT_AUDIENCE`,
 `PRODUCT_CLIENT_APP_ID`, `INSTANCE_CONNECTION_NAME`, `PGDATABASE`, and
 `PGUSER` are mandatory and pinned to the selected UAT or production contract.
+
+The stock candidate additionally requires
+`HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED=true`, a server-only
+`FINNHUB_API_KEY`, and the bounded `PUBLIC_STOCK_QUOTES_RATE_LIMIT`,
+`PUBLIC_STOCK_QUOTES_PROVIDER_REQUESTS_PER_MINUTE`, and
+`FINNHUB_QUOTE_TIMEOUT_MS` settings. The website gateway separately requires
+the exact `HUSHH_TECH_INVESTOR_API_URL` for its project and a server-only
+`HUSHH_TECH_PUBLIC_RATE_LIMIT_SALT`. Missing or drifted values fail closed.
 
 Run `npm run check` from this directory. The image uses a digest-pinned Node 22
 base and defaults to the Cloud Run `linux/amd64` platform:

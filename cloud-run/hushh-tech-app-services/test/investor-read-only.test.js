@@ -185,7 +185,7 @@ test("only two reviewed contracts exist and all real entries remain frozen", asy
   );
   assert.match(
     readFileSync(new URL("../src/server.js", import.meta.url), "utf8"),
-    /handlers:\s*Object\.freeze\(\{\}\)/,
+    /handlers:\s*runtimeHandlers\.handlers/,
   );
 
   let calls = 0;
@@ -393,7 +393,8 @@ test("Finnhub adapter encodes symbols and projects the exact quote fields", asyn
     timestamp: 7,
   });
   assert.match(calls[0].url, /symbol=BRK\.B/);
-  assert.equal(calls[0].options.signal, signal);
+  assert.notEqual(calls[0].options.signal, signal);
+  assert.equal(calls[0].options.signal.aborted, false);
   assert.equal(calls[0].options.redirect, "error");
 });
 

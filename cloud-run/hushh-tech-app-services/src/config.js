@@ -79,6 +79,15 @@ function boundedInteger(env, name, fallback, minimum, maximum) {
   return value;
 }
 
+function exactBoolean(env, name, fallback = false) {
+  const raw = clean(env[name]);
+  if (!raw) return fallback;
+  if (raw !== "true" && raw !== "false") {
+    throw new ConfigurationError(`${name} must be true or false.`);
+  }
+  return raw === "true";
+}
+
 function canonicalAudience(value, expectedOrigin) {
   let parsed;
   try {
@@ -177,6 +186,26 @@ export function readRuntimeConfig(env = process.env) {
     throw new ConfigurationError("Cloud SQL runtime contract drifted.");
   }
   assertNoDatabasePassword(env);
+  const publicStockQuotesEnabled = exactBoolean(
+    env,
+    "HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED",
+  );
+  const finnhubApiKey = clean(env.FINNHUB_API_KEY);
+  if (
+    serviceOwner !== "investor-api" &&
+    (publicStockQuotesEnabled || finnhubApiKey)
+  ) {
+    throw new ConfigurationError(
+      "The public stock-quotes provider belongs only to investor-api.",
+    );
+  }
+  if (serviceOwner === "investor-api") {
+    if (publicStockQuotesEnabled !== Boolean(finnhubApiKey)) {
+      throw new ConfigurationError(
+        "Public stock quotes and FINNHUB_API_KEY must be enabled together.",
+      );
+    }
+  }
   const expectedServiceAudience = `https://${CLOUD_RUN_SERVICE_NAMES[serviceOwner]}-${project.number}.${project.region}.run.app`;
   const handlerDeadlineMs = boundedInteger(
     env,
@@ -238,6 +267,29 @@ export function readRuntimeConfig(env = process.env) {
       1_048_576,
     ),
     requestRateLimit: boundedInteger(env, "REQUEST_RATE_LIMIT", 120, 10, 600),
+    publicStockQuotesEnabled,
+    publicStockQuotesRateLimit: boundedInteger(
+      env,
+      "PUBLIC_STOCK_QUOTES_RATE_LIMIT",
+      30,
+      1,
+      120,
+    ),
+    publicStockQuotesProviderRequestRateLimit: boundedInteger(
+      env,
+      "PUBLIC_STOCK_QUOTES_PROVIDER_REQUESTS_PER_MINUTE",
+      2,
+      1,
+      10,
+    ),
+    finnhubQuoteTimeoutMs: boundedInteger(
+      env,
+      "FINNHUB_QUOTE_TIMEOUT_MS",
+      5_000,
+      100,
+      15_000,
+    ),
+    finnhubApiKey,
   });
 }
 
