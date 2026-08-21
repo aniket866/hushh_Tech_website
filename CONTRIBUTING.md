@@ -83,7 +83,8 @@ git commit -s -m "feat: harden governed CI pipeline"
 - New runtime code should live in the existing repo structure instead of adding ad hoc root files.
 - Do not add new public examples or docs that teach browser-visible vendor secret usage.
 - Server-side secret usage should stay behind API routes or maintainer-controlled runtime config.
-- Database changes should go through `supabase/migrations/` with timestamped files.
+- Legacy Supabase database changes go through `supabase/migrations/` with timestamped files.
+- GCP cutover contracts belong in `migration/` and must stay plan-only until a governed target workflow is authorized.
 - If your change affects deploy, auth, wallets, or vendor integrations, document the operational impact clearly in the PR.
 
 ## Validation
