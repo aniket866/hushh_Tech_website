@@ -1,0 +1,343 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractId": "hushh-tech-supabase-storage-cutover-v1",
+  "contractState": "PLANNING_ONLY_NO_LIVE_IO",
+  "trackingIssue": 1950,
+  "frozenAt": "2026-08-20T20:14:47.801539Z",
+  "executionPolicy": {
+    "allowedEnvironment": "uat",
+    "allowedProject": "hushh-tech-uat",
+    "region": "us-central1",
+    "liveSourceReadsAllowed": false,
+    "liveTargetReadsAllowed": false,
+    "objectCopiesAllowed": false,
+    "objectDeletesAllowed": false,
+    "productionExecutionAllowed": false,
+    "productionProject": "hushh-tech-prod"
+  },
+  "sourceSnapshot": {
+    "provider": "supabase",
+    "projectRef": "ibsisfnjxeowvdtvgzff",
+    "inventorySchema": "supabase-storage-source-jsonl-v1",
+    "bucketCount": 6,
+    "objectCount": 124,
+    "totalBytes": 111078397,
+    "privateInventoryMustRemainUntracked": true,
+    "maximumPrivateInputBytes": 8388608
+  },
+  "continuityPolicy": {
+    "maximumHistoryEntries": 256,
+    "globalExportRunIdReuseAllowed": false,
+    "globalDeltaEvidenceDigestReuseAllowed": false
+  },
+  "targetPolicy": {
+    "provider": "gcp-cloud-storage",
+    "project": "hushh-tech-uat",
+    "region": "us-central1",
+    "inventorySchema": "gcs-storage-target-jsonl-v1",
+    "uniformBucketLevelAccessRequired": true,
+    "publicAccessPreventionRequired": true,
+    "publicIamMembersAllowed": [],
+    "objectPublicAclAllowed": false,
+    "targetGenerationRequired": true,
+    "bucketLocation": "US-CENTRAL1",
+    "objectVersioningRequired": true,
+    "fullIamEvidenceRequired": true,
+    "signedUrlIssuerEvidenceRequired": true,
+    "iamEvidenceScope": "EFFECTIVE_PROJECT_AND_BUCKET",
+    "conditionalIamBindingsAllowed": false,
+    "inheritedIamBindingsAllowed": [],
+    "forbiddenIamMemberPrefixes": [
+      "allUsers",
+      "allAuthenticatedUsers",
+      "projectOwner:",
+      "projectEditor:",
+      "projectViewer:",
+      "domain:",
+      "group:",
+      "user:"
+    ]
+  },
+  "parityContract": {
+    "sourceSnapshotKinds": [
+      "FROZEN_BASELINE",
+      "RECORDED_DELTA"
+    ],
+    "recordedDeltaRequires": [
+      "previousCheckpointDigestSha256",
+      "previousSourceInventoryDigestSha256",
+      "previousSourceArtifactDigestSha256",
+      "previousDeltaEvidenceDigestSha256",
+      "deltaEvidenceDigestSha256",
+      "sourceArtifactDigestSha256",
+      "exportRunId",
+      "snapshotSequence"
+    ],
+    "requiredObjectFields": [
+      "bucketId",
+      "objectKey",
+      "sizeBytes",
+      "mimeType",
+      "sourceUpdatedAt",
+      "sourceCacheControlMetadata",
+      "servingCacheControl",
+      "sha256"
+    ],
+    "exactComparisons": [
+      "bucket",
+      "key",
+      "bytes",
+      "mimeType",
+      "sourceTimestampMetadata",
+      "cacheControl",
+      "sha256",
+      "accessMode"
+    ],
+    "objectIdentityAlgorithm": "sha256(bucketId + NUL + objectKey)",
+    "inventoryDigestAlgorithm": "sha256(canonical_sorted_json_lines)",
+    "missingObjectsAllowed": false,
+    "missingHashesAllowed": false,
+    "unknownBucketsAllowed": false,
+    "changedTargetGenerationsAllowed": false,
+    "overwriteWithoutGenerationPreconditionAllowed": false,
+    "unrecordedSourceDeletionsAllowed": false,
+    "sourceObjectResurrectionAllowed": false
+  },
+  "signedUrlPolicy": {
+    "issuer": "server_service_identity_only",
+    "allowedMethods": [
+      "GET",
+      "HEAD"
+    ],
+    "maximumTtlSeconds": 300,
+    "generationPinned": true,
+    "bucketAndObjectAllowlistRequired": true,
+    "issuerEvidenceRequired": true,
+    "responseCacheControl": "private, no-store",
+    "browserCredentialExposureAllowed": false
+  },
+  "archivePlan": {
+    "planningOnly": true,
+    "productionOnlyAfterCutover": true,
+    "sourceFreezeSoakHours": 72,
+    "retentionDays": 90,
+    "retentionSeconds": 7776000,
+    "retentionLockRequired": true,
+    "objectVersioningRequired": true,
+    "cloudKmsCmekRequired": true,
+    "kmsKeyRotationDays": 90,
+    "restoreDrillRequiredBeforeRetentionLock": true,
+    "deleteAtExpiryRequiresSeparateApproval": true
+  },
+  "buckets": [
+    {
+      "sourceBucket": "assets",
+      "sourcePublic": true,
+      "objectCount": 5,
+      "totalBytes": 19971280,
+      "targetBucket": "hushh-tech-assets-legal-uat",
+      "targetAccessMode": "PRIVATE_SERVICE_OR_SIGNED_URL",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "CONTROLLED_MEDIA_ROUTE_ONLY",
+      "signedUrlIssuers": [
+        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+      ],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceBucket": "community-uploads",
+      "sourcePublic": true,
+      "objectCount": 115,
+      "totalBytes": 81259134,
+      "targetBucket": "hushh-tech-community-content-uat",
+      "targetAccessMode": "PRIVATE_OR_CONTROLLED_PUBLIC_MEDIA",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "MEDIA_HOST_AFTER_CONTENT_REVIEW",
+      "signedUrlIssuers": [
+        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+      ],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceBucket": "hushh-agent-profile-images",
+      "sourcePublic": true,
+      "objectCount": 1,
+      "totalBytes": 716241,
+      "targetBucket": "hushh-tech-profile-images-uat",
+      "targetAccessMode": "PRIVATE_OR_CONTROLLED_PUBLIC_RENDITION",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "RENDITION_ONLY_AFTER_OWNER_AND_CONTENT_REVIEW",
+      "signedUrlIssuers": [
+        "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+      ],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceBucket": "hushh-ai-media",
+      "sourcePublic": true,
+      "objectCount": 0,
+      "totalBytes": 0,
+      "targetBucket": "hushh-tech-ai-media-uat",
+      "targetAccessMode": "PRIVATE_OWNER_SIGNED_URL",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "NONE",
+      "signedUrlIssuers": [
+        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+      ],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceBucket": "hushh-gamma-pdf",
+      "sourcePublic": true,
+      "objectCount": 3,
+      "totalBytes": 9131742,
+      "targetBucket": "hushh-tech-reports-uat",
+      "targetAccessMode": "PRIVATE_SIGNED_URL",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "NONE",
+      "signedUrlIssuers": [
+        "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+      ],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceBucket": "wa-evidence",
+      "sourcePublic": false,
+      "objectCount": 0,
+      "totalBytes": 0,
+      "targetBucket": "hushh-tech-wa-evidence-uat",
+      "targetAccessMode": "SERVICE_IDENTITY_ONLY",
+      "targetServingCacheControl": "private, no-store",
+      "publicDelivery": "NONE",
+      "signedUrlIssuers": [],
+      "allowedIamBindings": [
+        {
+          "role": "roles/storage.objectAdmin",
+          "members": [
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectCreator",
+          "members": [
+            "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        },
+        {
+          "role": "roles/storage.objectViewer",
+          "members": [
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
+            "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          ]
+        }
+      ]
+    }
+  ],
+  "secondaryReferenceGates": [
+    {
+      "referenceKey": "legacy-community-data",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    },
+    {
+      "referenceKey": "kyc-client-runtime",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    },
+    {
+      "referenceKey": "devops-webhook",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    },
+    {
+      "referenceKey": "kyc-protocol-documentation",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    },
+    {
+      "referenceKey": "legacy-metrics-project",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    },
+    {
+      "referenceKey": "reports-market-storage",
+      "requiredDisposition": "MIGRATE_OR_PROVE_NON_USE_THEN_REMOVE_REFERENCE"
+    }
+  ],
+  "terminalSecondaryDispositions": [
+    "MIGRATED_AND_REFERENCE_REMOVED",
+    "NON_USE_PROVEN_AND_REFERENCE_REMOVED"
+  ]
+}
