@@ -182,6 +182,10 @@ describe("CI workflow scripts", () => {
       path.join(repoRoot, "scripts/ci/orchestrate.sh"),
       "utf8"
     );
+    const governance = fs.readFileSync(
+      path.join(repoRoot, "docs/reference/operations/ci-governance.md"),
+      "utf8"
+    );
 
     for (const workflow of [prWorkflow, queueWorkflow]) {
       expect(workflow).toContain('SERVICE_NODE_VERSION: "22.23.2"');
@@ -198,6 +202,7 @@ describe("CI workflow scripts", () => {
     expect(orchestrator).toContain("npm ci --ignore-scripts");
     expect(orchestrator).toContain("npm run check");
     expect(orchestrator).toContain("npm audit --omit=dev");
+    expect(governance).toContain("8. `GCP Service Foundation`");
   });
 
   it("registers each Hushh Research compatibility route once", () => {
