@@ -10,7 +10,12 @@ const {
   isMissingProfileStatusColumnError,
 } = __testing__;
 
-type JourneyState = "loading" | "unauthenticated" | InvestorAccessState;
+type JourneyState =
+  | "loading"
+  | "unauthenticated"
+  | "research_ready"
+  | "research_unavailable"
+  | InvestorAccessState;
 
 const navigatorOf = () => {
   const navigate = vi.fn();
@@ -39,6 +44,21 @@ describe("useInvestorJourneyCta CTA matrix", () => {
       currentStep: 1,
       expectedText: "Start investing",
       expectedRoute: "/onboarding/financial-link",
+      isInvestor: false,
+    },
+    {
+      label: "Research profile metadata opens only the safe public profile",
+      state: "research_ready",
+      currentStep: 1,
+      expectedText: "View your profile",
+      expectedRoute: "/profile",
+      isInvestor: false,
+    },
+    {
+      label: "unavailable Research data cannot enter the legacy funnel",
+      state: "research_unavailable",
+      currentStep: 1,
+      expectedText: "Profile unavailable",
       isInvestor: false,
     },
     {
@@ -119,6 +139,8 @@ describe("useInvestorJourneyCta CTA matrix", () => {
     const allStates: JourneyState[] = [
       "loading",
       "unauthenticated",
+      "research_ready",
+      "research_unavailable",
       "needs_onboarding",
       "needs_payment",
       "payment_in_review",

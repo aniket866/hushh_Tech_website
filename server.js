@@ -99,6 +99,8 @@ app.all('/api/send-email-notification', async (req, res) => wrapHandler(await lo
 app.all('/api/contact-notification', async (req, res) => wrapHandler(await loadApi('contact-notification'))(req, res));
 app.all('/api/wallet-pass', async (req, res) => wrapHandler(await loadApi('wallet-pass'))(req, res));
 app.all('/api/google-wallet-pass', async (req, res) => wrapHandler(await loadApi('google-wallet-pass'))(req, res));
+app.all('/api/hushh-research/config', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
+app.all('/api/hushh-research/*', async (req, res) => wrapHandler(await loadApi('hushh-research-client'))(req, res));
 
 // ---------------------------------------------------------------------------
 // .well-known routes (Apple App Site Association, etc.)

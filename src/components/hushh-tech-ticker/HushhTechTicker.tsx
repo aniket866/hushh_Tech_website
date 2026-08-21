@@ -1,7 +1,9 @@
 import { useRef } from "react";
 
+import { useOptionalAuthSession } from "../../auth/AuthSessionProvider";
 import { useConstantTickerMotion } from "../../hooks/useConstantTickerMotion";
 import { StockQuote, useStockQuotes } from "../../hooks/useStockQuotes";
+import { isHushhResearchProductBoundary } from "../../services/hushhResearch/legacyProductData";
 import { Icon, SYS, appleFont } from "../hushh-tech-ui/HushhAppleUI";
 
 const logoTint = [
@@ -70,9 +72,19 @@ const TickerChip = ({
 };
 
 export default function HushhTechTicker() {
+  const user = useOptionalAuthSession()?.user;
   const tickerLoopRef = useRef<HTMLDivElement>(null);
   const tickerTrackRef = useRef<HTMLDivElement>(null);
-  const { quotes, loading: quotesLoading, lastUpdated } = useStockQuotes(120000);
+  const pathname =
+    typeof window === "undefined" ? "" : window.location.pathname;
+  const isResearchBoundary = isHushhResearchProductBoundary(
+    pathname,
+    user,
+  );
+  const { quotes, loading: quotesLoading, lastUpdated } = useStockQuotes(
+    120000,
+    !isResearchBoundary,
+  );
 
   useConstantTickerMotion({
     enabled: quotes.length > 0,

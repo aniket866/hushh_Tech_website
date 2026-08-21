@@ -34,6 +34,13 @@ The Deep Intelligence API is a separate consent-gated Gemini Deep Research
 service. Its full contract and safety boundary live in
 `docs/reference/architecture/deep-intelligence-api.md`.
 
+### Hushh Research UAT client
+
+The default-off Hushh Research product connector uses same-origin routes under
+`/api/hushh-research/*`. Its Firebase, PKCE, compatibility, connector-key, and
+rollback contracts live in
+[`hushh-research-uat-client.md`](./hushh-research-uat-client.md).
+
 ## Contract rules
 
 1. Treat any browser page and its backing API route as one behavior contract.

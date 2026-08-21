@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { normalizeOAuthRedirectUrl } from "../../auth/authHost";
+import { isHushhResearchAuthMode } from "../../services/hushhResearch/firebaseAuth";
 import { getOAuthRedirectUrl } from "../../utils/platform";
 
 export interface ClientEnvConfig {
@@ -64,7 +65,13 @@ export function createSupabaseClient(
   return supabase;
 }
 
+export function shouldSuppressLegacySupabaseBootstrap(): boolean {
+  return isHushhResearchAuthMode();
+}
+
 const config: Config = buildClientConfig(import.meta.env);
-config.supabaseClient = createSupabaseClient(config);
+if (!shouldSuppressLegacySupabaseBootstrap()) {
+  config.supabaseClient = createSupabaseClient(config);
+}
 
 export default config;

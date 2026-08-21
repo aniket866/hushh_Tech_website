@@ -19,6 +19,7 @@ env:
   VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
   VITE_PLAID_REDIRECT_URI: "https://hushhtech.com/onboarding/financial-link"
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   smoke-gate:

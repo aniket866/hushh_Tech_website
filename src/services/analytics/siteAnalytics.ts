@@ -1,4 +1,10 @@
 import config from "../../resources/config/config";
+import {
+  isHushhResearchAuthMode,
+} from "../hushhResearch/firebaseAuth";
+import {
+  isHushhResearchAuthRoute,
+} from "../hushhResearch/contracts";
 
 const ANALYTICS_ID_KEY = "hushh_site_analytics_id";
 const ANALYTICS_SESSION_KEY = "hushh_site_analytics_session_id";
@@ -245,9 +251,23 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
     return;
   }
 
-  const routePath = sanitizeAnalyticsPath(
-    options.routePath || window.location.pathname
+  const currentPath = sanitizeAnalyticsPath(window.location.pathname);
+  const requestedPath = sanitizeAnalyticsPath(
+    options.routePath || window.location.pathname,
   );
+  if (
+    isHushhResearchAuthMode() ||
+    isHushhResearchAuthRoute(window.location.pathname) ||
+    isHushhResearchAuthRoute(options.routePath || window.location.pathname) ||
+    isHushhResearchAuthRoute(currentPath) ||
+    isHushhResearchAuthRoute(requestedPath)
+  ) {
+    // The legacy collector persists to Supabase. Research sessions and the
+    // launch callback must not silently write into that backend.
+    return;
+  }
+
+  const routePath = requestedPath;
   const routeGroup = options.routeGroup || inferRouteGroup(routePath);
   const body = {
     anonymousId: getOrCreateAnalyticsId(),
