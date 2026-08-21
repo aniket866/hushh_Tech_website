@@ -13,6 +13,7 @@ This file is the repo-routing map for the first-wave Hushhtech skill system.
 | `src/components/ui`, `src/components/hushh-tech-*`, `src/theme`, `docs/reference/quality/design-system.md` | shared UI and design-system surfaces | `frontend-design-system` |
 | `src/auth`, `src/resources/config`, auth/env/secret-sensitive `api/*` routes | auth, env, secret, and fail-closed risk escalation | `security-audit` |
 | `api`, `api/shared`, `server.js`, `supabase/**`, `cloud-run/**` runtime code | backend runtime, API contracts, Supabase, and standalone service code | `backend` |
+| `api/hushh-research-client.js`, `api/shared/hushhResearch*`, `src/auth`, `src/services/hushhResearch`, `docs/reference/architecture/hushh-research-uat-client.md` | UAT-only Hushh Research client boundary | `security-audit` |
 | `tests`, `vitest.config.ts`, Playwright commands | proof selection and quality gates | `quality-contracts` |
 
 ## First-wave routing rules

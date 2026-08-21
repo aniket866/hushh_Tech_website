@@ -12,7 +12,7 @@ permissions:
   checks: read
 
 concurrency:
-  group: deploy-production-${{ github.event.inputs.sha || github.run_id }}
+  group: deploy-production
   cancel-in-progress: false
 
 env:
@@ -24,6 +24,7 @@ env:
   VITE_SUPABASE_URL: https://example.supabase.co
   VITE_SUPABASE_ANON_KEY: ci-anon-key
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   deploy:
@@ -89,6 +90,30 @@ jobs:
             echo "Refusing deploy: expected project 'hushh-tech-prod' but got '$ACTIVE_PROJECT'."
             exit 1
           fi
+
+      - name: Refuse drifted Research bindings in production
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-prod \
+            --region=us-central1 \
+            --format=json)"
+          jq -e '
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              | length == 0)
+            or
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              == [{"name":"HUSHH_RESEARCH_CLIENT_ENABLED","value":"false"}])
+          ' <<<"$service_json" >/dev/null
+          jq -e '
+            [.spec.template.spec.containers[0].env[]?
+              | select(.name != "HUSHH_RESEARCH_CLIENT_ENABLED")
+              | select(.name | startswith("HUSHH_RESEARCH_"))]
+              | length == 0
+          ' <<<"$service_json" >/dev/null
 
       - name: Load web auth build env from Secret Manager
         shell: bash
@@ -176,7 +201,7 @@ jobs:
       - name: Deploy to Cloud Run
         shell: bash
         run: |
-          runtime_env="NODE_ENV=production,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-prod,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-prod,GOOGLE_CLOUD_LOCATION=us-central1,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true"
+          runtime_env="NODE_ENV=production,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-prod,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-prod,GOOGLE_CLOUD_LOCATION=us-central1,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true,HUSHH_RESEARCH_CLIENT_ENABLED=false"
           runtime_secrets="SUPABASE_URL=hushh-tech-supabase-url:latest"
           runtime_secrets+=",SUPABASE_SERVICE_ROLE_KEY=hushh-tech-supabase-service-role-key:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
@@ -214,6 +239,28 @@ jobs:
             --clear-base-image \
             --quiet
 
+      - name: Verify Research client remains absent in production
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_HUSHH_RESEARCH_CLIENT_ENABLED=false \
+            node scripts/smoke-hushh-research-client.mjs "$SMOKE_BASE_URL" \
+            > /tmp/prod-hushh-research-client-smoke.json
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-prod \
+            --region=us-central1 \
+            --format=json)"
+          jq -e '
+            [.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              == [{"name":"HUSHH_RESEARCH_CLIENT_ENABLED","value":"false"}]
+            and
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name != "HUSHH_RESEARCH_CLIENT_ENABLED")
+              | select(.name | startswith("HUSHH_RESEARCH_"))]
+              | length == 0)
+          ' <<<"$service_json" >/dev/null
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
@@ -227,3 +274,11 @@ jobs:
           name: prod-oauth-smoke
           if-no-files-found: error
           path: /tmp/prod-oauth-smoke.json
+
+      - name: Upload production Research hard-off proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-hushh-research-client-smoke
+          if-no-files-found: error
+          path: /tmp/prod-hushh-research-client-smoke.json
