@@ -115,6 +115,41 @@ The delta planner never overwrites blindly. New objects use a does-not-exist pre
 
 `migration/storage/supabase-storage-copy-policy.candidate.v1.json` is separate from the base contract. It keeps `executionActivated` and `copyExecutionAllowed` false. The collector is a no-network dry run unless `--allow-read-only-live` is present, and it is restricted to UAT project `hushh-tech-uat` in `us-central1`.
 
+The partial-evidence collector records a fail-closed source bucket-set check and target namespace, configuration, Identity and Access Management, and inherited-policy reads without downloading source or target object bytes. Its raw provider responses stay in a private `0600` artifact. The sanitized artifact binds the raw file digest, one capture identifier and window, every raw-response digest, exact read method and endpoint class, HTTP or process status, required source public states, normalized target policy, and hashed unknown names and principals. It never proves signing, source-byte parity, or copy readiness.
+
+Check the partial collector without making any provider request:
+
+```bash
+npm run migration:storage:partial
+```
+
+After explicit read-only authorization, capture both artifacts outside tracked paths:
+
+```bash
+npm run migration:storage:partial -- \
+  --mode capture \
+  --environment uat \
+  --project hushh-tech-uat \
+  --allow-read-only-live \
+  --raw-output tmp/private-storage-partial-raw.json \
+  --evidence-output tmp/private-storage-partial-evidence.json
+```
+
+Revalidate them using the exact file digests returned by capture:
+
+```bash
+npm run migration:storage:partial -- \
+  --mode validate \
+  --environment uat \
+  --project hushh-tech-uat \
+  --raw-capture tmp/private-storage-partial-raw.json \
+  --raw-capture-file-digest-sha256 '<exact-raw-file-sha256>' \
+  --evidence tmp/private-storage-partial-evidence.json \
+  --evidence-file-digest-sha256 '<exact-evidence-file-sha256>'
+```
+
+An unknown live source bucket is always `SOURCE_UNKNOWN_BUCKET_REVIEW_REQUIRED`. Its identifier remains hash-only outside private evidence. Object metadata and aggregate traffic evidence must bind their exact capture windows, query and response digests, and file digests. Explicit ownership plus a reviewed migration-or-archive disposition is required before any source or target copy. The unknown bucket is not added to the frozen six-bucket contract and cannot be excluded by the collector.
+
 Check the source collector without making a provider request:
 
 ```bash
@@ -227,7 +262,7 @@ The later production archive remains planning-only here. It requires Cloud Key M
 
 ```bash
 npm run migration:storage:test
-npx eslint scripts/migration/storage-cutover-contract.mjs scripts/migration/storage-cutover-plan.mjs scripts/migration/storage-live-common.mjs scripts/migration/storage-live-policy.mjs scripts/migration/storage-live-inventory.mjs scripts/migration/storage-copy-executor.mjs tests/storageCutoverPlan.test.ts tests/storageLiveCopy.test.ts
+npx eslint scripts/migration/storage-cutover-contract.mjs scripts/migration/storage-cutover-plan.mjs scripts/migration/storage-live-common.mjs scripts/migration/storage-live-policy.mjs scripts/migration/storage-live-inventory.mjs scripts/migration/storage-readonly-partial-evidence.mjs scripts/migration/storage-copy-executor.mjs tests/storageCutoverPlan.test.ts tests/storageLiveCopy.test.ts tests/storageReadonlyPartialEvidence.test.ts
 npx tsc --noEmit
 git diff --check
 ```
