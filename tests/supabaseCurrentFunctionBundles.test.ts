@@ -666,6 +666,9 @@ describe("current bundle checker report boundary", () => {
       "exact approved direct child"
     );
     const approved = path.resolve(DEFAULT_REPORT_PATH);
+    const approvedParent = path.dirname(approved);
+    fs.mkdirSync(approvedParent, { recursive: true, mode: 0o700 });
+    fs.chmodSync(approvedParent, 0o700);
     expect(fs.existsSync(approved)).toBe(false);
     try {
       writeApprovedReport({ reportPath: DEFAULT_REPORT_PATH, result: { valid: true } });

@@ -6,6 +6,7 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -80,7 +81,7 @@ type JsonRecord = Record<string, unknown>;
 
 const temporaryDirectories: string[] = [];
 const temporaryDirectory = () => {
-  const directory = mkdtempSync('/private/tmp/hushh-storage-live-test-');
+  const directory = mkdtempSync(join(realpathSync(tmpdir()), 'hushh-storage-live-test-'));
   temporaryDirectories.push(directory);
   return directory;
 };
