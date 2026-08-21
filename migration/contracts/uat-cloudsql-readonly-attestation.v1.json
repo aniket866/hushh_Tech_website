@@ -1,0 +1,246 @@
+{
+  "version": 1,
+  "capturedAt": "2026-08-21T20:45:35Z",
+  "mode": "LIVE_READ_ONLY_PARTIAL_ATTESTATION",
+  "sourcePr": {
+    "number": 1965,
+    "headSha": "0276f9742428bb0868e288e8fa7a08287499a742"
+  },
+  "target": {
+    "environment": "uat",
+    "project": "hushh-tech-uat",
+    "region": "us-central1",
+    "instance": "hushh-tech-app-pg-uat",
+    "database": "hushh_tech_app",
+    "postgresMajor": 17
+  },
+  "cloudSqlAdminApi": {
+    "status": "ATTESTED",
+    "instanceCanonicalSha256": "0ce2feb7fdcd12be96a28e742edb35a2df65bb82a87bcbb07978c1f245af24ae",
+    "databaseInventoryCanonicalSha256": "48c8f8c42cfb4e2c2056cb707f99b6ee39f02eabe61fbf647acf8058d2d716d1",
+    "iamDatabaseUsersCanonicalSha256": "b90876d25696008a084447db6507f260dd6b3738c4f38128a4fe6c4b3efa73c3",
+    "instance": {
+      "name": "hushh-tech-app-pg-uat",
+      "project": "hushh-tech-uat",
+      "region": "us-central1",
+      "zone": "us-central1-a",
+      "databaseVersion": "POSTGRES_17",
+      "state": "RUNNABLE",
+      "availabilityType": "ZONAL",
+      "activationPolicy": "ALWAYS",
+      "privateNetworkConfigured": true,
+      "publicIpv4Enabled": false,
+      "observedIpAddressTypes": [
+        "PRIVATE"
+      ],
+      "sslMode": "ENCRYPTED_ONLY",
+      "requireSslLegacyFlag": false,
+      "backupEnabled": true,
+      "pointInTimeRecoveryEnabled": true,
+      "transactionLogRetentionDays": 7,
+      "storageAutoResize": true,
+      "storageAutoResizeLimitGb": 0,
+      "dataDiskType": "PD_SSD",
+      "dataDiskSizeGb": 20,
+      "deletionProtectionEnabled": false,
+      "iamDatabaseAuthenticationEnabled": true,
+      "serverCaPresent": true
+    },
+    "databases": [
+      {
+        "name": "hushh_tech_app",
+        "charset": "UTF8",
+        "collation": "en_US.UTF8"
+      },
+      {
+        "name": "postgres",
+        "charset": "UTF8",
+        "collation": "en_US.UTF8"
+      }
+    ],
+    "iamDatabaseUsers": {
+      "type": "CLOUD_IAM_SERVICE_ACCOUNT",
+      "count": 10,
+      "reviewedRoleLabels": [
+        "audit",
+        "content_api",
+        "engagement_api",
+        "financial_api",
+        "identity_api",
+        "investor_api",
+        "migration",
+        "rollback",
+        "webhooks",
+        "worker"
+      ]
+    }
+  },
+  "catalogAttestation": {
+    "status": "BLOCKED",
+    "targetEmptyAndSafe": "NOT_PROVEN",
+    "systemIdentifier": null,
+    "serverVersionNum": null,
+    "transactionReadOnlyObserved": false,
+    "query": {
+      "path": "migration/sql/target_cloudsql_attestation_read_only.sql",
+      "sha256": "a287cdfe84449aaeaa1f6266c5ef19968fe815528d5c6ecb12efecf0c822f1e4",
+      "transaction": "REPEATABLE_READ_READ_ONLY_ROLLBACK",
+      "statementTimeoutMs": 10000,
+      "lockTimeoutMs": 1000,
+      "idleInTransactionTimeoutMs": 15000
+    },
+    "connectionAttempt": {
+      "method": "CLOUD_SQL_AUTH_PROXY_AUTO_IAM_PRIVATE_IP",
+      "result": "PRIVATE_NETWORK_PATH_UNAVAILABLE",
+      "authenticationEvaluated": false,
+      "rawOutputRetained": false
+    },
+    "accessFacts": {
+      "currentOperatorIsExistingIamDatabaseUser": false,
+      "existingIamDatabaseUserCount": 10,
+      "impersonableExistingIamDatabaseUserCount": 0,
+      "userRoleGrantOrPasswordMutationAttempted": false
+    },
+    "blockers": [
+      "PRIVATE_NETWORK_PATH_UNAVAILABLE_FROM_OPERATOR_HOST",
+      "CURRENT_OPERATOR_NOT_EXISTING_IAM_DATABASE_USER",
+      "NO_EXISTING_IMPERSONATION_PERMISSION_FOR_IAM_DATABASE_USERS"
+    ],
+    "collections": [
+      {
+        "name": "database_identity",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "schemas",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "relations",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "sequences",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "functions",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "triggers",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "extensions",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "roles",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "role_memberships",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "object_ownership",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "object_acls",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      },
+      {
+        "name": "default_acls",
+        "status": "NOT_CAPTURED",
+        "rowCount": null,
+        "sha256": null
+      }
+    ]
+  },
+  "roleAndGrantAttestation": {
+    "status": "NOT_ATTESTED",
+    "reviewedTargetRoleLabels": [
+      "hushh_tech_schema_owner",
+      "hushh_tech_migration",
+      "hushh_tech_runtime",
+      "hushh_tech_audit",
+      "hushh_tech_rollback"
+    ],
+    "flags": null,
+    "memberships": null,
+    "ownership": null,
+    "databaseTemporaryPrivilege": null,
+    "bypassRls": null,
+    "createRole": null,
+    "superuser": null,
+    "login": null,
+    "grants": null
+  },
+  "reviewedInVpcRemedy": {
+    "status": "NOT_EXECUTED",
+    "roleLabel": "audit",
+    "iamDatabaseUsername": "hushh-tech-audit-uat@hushh-tech-uat.iam",
+    "existingIamDatabaseUser": true,
+    "cloudSqlClient": true,
+    "cloudSqlInstanceUser": true,
+    "iamOrNetworkChangeRequiredForEvidenceRecord": false,
+    "requiredExecutionBoundary": "PREEXISTING_IN_VPC_EXECUTOR_USING_REVIEWED_AUDIT_IDENTITY"
+  },
+  "cleanup": {
+    "verifiedAt": "2026-08-21T20:47:39Z",
+    "proxyProcessCountAfter": 0,
+    "temporaryProxyDirectoryCountAfter": 0,
+    "temporaryCredentialFilesCreated": 0,
+    "temporaryCredentialFilesPresentAfter": 0,
+    "rawPsqlOutputRetained": false
+  },
+  "compileBlockerDisposition": {
+    "source": "migration/contracts/target-schema-offline-compile-evidence.v1.json",
+    "sourceSha256": "3b5d53544710bd8e41f870667bed1fb645f539341be82819470c0078bf7cf666",
+    "sourceBlockers": [
+      "PLAN_ONLY_EXECUTION",
+      "GOVERNED_EXECUTOR_NOT_PRESENT",
+      "SEALED_SCHEMA_OWNER_EXECUTOR_BINDING_REQUIRED",
+      "LIVE_TARGET_ATTESTATION_REQUIRED",
+      "48_SOURCE_POLICY_CONTRACTS_BLOCKED",
+      "16_LEGACY_RPC_CONTRACTS_BLOCKED",
+      "SOURCE_EXTENSION_SET_REVIEW_REQUIRED"
+    ],
+    "closedByThisAttestation": [],
+    "remaining": [
+      "PLAN_ONLY_EXECUTION",
+      "GOVERNED_EXECUTOR_NOT_PRESENT",
+      "SEALED_SCHEMA_OWNER_EXECUTOR_BINDING_REQUIRED",
+      "LIVE_TARGET_ATTESTATION_REQUIRED",
+      "48_SOURCE_POLICY_CONTRACTS_BLOCKED",
+      "16_LEGACY_RPC_CONTRACTS_BLOCKED",
+      "SOURCE_EXTENSION_SET_REVIEW_REQUIRED"
+    ],
+    "liveTargetAttestationProgress": "INSTANCE_CONFIG_ONLY_CATALOG_BLOCKED"
+  },
+  "evidenceSha256": "2150e0ad204b6fd3e4e87697772a882b07b0a1bebdcd137e68f453fc945ae238"
+}
