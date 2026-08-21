@@ -23,6 +23,8 @@
     "build:assets": "npm run build:community && node scripts/generate-sitemap.js && node scripts/generate-robots.js",
     "gcp:secrets:audit": "node scripts/gcp/audit-hushh-tech-secret-manager.mjs",
     "gcp:secrets:migrate-uat": "node scripts/gcp/migrate-hushh-tech-uat-env-to-secrets.mjs",
+    "migration:native:contract": "node scripts/migration/check-native-cutover-gate.mjs",
+    "migration:native:deletion-ready": "node scripts/migration/check-native-cutover-gate.mjs --assert-ready",
     "build:web": "npm run build:assets && vite build",
     "build": "vitest run && npm run build:web",
     "preview": "vite preview",

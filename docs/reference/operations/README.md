@@ -9,6 +9,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 3. [CI Governance](./ci-governance.md) for which PR and deploy lanes are inputs versus merge authority
 4. [Qodo Context Engine Rollout](./qodo-context-engine-rollout.md) for the hushhtech-first indexing and RAG adoption plan
 5. [Skill Taxonomy](./skill-taxonomy.md) for the first-wave owner and spoke skill layout behind this flow
+6. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
 
 ## Canonical workflow and governance
 
