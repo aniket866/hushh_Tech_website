@@ -23,7 +23,8 @@ This document maps the current Hushhtech API contract surfaces that matter durin
 
 1. `api/shared/walletPassModel.js`
 2. `api/metrics/service.js`
-3. `server.js`
+3. `api/shared/supabaseRetirementFunctionRegistry.js`
+4. `server.js`
 
 ### Standalone Cloud Run services
 
@@ -39,6 +40,10 @@ service. Its full contract and safety boundary live in
 2. If a PR changes request shape, response shape, env assumptions, or error behavior, it is an API contract change.
 3. `backend-api-contracts` should own the routing decision for small contract corrections during patch-and-merge review.
 4. `security-audit` must be consulted if the route change touches auth, secrets, privileged data, or fail-closed behavior.
+5. A legacy `/functions/v1/{slug}` compatibility route must resolve the slug
+   through `supabaseRetirementFunctionRegistry.js`. Unknown slugs and functions
+   that are not `PORTED_AND_VERIFIED` fail closed; `get-secrets` always
+   returns `410 FEATURE_RETIRED`. A generic upstream proxy is forbidden.
 
 ## Analytics contract
 

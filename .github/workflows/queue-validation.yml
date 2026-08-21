@@ -55,6 +55,20 @@ jobs:
       - name: Validate environment contract
         run: bash scripts/ci/orchestrate.sh env
 
+  supabase-retirement-contract:
+    name: Supabase Retirement Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate frozen migration inventory
+        run: bash scripts/ci/orchestrate.sh retirement
+
   web-validation:
     name: Web Validation
     runs-on: ubuntu-latest
@@ -141,6 +155,7 @@ jobs:
     needs:
       - secret-scan
       - env-contract
+      - supabase-retirement-contract
       - web-validation
       - lint
       - security-audit
@@ -154,6 +169,7 @@ jobs:
           declare -A REQUIRED_RESULTS=(
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
+            ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
             ["Web Validation"]="${{ needs.web-validation.result }}"
             ["Lint"]="${{ needs.lint.result }}"
             ["Security Audit"]="${{ needs.security-audit.result }}"

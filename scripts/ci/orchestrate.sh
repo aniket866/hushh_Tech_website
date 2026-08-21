@@ -14,6 +14,9 @@ case "$COMMAND" in
   env)
     npm run env:check
     ;;
+  retirement)
+    npm run migration:retirement:check
+    ;;
   web)
     npm run test
     npx tsc --noEmit
@@ -26,6 +29,7 @@ case "$COMMAND" in
     npm run smoke:ci
     ;;
   queue)
+    npm run migration:retirement:check
     npm run env:check
     npm run lint:ci
     npm run test
@@ -34,7 +38,7 @@ case "$COMMAND" in
     npm run smoke:ci
     ;;
   *)
-    echo "Usage: bash scripts/ci/orchestrate.sh {secret|env|web|lint|smoke|queue}"
+    echo "Usage: bash scripts/ci/orchestrate.sh {secret|env|retirement|web|lint|smoke|queue}"
     exit 1
     ;;
 esac

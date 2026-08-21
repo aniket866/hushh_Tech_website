@@ -54,14 +54,15 @@ Current `PR Validation` check surface:
 1. `DCO`
 2. `Secret Scan`
 3. `Env Contract Check`
-4. `Reviewer Context & Compliance`
-5. `PR Hygiene`
-6. `Semantic PR Guard` (advisory-first; not yet in `CI Status Gate`)
-7. `Web Validation`
-8. `Lint`
-9. `Security Audit`
-10. `Sensitive NDA Gate`
-11. `CI Status Gate`
+4. `Supabase Retirement Contract`
+5. `Reviewer Context & Compliance`
+6. `PR Hygiene`
+7. `Semantic PR Guard` (advisory-first; not yet in `CI Status Gate`)
+8. `Web Validation`
+9. `Lint`
+10. `Security Audit`
+11. `Sensitive NDA Gate`
+12. `CI Status Gate`
 
 ## Queue and post-merge lanes
 
@@ -69,13 +70,15 @@ Current `PR Validation` check surface:
 
 - file: `.github/workflows/queue-validation.yml`
 - trigger: `merge_group`
-- purpose: authoritative freshness-at-merge-time validation
+- purpose: authoritative freshness-at-merge-time validation, including the
+  frozen Supabase retirement inventory
 
 ### `Main Post-Merge Smoke`
 
 - file: `.github/workflows/main-post-merge-smoke.yml`
 - trigger: `push` to `main`
-- purpose: post-merge deploy-eligibility proof on landed `main` SHA
+- purpose: post-merge deploy-eligibility proof on landed `main` SHA, with the
+  retirement contract checked before the deploy artifact is built
 
 ## Deploy lanes
 
@@ -111,3 +114,6 @@ That check creates a temporary test user, proves sensitive community posts fail 
 8. `Queue Validation` matters for freshness and merge authority, not contributor patch review.
 9. `Main Post-Merge Smoke` gates the automatic UAT promotion path for the website lane, while `Deploy Email Template API` is a separate main-branch service deploy lane.
 10. If `Reviewer Context & Compliance` fails, treat `Hushh Signalkeeper` output as ungrounded until `.pr_agent.toml`, the repo-root metadata files, or `pr_compliance_checklist.yaml` are repaired on `main`.
+11. `Supabase Retirement Contract` is blocking in pull requests and merge
+    groups and runs again post-merge. It freezes scope; it does not prove that
+    any source data has migrated or that Supabase is outside the serving path.

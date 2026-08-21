@@ -88,6 +88,20 @@ jobs:
           if-no-files-found: error
           path: tmp/ci/env-contract-report.json
 
+  supabase-retirement-contract:
+    name: Supabase Retirement Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate frozen migration inventory
+        run: bash scripts/ci/orchestrate.sh retirement
+
   reviewer-context:
     name: Reviewer Context & Compliance
     runs-on: ubuntu-latest
@@ -328,6 +342,7 @@ jobs:
       - dco
       - secret-scan
       - env-contract
+      - supabase-retirement-contract
       - reviewer-context
       - pr-hygiene
       - phase2-pr-policy
@@ -345,6 +360,7 @@ jobs:
             ["DCO"]="${{ needs.dco.result }}"
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
+            ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
             ["Reviewer Context & Compliance"]="${{ needs.reviewer-context.result }}"
             ["PR Hygiene"]="${{ needs.pr-hygiene.result }}"
             ["Phase 2 PR Policy"]="${{ needs.phase2-pr-policy.result }}"
