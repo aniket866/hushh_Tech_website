@@ -1,0 +1,149 @@
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+
+import { RuntimeError } from "../errors.js";
+
+const TOKEN_LIMIT = 8_192;
+
+function headerValue(headers, name) {
+  const value = headers?.[name] ?? headers?.[name.toLowerCase()];
+  return Array.isArray(value) ? value.join(",") : String(value ?? "").trim();
+}
+
+function readBearer(headers, name) {
+  const match = /^Bearer\s+([^\s]+)$/i.exec(headerValue(headers, name));
+  if (!match || match[1].length < 32 || match[1].length > TOKEN_LIMIT) {
+    throw new RuntimeError("UNAUTHENTICATED", "Sign-in required.", 401);
+  }
+  return match[1];
+}
+
+function invalidToken() {
+  return new RuntimeError("UNAUTHENTICATED", "Sign-in required.", 401);
+}
+
+function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
+  const nowSeconds = Math.floor(nowMs / 1_000);
+  const uid = String(decoded?.uid ?? decoded?.sub ?? "").trim();
+  const authTime = Number(decoded?.auth_time);
+  const issuedAt = Number(decoded?.iat);
+  const expiresAt = Number(decoded?.exp);
+  const launchAuthorizationId = String(
+    decoded?.product_launch_authorization_id ?? "",
+  ).trim();
+  const launchValidAfterMs = Number(decoded?.product_launch_valid_after_ms);
+
+  if (
+    !uid ||
+    uid.length > 128 ||
+    decoded?.sub !== uid ||
+    decoded?.aud !== config.firebaseProjectId ||
+    decoded?.iss !==
+      `https://securetoken.google.com/${config.firebaseProjectId}` ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt <= nowSeconds ||
+    !Number.isFinite(issuedAt) ||
+    issuedAt > nowSeconds + 300 ||
+    !Number.isFinite(authTime) ||
+    authTime > nowSeconds + 300 ||
+    decoded?.product_client !== config.productClient ||
+    decoded?.product_client_app_id !== config.productClientAppId ||
+    decoded?.product_audience !== config.productAudience ||
+    !launchAuthorizationId ||
+    launchAuthorizationId.length > 128 ||
+    !Number.isSafeInteger(launchValidAfterMs) ||
+    launchValidAfterMs < 0 ||
+    launchValidAfterMs > nowMs ||
+    issuedAt * 1_000 < launchValidAfterMs
+  ) {
+    throw invalidToken();
+  }
+
+  if (
+    recentAuthRequired &&
+    nowSeconds - authTime > config.recentAuthSeconds
+  ) {
+    throw new RuntimeError(
+      "RECENT_AUTH_REQUIRED",
+      "Sign in again.",
+      401,
+    );
+  }
+
+  return Object.freeze({
+    kind: "firebase",
+    uid,
+    authTime,
+    launchAuthorizationId,
+  });
+}
+
+function isExpectedTokenRejection(error) {
+  const code = String(error?.code ?? "");
+  return (
+    code.startsWith("auth/argument") ||
+    code.includes("id-token") ||
+    code.includes("token-revoked") ||
+    code.includes("user-disabled") ||
+    code.includes("invalid-credential")
+  );
+}
+
+export function createFirebaseAdminAuth(projectId) {
+  const name = `hushh-tech-app-services-${projectId}`;
+  const app =
+    getApps().find((candidate) => candidate.name === name) ??
+    initializeApp({ projectId }, name);
+  return getAuth(app);
+}
+
+export function createFirebaseProductVerifier({
+  config,
+  auth = createFirebaseAdminAuth(config.firebaseProjectId),
+  now = Date.now,
+} = {}) {
+  if (!config || typeof auth?.verifyIdToken !== "function") {
+    throw new Error("Firebase verifier configuration is required.");
+  }
+
+  return async function verifyFirebaseProductRequest(request, entry) {
+    const token = readBearer(
+      request.headers,
+      "x-hushh-firebase-authorization",
+    );
+    let decoded;
+    try {
+      decoded = await auth.verifyIdToken(token, true);
+    } catch (error) {
+      if (isExpectedTokenRejection(error)) throw invalidToken();
+      throw new RuntimeError(
+        "AUTHORITY_UNAVAILABLE",
+        "Sign-in service unavailable.",
+        503,
+        { cause: error },
+      );
+    }
+
+    const actor = assertFirebaseClaims(
+      decoded,
+      config,
+      now(),
+      entry.auth_mode.includes("recent_auth"),
+    );
+    const forwardedUid = headerValue(
+      request.headers,
+      "x-hushh-firebase-uid",
+    );
+    const forwardedAuthTime = headerValue(
+      request.headers,
+      "x-hushh-firebase-auth-time",
+    );
+    if (
+      forwardedUid !== actor.uid ||
+      forwardedAuthTime !== String(actor.authTime)
+    ) {
+      throw invalidToken();
+    }
+    return actor;
+  };
+}
