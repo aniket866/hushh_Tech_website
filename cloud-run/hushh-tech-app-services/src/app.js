@@ -527,6 +527,7 @@ export function createApp({
         }
 
         const limiterKey = rateLimitKey(googleCaller, actor, entry);
+        rateLimiter(limiterKey);
         await consumeSharedRateLimit(sharedRateLimiter, {
           key: limiterKey,
           limit: config.requestRateLimit,
@@ -534,7 +535,6 @@ export function createApp({
           signal: deadline.signal,
         });
         throwIfAborted(deadline.signal);
-        rateLimiter(limiterKey);
 
         const webhookState =
           rule.actor === "webhook"

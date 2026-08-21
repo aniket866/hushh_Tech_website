@@ -559,9 +559,17 @@ test("strict request, response, method, handler, and rate limits fail closed", a
   assert.equal(wrongMethod.response.status, 405);
   assert.equal(errorCode(wrongMethod), "METHOD_NOT_ALLOWED");
 
+  let sharedLimitCalls = 0;
   const limited = createApp({
     ...base,
     rateLimiter: createRateLimiter({ limit: 1 }),
+    sharedRateLimiter: {
+      consume: async () => {
+        sharedLimitCalls += 1;
+        return { allowed: true };
+      },
+      verifyReady: async () => true,
+    },
     handlers: {
       [entry.slug]: async () => ({ status: 200, body: { ok: true } }),
     },
@@ -577,6 +585,23 @@ test("strict request, response, method, handler, and rate limits fail closed", a
   assert.equal(first.response.status, 200);
   assert.equal(second.response.status, 429);
   assert.equal(errorCode(second), "RATE_LIMITED");
+  assert.equal(sharedLimitCalls, 1);
+});
+
+test("the process-local guard uses the same fixed window boundary", () => {
+  let timestamp = 59_999;
+  const limiter = createRateLimiter({
+    limit: 1,
+    windowMs: 60_000,
+    now: () => timestamp,
+  });
+  assert.equal(limiter("bucket").resetAt, 60_000);
+  assert.throws(
+    () => limiter("bucket"),
+    (error) => error instanceof RuntimeError && error.code === "RATE_LIMITED",
+  );
+  timestamp = 60_000;
+  assert.equal(limiter("bucket").resetAt, 120_000);
 });
 
 test("database facade rejects userless work and never exposes the pool", async () => {
