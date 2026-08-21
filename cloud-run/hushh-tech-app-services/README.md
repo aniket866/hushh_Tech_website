@@ -18,6 +18,14 @@ secret-disclosure function has no handler.
 Unknown, wrong-owner, retired, unverified, and unimplemented routes fail
 closed.
 
+Two investor read-only contracts and handlers are compiled but deliberately
+unwired: `hushh-location-geocode` and `stock-quotes`. `get-locations`,
+`hushh-dob-inference`, and `investor-og-image` remain unimplemented and frozen
+behind licensing, privacy, and public-media contract blockers. The source map,
+exact wire behavior, blockers, and live-verification checklist are documented in
+`docs/reference/architecture/gcp-investor-read-only-function-batch.md`. Contract
+presence does not change the frozen registry or make a route reachable.
+
 ## Runtime boundary
 
 - Cloud Run ingress and Invoker IAM remain infrastructure controls. Readiness

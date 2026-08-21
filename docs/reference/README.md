@@ -8,6 +8,7 @@ This folder contains the tracked reference material used by the first-wave OSS c
 2. [Quality Reference](./quality/README.md) for proof selection, patch-and-merge safety, and shared UI review
 3. [API Contracts](./architecture/api-contracts.md) for backend route and page-to-API contract review
 4. [Deep Intelligence API](./architecture/deep-intelligence-api.md) for the standalone Gemini Deep Research Cloud Run mirror
+5. [GCP investor read-only function batch](./architecture/gcp-investor-read-only-function-batch.md) for two unreachable reviewed contracts, three deferred candidates, blockers, and live-verification gates
 
 ## Suggested order
 

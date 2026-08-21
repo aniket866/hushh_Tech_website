@@ -7,7 +7,10 @@ import {
   buildGcpFunctionRegistry,
   createGcpFunctionGateway,
 } from "../api/shared/gcpFunctionGateway.js";
-import { buildGcpFunctionContracts } from "../api/shared/gcpFunctionContracts.js";
+import {
+  buildGcpFunctionContracts,
+  GCP_FUNCTION_CONTRACTS,
+} from "../api/shared/gcpFunctionContracts.js";
 import {
   createLegacyFunctionRawBodyParser,
   legacyFunctionParserError,
@@ -80,6 +83,35 @@ const enabledEnv = {
 };
 
 describe("GCP function registry", () => {
+  it("stages two exact contracts while all live registry entries stay frozen", () => {
+    expect([...GCP_FUNCTION_CONTRACTS.keys()].sort()).toEqual([
+      "hushh-location-geocode",
+      "stock-quotes",
+    ]);
+    expect(
+      SUPABASE_RETIREMENT_FUNCTIONS.filter(
+        (entry) => GCP_FUNCTION_CONTRACTS.has(entry.slug),
+      ).every((entry) => entry.migration_state === "INVENTORY_FROZEN"),
+    ).toBe(true);
+    expect(GCP_FUNCTION_CONTRACTS.get("hushh-location-geocode")).toMatchObject({
+      methods: ["POST"],
+      contentTypes: ["application/json"],
+      maxRequestBytes: 16_384,
+      timeoutMs: 25_000,
+      publicCache: false,
+    });
+    expect(GCP_FUNCTION_CONTRACTS.get("stock-quotes")).toMatchObject({
+      methods: ["GET", "POST"],
+      contentTypes: ["application/json"],
+      maxRequestBytes: 8_192,
+      timeoutMs: 25_000,
+      publicCache: false,
+    });
+    expect(GCP_FUNCTION_CONTRACTS.has("get-locations")).toBe(false);
+    expect(GCP_FUNCTION_CONTRACTS.has("hushh-dob-inference")).toBe(false);
+    expect(GCP_FUNCTION_CONTRACTS.has("investor-og-image")).toBe(false);
+  });
+
   it("rejects duplicates and non-explicit owners", () => {
     expect(() => buildGcpFunctionRegistry([baseEntry, baseEntry])).toThrow(
       /Duplicate legacy function slug/,

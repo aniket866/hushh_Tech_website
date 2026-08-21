@@ -7,10 +7,12 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const TEMPLATE_LITERAL_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 const TEMPLATE_PARAMETER_PATTERN = /^:[a-z][a-z0-9_]{0,31}$/;
 const MEDIA_TYPE_PATTERN = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/;
+const CACHE_CONTROL_VALUES = new Set(["private, no-store"]);
 const CREDENTIAL_KEY_PATTERN =
   /(?:authorization|credential|password|private[_-]?key|secret|service[_-]?role|token)/i;
 const MAX_QUERY_BYTES = 4_096;
 const MAX_QUERY_VALUES = 32;
+const MAX_REQUEST_BYTES = 1_048_576;
 
 function invalidDefinition(slug, reason) {
   throw new Error(`Invalid function contract for ${slug}: ${reason}.`);
@@ -113,12 +115,29 @@ function compileContract(slug, contract) {
   if (
     Object.keys(contract).some(
       (name) =>
-        !["methods", "subpaths", "query", "body", "mediaTypes"].includes(
-          name,
-        ),
+        ![
+          "methods",
+          "subpaths",
+          "query",
+          "body",
+          "mediaTypes",
+          "cacheControl",
+          "maxRequestBytes",
+        ].includes(name),
     )
   ) {
     invalidDefinition(slug, "unknown field");
+  }
+  const cacheControl = contract.cacheControl ?? "private, no-store";
+  if (!CACHE_CONTROL_VALUES.has(cacheControl)) {
+    invalidDefinition(slug, "cache control is invalid");
+  }
+  if (
+    !Number.isSafeInteger(contract.maxRequestBytes) ||
+    contract.maxRequestBytes < 0 ||
+    contract.maxRequestBytes > MAX_REQUEST_BYTES
+  ) {
+    invalidDefinition(slug, "maximum request bytes is invalid");
   }
   return Object.freeze({
     methods: Object.freeze([...contract.methods]),
@@ -128,6 +147,8 @@ function compileContract(slug, contract) {
     query: compileQuery(slug, contract.query),
     body: contract.body,
     mediaTypes: Object.freeze([...contract.mediaTypes]),
+    cacheControl,
+    maxRequestBytes: contract.maxRequestBytes,
   });
 }
 
@@ -211,7 +232,15 @@ export function assertFunctionRequestContract(contract, request) {
     }
   }
 
-  const hasBody = Buffer.isBuffer(request.rawBody) && request.rawBody.length > 0;
+  const bodyBytes = Buffer.isBuffer(request.rawBody) ? request.rawBody.length : 0;
+  if (bodyBytes > contract.maxRequestBytes) {
+    throw new RuntimeError(
+      "PAYLOAD_TOO_LARGE",
+      "Request is too large.",
+      413,
+    );
+  }
+  const hasBody = bodyBytes > 0;
   if (
     (contract.body === "required" && !hasBody) ||
     (contract.body === "forbidden" && hasBody)
@@ -224,4 +253,28 @@ export function assertFunctionRequestContract(contract, request) {
   return true;
 }
 
-export const FUNCTION_CONTRACTS = createFunctionContracts({});
+export const INVESTOR_READ_ONLY_FUNCTION_CONTRACTS = createFunctionContracts({
+  "hushh-location-geocode": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "required",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 16_384,
+  },
+  "stock-quotes": {
+    methods: ["GET", "POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 8_192,
+  },
+});
+
+// Contract presence is not enablement. The frozen registry is checked before
+// these definitions, and all 112 entries remain unreachable until independent
+// UAT parity changes a specific entry to PORTED_AND_VERIFIED.
+export const FUNCTION_CONTRACTS = INVESTOR_READ_ONLY_FUNCTION_CONTRACTS;
