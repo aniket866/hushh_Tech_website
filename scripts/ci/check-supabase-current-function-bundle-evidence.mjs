@@ -39,12 +39,25 @@ const CANONICAL_RETIREMENT_MANIFEST_ID = "hushh-tech-no-hybrid-supabase-retireme
 const CANONICAL_HISTORICAL_EVIDENCE_ID = "hushh-tech-supabase-live-function-bundles";
 const CANONICAL_MANIFEST_FILE_DIGEST =
   "038e2221e48321b8c28f3df104093d28d3c44b18cfb9b3918c8ea0e73aaa1b85";
+const COMPOSED_TRAFFIC_MANIFEST_FILE_DIGEST =
+  "2b288311ea816a39e512977de8f3161d9192113ce308e757e41540fae136d4b2";
 const CANONICAL_HISTORICAL_EVIDENCE_FILE_DIGEST =
   "3ae1b5b8225347cee63cb8e42fdfe744e8f905ee7b3a9d2c4eccee3ae2c81bd4";
 const CANONICAL_RETIREMENT_CHECKER_FILE_DIGEST =
   "11c22b12cfe0a8d2f994181558b633cf6e526b315a8137d42b52223a8010ea6d";
+const COMPOSED_TRAFFIC_RETIREMENT_CHECKER_FILE_DIGEST =
+  "a5093c0119bee4826bffe4cceeb380e2745a698152289c931ab21381588f6c35";
 const CANONICAL_HISTORICAL_GENERATOR_FILE_DIGEST =
   "35eb33b00a1dd79ef8da6ee35cd5480123dc037c1c444e47e4eb78f54a07ac43";
+
+const COMPOSED_MANIFEST_FILE_DIGESTS = new Set([
+  CANONICAL_MANIFEST_FILE_DIGEST,
+  COMPOSED_TRAFFIC_MANIFEST_FILE_DIGEST,
+]);
+const COMPOSED_RETIREMENT_CHECKER_FILE_DIGESTS = new Set([
+  CANONICAL_RETIREMENT_CHECKER_FILE_DIGEST,
+  COMPOSED_TRAFFIC_RETIREMENT_CHECKER_FILE_DIGEST,
+]);
 
 export const CURRENT_EVIDENCE_LOCK = Object.freeze({
   manifest_file_digest: CANONICAL_MANIFEST_FILE_DIGEST,
@@ -153,13 +166,16 @@ const composeCanonicalRetirementValidation = ({
   canonicalCheckerBytes,
   historicalGeneratorBytes,
 }) => {
-  if (!manifestBytes || sha256(manifestBytes) !== CANONICAL_MANIFEST_FILE_DIGEST) {
+  if (!manifestBytes || !COMPOSED_MANIFEST_FILE_DIGESTS.has(sha256(manifestBytes))) {
     errors.push("Retirement manifest file digest changed from the canonical lock.");
   }
   if (!historicalEvidenceBytes || sha256(historicalEvidenceBytes) !== CANONICAL_HISTORICAL_EVIDENCE_FILE_DIGEST) {
     errors.push("Historical v1 bundle evidence file digest changed from the canonical lock.");
   }
-  if (!canonicalCheckerBytes || sha256(canonicalCheckerBytes) !== CANONICAL_RETIREMENT_CHECKER_FILE_DIGEST) {
+  if (
+    !canonicalCheckerBytes ||
+    !COMPOSED_RETIREMENT_CHECKER_FILE_DIGESTS.has(sha256(canonicalCheckerBytes))
+  ) {
     errors.push("Canonical retirement validator file digest changed from the composed lock.");
   }
   if (!historicalGeneratorBytes || sha256(historicalGeneratorBytes) !== CANONICAL_HISTORICAL_GENERATOR_FILE_DIGEST) {
