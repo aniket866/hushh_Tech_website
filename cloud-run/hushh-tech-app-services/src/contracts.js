@@ -368,6 +368,55 @@ export const ENGAGEMENT_ADMIN_FUNCTION_CONTRACTS = createFunctionContracts({
   },
 });
 
+export const NOTIFY_WRITE_FUNCTION_CONTRACTS = createFunctionContracts({
+  "ceo-calendar-booking": {
+    methods: ["GET", "POST"],
+    subpaths: [""],
+    query: {
+      days: { required: false, multiple: false, maxLength: 2 },
+    },
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 16_384,
+  },
+  "coins-credit-notification": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 8_192,
+  },
+  "coins-deduction-notification": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 8_192,
+  },
+  "create-verification-session": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 32_768,
+  },
+  "nda-signed-notification": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 1_048_576,
+  },
+  "nws-score-notification": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 32_768,
+  },
+  "onboarding-funding-name-match": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "optional",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+  "onboarding-proof-of-funds": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "optional",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+});
+
 // Contract presence is not enablement. The frozen registry is checked before
 // these definitions, and all 112 entries remain unreachable until independent
 // UAT parity changes a specific entry to PORTED_AND_VERIFIED.
