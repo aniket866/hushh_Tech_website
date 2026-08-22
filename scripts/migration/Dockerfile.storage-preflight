@@ -1,0 +1,31 @@
+FROM --platform=linux/amd64 node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
+
+WORKDIR /app
+
+COPY scripts/migration/check-storage-preflight-image-closure.mjs ./
+COPY scripts/migration/storage-cutover-contract.mjs ./
+COPY scripts/migration/storage-isolated-cutover-contract.mjs ./
+COPY scripts/migration/storage-live-common.mjs ./
+COPY scripts/migration/storage-live-policy.mjs ./
+COPY scripts/migration/storage-live-inventory.mjs ./
+COPY scripts/migration/storage-seven-bucket-contract.mjs ./
+COPY scripts/migration/storage-preflight-job.mjs ./
+
+COPY migration/storage/supabase-storage-copy-policy.candidate.v1.json /migration/storage/
+COPY migration/storage/supabase-storage-cutover.v1.json /migration/storage/
+COPY migration/storage/supabase-storage-isolated-cutover-uat.v1.json /migration/storage/
+COPY migration/storage/supabase-storage-seven-bucket-uat.activation.v1.json /migration/storage/
+COPY migration/storage/supabase-storage-seven-bucket-uat.v1.json /migration/storage/
+
+RUN chmod 0444 /app/*.mjs /migration/storage/*.json \
+    && node /app/check-storage-preflight-image-closure.mjs --root=/
+
+USER 65532:65532
+
+RUN node --check ./storage-preflight-job.mjs \
+    && test -r ./storage-preflight-job.mjs \
+    && test ! -w ./storage-preflight-job.mjs \
+    && test -r /migration/storage/supabase-storage-cutover.v1.json \
+    && test ! -w /migration/storage/supabase-storage-cutover.v1.json
+
+ENTRYPOINT ["node", "./storage-preflight-job.mjs"]
