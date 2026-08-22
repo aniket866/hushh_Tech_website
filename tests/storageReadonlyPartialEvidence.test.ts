@@ -44,6 +44,9 @@ const fixtureWindow = {
   endedAt: '2026-08-21T20:01:00.000Z',
 };
 const captureId = 'storage-partial-12345678-1234-1234-1234-123456789abc';
+const assetsTargetBucket = STORAGE_CUTOVER_CONTRACT.buckets.find(
+  (bucket) => bucket.sourceBucket === 'assets',
+)!.targetBucket;
 
 const responseBytes = (value: unknown) => Buffer.from(JSON.stringify(value));
 
@@ -142,7 +145,7 @@ const makeRawCapture = () => {
         versioning: { enabled: true },
       },
     });
-    const iamDenied = bucket.targetBucket === 'hushh-tech-assets-legal-uat';
+    const iamDenied = bucket.targetBucket === assetsTargetBucket;
     httpRequest(requests, {
       provider: 'gcp',
       endpointClass: 'GCS_BUCKET_IAM',
@@ -299,7 +302,7 @@ describe('read-only partial storage evidence', () => {
   it('records the assets IAM 403 as a request receipt and blocker', async () => {
     const { evidence } = await makeBoundFixture();
     const target = evidence.targets.find(
-      (entry: JsonRecord) => entry.bucketName === 'hushh-tech-assets-legal-uat',
+      (entry: JsonRecord) => entry.bucketName === assetsTargetBucket,
     );
     expect(target).toMatchObject({ iamHttpStatus: 403, iamRead: false });
     expect(evidence.requests).toContainEqual(expect.objectContaining({
