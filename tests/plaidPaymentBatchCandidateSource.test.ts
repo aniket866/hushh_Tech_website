@@ -28,13 +28,16 @@ describe("default-off Plaid and payment candidate source evidence", () => {
     const terminal = JSON.parse(terminalBytes.toString("utf8"));
 
     expect(matrix).toMatchObject({
-      schema_version: 1,
+      schema_version: 2,
       base_commit: "95a88840d7f575e9852e89051e5b34f3f689a39f",
       deployment_state: "DEFAULT_OFF",
       required_registry_state: "INVENTORY_FROZEN",
       source_approval: {
         status: "BLOCKED",
         metadata_end_check_passed: false,
+        detached_approval_status: "MISSING",
+        end_metadata_artifact_status: "MISSING",
+        checked_in_approval_artifact: "forbidden",
         source_evidence_file_sha256: digest(liveV2Bytes),
         source_evidence_digest: liveV2.evidence_digest.digest,
         canonical_source_tree_digest: liveV2.canonical_source_tree.digest,
@@ -114,10 +117,16 @@ describe("default-off Plaid and payment candidate source evidence", () => {
       expect(terminalRow.source.deployment_binding_sha256).toBe(
         row.deployment_binding_sha256,
       );
-      expect(row.blockers).toEqual(terminalRow.blockers);
-      expect(row.blockers).toHaveLength(6);
-      expect(row.candidate_activation_blockers).toContain(
-        "DETACHED_CANDIDATE_APPROVAL_MISSING",
+      expect(row.blockers.slice(0, 6)).toEqual(terminalRow.blockers);
+      expect(row.blockers[6].code).toBe("DETACHED_CANDIDATE_APPROVAL_MISSING");
+      expect(row.blockers.at(-1).code).toBe(
+        "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+      );
+      expect(row.method).toBe("POST");
+      expect(row.media_type).toBe("application/json");
+      expect(row.cache_policy).toBe("private, no-store");
+      expect(row.cors_policy).toBe(
+        row.slug === "plaid-data-webhook" ? "forbidden" : "same-origin allowlist",
       );
       expect(terminalRow.target.contract_digest).toBeNull();
       expect(terminalRow.target.live_evidence_digest).toBeNull();

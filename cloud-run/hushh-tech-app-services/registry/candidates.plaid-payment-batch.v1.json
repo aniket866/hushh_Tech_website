@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "base_commit": "95a88840d7f575e9852e89051e5b34f3f689a39f",
   "deployment_state": "DEFAULT_OFF",
   "required_registry_state": "INVENTORY_FROZEN",
@@ -20,7 +20,10 @@
     "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
     "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
     "terminal_matrix_file_sha256": "d6331e9229ad3002cd5568c69d80d2c078ad3791b23fba7ccab50ef667b4b40f",
-    "terminal_matrix_evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8"
+    "terminal_matrix_evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8",
+    "detached_approval_status": "MISSING",
+    "end_metadata_artifact_status": "MISSING",
+    "checked_in_approval_artifact": "forbidden"
   },
   "runtime_byte_lock": {
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
@@ -37,7 +40,14 @@
     "required_header": "plaid-verification",
     "detached_implementation": "cloud-run/hushh-tech-app-services/src/handlers/plaid-payment-batch.js#verifyPlaidWebhookSignature",
     "verification": "Plaid JWT kid lookup plus ES256 signature and exact raw-body SHA-256 claim before JSON parse",
-    "verification_order": ["bounded compact JWT", "alg ES256 and kid", "public JWK only", "P-256 signature", "five-minute freshness", "constant-time exact raw-body SHA-256"],
+    "verification_order": [
+      "bounded compact JWT",
+      "alg ES256 and kid",
+      "public JWK only",
+      "P-256 signature",
+      "five-minute freshness",
+      "constant-time exact raw-body SHA-256"
+    ],
     "forgery_gate": "node --test test/plaid-payment-batch.test.js",
     "query_secret": "forbidden",
     "body_secret": "forbidden",
@@ -72,22 +82,78 @@
       "manifest_version": 5752,
       "verify_jwt": true,
       "deployment_binding_sha256": "fb18aa6d20f257b5e14c25147f94bd3f471b02106b462f2c89bd549c895d5b2d",
-      "traffic_30d": {"request_count": 36, "status_2xx": 36, "status_4xx": 0, "options": 18, "post": 18, "jwt_present": 18},
+      "traffic_30d": {
+        "request_count": 36,
+        "status_2xx": 36,
+        "status_4xx": 0,
+        "options": 18,
+        "post": 18,
+        "jwt_present": 18
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST user and allowlisted OAuth redirect JSON plus Idempotency-Key",
       "response": "KMS-sealed short-lived link token and expiration",
       "tables": [],
-      "side_effects": ["plaid_link_token_create"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=5752;current=5795"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "side_effects": [
+        "plaid_link_token_create"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PLAID_SECRET_MANAGER_KMS_AND_OAUTH_REDIRECT_LIVE_PROOF_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=5752;current=5795"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_SECRET_MANAGER_KMS_AND_OAUTH_REDIRECT_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "plaid_link_domain_adapter"
+      ]
     },
     {
       "slug": "exchange-public-token",
@@ -99,22 +165,90 @@
       "manifest_version": 5728,
       "verify_jwt": true,
       "deployment_binding_sha256": "d607ac6f4e7ac8e0551f5912183dd977ad32f67bf97704bc28f69632a74d2548",
-      "traffic_30d": {"request_count": 8, "status_2xx": 8, "status_4xx": 0, "options": 4, "post": 4, "jwt_present": 4},
+      "traffic_30d": {
+        "request_count": 8,
+        "status_2xx": 8,
+        "status_4xx": 0,
+        "options": 4,
+        "post": 4,
+        "jwt_present": 4
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST single-use public token and bounded account selection plus Idempotency-Key",
       "response": "item and display-only account metadata; never access token",
-      "tables": ["plaid_items", "onboarding_data", "plaid_accounts", "plaid_transfer_accounts"],
-      "side_effects": ["plaid_public_token_exchange", "plaid_accounts_get", "KMS_encrypt_access_token", "transactional_upserts"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=5728;current=5771"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "plaid_items",
+        "onboarding_data",
+        "plaid_accounts",
+        "plaid_transfer_accounts"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PLAID_ACCESS_TOKEN_CLOUD_KMS_ENVELOPE_LIVE_PROOF_MISSING", "FOUR_TABLE_SERIALIZABLE_PARITY_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "plaid_public_token_exchange",
+        "plaid_accounts_get",
+        "KMS_encrypt_access_token",
+        "transactional_upserts"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=5728;current=5771"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_ACCESS_TOKEN_CLOUD_KMS_ENVELOPE_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "FOUR_TABLE_SERIALIZABLE_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "plaid_exchange_domain_adapter"
+      ]
     },
     {
       "slug": "fund-coupon-redeem",
@@ -126,22 +260,92 @@
       "manifest_version": 3180,
       "verify_jwt": true,
       "deployment_binding_sha256": "9ab0d962c6af024c5eb25ad9bfabaac1c122b6d62b1b117822fa7950e843a383",
-      "traffic_30d": {"request_count": 4, "status_2xx": 4, "status_4xx": 0, "options": 2, "post": 2, "jwt_present": 2},
+      "traffic_30d": {
+        "request_count": 4,
+        "status_2xx": 4,
+        "status_4xx": 0,
+        "options": 2,
+        "post": 2,
+        "jwt_present": 2
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST user and Secret-Manager-backed coupon plus Idempotency-Key",
       "response": "payment and manual-review state without coupon echo",
-      "tables": ["onboarding_data", "user_financial_data", "fund_investment_plans", "fund_stripe_payment_requests", "fund_stripe_payments", "ceo_meeting_payments", "fund_payment_reviews", "fund_payment_notifications"],
-      "side_effects": ["single_serializable_ledger_transaction", "transactional_email_outbox"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=3180;current=3223"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "onboarding_data",
+        "user_financial_data",
+        "fund_investment_plans",
+        "fund_stripe_payment_requests",
+        "fund_stripe_payments",
+        "ceo_meeting_payments",
+        "fund_payment_reviews",
+        "fund_payment_notifications"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "DEFAULT_COUPON_FALLBACK_REMOVAL_AND_SECRET_MANAGER_PROOF_MISSING", "EIGHT_TABLE_TRANSACTION_AND_EMAIL_OUTBOX_PARITY_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "single_serializable_ledger_transaction",
+        "transactional_email_outbox"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=3180;current=3223"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DEFAULT_COUPON_FALLBACK_REMOVAL_AND_SECRET_MANAGER_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "EIGHT_TABLE_TRANSACTION_AND_EMAIL_OUTBOX_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "fund_coupon_domain_adapter"
+      ]
     },
     {
       "slug": "fund-payment-request-create",
@@ -153,22 +357,89 @@
       "manifest_version": 4092,
       "verify_jwt": true,
       "deployment_binding_sha256": "7ec36aa83f00dd7de134b98ea74ab93f18222d3274f85b5343dc746c930a3e7c",
-      "traffic_30d": {"request_count": 4, "status_2xx": 4, "status_4xx": 0, "options": 2, "post": 2, "jwt_present": 2},
+      "traffic_30d": {
+        "request_count": 4,
+        "status_2xx": 4,
+        "status_4xx": 0,
+        "options": 2,
+        "post": 2,
+        "jwt_present": 2
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST user and integer-cent first payment plus Idempotency-Key",
       "response": "request reference and payment URL from sealed ledger result",
-      "tables": ["onboarding_data", "user_financial_data", "fund_investment_plans", "fund_stripe_payment_requests", "fund_payment_notifications"],
-      "side_effects": ["single_serializable_ledger_transaction", "transactional_email_outbox"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=4092;current=4135"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "onboarding_data",
+        "user_financial_data",
+        "fund_investment_plans",
+        "fund_stripe_payment_requests",
+        "fund_payment_notifications"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PAYMENT_TOKEN_KMS_AND_CANONICAL_ORIGIN_PROOF_MISSING", "FIVE_TABLE_TRANSACTION_AND_EMAIL_OUTBOX_PARITY_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "single_serializable_ledger_transaction",
+        "transactional_email_outbox"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=4092;current=4135"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PAYMENT_TOKEN_KMS_AND_CANONICAL_ORIGIN_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "FIVE_TABLE_TRANSACTION_AND_EMAIL_OUTBOX_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "fund_payment_domain_adapter"
+      ]
     },
     {
       "slug": "fund-payment-status",
@@ -180,22 +451,71 @@
       "manifest_version": 4087,
       "verify_jwt": true,
       "deployment_binding_sha256": "16b45c57d835a73bdf7d33034093a52bb3e601fef278bb31d3553cd492dc57e7",
-      "traffic_30d": {"request_count": 55, "status_2xx": 55, "status_4xx": 0, "options": 26, "post": 29, "jwt_present": 29},
+      "traffic_30d": {
+        "request_count": 55,
+        "status_2xx": 55,
+        "status_4xx": 0,
+        "options": 26,
+        "post": 29,
+        "jwt_present": 29
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST caller-owned user identifier",
       "response": "bounded latest request payments and review rows",
-      "tables": ["fund_stripe_payment_requests", "fund_stripe_payments", "fund_payment_reviews"],
+      "tables": [
+        "fund_stripe_payment_requests",
+        "fund_stripe_payments",
+        "fund_payment_reviews"
+      ],
       "side_effects": [],
       "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=4087;current=4130"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=4087;current=4130"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "EXACT_CALLER_OWNED_COLUMN_GRANTS_RLS_AND_LIVE_RESPONSE_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "EXACT_CALLER_OWNED_COLUMN_GRANTS_RLS_AND_LIVE_RESPONSE_PARITY_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "fund_payment_read_adapter"
+      ]
     },
     {
       "slug": "plaid-data-sync-start",
@@ -207,22 +527,90 @@
       "manifest_version": 4093,
       "verify_jwt": true,
       "deployment_binding_sha256": "da45400a5b5408d0c3e0b3657c3a0295262d0f06161f94cfd23c2ad53c7d4446",
-      "traffic_30d": {"request_count": 8, "status_2xx": 8, "status_4xx": 0, "options": 4, "post": 4, "jwt_present": 4},
+      "traffic_30d": {
+        "request_count": 8,
+        "status_2xx": 8,
+        "status_4xx": 0,
+        "options": 4,
+        "post": 4,
+        "jwt_present": 4
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST caller-owned user and optional item plus Idempotency-Key",
       "response": "aggregate availability only; no raw financial rows",
-      "tables": ["plaid_items", "plaid_product_sync_statuses", "onboarding_data", "plaid_accounts", "plaid_sync_cursors", "user_financial_data"],
-      "side_effects": ["plaid_product_reads", "transactional_product_status_and_outbox_updates"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=4093;current=4136"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "plaid_items",
+        "plaid_product_sync_statuses",
+        "onboarding_data",
+        "plaid_accounts",
+        "plaid_sync_cursors",
+        "user_financial_data"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PLAID_PRODUCT_SCHEMA_QUOTA_CURSOR_AND_OUTBOX_PARITY_MISSING", "PLAID_ACCESS_TOKEN_CLOUD_KMS_ENVELOPE_LIVE_PROOF_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "plaid_product_reads",
+        "transactional_product_status_and_outbox_updates"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=4093;current=4136"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_PRODUCT_SCHEMA_QUOTA_CURSOR_AND_OUTBOX_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_ACCESS_TOKEN_CLOUD_KMS_ENVELOPE_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "plaid_sync_domain_adapter"
+      ]
     },
     {
       "slug": "plaid-data-webhook",
@@ -234,22 +622,87 @@
       "manifest_version": 4094,
       "verify_jwt": false,
       "deployment_binding_sha256": "6a1dc1ac84a9aff459972b4206446b14d8c6a315104be33b0e74eed9d0b0d2ff",
-      "traffic_30d": {"request_count": 470, "status_2xx": 0, "status_4xx": 470, "options": 0, "post": 470, "jwt_present": 0},
+      "traffic_30d": {
+        "request_count": 470,
+        "status_2xx": 0,
+        "status_4xx": 470,
+        "options": 0,
+        "post": 470,
+        "jwt_present": 0
+      },
       "target_auth": "provider_signature_raw_body",
       "target_owner_group": "signed-webhook-service",
       "request": "POST exact raw JSON after Plaid-Verification JWT succeeds",
       "response": "accepted event identity and queued product count only",
-      "tables": ["plaid_data_events", "plaid_items", "plaid_product_sync_statuses"],
-      "side_effects": ["transactional_event_claim", "transactional_product_sync_outbox"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=4094;current=4137"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "plaid_data_events",
+        "plaid_items",
+        "plaid_product_sync_statuses"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "PLAID_JWKS_KID_CACHE_ES256_BODY_HASH_AND_FORGERY_LIVE_PROOF_MISSING", "OBSERVED_470_OF_470_REQUESTS_WERE_4XX_NO_SUCCESS_PARITY", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PLAID_EVENT_SCHEMA_AND_TRANSACTIONAL_OUTBOX_LIVE_PARITY_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "transactional_event_claim",
+        "transactional_product_sync_outbox"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=4094;current=4137"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_JWKS_KID_CACHE_ES256_BODY_HASH_AND_FORGERY_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "OBSERVED_470_OF_470_REQUESTS_WERE_4XX_NO_SUCCESS_PARITY",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PLAID_EVENT_SCHEMA_AND_TRANSACTIONAL_OUTBOX_LIVE_PARITY_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 1048576,
+      "cache_policy": "private, no-store",
+      "cors_policy": "forbidden",
+      "dependencies": [
+        "plaid_es256_raw_body_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "plaid_webhook_domain_adapter"
+      ]
     },
     {
       "slug": "plaid-diagnostics-log",
@@ -261,22 +714,84 @@
       "manifest_version": 4023,
       "verify_jwt": false,
       "deployment_binding_sha256": "d739f560f1bec2fef4acf314d43acc55ffdef0e35909f3e0c280f9e684e24424",
-      "traffic_30d": {"request_count": 173, "status_2xx": 173, "status_4xx": 0, "options": 57, "post": 116, "jwt_present": 116},
+      "traffic_30d": {
+        "request_count": 173,
+        "status_2xx": 173,
+        "status_4xx": 0,
+        "options": 57,
+        "post": 116,
+        "jwt_present": 116
+      },
       "target_auth": "firebase_bearer_recent_auth_or_google_service_identity",
       "target_owner_group": "financial-api-worker",
       "request": "POST allowlisted redacted diagnostics plus Idempotency-Key",
       "response": "accepted boolean only",
-      "tables": ["plaid_link_diagnostics"],
-      "side_effects": ["single_redacted_diagnostic_insert"],
-      "blockers": [
-        {"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"},
-        {"code": "SOURCE_METADATA_END_CHECK_MISSING", "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"},
-        {"code": "SOURCE_REVISION_UNPROVEN", "evidence": "NOT_PROVEN"},
-        {"code": "SOURCE_VERSION_DRIFT", "evidence": "manifest=4023;current=4066"},
-        {"code": "TARGET_CONTRACT_MISSING", "evidence": "terminal contract entry absent"},
-        {"code": "TARGET_REGISTRY_NOT_ENABLED", "evidence": "INVENTORY_FROZEN"}
+      "tables": [
+        "plaid_link_diagnostics"
       ],
-      "candidate_activation_blockers": ["DETACHED_CANDIDATE_APPROVAL_MISSING", "SOURCE_ANONYMOUS_TARGET_AUTHENTICATED_PARITY_DECISION_MISSING", "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING", "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING", "PII_REDACTION_AND_RETENTION_LIVE_PROOF_MISSING", "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED"]
+      "side_effects": [
+        "single_redacted_diagnostic_insert"
+      ],
+      "blockers": [
+        {
+          "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+          "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+        },
+        {
+          "code": "SOURCE_METADATA_END_CHECK_MISSING",
+          "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+        },
+        {
+          "code": "SOURCE_REVISION_UNPROVEN",
+          "evidence": "NOT_PROVEN"
+        },
+        {
+          "code": "SOURCE_VERSION_DRIFT",
+          "evidence": "manifest=4023;current=4066"
+        },
+        {
+          "code": "TARGET_CONTRACT_MISSING",
+          "evidence": "terminal contract entry absent"
+        },
+        {
+          "code": "TARGET_REGISTRY_NOT_ENABLED",
+          "evidence": "INVENTORY_FROZEN"
+        },
+        {
+          "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "SOURCE_ANONYMOUS_TARGET_AUTHENTICATED_PARITY_DECISION_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "CALLER_IDEMPOTENCY_HEADER_ROLLOUT_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "PII_REDACTION_AND_RETENTION_LIVE_PROOF_MISSING",
+          "evidence": "MISSING"
+        },
+        {
+          "code": "DOMAIN_OPERATION_ADAPTER_NOT_RUNTIME_WIRED",
+          "evidence": "MISSING"
+        }
+      ],
+      "method": "POST",
+      "media_type": "application/json",
+      "body_limit_bytes": 262144,
+      "cache_policy": "private, no-store",
+      "cors_policy": "same-origin allowlist",
+      "dependencies": [
+        "firebase_product_verifier",
+        "cloud_sql_serializable_fenced_operation_v1",
+        "plaid_diagnostics_domain_adapter"
+      ]
     }
   ]
 }

@@ -14,7 +14,6 @@ const JSON_HEADERS = Object.freeze({
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 const PLAID_KEY_ID_PATTERN = /^[A-Za-z0-9._:-]{1,256}$/;
-const FIREBASE_UID_PATTERN = /^[^\u0000-\u001f\u007f]{1,128}$/;
 const GOOGLE_SERVICE_EMAIL_PATTERN =
   /^[a-z0-9][a-z0-9._-]{0,126}@[a-z0-9.-]+\.iam\.gserviceaccount\.com$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._~:+/-]{16,200}$/;
@@ -31,9 +30,11 @@ const MAX_WEBHOOK_JWT_BYTES = 16_384;
 const MAX_WEBHOOK_AGE_SECONDS = 300;
 const MAX_WEBHOOK_CLOCK_SKEW_SECONDS = 30;
 const MAX_FIRST_PAYMENT_CENTS = 10_000_000_000;
-const MAX_DIAGNOSTIC_FIELD_BYTES = 16_000;
-const MAX_DIAGNOSTIC_DEPTH = 6;
-const MAX_DIAGNOSTIC_KEYS = 128;
+const MIN_RECENT_AUTH_SECONDS = 60;
+const MAX_RECENT_AUTH_SECONDS = 900;
+const MAX_FIREBASE_CLOCK_SKEW_SECONDS = 300;
+const MAX_APPROVAL_AGE_SECONDS = 900;
+const MAX_APPROVAL_CLOCK_SKEW_SECONDS = 30;
 const PLAID_DATA_PRODUCTS = Object.freeze([
   "accounts",
   "balance",
@@ -49,12 +50,102 @@ const PLAID_DATA_PRODUCTS = Object.freeze([
   "statements",
   "income",
 ]);
-const SENSITIVE_DIAGNOSTIC_KEY =
-  /(?:access|public|refresh|service)[\s_-]*token|authorization|cookie|credential|secret|password|passcode|e[\s_-]*mail|phone|address|routing|account(?:[\s_-]*number)?|ssn|tax[\s_-]*id|holder|(?:first|last|full|legal|user)[\s_-]*name|balance/i;
-const SENSITIVE_DIAGNOSTIC_VALUE =
-  /(?:bearer\s+[A-Za-z0-9._~+/-]{16,}|(?:access|public|refresh|service)[_-](?:sandbox|development|production)[-_][A-Za-z0-9._~-]{8,}|eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\b\d{3}-?\d{2}-?\d{4}\b|(?:\+?\d[\s().-]*){9,})/i;
 const FORBIDDEN_RESPONSE_KEY =
   /(?:access|public|refresh|service)[_-]?token|authorization|cookie|credential|secret|password|passcode|routing[_-]?number|account[_-]?number|ssn|tax[_-]?id/i;
+const FORBIDDEN_RESPONSE_VALUE =
+  /(?:bearer\s+[A-Za-z0-9._~+/-]{16,}|(?:access|public|refresh|service)[_-](?:sandbox|development|production)[-_][A-Za-z0-9._~-]{4,}|(?:secret|password|passcode|api[_-]?key)[=:_-][A-Za-z0-9._~-]{4,}|eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|sk_(?:live|test)_[A-Za-z0-9]{8,}|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i;
+const PLAID_DIAGNOSTIC_EVENT_TYPES = new Set([
+  "LINK_EXIT",
+  "create_link_token_failed",
+  "exchange_or_sync_failed",
+  "exchange_token_succeeded",
+  "financial_link_completed_redirect",
+  "financial_link_mount",
+  "financial_link_redirect_suppressed",
+  "financial_link_resume_redirect",
+  "financial_link_unmount",
+  "oauth_resume_recovered",
+  "oauth_resume_session_missing",
+  "plaid_link_done",
+  "plaid_link_exit",
+  "plaid_link_success",
+  "plaid_sdk_event",
+  "uncaught_plaid_error",
+  "uncaught_react_error",
+  "unhandled_plaid_rejection",
+]);
+const PLAID_DIAGNOSTIC_STEPS = new Set([
+  "idle",
+  "creating_token",
+  "ready",
+  "linking",
+  "exchanging",
+  "fetching",
+  "done",
+  "error",
+  "oauth",
+]);
+const INVESTOR_ACCESS_STATES = new Set([
+  "not_started",
+  "payment_in_review",
+  "rejected_investor",
+  "verified_investor",
+]);
+const SAFE_DIAGNOSTIC_CODES = new Set([
+  "API_ERROR",
+  "INSTITUTION_DOWN",
+  "INSTITUTION_ERROR",
+  "INVALID_INPUT",
+  "INVALID_LINK_TOKEN",
+  "INVALID_PUBLIC_TOKEN",
+  "INVALID_REQUEST",
+  "ITEM_ERROR",
+  "ITEM_LOGIN_REQUIRED",
+  "OAUTH_ERROR",
+  "PRODUCT_NOT_READY",
+  "RATE_LIMIT_EXCEEDED",
+  "RECAPTCHA_ERROR",
+]);
+const SAFE_PLAID_EVENT_CODES = new Set([
+  "ERROR",
+  "EXIT",
+  "HANDOFF",
+  "OPEN",
+  "SELECT_INSTITUTION",
+  "SUBMIT_CREDENTIALS",
+  "TRANSITION_VIEW",
+]);
+const SAFE_PLAID_VIEW_CODES = new Set([
+  "CONNECTED",
+  "CONSENT",
+  "CREDENTIAL",
+  "ERROR",
+  "EXIT",
+  "HANDOFF",
+  "OAUTH",
+  "SELECT_ACCOUNT",
+  "SELECT_INSTITUTION",
+]);
+const RESPONSE_STATUS_CODES = new Set([
+  "active",
+  "cancelled",
+  "checkout_created",
+  "complete",
+  "completed",
+  "draft",
+  "failed",
+  "not_started",
+  "paid",
+  "partial",
+  "payment_link_sent",
+  "pending",
+  "pending_manual_verification",
+  "rejected",
+  "rejected_investor",
+  "refunded",
+  "verified",
+  "verified_investor",
+]);
 
 const SOURCE_EVIDENCE = Object.freeze({
   sourceEvidenceFileSha256:
@@ -167,15 +258,6 @@ const SOURCE_PINS = Object.freeze({
     requestCount30d: 173,
   }),
 });
-
-const AUTHORITATIVE_BLOCKER_CODES = Object.freeze([
-  "SOURCE_BUNDLE_VERSION_UNBOUND",
-  "SOURCE_METADATA_END_CHECK_MISSING",
-  "SOURCE_REVISION_UNPROVEN",
-  "SOURCE_VERSION_DRIFT",
-  "TARGET_CONTRACT_MISSING",
-  "TARGET_REGISTRY_NOT_ENABLED",
-]);
 
 function blockerEvidence(pin) {
   return Object.freeze([
@@ -414,6 +496,23 @@ function exactKeys(value, expected) {
   );
 }
 
+function hasControlCharacters(value) {
+  for (const character of value) {
+    const code = character.codePointAt(0);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
+function validFirebaseUid(value) {
+  return (
+    typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= 128 &&
+    !hasControlCharacters(value)
+  );
+}
+
 function fail(code, message = "Service unavailable.", status = 503) {
   throw new RuntimeError(code, message, status);
 }
@@ -422,106 +521,152 @@ function json(status, body) {
   return Object.freeze({ status, headers: JSON_HEADERS, body });
 }
 
-function approvalMaterial(slug, row) {
-  return stableJson({
-    schemaVersion: 1,
-    slug,
-    checkedInSourceSha256: row.checkedInSourceSha256,
-    liveV2BundleSha256: row.liveV2BundleSha256,
-    functionId: row.functionId,
-    manifestVersion: row.manifestVersion,
-    sourceVersion: row.sourceVersion,
-    verifyJwt: row.verifyJwt,
-    requestCount30d: row.requestCount30d,
-    metadataEndCheckPassed: row.metadataEndCheckPassed,
-    metadataEndCheckDigestSha256: row.metadataEndCheckDigestSha256,
-    deploymentBindingSha256: row.deploymentBindingSha256,
-    sourceEvidenceFileSha256: row.sourceEvidenceFileSha256,
-    sourceEvidenceDigest: row.sourceEvidenceDigest,
-    canonicalSourceTreeDigest: row.canonicalSourceTreeDigest,
-    currentMetadataDigest: row.currentMetadataDigest,
-    trafficEvidenceFileSha256: row.trafficEvidenceFileSha256,
-    trafficEvidenceDigest: row.trafficEvidenceDigest,
-    deploymentInventoryDigest: row.deploymentInventoryDigest,
-    terminalMatrixFileSha256: row.terminalMatrixFileSha256,
-    terminalMatrixEvidenceDigest: row.terminalMatrixEvidenceDigest,
-    authoritativeBlockers: row.authoritativeBlockers,
-  });
-}
+const END_METADATA_ARTIFACT_KEYS = Object.freeze([
+  "schemaVersion",
+  "kind",
+  "artifactId",
+  "capturedAt",
+  "baseCommit",
+  "sourceEvidenceDigest",
+  "trafficEvidenceDigest",
+  "terminalMatrixEvidenceDigest",
+  "entries",
+]);
+const END_METADATA_ENTRY_KEYS = Object.freeze([
+  "slug",
+  "functionId",
+  "sourceVersion",
+  "liveV2BundleSha256",
+  "deploymentBindingSha256",
+  "metadataEndCheckPassed",
+  "currentMetadataDigest",
+]);
+const APPROVAL_RECEIPT_KEYS = Object.freeze([
+  "schemaVersion",
+  "decision",
+  "scope",
+  "slug",
+  "artifactDigest",
+  "approvalId",
+  "approvedAt",
+  "keyVersion",
+  "signatureVerified",
+]);
 
-export function calculatePlaidPaymentApprovalBinding(slug, row) {
-  return sha256(approvalMaterial(slug, row));
-}
-
-export function calculatePlaidPaymentEndMetadataBinding(slug, row) {
-  return sha256(
-    stableJson({
-      schemaVersion: 1,
-      slug,
-      functionId: row.functionId,
-      sourceVersion: row.sourceVersion,
-      liveV2BundleSha256: row.liveV2BundleSha256,
-      metadataEndCheckPassed: row.metadataEndCheckPassed,
-      currentMetadataDigest: row.currentMetadataDigest,
-      deploymentBindingSha256: row.deploymentBindingSha256,
-    }),
-  );
-}
-
-function requireEvidence(evidence, slug) {
-  const pin = SOURCE_PINS[slug];
-  const row = evidence?.[slug];
-  const blockers = PLAID_PAYMENT_AUTHORITATIVE_BLOCKERS[slug];
-  const expectedFields = [
-    "approved",
-    "schemaVersion",
-    "checkedInSourceSha256",
-    "liveV2BundleSha256",
-    "functionId",
-    "manifestVersion",
-    "sourceVersion",
-    "verifyJwt",
-    "requestCount30d",
-    "metadataEndCheckPassed",
-    "metadataEndCheckDigestSha256",
-    "deploymentBindingSha256",
-    "sourceEvidenceFileSha256",
-    "sourceEvidenceDigest",
-    "canonicalSourceTreeDigest",
-    "currentMetadataDigest",
-    "trafficEvidenceFileSha256",
-    "trafficEvidenceDigest",
-    "deploymentInventoryDigest",
-    "terminalMatrixFileSha256",
-    "terminalMatrixEvidenceDigest",
-    "authoritativeBlockers",
-    "bindingSha256",
-  ];
+function parseIsoTimestamp(value) {
   if (
-    !pin ||
-    !exactKeys(row, expectedFields) ||
-    row.approved !== true ||
-    row.schemaVersion !== 1 ||
-    row.checkedInSourceSha256 !== pin.source ||
-    row.liveV2BundleSha256 !== pin.live ||
-    row.functionId !== pin.functionId ||
-    row.manifestVersion !== pin.manifestVersion ||
-    row.sourceVersion !== pin.sourceVersion ||
-    row.verifyJwt !== pin.verifyJwt ||
-    row.requestCount30d !== pin.requestCount30d ||
-    row.metadataEndCheckPassed !== true ||
-    row.deploymentBindingSha256 !== pin.deploymentBindingSha256 ||
-    Object.entries(SOURCE_EVIDENCE).some(([key, value]) => row[key] !== value) ||
-    row.authoritativeBlockers?.map(({ code }) => code).join("\0") !==
-      AUTHORITATIVE_BLOCKER_CODES.join("\0") ||
-    stableJson(row.authoritativeBlockers) !== stableJson(blockers) ||
-    row.metadataEndCheckDigestSha256 !==
-      calculatePlaidPaymentEndMetadataBinding(slug, row) ||
-    row.bindingSha256 !== calculatePlaidPaymentApprovalBinding(slug, row) ||
-    !HASH_PATTERN.test(row.bindingSha256)
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+  ) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
+    ? parsed
+    : null;
+}
+
+function validateEndMetadataArtifact(artifact, nowMs) {
+  if (
+    !exactKeys(artifact, END_METADATA_ARTIFACT_KEYS) ||
+    artifact.schemaVersion !== 1 ||
+    artifact.kind !== "supabase_current_v2_end_metadata_v1" ||
+    !UUID_PATTERN.test(String(artifact.artifactId ?? "")) ||
+    artifact.baseCommit !== "95a88840d7f575e9852e89051e5b34f3f689a39f" ||
+    artifact.sourceEvidenceDigest !== SOURCE_EVIDENCE.sourceEvidenceDigest ||
+    artifact.trafficEvidenceDigest !== SOURCE_EVIDENCE.trafficEvidenceDigest ||
+    artifact.terminalMatrixEvidenceDigest !==
+      SOURCE_EVIDENCE.terminalMatrixEvidenceDigest ||
+    !Array.isArray(artifact.entries) ||
+    artifact.entries.length !== PLAID_PAYMENT_SLUGS.length
   ) {
     fail("CANDIDATE_EVIDENCE_REQUIRED");
   }
+  const capturedAtMs = parseIsoTimestamp(artifact.capturedAt);
+  if (
+    capturedAtMs === null ||
+    capturedAtMs > nowMs + MAX_APPROVAL_CLOCK_SKEW_SECONDS * 1_000 ||
+    nowMs - capturedAtMs > MAX_APPROVAL_AGE_SECONDS * 1_000
+  ) {
+    fail("CANDIDATE_EVIDENCE_REQUIRED");
+  }
+  const slugs = artifact.entries.map((entry) => entry?.slug);
+  if (stableJson(slugs) !== stableJson(PLAID_PAYMENT_SLUGS)) {
+    fail("CANDIDATE_EVIDENCE_REQUIRED");
+  }
+  for (const entry of artifact.entries) {
+    const pin = SOURCE_PINS[entry?.slug];
+    if (
+      !pin ||
+      !exactKeys(entry, END_METADATA_ENTRY_KEYS) ||
+      entry.functionId !== pin.functionId ||
+      entry.sourceVersion !== pin.sourceVersion ||
+      entry.liveV2BundleSha256 !== pin.live ||
+      entry.deploymentBindingSha256 !== pin.deploymentBindingSha256 ||
+      entry.metadataEndCheckPassed !== true ||
+      entry.currentMetadataDigest !== SOURCE_EVIDENCE.currentMetadataDigest
+    ) {
+      fail("CANDIDATE_EVIDENCE_REQUIRED");
+    }
+  }
+  return sha256(Buffer.from(stableJson(artifact), "utf8"));
+}
+
+async function requireDetachedApproval({
+  detachedApprovalVerifier,
+  endMetadataArtifact,
+  slug,
+  nowMs,
+  signal,
+}) {
+  const artifactDigest = validateEndMetadataArtifact(endMetadataArtifact, nowMs);
+  if (
+    detachedApprovalVerifier?.configured !== true ||
+    detachedApprovalVerifier.algorithm !== "cloud_kms_asymmetric_signature_v1" ||
+    typeof detachedApprovalVerifier.verify !== "function"
+  ) {
+    fail("CANDIDATE_EVIDENCE_REQUIRED");
+  }
+  let receipt;
+  try {
+    receipt = await detachedApprovalVerifier.verify(
+      Object.freeze({
+        schemaVersion: 1,
+        scope: "plaid_payment_batch_candidate_v1",
+        slug,
+        artifactDigest,
+        signal,
+      }),
+    );
+  } catch {
+    fail("CANDIDATE_EVIDENCE_REQUIRED");
+  }
+  throwIfAborted(signal);
+  const approvedAtMs = parseIsoTimestamp(receipt?.approvedAt);
+  if (
+    !exactKeys(receipt, APPROVAL_RECEIPT_KEYS) ||
+    receipt.schemaVersion !== 1 ||
+    receipt.decision !== "APPROVED" ||
+    receipt.scope !== "plaid_payment_batch_candidate_v1" ||
+    receipt.slug !== slug ||
+    receipt.artifactDigest !== artifactDigest ||
+    !UUID_PATTERN.test(String(receipt.approvalId ?? "")) ||
+    receipt.signatureVerified !== true ||
+    typeof receipt.keyVersion !== "string" ||
+    !/^projects\/hushh-tech-uat\/locations\/[a-z0-9-]+\/keyRings\/[A-Za-z0-9_-]+\/cryptoKeys\/[A-Za-z0-9_-]+\/cryptoKeyVersions\/[1-9]\d*$/.test(
+      receipt.keyVersion,
+    ) ||
+    approvedAtMs === null ||
+    approvedAtMs < capturedAtMs(endMetadataArtifact) ||
+    approvedAtMs > nowMs + MAX_APPROVAL_CLOCK_SKEW_SECONDS * 1_000 ||
+    nowMs - approvedAtMs > MAX_APPROVAL_AGE_SECONDS * 1_000
+  ) {
+    fail("CANDIDATE_EVIDENCE_REQUIRED");
+  }
+}
+
+function capturedAtMs(artifact) {
+  return parseIsoTimestamp(artifact.capturedAt);
 }
 
 function throwIfAborted(signal) {
@@ -531,15 +676,24 @@ function throwIfAborted(signal) {
     : new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503);
 }
 
-function requireUserActor(actor, expectedUid, allowedGoogleServiceCallers) {
-  if (!FIREBASE_UID_PATTERN.test(String(expectedUid ?? ""))) {
+function requireUserActor(
+  actor,
+  expectedUid,
+  allowedGoogleServiceCallers,
+  nowMs,
+  recentAuthSeconds,
+) {
+  if (!validFirebaseUid(expectedUid)) {
     fail("ACCESS_DENIED", "Access denied.", 403);
   }
   if (
     actor?.kind === "firebase" &&
-    FIREBASE_UID_PATTERN.test(String(actor.uid ?? "")) &&
+    validFirebaseUid(actor.uid) &&
     actor.uid === expectedUid &&
-    actor.recentAuth === true
+    Number.isSafeInteger(actor.authTime) &&
+    actor.authTime <=
+      Math.floor(nowMs / 1_000) + MAX_FIREBASE_CLOCK_SKEW_SECONDS &&
+    Math.floor(nowMs / 1_000) - actor.authTime <= recentAuthSeconds
   ) {
     return Object.freeze({
       kind: "firebase",
@@ -559,7 +713,7 @@ function requireUserActor(actor, expectedUid, allowedGoogleServiceCallers) {
     !allowedGoogleServiceCallers.has(serviceEmail) ||
     serviceSubject.length < 1 ||
     serviceSubject.length > 256 ||
-    /[\u0000-\u001f\u007f]/.test(serviceSubject)
+    hasControlCharacters(serviceSubject)
   ) {
     fail("ACCESS_DENIED", "Access denied.", 403);
   }
@@ -623,7 +777,7 @@ function boundedText(value, max, { required = false } = {}) {
   if (
     typeof value !== "string" ||
     value.length > max ||
-    /[\u0000-\u001f\u007f]/.test(value)
+    hasControlCharacters(value)
   ) {
     fail("INVALID_REQUEST", "Invalid request.", 400);
   }
@@ -747,7 +901,11 @@ function validateTransaction(context) {
 function assertResponseSafe(value, depth = 0) {
   if (depth > 8) fail("HANDLER_CONTRACT_INVALID");
   if (value === null || value === undefined) return;
-  if (["string", "number", "boolean"].includes(typeof value)) return;
+  if (typeof value === "string") {
+    if (FORBIDDEN_RESPONSE_VALUE.test(value)) fail("HANDLER_CONTRACT_INVALID");
+    return;
+  }
+  if (["number", "boolean"].includes(typeof value)) return;
   if (Array.isArray(value)) {
     if (value.length > 256) fail("HANDLER_CONTRACT_INVALID");
     for (const item of value) assertResponseSafe(item, depth + 1);
@@ -812,17 +970,52 @@ function responseText(value, max, { nullable = false } = {}) {
     typeof value !== "string" ||
     value.length < 1 ||
     value.length > max ||
-    /[\u0000-\u001f\u007f]/.test(value)
+    hasControlCharacters(value) ||
+    FORBIDDEN_RESPONSE_VALUE.test(value)
   ) {
     fail("HANDLER_CONTRACT_INVALID");
   }
 }
 
-function responseRecords(value, max, allowed) {
+function responseNullableText(value, max) {
+  responseText(value, max, { nullable: true });
+}
+
+function responseNumber(value, min, max, { nullable = false } = {}) {
+  if (nullable && value === null) return;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    fail("HANDLER_CONTRACT_INVALID");
+  }
+}
+
+function responseEnum(value, allowed, { nullable = false } = {}) {
+  if (nullable && value === null) return;
+  responseText(value, 128);
+  if (!allowed.has(value)) fail("HANDLER_CONTRACT_INVALID");
+}
+
+function responseTimestamp(value, { nullable = false } = {}) {
+  if (nullable && value === null) return;
+  if (parseIsoTimestamp(value) === null) fail("HANDLER_CONTRACT_INVALID");
+}
+
+function responseCodeArray(value, max) {
   if (!Array.isArray(value) || value.length > max) {
     fail("HANDLER_CONTRACT_INVALID");
   }
-  for (const row of value) responseObject(row, allowed);
+  for (const code of value) {
+    responseText(code, 128);
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(code)) {
+      fail("HANDLER_CONTRACT_INVALID");
+    }
+  }
+}
+
+function responseRecords(value, max, validate) {
+  if (!Array.isArray(value) || value.length > max) {
+    fail("HANDLER_CONTRACT_INVALID");
+  }
+  for (const row of value) validate(row);
 }
 
 function responseHttpsUrl(value, allowedOrigins) {
@@ -857,6 +1050,125 @@ function validateFetchErrors(value) {
   }
 }
 
+function validateInstitution(value) {
+  responseObject(value, ["id", "name"], ["id", "name"]);
+  responseNullableText(value.id, 128);
+  responseNullableText(value.name, 256);
+}
+
+function validateExchangeAccount(value) {
+  responseObject(
+    value,
+    ["account_id", "name", "official_name", "mask", "type", "subtype"],
+    ["account_id", "name", "official_name", "mask", "type", "subtype"],
+  );
+  responseText(value.account_id, 256);
+  responseText(value.name, 256);
+  responseNullableText(value.official_name, 256);
+  responseNullableText(value.mask, 8);
+  if (value.mask !== null && !/^[A-Za-z0-9]{1,8}$/.test(value.mask)) {
+    fail("HANDLER_CONTRACT_INVALID");
+  }
+  responseNullableText(value.type, 64);
+  responseNullableText(value.subtype, 64);
+}
+
+function validateLatestRequest(value) {
+  responseObject(value, [
+    "id",
+    "request_reference",
+    "selected_fund",
+    "class_a_units",
+    "class_b_units",
+    "class_c_units",
+    "commitment_amount",
+    "first_payment_amount",
+    "recurring_selected",
+    "recurring_amount",
+    "recurring_frequency",
+    "recurring_day_of_month",
+    "status",
+    "expires_at",
+    "paid_at",
+    "verified_at",
+    "rejected_at",
+    "risk_flags",
+    "plaid_match_confidence",
+    "created_at",
+  ], [
+    "id",
+    "request_reference",
+    "selected_fund",
+    "class_a_units",
+    "class_b_units",
+    "class_c_units",
+    "commitment_amount",
+    "first_payment_amount",
+    "recurring_selected",
+    "recurring_amount",
+    "recurring_frequency",
+    "recurring_day_of_month",
+    "status",
+    "expires_at",
+    "paid_at",
+    "verified_at",
+    "rejected_at",
+    "risk_flags",
+    "plaid_match_confidence",
+    "created_at",
+  ]);
+  responseText(value.id, 256);
+  responseText(value.request_reference, 128);
+  responseText(value.selected_fund, 128);
+  for (const field of ["class_a_units", "class_b_units", "class_c_units"]) {
+    responseInteger(value[field], 0, 10_000_000);
+  }
+  responseNumber(value.commitment_amount, 0, 100_000_000);
+  responseNumber(value.first_payment_amount, 0, 100_000_000);
+  responseBoolean(value.recurring_selected);
+  responseNumber(value.recurring_amount, 0, 100_000_000, { nullable: true });
+  responseNullableText(value.recurring_frequency, 32);
+  responseNumber(value.recurring_day_of_month, 1, 31, { nullable: true });
+  responseEnum(value.status, RESPONSE_STATUS_CODES);
+  for (const field of ["expires_at", "paid_at", "verified_at", "rejected_at"]) {
+    responseTimestamp(value[field], { nullable: field !== "expires_at" });
+  }
+  responseCodeArray(value.risk_flags, 32);
+  responseNumber(value.plaid_match_confidence, 0, 1, { nullable: true });
+  responseTimestamp(value.created_at);
+}
+
+function validatePayment(value) {
+  responseObject(value, [
+    "id", "amount_cents", "currency", "payment_kind", "status", "paid_at",
+    "failed_at", "refunded_at", "disputed_at",
+  ], [
+    "id", "amount_cents", "currency", "payment_kind", "status", "paid_at",
+    "failed_at", "refunded_at", "disputed_at",
+  ]);
+  responseText(value.id, 256);
+  responseInteger(value.amount_cents, 0, MAX_FIRST_PAYMENT_CENTS);
+  responseText(value.currency, 3);
+  if (!/^[A-Z]{3}$/.test(value.currency)) fail("HANDLER_CONTRACT_INVALID");
+  responseText(value.payment_kind, 64);
+  responseEnum(value.status, RESPONSE_STATUS_CODES);
+  for (const field of ["paid_at", "failed_at", "refunded_at", "disputed_at"]) {
+    responseTimestamp(value[field], { nullable: true });
+  }
+}
+
+function validateReview(value) {
+  responseObject(value, ["id", "status", "flags", "notes", "reviewed_at", "created_at"], [
+    "id", "status", "flags", "notes", "reviewed_at", "created_at",
+  ]);
+  responseText(value.id, 256);
+  responseEnum(value.status, RESPONSE_STATUS_CODES);
+  responseCodeArray(value.flags, 32);
+  responseNullableText(value.notes, 2_048);
+  responseTimestamp(value.reviewed_at, { nullable: true });
+  responseTimestamp(value.created_at);
+}
+
 function projectCandidateResult(slug, result, allowedResponseOrigins) {
   const safe = normalizeResult(result);
   if (slug === "plaid-data-webhook") {
@@ -878,55 +1190,20 @@ function projectCandidateResult(slug, result, allowedResponseOrigins) {
     ]);
     responseBoolean(safe.success);
     if (safe.latest_request !== null) {
-      responseObject(safe.latest_request, [
-        "id",
-        "request_reference",
-        "selected_fund",
-        "class_a_units",
-        "class_b_units",
-        "class_c_units",
-        "commitment_amount",
-        "first_payment_amount",
-        "recurring_selected",
-        "recurring_amount",
-        "recurring_frequency",
-        "recurring_day_of_month",
-        "status",
-        "expires_at",
-        "paid_at",
-        "verified_at",
-        "rejected_at",
-        "risk_flags",
-        "plaid_match_confidence",
-        "created_at",
-      ]);
+      validateLatestRequest(safe.latest_request);
     }
-    responseRecords(safe.payments, 10, [
-      "id",
-      "amount_cents",
-      "currency",
-      "payment_kind",
-      "status",
-      "paid_at",
-      "failed_at",
-      "refunded_at",
-      "disputed_at",
-    ]);
-    responseRecords(safe.reviews, 5, [
-      "id",
-      "status",
-      "flags",
-      "notes",
-      "reviewed_at",
-      "created_at",
-    ]);
+    responseRecords(safe.payments, 10, validatePayment);
+    responseRecords(safe.reviews, 5, validateReview);
   } else if (slug === "create-link-token") {
     responseObject(safe, ["link_token", "expiration"], [
       "link_token",
       "expiration",
     ]);
     responseText(safe.link_token, 4_096);
-    responseText(safe.expiration, 64);
+    if (!/^link-(?:sandbox|development)-[A-Za-z0-9_-]{4,4080}$/.test(safe.link_token)) {
+      fail("HANDLER_CONTRACT_INVALID");
+    }
+    responseTimestamp(safe.expiration);
   } else if (slug === "exchange-public-token") {
     responseObject(safe, ["item_id", "institution", "accounts"], [
       "item_id",
@@ -934,15 +1211,8 @@ function projectCandidateResult(slug, result, allowedResponseOrigins) {
       "accounts",
     ]);
     responseText(safe.item_id, 256);
-    responseObject(safe.institution, ["id", "name"], ["id", "name"]);
-    responseRecords(safe.accounts, 32, [
-      "account_id",
-      "name",
-      "official_name",
-      "mask",
-      "type",
-      "subtype",
-    ]);
+    validateInstitution(safe.institution);
+    responseRecords(safe.accounts, 32, validateExchangeAccount);
   } else if (slug === "plaid-data-sync-start") {
     responseObject(
       safe,
@@ -960,7 +1230,9 @@ function projectCandidateResult(slug, result, allowedResponseOrigins) {
       ],
       ["status", "available_products", "products_available", "can_proceed"],
     );
-    responseText(safe.status, 32);
+    responseEnum(safe.status, RESPONSE_STATUS_CODES);
+    if (safe.item_id !== undefined) responseText(safe.item_id, 256);
+    if (safe.institution !== undefined) validateInstitution(safe.institution);
     validateProductMap(safe.available_products);
     responseInteger(safe.products_available, 0, PLAID_DATA_PRODUCTS.length);
     responseBoolean(safe.can_proceed);
@@ -995,6 +1267,15 @@ function projectCandidateResult(slug, result, allowedResponseOrigins) {
     );
     responseBoolean(safe.success);
     responseBoolean(safe.already_redeemed);
+    for (const field of ["payment_request_id", "request_reference"]) {
+      if (safe[field] !== undefined) responseNullableText(safe[field], 256);
+    }
+    responseEnum(safe.status, RESPONSE_STATUS_CODES);
+    if (safe.manual_verification_status !== undefined) {
+      responseEnum(safe.manual_verification_status, RESPONSE_STATUS_CODES, {
+        nullable: true,
+      });
+    }
     responseInteger(safe.coins_awarded, 0, 10_000_000);
   } else if (slug === "fund-payment-request-create") {
     responseObject(
@@ -1023,12 +1304,21 @@ function projectCandidateResult(slug, result, allowedResponseOrigins) {
     );
     responseBoolean(safe.success);
     responseBoolean(safe.reused);
+    responseText(safe.payment_request_id, 256);
+    responseText(safe.request_reference, 256);
     responseHttpsUrl(safe.payment_url, allowedResponseOrigins);
+    responseEnum(safe.status, RESPONSE_STATUS_CODES);
+    if (safe.expires_at !== undefined) responseTimestamp(safe.expires_at);
+    if (safe.manual_verification_status !== undefined) {
+      responseEnum(safe.manual_verification_status, RESPONSE_STATUS_CODES, {
+        nullable: true,
+      });
+    }
     if (safe.risk_flags !== undefined) {
       if (!Array.isArray(safe.risk_flags) || safe.risk_flags.length > 32) {
         fail("HANDLER_CONTRACT_INVALID");
       }
-      for (const flag of safe.risk_flags) responseText(flag, 128);
+      responseCodeArray(safe.risk_flags, 32);
     }
     for (const field of ["recurring_selected", "email_sent"]) {
       if (safe[field] !== undefined) responseBoolean(safe[field]);
@@ -1097,56 +1387,89 @@ async function runFenced({
   );
 }
 
-function sanitizeUrl(value) {
-  if (typeof value !== "string") return value;
-  try {
-    const url = new URL(value);
-    url.search = "";
-    url.hash = "";
-    return url.toString().slice(0, 2_048);
-  } catch {
-    return value.slice(0, 2_048);
-  }
+function diagnosticObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
-function sanitizeDiagnosticText(value) {
-  const sanitized = sanitizeUrl(value).slice(0, 2_048);
-  return SENSITIVE_DIAGNOSTIC_VALUE.test(sanitized)
-    ? "[redacted]"
-    : sanitized;
+function diagnosticBoolean(value) {
+  return typeof value === "boolean" ? value : null;
 }
 
-function sanitizeDiagnostic(value, state, depth = 0, key = "") {
-  if (SENSITIVE_DIAGNOSTIC_KEY.test(key)) return "[redacted]";
-  if (depth > MAX_DIAGNOSTIC_DEPTH || state.keys > MAX_DIAGNOSTIC_KEYS) {
-    return "[truncated]";
-  }
-  if (value === null || ["boolean", "number"].includes(typeof value)) return value;
-  if (typeof value === "string") return sanitizeDiagnosticText(value);
-  if (Array.isArray(value)) {
-    return value.slice(0, 32).map((item) => sanitizeDiagnostic(item, state, depth + 1));
-  }
-  if (!value || typeof value !== "object") return null;
-  const output = Object.create(null);
-  for (const [childKey, child] of Object.entries(value).slice(0, 64)) {
-    state.keys += 1;
-    output[childKey.slice(0, 128)] = sanitizeDiagnostic(
-      child,
-      state,
-      depth + 1,
-      childKey,
-    );
-  }
-  return output;
+function diagnosticInteger(value, min, max) {
+  return Number.isSafeInteger(value) && value >= min && value <= max ? value : null;
 }
 
-function boundedDiagnostic(value) {
-  const sanitized = sanitizeDiagnostic(value ?? {}, { keys: 0 });
-  const serialized = JSON.stringify(sanitized);
-  if (Buffer.byteLength(serialized, "utf8") <= MAX_DIAGNOSTIC_FIELD_BYTES) {
-    return sanitized;
-  }
-  return Object.freeze({ truncated: true, sha256: sha256(Buffer.from(serialized, "utf8")) });
+function diagnosticNumber(value, min, max) {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : null;
+}
+
+function diagnosticCode(value, allowed = SAFE_DIAGNOSTIC_CODES) {
+  return typeof value === "string" && allowed.has(value) ? value : null;
+}
+
+function diagnosticPresence(value) {
+  return typeof value === "string" && value.length > 0 ? true : null;
+}
+
+function sanitizeDiagnostics(body) {
+  const page = diagnosticObject(body.page_state);
+  const plaid = diagnosticObject(body.plaid_metadata);
+  const error = diagnosticObject(body.error_details);
+  const browser = diagnosticObject(body.browser_context);
+  const viewport = diagnosticObject(browser.viewport);
+  const accessState = INVESTOR_ACCESS_STATES.has(page.accessState)
+    ? page.accessState
+    : null;
+  return deepFreeze({
+    pageState: {
+      isReviewMode: diagnosticBoolean(page.isReviewMode),
+      useSandboxDirectConnect: diagnosticBoolean(page.useSandboxDirectConnect),
+      blockLocalPlaidLink: diagnosticBoolean(page.blockLocalPlaidLink),
+      isPlaidOAuthResume: diagnosticBoolean(page.isPlaidOAuthResume),
+      isCompleted: diagnosticBoolean(page.isCompleted),
+      hasOAuthStateId: diagnosticBoolean(page.hasOAuthStateId),
+      currentStep: diagnosticInteger(page.currentStep, 0, 100),
+      accessState,
+    },
+    plaidMetadata: {
+      eventName: diagnosticCode(plaid.eventName, SAFE_PLAID_EVENT_CODES),
+      viewName: diagnosticCode(plaid.viewName, SAFE_PLAID_VIEW_CODES),
+      errorCode: diagnosticCode(plaid.errorCode ?? plaid.error_code),
+      errorType: diagnosticCode(plaid.errorType ?? plaid.error_type),
+      accountsCount: diagnosticInteger(plaid.accountsCount, 0, 32),
+      productsAvailable: diagnosticInteger(
+        plaid.productsAvailable,
+        0,
+        PLAID_DATA_PRODUCTS.length,
+      ),
+      canProceed: diagnosticBoolean(plaid.canProceed),
+      institutionPresent:
+        diagnosticPresence(plaid.institutionName) ??
+        diagnosticPresence(plaid.institutionId),
+      itemPresent: diagnosticPresence(plaid.itemId),
+      requestPresent: diagnosticPresence(plaid.requestId),
+      oauthStatePresent: diagnosticPresence(plaid.oauthStateId),
+    },
+    errorDetails: {
+      errorCode: diagnosticCode(error.errorCode ?? error.error_code ?? error.code),
+      errorType: diagnosticCode(error.errorType ?? error.error_type),
+      lineNumber: diagnosticInteger(error.lineNumber, 0, 10_000_000),
+      columnNumber: diagnosticInteger(error.columnNumber, 0, 10_000_000),
+      hasMessage: diagnosticPresence(error.message),
+      hasDisplayMessage: diagnosticPresence(
+        error.displayMessage ?? error.display_message,
+      ),
+      hasStack: diagnosticPresence(error.stack),
+    },
+    browserContext: {
+      online: diagnosticBoolean(browser.online),
+      viewportWidth: diagnosticInteger(viewport.width, 0, 20_000),
+      viewportHeight: diagnosticInteger(viewport.height, 0, 20_000),
+      devicePixelRatio: diagnosticNumber(browser.devicePixelRatio, 0.1, 16),
+    },
+  });
 }
 
 function parseWebhook(request, actor, webhookClaim) {
@@ -1259,8 +1582,19 @@ export function createPlaidPaymentCandidateHandlers({
   operations,
   allowedRedirectOrigins = [],
   allowedGoogleServiceCallers = [],
-  approvedSourceEvidence,
+  detachedApprovalVerifier,
+  endMetadataArtifact,
+  now = Date.now,
+  recentAuthSeconds = 300,
 } = {}) {
+  if (
+    typeof now !== "function" ||
+    !Number.isSafeInteger(recentAuthSeconds) ||
+    recentAuthSeconds < MIN_RECENT_AUTH_SECONDS ||
+    recentAuthSeconds > MAX_RECENT_AUTH_SECONDS
+  ) {
+    throw new Error("Plaid payment candidate clock configuration is invalid.");
+  }
   const redirectOrigins = new Set(allowedRedirectOrigins);
   const googleServiceCallers = new Set(
     allowedGoogleServiceCallers.map((value) => String(value).trim().toLowerCase()),
@@ -1268,9 +1602,19 @@ export function createPlaidPaymentCandidateHandlers({
   const runCandidate = (input) =>
     runFenced({ ...input, allowedResponseOrigins: redirectOrigins });
   const invoke = (slug, handler) => async (context) => {
-    requireEvidence(approvedSourceEvidence, slug);
+    const nowMs = now();
+    if (!Number.isFinite(nowMs) || nowMs < 0) {
+      fail("CANDIDATE_EVIDENCE_REQUIRED");
+    }
+    await requireDetachedApproval({
+      detachedApprovalVerifier,
+      endMetadataArtifact,
+      slug,
+      nowMs,
+      signal: context?.signal,
+    });
     throwIfAborted(context?.signal);
-    return handler(context);
+    return handler(context, nowMs);
   };
 
   return Object.freeze({
@@ -1302,7 +1646,7 @@ export function createPlaidPaymentCandidateHandlers({
       });
     }),
 
-    "plaid-diagnostics-log": invoke("plaid-diagnostics-log", async (context) => {
+    "plaid-diagnostics-log": invoke("plaid-diagnostics-log", async (context, nowMs) => {
       const body = exactObject(
         requestBody(context.request),
         [
@@ -1324,7 +1668,18 @@ export function createPlaidPaymentCandidateHandlers({
         context.actor,
         expectedUid,
         googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
       );
+      const eventType = boundedText(body.event_type, 64, { required: true });
+      const plaidStep = boundedText(body.plaid_step, 32);
+      if (
+        !PLAID_DIAGNOSTIC_EVENT_TYPES.has(eventType) ||
+        (plaidStep !== null && !PLAID_DIAGNOSTIC_STEPS.has(plaidStep))
+      ) {
+        fail("INVALID_REQUEST", "Invalid request.", 400);
+      }
+      const sanitized = sanitizeDiagnostics(body);
       const payload = Object.freeze({
         sessionId:
           body.session_id === undefined || body.session_id === null
@@ -1332,12 +1687,9 @@ export function createPlaidPaymentCandidateHandlers({
             : UUID_PATTERN.test(String(body.session_id))
               ? String(body.session_id)
               : fail("INVALID_REQUEST", "Invalid request.", 400),
-        eventType: boundedText(body.event_type, 64, { required: true }),
-        plaidStep: boundedText(body.plaid_step, 32),
-        pageState: boundedDiagnostic(body.page_state),
-        plaidMetadata: boundedDiagnostic(body.plaid_metadata),
-        errorDetails: boundedDiagnostic(body.error_details),
-        browserContext: boundedDiagnostic(body.browser_context),
+        eventType,
+        plaidStep,
+        ...sanitized,
       });
       return runCandidate({
         operationLedger,
@@ -1358,10 +1710,16 @@ export function createPlaidPaymentCandidateHandlers({
       });
     }),
 
-    "fund-payment-status": invoke("fund-payment-status", async (context) => {
+    "fund-payment-status": invoke("fund-payment-status", async (context, nowMs) => {
       const body = exactObject(requestBody(context.request), ["userId", "user_id"]);
       const uid = userId(body);
-      const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+      const actor = requireUserActor(
+        context.actor,
+        uid,
+        googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
+      );
       requireOperations(operations);
       const result = await operations.getFundPaymentStatus({
         ...operationActor(actor),
@@ -1374,13 +1732,19 @@ export function createPlaidPaymentCandidateHandlers({
       );
     }),
 
-    "create-link-token": invoke("create-link-token", async (context) => {
+    "create-link-token": invoke("create-link-token", async (context, nowMs) => {
       const body = exactObject(
         requestBody(context.request),
         ["userId", "user_id", "userEmail", "redirectUri", "receivedRedirectUri"],
       );
       const uid = userId(body);
-      const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+      const actor = requireUserActor(
+        context.actor,
+        uid,
+        googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
+      );
       const requestedEmail = email(body.userEmail);
       const verifiedEmail = email(actor.email);
       if (requestedEmail && requestedEmail !== verifiedEmail) {
@@ -1411,7 +1775,7 @@ export function createPlaidPaymentCandidateHandlers({
       });
     }),
 
-    "exchange-public-token": invoke("exchange-public-token", async (context) => {
+    "exchange-public-token": invoke("exchange-public-token", async (context, nowMs) => {
       const body = exactObject(
         requestBody(context.request),
         [
@@ -1427,7 +1791,13 @@ export function createPlaidPaymentCandidateHandlers({
         ],
       );
       const uid = userId(body);
-      const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+      const actor = requireUserActor(
+        context.actor,
+        uid,
+        googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
+      );
       const payload = Object.freeze({
         publicToken: boundedText(
           aliasedValue(body, ["publicToken", "public_token"]),
@@ -1464,13 +1834,19 @@ export function createPlaidPaymentCandidateHandlers({
       });
     }),
 
-    "plaid-data-sync-start": invoke("plaid-data-sync-start", async (context) => {
+    "plaid-data-sync-start": invoke("plaid-data-sync-start", async (context, nowMs) => {
       const body = exactObject(
         requestBody(context.request),
         ["userId", "user_id", "itemId", "item_id", "plaid_item_id"],
       );
       const uid = userId(body);
-      const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+      const actor = requireUserActor(
+        context.actor,
+        uid,
+        googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
+      );
       const payload = Object.freeze({
         userId: uid,
         itemId: boundedText(
@@ -1497,13 +1873,19 @@ export function createPlaidPaymentCandidateHandlers({
       });
     }),
 
-    "fund-coupon-redeem": invoke("fund-coupon-redeem", async (context) => {
+    "fund-coupon-redeem": invoke("fund-coupon-redeem", async (context, nowMs) => {
       const body = exactObject(
         requestBody(context.request),
         ["userId", "user_id", "couponCode", "coupon_code"],
       );
       const uid = userId(body);
-      const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+      const actor = requireUserActor(
+        context.actor,
+        uid,
+        googleServiceCallers,
+        nowMs,
+        recentAuthSeconds,
+      );
       const payload = Object.freeze({
         userId: uid,
         couponCode: boundedText(
@@ -1533,7 +1915,7 @@ export function createPlaidPaymentCandidateHandlers({
 
     "fund-payment-request-create": invoke(
       "fund-payment-request-create",
-      async (context) => {
+      async (context, nowMs) => {
         const body = exactObject(
           requestBody(context.request),
           [
@@ -1545,7 +1927,13 @@ export function createPlaidPaymentCandidateHandlers({
           ],
         );
         const uid = userId(body);
-        const actor = requireUserActor(context.actor, uid, googleServiceCallers);
+        const actor = requireUserActor(
+          context.actor,
+          uid,
+          googleServiceCallers,
+          nowMs,
+          recentAuthSeconds,
+        );
         const firstPaymentCents = usdCents(
           aliasedValue(body, [
             "firstPaymentAmount",

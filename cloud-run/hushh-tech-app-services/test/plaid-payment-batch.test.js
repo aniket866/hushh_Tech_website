@@ -7,11 +7,9 @@ import {
 import test from "node:test";
 
 import { RuntimeError } from "../src/errors.js";
+import { createFirebaseProductVerifier } from "../src/auth/firebase.js";
 import {
-  calculatePlaidPaymentApprovalBinding,
-  calculatePlaidPaymentEndMetadataBinding,
   createPlaidPaymentCandidateHandlers,
-  PLAID_PAYMENT_AUTHORITATIVE_BLOCKERS,
   PLAID_PAYMENT_LEDGER_CONTRACT,
   PLAID_PAYMENT_SLUGS,
   PLAID_PAYMENT_SOURCE_EVIDENCE,
@@ -31,6 +29,8 @@ const GOOGLE_ACTOR = Object.freeze({
 });
 const TRANSACTION_DURABILITY_FOR_TEST =
   "cloud_sql_serializable_transaction_v1";
+const AUTH_NOW_MS = 2_000_000_000_000;
+const AUTH_NOW_SECONDS = Math.floor(AUTH_NOW_MS / 1_000);
 const PLAID_NOW_SECONDS = 1_800_000_000;
 const PLAID_KEY_ID = "bfbd5111-8e33-4643-8ced-b2e642a72f3c";
 const PLAID_SIGNING_KEYS = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -96,38 +96,53 @@ function runtimeCode(error, code, statusCode) {
   return true;
 }
 
-function approval(slug, overrides = {}) {
-  const pin = PLAID_PAYMENT_SOURCE_PINS[slug];
-  const row = {
-    approved: true,
+function endMetadataArtifact(overrides = {}) {
+  return {
     schemaVersion: 1,
-    checkedInSourceSha256: pin.source,
-    liveV2BundleSha256: pin.live,
-    functionId: pin.functionId,
-    manifestVersion: pin.manifestVersion,
-    sourceVersion: pin.sourceVersion,
-    verifyJwt: pin.verifyJwt,
-    requestCount30d: pin.requestCount30d,
-    metadataEndCheckPassed: true,
-    metadataEndCheckDigestSha256: "",
-    deploymentBindingSha256: pin.deploymentBindingSha256,
-    ...PLAID_PAYMENT_SOURCE_EVIDENCE,
-    authoritativeBlockers: PLAID_PAYMENT_AUTHORITATIVE_BLOCKERS[slug].map(
-      (blocker) => ({ ...blocker }),
-    ),
-    bindingSha256: "",
+    kind: "supabase_current_v2_end_metadata_v1",
+    artifactId: "0cc6cfee-fc46-4b4e-9b72-7307f06d2790",
+    capturedAt: new Date(AUTH_NOW_MS - 10_000).toISOString(),
+    baseCommit: "95a88840d7f575e9852e89051e5b34f3f689a39f",
+    sourceEvidenceDigest: PLAID_PAYMENT_SOURCE_EVIDENCE.sourceEvidenceDigest,
+    trafficEvidenceDigest: PLAID_PAYMENT_SOURCE_EVIDENCE.trafficEvidenceDigest,
+    terminalMatrixEvidenceDigest:
+      PLAID_PAYMENT_SOURCE_EVIDENCE.terminalMatrixEvidenceDigest,
+    entries: PLAID_PAYMENT_SLUGS.map((slug) => {
+      const pin = PLAID_PAYMENT_SOURCE_PINS[slug];
+      return {
+        slug,
+        functionId: pin.functionId,
+        sourceVersion: pin.sourceVersion,
+        liveV2BundleSha256: pin.live,
+        deploymentBindingSha256: pin.deploymentBindingSha256,
+        metadataEndCheckPassed: true,
+        currentMetadataDigest: PLAID_PAYMENT_SOURCE_EVIDENCE.currentMetadataDigest,
+      };
+    }),
     ...overrides,
   };
-  row.metadataEndCheckDigestSha256 = calculatePlaidPaymentEndMetadataBinding(
-    slug,
-    row,
-  );
-  row.bindingSha256 = calculatePlaidPaymentApprovalBinding(slug, row);
-  return row;
 }
 
-function allApprovals() {
-  return Object.fromEntries(PLAID_PAYMENT_SLUGS.map((slug) => [slug, approval(slug)]));
+function approvalVerifier(overrides = {}) {
+  return {
+    configured: true,
+    algorithm: "cloud_kms_asymmetric_signature_v1",
+    async verify(input) {
+      return {
+        schemaVersion: 1,
+        decision: "APPROVED",
+        scope: input.scope,
+        slug: input.slug,
+        artifactDigest: input.artifactDigest,
+        approvalId: "38f598f7-e848-4245-aea6-581629c87739",
+        approvedAt: new Date(AUTH_NOW_MS - 5_000).toISOString(),
+        keyVersion:
+          "projects/hushh-tech-uat/locations/us-central1/keyRings/migration/cryptoKeys/candidate-approval/cryptoKeyVersions/1",
+        signatureVerified: true,
+      };
+    },
+    ...overrides,
+  };
 }
 
 function defaultResults() {
@@ -147,7 +162,14 @@ function defaultResults() {
     exchangePublicToken: {
       item_id: "item-display-id",
       institution: { id: "ins_1", name: "Test Bank" },
-      accounts: [{ account_id: "acct_1", name: "Checking", mask: "1234" }],
+      accounts: [{
+        account_id: "acct_1",
+        name: "Checking",
+        official_name: null,
+        mask: "1234",
+        type: "depository",
+        subtype: "checking",
+      }],
     },
     startPlaidDataSync: {
       status: "partial",
@@ -177,7 +199,8 @@ function harness({
   replay = false,
   resultOverrides = {},
   ledgerOverrides = {},
-  approvedSourceEvidence = allApprovals(),
+  detachedApprovalVerifier = approvalVerifier(),
+  artifact = endMetadataArtifact(),
 } = {}) {
   const calls = [];
   const inputs = [];
@@ -249,7 +272,10 @@ function harness({
       operations,
       allowedRedirectOrigins: ["https://uat.hushhtech.com"],
       allowedGoogleServiceCallers: [GOOGLE_CALLER_EMAIL],
-      approvedSourceEvidence,
+      detachedApprovalVerifier,
+      endMetadataArtifact: artifact,
+      now: () => AUTH_NOW_MS,
+      recentAuthSeconds: 300,
     }),
   };
 }
@@ -260,7 +286,7 @@ function context(slug, body, overrides = {}) {
       kind: "firebase",
       uid: UID,
       email: "investor@example.test",
-      recentAuth: true,
+      authTime: AUTH_NOW_SECONDS - 20,
     },
     request: {
       headers: { "idempotency-key": KEY },
@@ -272,19 +298,16 @@ function context(slug, body, overrides = {}) {
 }
 
 test("candidate remains fail-closed without exact end-metadata approval", async () => {
-  const missing = harness({ approvedSourceEvidence: {} });
+  const missing = harness({ detachedApprovalVerifier: null });
   await assert.rejects(
     missing.handlers["create-link-token"](
       context("create-link-token", { userId: UID }),
     ),
     (error) => runtimeCode(error, "CANDIDATE_EVIDENCE_REQUIRED", 503),
   );
-  const forged = allApprovals();
-  forged["create-link-token"] = {
-    ...forged["create-link-token"],
-    requestCount30d: 35,
-  };
-  const forgedHarness = harness({ approvedSourceEvidence: forged });
+  const forgedArtifact = endMetadataArtifact();
+  forgedArtifact.entries[0].sourceVersion -= 1;
+  const forgedHarness = harness({ artifact: forgedArtifact });
   await assert.rejects(
     forgedHarness.handlers["create-link-token"](
       context("create-link-token", { userId: UID }),
@@ -293,6 +316,91 @@ test("candidate remains fail-closed without exact end-metadata approval", async 
   );
   assert.equal(missing.calls.length, 0);
   assert.equal(forgedHarness.calls.length, 0);
+
+  const forgedReceipt = harness({
+    detachedApprovalVerifier: approvalVerifier({
+      async verify(input) {
+        return {
+          schemaVersion: 1,
+          decision: "APPROVED",
+          scope: input.scope,
+          slug: input.slug,
+          artifactDigest: "0".repeat(64),
+          approvalId: "38f598f7-e848-4245-aea6-581629c87739",
+          approvedAt: new Date(AUTH_NOW_MS - 5_000).toISOString(),
+          keyVersion:
+            "projects/hushh-tech-uat/locations/us-central1/keyRings/migration/cryptoKeys/candidate-approval/cryptoKeyVersions/1",
+          signatureVerified: true,
+        };
+      },
+    }),
+  });
+  await assert.rejects(
+    forgedReceipt.handlers["create-link-token"](
+      context("create-link-token", { userId: UID }),
+    ),
+    (error) => runtimeCode(error, "CANDIDATE_EVIDENCE_REQUIRED", 503),
+  );
+
+  const staleArtifact = harness({
+    artifact: endMetadataArtifact({
+      capturedAt: new Date(AUTH_NOW_MS - 901_000).toISOString(),
+    }),
+  });
+  await assert.rejects(
+    staleArtifact.handlers["create-link-token"](
+      context("create-link-token", { userId: UID }),
+    ),
+    (error) => runtimeCode(error, "CANDIDATE_EVIDENCE_REQUIRED", 503),
+  );
+});
+
+test("candidate consumes the real Firebase verifier actor contract", async () => {
+  const verify = createFirebaseProductVerifier({
+    config: {
+      firebaseProjectId: "hushh-tech-uat",
+      productClient: "hushh-tech",
+      productClientAppId: "app_hushh-technologies_cd1895ef",
+      productAudience: "hushh-tech-uat",
+      recentAuthSeconds: 300,
+    },
+    auth: {
+      verifyIdToken: async () => ({
+        uid: UID,
+        sub: UID,
+        aud: "hushh-tech-uat",
+        iss: "https://securetoken.google.com/hushh-tech-uat",
+        iat: AUTH_NOW_SECONDS - 10,
+        exp: AUTH_NOW_SECONDS + 300,
+        auth_time: AUTH_NOW_SECONDS - 20,
+        product_client: "hushh-tech",
+        product_client_app_id: "app_hushh-technologies_cd1895ef",
+        product_audience: "hushh-tech-uat",
+        product_launch_authorization_id: "launch-authorization-1",
+        product_launch_valid_after_ms: AUTH_NOW_MS - 20_000,
+        email: "Investor@Example.Test",
+      }),
+    },
+    now: () => AUTH_NOW_MS,
+  });
+  const actor = await verify(
+    {
+      headers: {
+        "x-hushh-firebase-authorization": `Bearer ${"x".repeat(64)}`,
+        "x-hushh-firebase-uid": UID,
+        "x-hushh-firebase-auth-time": String(AUTH_NOW_SECONDS - 20),
+      },
+    },
+    { auth_mode: "firebase_bearer_recent_auth" },
+  );
+  assert.equal("recentAuth" in actor, false);
+  const { handlers, calls } = harness();
+  await handlers["fund-payment-status"]({
+    ...context("fund-payment-status", { userId: UID }),
+    actor,
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].input.callerKind, "firebase");
 });
 
 test("all eight candidates exist but browser writes require recent Firebase auth and idempotency", async () => {
@@ -320,7 +428,14 @@ test("all eight candidates exist but browser writes require recent Firebase auth
   await assert.rejects(
     handlers["plaid-data-sync-start"]({
       ...context("plaid-data-sync-start", { userId: UID }),
-      actor: { kind: "firebase", uid: UID, recentAuth: false },
+      actor: { kind: "firebase", uid: UID, authTime: AUTH_NOW_SECONDS - 301 },
+    }),
+    (error) => runtimeCode(error, "ACCESS_DENIED", 403),
+  );
+  await assert.rejects(
+    handlers["plaid-data-sync-start"]({
+      ...context("plaid-data-sync-start", { userId: UID }),
+      actor: { kind: "firebase", uid: UID, recentAuth: true },
     }),
     (error) => runtimeCode(error, "ACCESS_DENIED", 403),
   );
@@ -410,7 +525,7 @@ test("Plaid webhook accepts only a verified provider actor and exact claimed raw
   await assert.rejects(
     handlers["plaid-data-webhook"]({
       ...base,
-      actor: { kind: "firebase", uid: UID, recentAuth: true },
+      actor: { kind: "firebase", uid: UID, authTime: AUTH_NOW_SECONDS - 20 },
     }),
     (error) => runtimeCode(error, "WEBHOOK_SIGNATURE_INVALID", 401),
   );
@@ -696,30 +811,64 @@ test("diagnostics are caller-owned, bounded, and redact financial and identity d
       page_state: {
         url: "https://uat.hushhtech.com/onboarding?token=leak#private",
         email: "investor@example.test",
+        isReviewMode: true,
+        currentStep: 12,
+        fullName: "Private Investor",
       },
       plaid_metadata: {
         account_number: "000123456789",
         mask: "1234",
+        institutionName: "Private Bank",
+        accountsCount: 2,
+        canProceed: true,
       },
       error_details: {
         message: "failed for second-investor@example.test",
         access_token: "secret",
+        card: "4111111111111111",
+        errorCode: "INVALID_REQUEST",
       },
       browser_context: {
         user_agent: "bounded-browser",
         note: "Bearer eyJhbGciOiJIUzI1NiJ9.sensitive-payload.signature",
+        online: true,
+        viewport: { width: 1440, height: 900, privateName: "Jane Doe" },
       },
     }),
   );
   assert.deepEqual(response.body, { accepted: true });
   const diagnostic = calls[0].input.diagnostic;
-  assert.equal(diagnostic.pageState.email, "[redacted]");
-  assert.equal(diagnostic.pageState.url, "https://uat.hushhtech.com/onboarding");
-  assert.equal(diagnostic.plaidMetadata.account_number, "[redacted]");
-  assert.equal(diagnostic.errorDetails.access_token, "[redacted]");
-  assert.equal(diagnostic.errorDetails.message, "[redacted]");
-  assert.equal(diagnostic.browserContext.note, "[redacted]");
-  assert.equal(diagnostic.plaidMetadata.mask, "1234");
+  assert.deepEqual(diagnostic.pageState, {
+    isReviewMode: true,
+    useSandboxDirectConnect: null,
+    blockLocalPlaidLink: null,
+    isPlaidOAuthResume: null,
+    isCompleted: null,
+    hasOAuthStateId: null,
+    currentStep: 12,
+    accessState: null,
+  });
+  assert.equal(diagnostic.plaidMetadata.accountsCount, 2);
+  assert.equal(diagnostic.plaidMetadata.canProceed, true);
+  assert.equal(diagnostic.plaidMetadata.institutionPresent, true);
+  assert.equal(diagnostic.errorDetails.errorCode, "INVALID_REQUEST");
+  assert.equal(diagnostic.errorDetails.hasMessage, true);
+  assert.equal(diagnostic.browserContext.online, true);
+  assert.equal(diagnostic.browserContext.viewportWidth, 1440);
+  const serialized = JSON.stringify(diagnostic);
+  for (const forbidden of [
+    "investor@example.test",
+    "second-investor@example.test",
+    "000123456789",
+    "4111111111111111",
+    "Private Investor",
+    "Private Bank",
+    "privateName",
+    "user_agent",
+    "access_token",
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
 
   await assert.rejects(
     handlers["plaid-diagnostics-log"]({
@@ -810,6 +959,48 @@ test("OAuth redirects, verified email, amount bounds, and response secret leakag
     ),
     (error) => runtimeCode(error, "HANDLER_CONTRACT_INVALID", 503),
   );
+
+  const leakingAllowedKey = harness({
+    resultOverrides: {
+      exchangePublicToken: {
+        ...defaultResults().exchangePublicToken,
+        institution: { id: "ins_1", name: "access-sandbox-secret-value" },
+      },
+    },
+  });
+  await assert.rejects(
+    leakingAllowedKey.handlers["exchange-public-token"](
+      context("exchange-public-token", {
+        publicToken: "public-sandbox-sensitive-credential",
+        userId: UID,
+      }),
+    ),
+    (error) => runtimeCode(error, "HANDLER_CONTRACT_INVALID", 503),
+  );
+
+  for (const accounts of [
+    [{ account_id: "acct_1", name: "Checking", mask: "1234" }],
+    [{ ...defaultResults().exchangePublicToken.accounts[0], extra: true }],
+    [{ ...defaultResults().exchangePublicToken.accounts[0], mask: 1234 }],
+  ]) {
+    const invalidAccount = harness({
+      resultOverrides: {
+        exchangePublicToken: {
+          ...defaultResults().exchangePublicToken,
+          accounts,
+        },
+      },
+    });
+    await assert.rejects(
+      invalidAccount.handlers["exchange-public-token"](
+        context("exchange-public-token", {
+          publicToken: "public-sandbox-sensitive-credential",
+          userId: UID,
+        }),
+      ),
+      (error) => runtimeCode(error, "HANDLER_CONTRACT_INVALID", 503),
+    );
+  }
 
   const leakingEmailDelivery = harness({
     resultOverrides: {
