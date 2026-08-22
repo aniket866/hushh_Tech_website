@@ -446,25 +446,49 @@ function collectDerivedStrings(source) {
   return { constants, values: [...constants.values(), ...decodedLiterals] };
 }
 
+function buildProviderComparisonCorpus(corpus) {
+  const variants = new Set([corpus]);
+  const decoded = decodeEscapes(corpus);
+  variants.add(decoded);
+  for (const value of [...variants]) variants.add(value.normalize("NFKC"));
+
+  const urlCandidates = [...variants].flatMap((value) =>
+    [...value.matchAll(/(?:https?|wss?):\/\/[^\s"'`<>\\]+/giu)].map((match) => match[0]),
+  );
+  for (const candidate of urlCandidates) {
+    for (const value of [candidate, candidate.replace(/[),;\]}]+$/g, "")]) {
+      try {
+        const parsed = new URL(value);
+        variants.add(parsed.href);
+        variants.add(parsed.hostname);
+      } catch {
+        // Malformed URL-shaped text remains visible in the original corpus.
+      }
+    }
+  }
+  return [...variants].join("\n");
+}
+
 function matchSignals(corpus) {
+  const comparisonCorpus = buildProviderComparisonCorpus(corpus);
   const matches = [];
-  if (PROVIDER_SDK_RE.test(corpus)) matches.push("PROVIDER_SDK_IMPORT");
-  if (PROVIDER_URL_RE.test(corpus)) matches.push("PROVIDER_URL");
-  if (PROVIDER_ENV_RE.test(corpus)) matches.push("PROVIDER_ENV_BINDING");
-  if (PROVIDER_CLI_RE.test(corpus)) matches.push("PROVIDER_CLI_ACCESS");
-  if (PROVIDER_CLIENT_RE.test(corpus)) matches.push("PROVIDER_CLIENT_ACCESS");
-  const normalizedCorpus = corpus.toLowerCase();
+  if (PROVIDER_SDK_RE.test(comparisonCorpus)) matches.push("PROVIDER_SDK_IMPORT");
+  if (PROVIDER_URL_RE.test(comparisonCorpus)) matches.push("PROVIDER_URL");
+  if (PROVIDER_ENV_RE.test(comparisonCorpus)) matches.push("PROVIDER_ENV_BINDING");
+  if (PROVIDER_CLI_RE.test(comparisonCorpus)) matches.push("PROVIDER_CLI_ACCESS");
+  if (PROVIDER_CLIENT_RE.test(comparisonCorpus)) matches.push("PROVIDER_CLIENT_ACCESS");
+  const normalizedCorpus = comparisonCorpus.toLowerCase();
   if (EXPECTED_FORBIDDEN_PROJECT_REFS.some((projectRef) => normalizedCorpus.includes(projectRef))) {
     matches.push("PROVIDER_PROJECT_REF");
   }
 
-  const providerTainted = matches.length > 0 || /\bsupabase\b/i.test(corpus);
-  if (providerTainted && /\bcreateClient\s*\(/.test(corpus)) {
+  const providerTainted = matches.length > 0 || /\bsupabase\b/i.test(comparisonCorpus);
+  if (providerTainted && /\bcreateClient\s*\(/.test(comparisonCorpus)) {
     matches.push("PROVIDER_CLIENT_CONSTRUCTION");
   }
   if (
     providerTainted &&
-    /\.(?:auth|from|functions|rpc|storage)\s*(?:\.|\?\.|\()/.test(corpus)
+    /\.(?:auth|from|functions|rpc|storage)\s*(?:\.|\?\.|\()/.test(comparisonCorpus)
   ) {
     matches.push("PROVIDER_DATA_OR_AUTH_ACCESS");
   }

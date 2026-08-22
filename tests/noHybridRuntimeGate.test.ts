@@ -141,6 +141,21 @@ describe("fail-closed no-hybrid runtime gate", () => {
     }
   });
 
+  it("normalizes Unicode and percent-encoded provider host labels", () => {
+    const samples = [
+      `fetch("https://tenant.ſupabase.co/rest/v1/x");`,
+      `fetch("https://tenant.ｓupabase.co/rest/v1/x");`,
+      `fetch("https://tenant.%C5%BFupabase.co/rest/v1/x");`,
+      `const endpoint = "https://tenant.ſupabase.co"; fetch(endpoint);`,
+    ];
+
+    for (const sample of samples) {
+      expect(analyzeExecutableContent(sample).violations.map((entry) => entry.code)).toContain(
+        "PROVIDER_URL",
+      );
+    }
+  });
+
   it("binds raw and derived references to every retired provider project", () => {
     const policy = loadNoHybridPolicy();
     expect(policy.forbidden_project_refs).toEqual([
