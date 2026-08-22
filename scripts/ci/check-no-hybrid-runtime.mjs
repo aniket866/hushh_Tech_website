@@ -143,6 +143,26 @@ const PROVIDER_SDK_RE = /(?:@supabase\/supabase-js|npm:\s*@?supabase|jsr:\s*@?su
 const PROVIDER_CLI_RE = /(?:^|\s)(?:npx\s+)?supabase\s+(?:db|functions|gen|inspect|link|migration|projects|secrets|start|status|stop)\b/i;
 const PROVIDER_CLIENT_RE = /\bsupabaseClient\b|\bsupabase\s*(?:\?\.|\.)\s*(?:auth|from|functions|rpc|storage)\b/i;
 
+// These two exact values are inert provenance labels on Google Cloud Storage
+// objects. They identify the source migration generation; they are not a
+// provider hostname, credential, client, or data-plane route. Only complete
+// string literals are removed. Concatenated, escaped, extended, or executable
+// provider references remain visible to every detector below.
+const INERT_STORAGE_MIGRATION_LINEAGE_LITERALS = Object.freeze([
+  "_hushh_migrations/supabase-cutover-v1",
+  "supabase-cutover-v1",
+]);
+
+function stripInertStorageMigrationLineageLiterals(source) {
+  let result = source;
+  for (const value of INERT_STORAGE_MIGRATION_LINEAGE_LITERALS) {
+    for (const quote of ['"', "'", "`"]) {
+      result = result.replaceAll(`${quote}${value}${quote}`, `${quote}storage-migration-lineage${quote}`);
+    }
+  }
+  return result;
+}
+
 function normalizeRelative(value) {
   return value.replaceAll(path.sep, "/").replace(/^\.\//, "").replace(/\/$/, "");
 }
@@ -476,22 +496,23 @@ function usesPublicFirebaseKeyAsCredential(source) {
 
 export function analyzeExecutableContent(source, relativePath = "fixture.ts") {
   const stripped = stripExecutableComments(source, relativePath);
-  const decoded = decodeEscapes(stripped);
+  const executable = stripInertStorageMigrationLineageLiterals(stripped);
+  const decoded = decodeEscapes(executable);
   const compact = decoded.replace(/[\s'"`+,[\](){}]/g, "");
-  const derived = collectDerivedStrings(stripped);
-  const directSignals = matchSignals(`${stripped}\n${decoded}\n${compact}`);
-  if (usesPublicFirebaseKeyAsCredential(stripped)) {
+  const derived = collectDerivedStrings(executable);
+  const directSignals = matchSignals(`${executable}\n${decoded}\n${compact}`);
+  if (usesPublicFirebaseKeyAsCredential(executable)) {
     directSignals.push("PUBLIC_FIREBASE_KEY_AS_CREDENTIAL");
   }
   const derivedCorpus = derived.values.join("\n");
   const derivedSignals = matchSignals(derivedCorpus);
-  for (const importMatch of stripped.matchAll(
+  for (const importMatch of executable.matchAll(
     /import\s*\{([^}]+)\}\s*from\s*["']@supabase\/supabase-js["']/gi,
   )) {
     const creator = importMatch[1].match(/\bcreateClient(?:\s+as\s+([A-Za-z_$][\w$]*))?/i);
     if (!creator) continue;
     const localName = creator[1] || "createClient";
-    if (new RegExp(`\\b${localName.replace(/[$]/g, "\\$")}\\s*\\(`).test(stripped)) {
+    if (new RegExp(`\\b${localName.replace(/[$]/g, "\\$")}\\s*\\(`).test(executable)) {
       directSignals.push("PROVIDER_CLIENT_CONSTRUCTION");
     }
   }

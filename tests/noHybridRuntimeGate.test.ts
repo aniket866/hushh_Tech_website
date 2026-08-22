@@ -182,6 +182,28 @@ describe("fail-closed no-hybrid runtime gate", () => {
     expect(analyzeExecutableContent(source).violations).toEqual([]);
   });
 
+  it("permits only exact inert storage-migration lineage while still rejecting provider access", () => {
+    const gcsOnly = `
+      const prefix = "_hushh_migrations/supabase-cutover-v1";
+      const schema = "supabase-cutover-v1";
+      const object = { storage: { prefix, schema } };
+      fetch("https://storage.googleapis.com/storage/v1/b/example/o", {
+        headers: { Authorization: \`Bearer \${token}\` },
+      });
+    `;
+    expect(analyzeExecutableContent(gcsOnly).violations).toEqual([]);
+
+    const providerAccess = `${gcsOnly}\nconst supabaseClient = client; supabaseClient.storage.from("assets");`;
+    expect(analyzeExecutableContent(providerAccess).violations.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining(["PROVIDER_CLIENT_ACCESS", "PROVIDER_DATA_OR_AUTH_ACCESS"]),
+    );
+
+    const extendedLineage = `const schema = "supabase-cutover-v1/tenant"; client.storage.from("assets");`;
+    expect(analyzeExecutableContent(extendedLineage).violations.map((entry) => entry.code)).toContain(
+      "PROVIDER_DATA_OR_AUTH_ACCESS",
+    );
+  });
+
   it("does not mistake URL slashes for comments in shell, YAML, Docker, or CSS", () => {
     const samples = [
       ["fixture.sh", "curl https://tenant.supabase.co/rest/v1/profiles"],
