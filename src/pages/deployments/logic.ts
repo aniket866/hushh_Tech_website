@@ -1,16 +1,9 @@
 /**
- * Deployments dashboard logic — client-side sign-in gate + data loading.
- *
- * NOTE: the sign-in is a hardcoded page gate (ankit@hushh.ai / 123456) per
- * product request. It is NOT a security boundary on its own (anyone can read
- * the bundle); the /api/deployments endpoint independently password-checks the
- * request server-side before returning any data.
+ * Deployments dashboard logic — Firebase claim gate + data loading.
+ * The server independently verifies the signed token and custom claim.
  */
 import { useCallback, useEffect, useState } from "react";
-
-const AUTH_KEY = "hushh_deployments_auth_v1";
-const OWNER_EMAIL = "ankit@hushh.ai";
-const OWNER_PASSWORD = "123456";
+import { useAuthSession } from "../../auth/AuthSessionProvider";
 
 export interface Deployment {
   env: "UAT" | "PROD";
@@ -21,69 +14,46 @@ export interface Deployment {
   image: string | null;
 }
 
-interface StoredAuth {
-  email: string;
-  password: string;
-}
-
-function readAuth(): StoredAuth | null {
-  try {
-    const raw = sessionStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as StoredAuth) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function useDeploymentsDashboard() {
-  const [auth, setAuth] = useState<StoredAuth | null>(() => readAuth());
+  const { session, signOut, status, user } = useAuthSession();
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [envErrors, setEnvErrors] = useState<{ env: string; error: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const signIn = useCallback((email: string, password: string): string | null => {
-    if (email.trim().toLowerCase() !== OWNER_EMAIL || password !== OWNER_PASSWORD) {
-      return "Incorrect email or password.";
-    }
-    const next: StoredAuth = { email: OWNER_EMAIL, password };
-    try {
-      sessionStorage.setItem(AUTH_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore storage errors */
-    }
-    setAuth(next);
-    return null;
-  }, []);
+  const hasAdminClaim = user?.app_metadata?.deployment_admin === true;
+  const accessToken = session?.access_token ?? null;
+  const isAuthed = status === "authenticated" && hasAdminClaim && Boolean(accessToken);
 
-  const signOut = useCallback(() => {
-    try {
-      sessionStorage.removeItem(AUTH_KEY);
-    } catch {
-      /* ignore */
-    }
-    setAuth(null);
+  const clear = useCallback(() => {
     setDeployments([]);
     setEnvErrors([]);
     setError(null);
   }, []);
 
   const load = useCallback(
-    async (a: StoredAuth) => {
+    async (token: string) => {
       setLoading(true);
       setError(null);
       try {
         const res = await fetch("/api/deployments", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password: a.password }),
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
         });
         const data = await res
           .json()
           .catch(() => ({ success: false, error: "Invalid response" }));
         if (!res.ok || !data.success) {
           if (res.status === 401) {
-            signOut();
+            await signOut();
+            clear();
             throw new Error("Session expired — please sign in again.");
           }
           throw new Error(data.error || `Request failed (HTTP ${res.status}).`);
@@ -96,23 +66,25 @@ export function useDeploymentsDashboard() {
         setLoading(false);
       }
     },
-    [signOut],
+    [clear, signOut],
   );
 
   useEffect(() => {
-    if (auth) void load(auth);
-  }, [auth, load]);
+    if (isAuthed && accessToken) void load(accessToken);
+    else clear();
+  }, [accessToken, clear, isAuthed, load]);
 
   return {
-    isAuthed: Boolean(auth),
-    signIn,
+    authStatus: status,
+    hasAdminClaim,
+    isAuthed,
     signOut,
     deployments,
     envErrors,
     loading,
     error,
     refresh: () => {
-      if (auth) void load(auth);
+      if (isAuthed && accessToken) void load(accessToken);
     },
   };
 }

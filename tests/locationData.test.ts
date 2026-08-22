@@ -13,10 +13,30 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const invokeFunctionMock = vi.hoisted(() => vi.fn(async (name: string, options: any = {}) => {
+  const query = options.query || {};
+  const params = new URLSearchParams();
+  for (const key of ['type', 'country', 'state']) {
+    if (query[key] !== undefined) params.set(key, String(query[key]));
+  }
+  const response = await globalThis.fetch(
+    `/api/gcp/functions/v1/${name}?${params.toString()}`,
+    {
+      credentials: 'same-origin',
+      headers: { Authorization: 'Bearer firebase-id-token' },
+    },
+  );
+  const payload = await response.json();
+  return response.ok
+    ? { data: payload, error: null, status: response.status || 200 }
+    : { data: null, error: { message: payload?.error || 'Function failed' }, status: response.status || 500 };
+}));
+
 // We mock the config module before importing locationData
 vi.mock('../src/resources/config/config', () => ({
   default: {
     GCP_API_BASE_URL: '/api/gcp',
+    gcpBackendClient: { functions: { invoke: invokeFunctionMock } },
   },
 }));
 
@@ -133,7 +153,11 @@ describe('locationData - Unit Tests', () => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const [url, options] = (global.fetch as any).mock.calls[0];
       expect(url).toBe('/api/gcp/functions/v1/get-locations?type=states&country=US');
-      expect(options).toEqual({ credentials: 'same-origin' });
+      expect(options).toEqual({
+        credentials: 'same-origin',
+        headers: { Authorization: 'Bearer firebase-id-token' },
+      });
+      expect(options.headers).not.toHaveProperty('apikey');
       expect(states).toEqual(mockStates);
     });
 

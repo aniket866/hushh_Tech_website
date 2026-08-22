@@ -1,5 +1,4 @@
 import axios from "axios";
-import config from "../../resources/config/config";
 import {
   getNdaGenerationUrl,
   getGcpBackendBaseUrl,
@@ -23,7 +22,6 @@ interface RequestFileAccessParams {
 
 function getAuthenticatedHeaders(accessToken: string) {
   return {
-    apikey: config.FIREBASE_API_KEY,
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };

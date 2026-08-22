@@ -403,41 +403,15 @@ function buildWindowFetchStartIso(window) {
   return `${window.startDate}T00:00:00.000Z`;
 }
 
-function createGcpBackendAdminClient(url, serviceRoleKey) {
-  return createGcpServerClient(url, serviceRoleKey);
+function createGcpBackendAdminClient() {
+  return createGcpServerClient();
 }
 
 function getWebsiteGcpBackendConfig(env) {
-  const gcpBackendUrl =
-    trimEnvValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME) || trimEnvValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME);
-  const serviceRoleKey = trimEnvValue(env.GCP_SERVER_ACTOR_UID);
-  const anonKey = trimEnvValue(env.VITE_FIREBASE_API_KEY);
-
-  if (!gcpBackendUrl) {
-    throw new Error(
-      "CLOUD_SQL_INSTANCE_CONNECTION_NAME or CLOUD_SQL_INSTANCE_CONNECTION_NAME is required for business metrics"
-    );
+  if (!trimEnvValue(env.GCP_SERVER_ACTOR_UID)) {
+    throw new Error("GCP_SERVER_ACTOR_UID is required for business metrics");
   }
-
-  if (serviceRoleKey) {
-    return {
-      url: gcpBackendUrl,
-      apiKey: serviceRoleKey,
-      accessLevel: "service_role",
-    };
-  }
-
-  if (anonKey) {
-    return {
-      url: gcpBackendUrl,
-      apiKey: anonKey,
-      accessLevel: "anon",
-    };
-  }
-
-  throw new Error(
-    "GCP_SERVER_ACTOR_UID is missing and no VITE_FIREBASE_API_KEY fallback is available"
-  );
+  return { accessLevel: "service_role" };
 }
 
 function getLegacyGcpBackendConfig(env) {
@@ -1699,14 +1673,11 @@ async function fetchGcpMetrics(env, window, warnings) {
 
 function createDefaultMetricsFetchers(env) {
   const websiteConfig = getWebsiteGcpBackendConfig(env);
-  const websiteClient = createGcpBackendAdminClient(
-    websiteConfig.url,
-    websiteConfig.apiKey
-  );
+  const websiteClient = createGcpBackendAdminClient();
   const hasServiceRole = websiteConfig.accessLevel === "service_role";
   const legacyConfig = getLegacyGcpBackendConfig(env);
   const legacyClient = legacyConfig
-    ? createGcpBackendAdminClient(legacyConfig.url, legacyConfig.serviceRoleKey)
+    ? createGcpBackendAdminClient()
     : null;
 
   return {

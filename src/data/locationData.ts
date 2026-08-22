@@ -235,12 +235,6 @@ const COUNTRIES: CountryItem[] = [
 const COUNTRY_NAME_MAP: Record<string, string> = {};
 COUNTRIES.forEach(c => { COUNTRY_NAME_MAP[c.isoCode] = c.name; });
 
-/** Build the edge function URL from GcpBackend config. */
-const getEdgeFunctionUrl = (): string => {
-  const base = config.GCP_API_BASE_URL;
-  return `${base}/functions/v1/get-locations`;
-};
-
 // ─── Public API ───────────────────────────────────────────────────────
 
 /** Get all countries (static, instant, no network call). */
@@ -262,16 +256,14 @@ export const getStatesOfCountry = async (
 
   // Primary: GcpBackend Edge Function (uses country-state-city server-side)
   try {
-    const url = `${getEdgeFunctionUrl()}?type=states&country=${encodeURIComponent(countryIsoCode)}`;
-    const res = await fetch(url, {
-      credentials: 'same-origin',
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data && Array.isArray(json.data)) {
-        return json.data as StateItem[];
-      }
+    const client = config.gcpBackendClient;
+    if (!client) throw new Error('GCP backend is unavailable');
+    const { data, error } = await client.functions.invoke<{ data?: StateItem[] }>(
+      'get-locations',
+      { method: 'GET', query: { country: countryIsoCode, type: 'states' } },
+    );
+    if (!error && Array.isArray(data?.data)) {
+      return data.data;
     }
   } catch (err) {
     console.warn('[locationData] Edge function failed, trying fallback:', err);
@@ -293,16 +285,14 @@ export const getCitiesOfState = async (
 
   // Primary: GcpBackend Edge Function
   try {
-    const url = `${getEdgeFunctionUrl()}?type=cities&country=${encodeURIComponent(countryIsoCode)}&state=${encodeURIComponent(stateCode)}`;
-    const res = await fetch(url, {
-      credentials: 'same-origin',
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json.data && Array.isArray(json.data)) {
-        return json.data as CityItem[];
-      }
+    const client = config.gcpBackendClient;
+    if (!client) throw new Error('GCP backend is unavailable');
+    const { data, error } = await client.functions.invoke<{ data?: CityItem[] }>(
+      'get-locations',
+      { method: 'GET', query: { country: countryIsoCode, state: stateCode, type: 'cities' } },
+    );
+    if (!error && Array.isArray(data?.data)) {
+      return data.data;
     }
   } catch (err) {
     console.warn('[locationData] Edge function failed for cities, trying fallback:', err);

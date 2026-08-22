@@ -85,7 +85,17 @@ export interface GcpBackendClient {
   from<T = unknown>(table: string): QueryBuilder<T>;
   rpc<T = unknown>(name: string, args?: Record<string, unknown>): Promise<BackendResult<T>>;
   storage: { from(bucket: string): Record<string, any> };
-  functions: { invoke<T = unknown>(name: string, options?: Record<string, unknown>): Promise<BackendResult<T>> };
+  functions: {
+    invoke<T = unknown>(name: string, options?: FunctionInvokeOptions): Promise<BackendResult<T>>;
+  };
+}
+
+export interface FunctionInvokeOptions {
+  body?: unknown;
+  method?: "GET" | "POST";
+  query?: Readonly<Record<string, string | number | boolean | undefined>>;
+  signal?: AbortSignal;
+  subpath?: readonly string[];
 }
 
 // Compatibility alias while call sites move to the provider-neutral name.

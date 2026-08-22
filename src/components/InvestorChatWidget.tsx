@@ -5,6 +5,7 @@ import { Settings, Zap, ArrowUp } from 'lucide-react';
 import { getOrCreateVisitorId } from '../utils/visitorId';
 import { ChatPaymentModal } from './ChatPaymentModal';
 import hushhLogo from './images/Hushhogo.png';
+import config from '../resources/config/config';
 
 type Message = { role: 'user' | 'assistant'; content: string; timestamp?: string };
 
@@ -17,6 +18,12 @@ interface AccessInfo {
   totalFreeMessages?: number;
   timeRemaining?: string;
   message?: string;
+}
+
+async function invokeChatFunction<T>(name: string, body: Record<string, unknown>) {
+  const client = config.gcpBackendClient;
+  if (!client) throw new Error('GCP backend is unavailable');
+  return client.functions.invoke<T>(name, { body, method: 'POST' });
 }
 
 // Hushh Assistant Avatar Component - Uses official Hushh logo
@@ -76,22 +83,9 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
 
   const checkAccess = async () => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-check-access`,
-        {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
-          },
-          body: JSON.stringify({ visitorId, slug }),
-        }
-      );
-      
-      if (res.ok) {
-        const data = await res.json();
-        setAccessInfo(data);
-      }
+      const { data, error } = await invokeChatFunction<AccessInfo>('chat-check-access', { visitorId, slug });
+      if (error) throw new Error(error.message);
+      if (data) setAccessInfo(data);
     } catch (err) {
       console.error('Access check error:', err);
     }
@@ -104,19 +98,8 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
 
     if (paymentStatus === 'success' && sessionId) {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-verify-payment`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
-            },
-            body: JSON.stringify({ sessionId, visitorId, slug }),
-          }
-        );
-
-        if (res.ok) {
+        const { error } = await invokeChatFunction('chat-verify-payment', { sessionId, visitorId, slug });
+        if (!error) {
           toast({
             title: 'Payment Successful!',
             description: 'You now have unlimited access for 30 minutes.',
@@ -143,20 +126,11 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
   const handlePayment = async () => {
     setProcessing(true);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-create-checkout`,
-        {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
-          },
-          body: JSON.stringify({ visitorId, slug }),
-        }
+      const { data, error } = await invokeChatFunction<{ checkoutUrl?: string }>(
+        'chat-create-checkout',
+        { visitorId, slug },
       );
-
-      if (res.ok) {
-        const data = await res.json();
+      if (!error && data?.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
         throw new Error('Failed to create checkout session');
@@ -193,25 +167,18 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       
-      const res = await fetch(
-        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/investor-chat`,
-        {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
-          },
-          body: JSON.stringify({ slug, message: text, visitorId, history }),
-        }
-      );
-      
-      if (res.status === 402) {
-        const data = await res.json();
+      const { data, error, status } = await invokeChatFunction<{
+        reply?: string;
+        message?: string;
+        accessInfo?: Partial<AccessInfo>;
+      }>('investor-chat', { slug, message: text, visitorId, history });
+
+      if (status === 402) {
         setMessages(prev => prev.slice(0, -1));
         setInput(text);
         toast({
           title: 'Payment Required',
-          description: data.message || 'Please pay to continue chatting.',
+          description: error?.message || data?.message || 'Please pay to continue chatting.',
           status: 'warning',
           duration: 5000,
         });
@@ -220,11 +187,7 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
         return;
       }
 
-      if (!res.ok) {
-        throw new Error('Failed to get response');
-      }
-      
-      const data = await res.json();
+      if (error || !data?.reply) throw new Error(error?.message || 'Failed to get response');
       const replyTimestamp = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply, timestamp: replyTimestamp }]);
       

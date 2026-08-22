@@ -6,10 +6,12 @@
  * to a "deployment": when it was created, whether it is currently live (serving
  * traffic), and its per-build URL (the Cloud Run revision TAG url, if tagged).
  *
- * Gated by a password (env DEPLOYMENTS_DASHBOARD_PASSWORD, default '123456') so
- * the deploy list is not world-readable even though the page gate is client-side.
+ * Gated by a revoked-token-aware Firebase custom claim. The browser gate is
+ * only presentation; this handler is the security boundary.
  */
 import { google } from "googleapis";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 const SERVICE = "hushh-tech-website";
 const REGION = "us-central1";
@@ -17,8 +19,69 @@ const PROJECTS = [
   { env: "PROD", project: "hushh-tech-prod" },
   { env: "UAT", project: "hushh-tech-uat" },
 ];
-const PASSWORD = process.env.DEPLOYMENTS_DASHBOARD_PASSWORD || "123456";
 const MAX_PER_ENV = 50;
+const FIREBASE_PROJECT_ID = "hushh-tech-uat";
+const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
+const FIREBASE_APP_NAME = "hushh-tech-deployments-uat";
+
+function statusError(message, status, code) {
+  return Object.assign(new Error(message), { status, code });
+}
+
+function assertDeploymentAuthority(env) {
+  const declaredProjects = [env.GOOGLE_CLOUD_PROJECT, env.GCP_PROJECT]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (
+    declaredProjects.length === 0 ||
+    declaredProjects.some((value) => value !== FIREBASE_PROJECT_ID) ||
+    String(env.FIREBASE_PROJECT_ID || "").trim() !== FIREBASE_PROJECT_ID
+  ) {
+    throw statusError("Deployment authority is unavailable.", 503, "AUTHORITY_UNAVAILABLE");
+  }
+}
+
+function defaultFirebaseVerifier(env) {
+  assertDeploymentAuthority(env);
+  const app =
+    getApps().find((candidate) => candidate.name === FIREBASE_APP_NAME) ||
+    initializeApp({ projectId: FIREBASE_PROJECT_ID }, FIREBASE_APP_NAME);
+  if (app.options.projectId !== FIREBASE_PROJECT_ID) {
+    throw statusError("Deployment authority is unavailable.", 503, "AUTHORITY_UNAVAILABLE");
+  }
+  return (token) => getAuth(app).verifyIdToken(token, true);
+}
+
+export async function authorizeDeploymentsRequest(
+  req,
+  { env = process.env, verifyIdToken } = {},
+) {
+  assertDeploymentAuthority(env);
+  const match = String(req?.headers?.authorization || "").match(/^Bearer\s+([^\s]{1,8192})$/i);
+  if (!match) throw statusError("Sign in required.", 401, "AUTH_REQUIRED");
+  let decoded;
+  try {
+    decoded = await (verifyIdToken || defaultFirebaseVerifier(env))(match[1]);
+  } catch (error) {
+    if (error?.code === "app/network-error" || error?.code === "auth/internal-error") {
+      throw statusError("Deployment authority is unavailable.", 503, "AUTHORITY_UNAVAILABLE");
+    }
+    throw statusError("Authentication is invalid.", 401, "AUTH_INVALID");
+  }
+  if (
+    !decoded?.uid ||
+    decoded.sub !== decoded.uid ||
+    decoded.aud !== FIREBASE_PROJECT_ID ||
+    decoded.iss !== FIREBASE_ISSUER ||
+    !Number.isFinite(decoded.auth_time)
+  ) {
+    throw statusError("Authentication is invalid.", 401, "AUTH_INVALID");
+  }
+  if (decoded.deployment_admin !== true) {
+    throw statusError("Access denied.", 403, "ADMIN_REQUIRED");
+  }
+  return { uid: decoded.uid };
+}
 
 async function getAccessToken() {
   const auth = new google.auth.GoogleAuth({
@@ -79,13 +142,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
-  const password =
-    (req.body && req.body.password) || req.headers["x-dashboard-password"] || "";
-  if (password !== PASSWORD) {
-    return res.status(401).json({ success: false, error: "Unauthorized" });
-  }
-
   try {
+    await authorizeDeploymentsRequest(req);
     const token = await getAccessToken();
     const results = await Promise.allSettled(PROJECTS.map((p) => listEnv(p, token)));
     const deployments = [];
@@ -99,8 +157,9 @@ export default async function handler(req, res) {
     );
     return res.status(200).json({ success: true, deployments, errors });
   } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
     return res
-      .status(500)
-      .json({ success: false, error: String((err && err.message) || err) });
+      .status(status)
+      .json({ success: false, error: status === 500 ? "Deployments unavailable." : String(err.message) });
   }
 }

@@ -19,6 +19,7 @@ import type {
   BackendError,
   BackendResult,
   GcpBackendClient,
+  FunctionInvokeOptions,
   QueryBuilder,
   Session,
   User,
@@ -27,6 +28,8 @@ import type {
 const APP_NAME = "hushh-tech-gcp";
 const DATA_PATH = "/api/gcp/data";
 const STORAGE_PATH = "/api/gcp/storage";
+const FUNCTION_NAME = /^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,126}[a-z0-9])$/;
+const FUNCTION_PATH_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
 
 export interface GcpClientConfig {
   apiKey: string;
@@ -79,6 +82,7 @@ export function firebaseUserToSessionUser(
       provider: value.providerData[0]?.providerId || "firebase",
       providers: value.providerData.map((entry) => entry.providerId),
       fund_admin: claims.fund_admin === true,
+      deployment_admin: claims.deployment_admin === true,
     },
     user_metadata: {
       full_name: value.displayName || undefined,
@@ -347,14 +351,44 @@ export function createGcpBackendClient(config: GcpClientConfig): GcpBackendClien
       },
     },
     functions: {
-      async invoke<T = unknown>(name: string, options: Record<string, unknown> = {}) {
+      async invoke<T = unknown>(name: string, options: FunctionInvokeOptions = {}) {
+        if (!FUNCTION_NAME.test(name)) {
+          return { data: null, error: { name: "FunctionPathError", message: "Function name is invalid.", status: 400 }, status: 400 };
+        }
+        const subpath = options.subpath ?? [];
+        if (!Array.isArray(subpath) || subpath.some((segment) => !FUNCTION_PATH_SEGMENT.test(segment))) {
+          return { data: null, error: { name: "FunctionPathError", message: "Function path is invalid.", status: 400 }, status: 400 };
+        }
+        const method = options.method ?? "POST";
+        if (method !== "GET" && method !== "POST") {
+          return { data: null, error: { name: "FunctionMethodError", message: "Function method is invalid.", status: 405 }, status: 405 };
+        }
+        if (method === "GET" && options.body !== undefined) {
+          return { data: null, error: { name: "FunctionBodyError", message: "GET functions cannot include a body.", status: 400 }, status: 400 };
+        }
+        const query = new URLSearchParams();
+        for (const [key, value] of Object.entries(options.query ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+          if (!FUNCTION_PATH_SEGMENT.test(key)) {
+            return { data: null, error: { name: "FunctionQueryError", message: "Function query is invalid.", status: 400 }, status: 400 };
+          }
+          if (value !== undefined) query.append(key, String(value));
+        }
         await auth.authStateReady();
         const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-        const response = await fetch(`/functions/v1/${encodeURIComponent(name)}`, {
-          method: "POST",
+        const pathname = ["", "functions", "v1", name, ...subpath]
+          .map((segment, index) => (index === 0 ? segment : encodeURIComponent(segment)))
+          .join("/");
+        const response = await fetch(`${pathname}${query.size ? `?${query.toString()}` : ""}`, {
+          method,
           credentials: "same-origin",
-          headers: { Accept: "application/json", "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify(options.body ?? {}),
+          cache: "no-store",
+          signal: options.signal,
+          headers: {
+            Accept: "application/json",
+            ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          ...(method === "POST" ? { body: JSON.stringify(options.body ?? {}) } : {}),
         });
         const payload = await response.json().catch(() => null);
         return response.ok

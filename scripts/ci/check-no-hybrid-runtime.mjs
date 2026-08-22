@@ -428,12 +428,43 @@ function matchSignals(corpus) {
   return [...new Set(matches)];
 }
 
+function usesPublicFirebaseKeyAsCredential(source) {
+  const firebaseKeyReference = String.raw`(?:\b(?:VITE_)?FIREBASE_API_KEY\b|\bconfig\s*(?:\.|\?\.)\s*FIREBASE_API_KEY\b|import\s*\.\s*meta\s*\.\s*env\s*\.\s*VITE_FIREBASE_API_KEY\b)`;
+  const taintedNames = new Set();
+  const declarations = [...source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+)/g)];
+  for (let pass = 0; pass <= declarations.length; pass += 1) {
+    let changed = false;
+    for (const [, name, expression] of declarations) {
+      if (taintedNames.has(name)) continue;
+      const referencesKey = new RegExp(firebaseKeyReference, "i").test(expression);
+      const referencesTainted = [...taintedNames].some((candidate) =>
+        new RegExp(`\\b${candidate.replace(/[$]/g, "\\$")}\\b`).test(expression),
+      );
+      if (referencesKey || referencesTainted) {
+        taintedNames.add(name);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  const taintedExpression = [firebaseKeyReference, ...[...taintedNames].map((name) => `\\b${name.replace(/[$]/g, "\\$")}\\b`)].join("|");
+  const credentialHeader = new RegExp(
+    String.raw`(?:["']?(?:authorization|apikey)["']?\s*:|\.set\(\s*["'](?:authorization|apikey)["']\s*,)\s*[^,\n}]{0,320}(?:${taintedExpression})`,
+    "i",
+  );
+  return credentialHeader.test(source);
+}
+
 export function analyzeExecutableContent(source, relativePath = "fixture.ts") {
   const stripped = stripExecutableComments(source, relativePath);
   const decoded = decodeEscapes(stripped);
   const compact = decoded.replace(/[\s'"`+,[\](){}]/g, "");
   const derived = collectDerivedStrings(stripped);
   const directSignals = matchSignals(`${stripped}\n${decoded}\n${compact}`);
+  if (usesPublicFirebaseKeyAsCredential(stripped)) {
+    directSignals.push("PUBLIC_FIREBASE_KEY_AS_CREDENTIAL");
+  }
   const derivedCorpus = derived.values.join("\n");
   const derivedSignals = matchSignals(derivedCorpus);
   for (const importMatch of stripped.matchAll(

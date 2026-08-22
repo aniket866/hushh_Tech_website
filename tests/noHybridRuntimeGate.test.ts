@@ -197,6 +197,28 @@ describe("fail-closed no-hybrid runtime gate", () => {
     }
   });
 
+  it("rejects a public Firebase API key used as an authorization credential", () => {
+    const unsafe = [
+      `fetch("/functions/v1/example", { headers: { apikey: import.meta.env.VITE_FIREBASE_API_KEY } });`,
+      `fetch("/functions/v1/example", { headers: { Authorization: \`Bearer \${config.FIREBASE_API_KEY}\` } });`,
+      `const publicKey = import.meta.env.VITE_FIREBASE_API_KEY; fetch("/x", { headers: { Authorization: \`Bearer \${publicKey}\` } });`,
+    ];
+    for (const source of unsafe) {
+      expect(analyzeExecutableContent(source).violations.map((entry) => entry.code)).toContain(
+        "PUBLIC_FIREBASE_KEY_AS_CREDENTIAL",
+      );
+    }
+
+    const safe = `
+      const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+      initializeApp({ apiKey });
+      fetch("/functions/v1/example", { headers: { Authorization: \`Bearer \${session.access_token}\` } });
+    `;
+    expect(analyzeExecutableContent(safe).violations.map((entry) => entry.code)).not.toContain(
+      "PUBLIC_FIREBASE_KEY_AS_CREDENTIAL",
+    );
+  });
+
   it("rejects static and computed transitive imports into classified provider archives", () => {
     const root = temporaryRoot();
     write(

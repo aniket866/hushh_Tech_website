@@ -1,7 +1,6 @@
 /**
  * /deployments — internal deployments dashboard.
- * Sign in (ankit@hushh.ai / 123456), then browse every UAT + PROD build and open
- * how the site looked at that build (per-build Cloud Run tag URL).
+ * Signed Firebase deployment admins can browse UAT and production revisions.
  * Styled to match the home / community Apple UI.
  */
 import { useMemo, useState } from "react";
@@ -54,21 +53,11 @@ const StatusChip = ({ live }: { live: boolean }) => (
   </span>
 );
 
-/* ── Sign-in gate ── */
-function LoginCard({ onSubmit }: { onSubmit: (email: string, password: string) => string | null }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(onSubmit(email, password));
-  };
-
+/* ── Access gate ── */
+function AccessCard({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => Promise<void> }) {
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-5">
-      <form
-        onSubmit={submit}
+      <div
         className="w-full max-w-[400px] rounded-[24px] bg-white p-8 shadow-[0_2px_18px_rgba(29,29,31,0.06),inset_0_0_0_0.5px_rgba(29,29,31,0.08)]"
       >
         <div
@@ -81,59 +70,37 @@ function LoginCard({ onSubmit }: { onSubmit: (email: string, password: string) =
           className="mb-1.5 text-[26px] font-semibold tracking-[-0.025em] text-[#1D1D1F]"
           style={{ fontFamily: appleDisplayFont }}
         >
-          Deployments sign-in
+          Deployments
         </h1>
         <p className="mb-6 text-[13.5px] leading-[1.5] text-[#1D1D1F]/60" style={{ fontFamily: appleFont }}>
-          Restricted to the Hushh team.
+          {signedIn ? "Admin access required." : "Sign in required."}
         </p>
-
-        <label className="mb-1.5 block text-[12px] font-medium text-[#1D1D1F]/70" style={{ fontFamily: appleFont }}>
-          Email
-        </label>
-        <input
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@hushh.ai"
-          className="mb-4 w-full rounded-[12px] border border-[#1D1D1F]/15 bg-white px-3.5 py-2.5 text-[14px] text-[#1D1D1F] outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/20"
-          style={{ fontFamily: appleFont }}
-        />
-
-        <label className="mb-1.5 block text-[12px] font-medium text-[#1D1D1F]/70" style={{ fontFamily: appleFont }}>
-          Password
-        </label>
-        <input
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••"
-          className="mb-5 w-full rounded-[12px] border border-[#1D1D1F]/15 bg-white px-3.5 py-2.5 text-[14px] text-[#1D1D1F] outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/20"
-          style={{ fontFamily: appleFont }}
-        />
-
-        {error && (
-          <p className="mb-4 text-[13px] font-medium text-[#B42318]" style={{ fontFamily: appleFont }}>
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
+        {signedIn ? (
+          <button
+            type="button"
+            onClick={() => void onSignOut()}
+            className="w-full rounded-full bg-[#0066CC] px-5 py-3 text-[15px] font-medium text-white transition hover:opacity-90"
+            style={{ fontFamily: appleFont }}
+          >
+            Sign out
+          </button>
+        ) : (
+          <a
+            href="/login?redirect=%2Fdeployments"
           className="w-full rounded-full bg-[#0066CC] px-5 py-3 text-[15px] font-medium text-white transition hover:opacity-90"
           style={{ fontFamily: appleFont }}
-        >
-          Sign in
-        </button>
-      </form>
+          >
+            Sign in
+          </a>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ── Dashboard ── */
 export default function DeploymentsPage() {
-  const { isAuthed, signIn, signOut, deployments, envErrors, loading, error, refresh } =
+  const { authStatus, isAuthed, signOut, deployments, envErrors, loading, error, refresh } =
     useDeploymentsDashboard();
   const [envFilter, setEnvFilter] = useState<"All" | "UAT" | "PROD">("All");
 
@@ -154,7 +121,7 @@ export default function DeploymentsPage() {
 
       <main id="main-content">
         {!isAuthed ? (
-          <LoginCard onSubmit={signIn} />
+          <AccessCard signedIn={authStatus === "authenticated"} onSignOut={signOut} />
         ) : (
           <section className="mx-auto w-full max-w-[1080px] px-5 pb-24 pt-12 md:pt-16">
             {/* Hero */}

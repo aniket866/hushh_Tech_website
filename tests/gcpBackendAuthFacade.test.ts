@@ -41,4 +41,19 @@ describe("GCP backend Firebase auth facade", () => {
       expect(user.app_metadata.fund_admin).toBe(expected);
     },
   );
+
+  it.each([
+    [true, true],
+    ["true", false],
+    [1, false],
+    [undefined, false],
+  ])(
+    "maps token.claims.deployment_admin=%p to app_metadata.deployment_admin=%p",
+    (claim, expected) => {
+      const claims = claim === undefined ? {} : { deployment_admin: claim };
+      const user = firebaseUserToSessionUser(firebaseUser, claims);
+
+      expect(user.app_metadata.deployment_admin).toBe(expected);
+    },
+  );
 });
