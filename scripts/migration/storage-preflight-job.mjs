@@ -15,12 +15,18 @@ import {
   calculateSelfBoundDigest,
   canonicalJson,
   fail,
+  isPlainObject,
   requireExactKeys,
   requireSha256,
   sha256,
 } from "./storage-live-common.mjs";
 
 const PROJECT = "hushh-tech-uat";
+const PROJECT_NUMBER = "175298245599";
+const TARGET_BUCKET_LOCATION = "US-CENTRAL1";
+const TARGET_TAG_BINDING_LOCATION = "us-central1";
+const TARGET_TAG_BINDINGS_HOST =
+  `${TARGET_TAG_BINDING_LOCATION}-cloudresourcemanager.googleapis.com`;
 const METADATA_TOKEN_URL =
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 const MAXIMUM_INPUT_BYTES = 1_048_576;
@@ -29,9 +35,36 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const ALLOWED_HTTPS_HOSTS = new Set([
   "storage.googleapis.com",
   "iam.googleapis.com",
-  "cloudresourcemanager.googleapis.com",
+  TARGET_TAG_BINDINGS_HOST,
   "secretmanager.googleapis.com",
 ]);
+const TARGET_BUCKET_NAMES = new Set(
+  ISOLATED_CUTOVER_CONTRACT.buckets.map((bucket) => bucket.targetBucket),
+);
+
+const assertFrozenTargetContract = () => {
+  if (
+    ISOLATED_CUTOVER_CONTRACT.project !== PROJECT ||
+    ISOLATED_CUTOVER_CONTRACT.projectNumber !== PROJECT_NUMBER ||
+    ISOLATED_CUTOVER_CONTRACT.location !== TARGET_BUCKET_LOCATION ||
+    TARGET_BUCKET_LOCATION.toLowerCase() !== TARGET_TAG_BINDING_LOCATION
+  ) {
+    fail(
+      "PREFLIGHT_JOB_TARGET_CONTRACT_DRIFT",
+      "The preflight target project or regional binding changed.",
+    );
+  }
+};
+
+const assertTargetBucketName = (bucketName) => {
+  if (typeof bucketName !== "string" || !TARGET_BUCKET_NAMES.has(bucketName)) {
+    fail(
+      "PREFLIGHT_JOB_TARGET_BUCKET_BLOCKED",
+      "Only an exact frozen UAT target bucket may be inspected.",
+    );
+  }
+  return bucketName;
+};
 
 const parseBoundedJson = async (response, code) => {
   const declared = response.headers.get("content-length");
@@ -64,6 +97,7 @@ const normalizedBindings = (bindings = [], scope = null) => bindings.map((bindin
 
 export class InCloudStoragePreflightClient {
   constructor({ fetchImpl = fetch, inheritedBindings }) {
+    assertFrozenTargetContract();
     if (!Array.isArray(inheritedBindings)) {
       fail("PREFLIGHT_JOB_INPUT_INVALID", "Inherited storage IAM evidence is missing.");
     }
@@ -161,31 +195,71 @@ export class InCloudStoragePreflightClient {
   }
 
   async getJson(url, code) {
-    const parsed = new URL(url);
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      fail("PREFLIGHT_JOB_ENDPOINT_BLOCKED", "A malformed provider endpoint was blocked.");
+    }
     if (
       parsed.protocol !== "https:" ||
+      parsed.username !== "" ||
+      parsed.password !== "" ||
+      parsed.port !== "" ||
+      parsed.hash !== "" ||
       !ALLOWED_HTTPS_HOSTS.has(parsed.hostname)
     ) {
       fail("PREFLIGHT_JOB_ENDPOINT_BLOCKED", "A non-read-only provider endpoint was blocked.");
     }
-    const response = await this.fetchImpl(parsed, {
-      method: "GET",
-      headers: { authorization: `Bearer ${await this.token()}` },
-      redirect: "error",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    const accessToken = await this.token();
+    let response;
+    try {
+      response = await this.fetchImpl(parsed, {
+        method: "GET",
+        headers: { authorization: `Bearer ${accessToken}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      fail(code, "A read-only provider request failed before receiving a response.");
+    }
+    if (
+      !response ||
+      response.redirected === true ||
+      (typeof response.url === "string" &&
+        response.url.length !== 0 &&
+        response.url !== parsed.href)
+    ) {
+      fail(code, "A read-only provider request redirected or changed endpoints.");
+    }
     if (!response.ok) fail(code, `A read-only provider request failed with status ${response.status}.`);
     return parseBoundedJson(response, code);
   }
 
-  getBucket(bucketName) {
-    return this.getJson(
-      `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucketName)}?projection=full`,
+  async getBucket(bucketName) {
+    const expectedBucketName = assertTargetBucketName(bucketName);
+    const payload = await this.getJson(
+      `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(expectedBucketName)}?projection=full`,
       "TARGET_BUCKET_READ_FAILED",
     );
+    if (
+      !isPlainObject(payload) ||
+      payload.id !== expectedBucketName ||
+      payload.name !== expectedBucketName
+    ) {
+      fail("TARGET_BUCKET_IDENTITY_DRIFT", "The target bucket identity changed.");
+    }
+    if (payload.projectNumber !== PROJECT_NUMBER) {
+      fail("TARGET_BUCKET_PROJECT_DRIFT", "The target bucket moved outside the frozen UAT project.");
+    }
+    if (payload.location !== TARGET_BUCKET_LOCATION) {
+      fail("TARGET_LOCATION_DRIFT", "The target bucket moved outside US-CENTRAL1.");
+    }
+    return payload;
   }
 
   getBucketIam(bucketName) {
+    assertTargetBucketName(bucketName);
     return this.getJson(
       `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucketName)}/iam`,
       "TARGET_IAM_READ_FAILED",
@@ -193,6 +267,7 @@ export class InCloudStoragePreflightClient {
   }
 
   async listObjects(bucketName) {
+    assertTargetBucketName(bucketName);
     const objects = [];
     let pageToken = null;
     const seenTokens = new Set();
@@ -255,13 +330,25 @@ export class InCloudStoragePreflightClient {
   }
 
   async inspectIsolation(bucketName, inheritedBindings) {
+    assertTargetBucketName(bucketName);
+    if (!Array.isArray(inheritedBindings)) {
+      fail("PREFLIGHT_JOB_INPUT_INVALID", "Inherited storage IAM evidence is missing.");
+    }
     const parent = `//storage.googleapis.com/projects/_/buckets/${bucketName}`;
-    const tagUrl = new URL("https://cloudresourcemanager.googleapis.com/v3/tagBindings");
+    const tagUrl = new URL(`https://${TARGET_TAG_BINDINGS_HOST}/v3/tagBindings`);
     tagUrl.searchParams.set("parent", parent);
-    tagUrl.searchParams.set("pageSize", "100");
+    tagUrl.searchParams.set("pageSize", "300");
     const tagPayload = await this.getJson(tagUrl, "TARGET_TAG_BINDING_READ_FAILED");
-    if (tagPayload.nextPageToken) {
-      fail("TARGET_TAG_BINDING_READ_FAILED", "The isolated tag binding set exceeded one bounded page.");
+    if (
+      !isPlainObject(tagPayload) ||
+      !Array.isArray(tagPayload.tagBindings) ||
+      Object.hasOwn(tagPayload, "nextPageToken") ||
+      Object.keys(tagPayload).some((key) => key !== "tagBindings")
+    ) {
+      fail(
+        "TARGET_TAG_BINDING_READ_FAILED",
+        "The regional tag binding response changed or exceeded one bounded page.",
+      );
     }
     if (!this.denyPolicy) {
       const attachment = encodeURIComponent(
