@@ -83,6 +83,11 @@ import {
   SEVEN_BUCKET_CONTRACT,
   sevenBucketActivationFileDigestSha256,
 } from '../scripts/migration/storage-seven-bucket-contract.mjs';
+import {
+  ISOLATED_CUTOVER_CONTRACT,
+  isolatedCutoverContractFileDigestSha256,
+  isolationTagValueNamespacedName,
+} from '../scripts/migration/storage-isolated-cutover-contract.mjs';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -102,6 +107,43 @@ afterEach(() => {
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const md5 = (value: string | Buffer) => createHash('md5').update(value).digest('base64');
 const crc32c = (value: string | Buffer) => createCrc32c().update(value).digestBase64();
+
+const safeBucketConfiguration = (bucketName: string) => ({
+  name: bucketName,
+  location: 'US-CENTRAL1',
+  storageClass: ISOLATED_CUTOVER_CONTRACT.storageClass,
+  iamConfiguration: {
+    uniformBucketLevelAccess: { enabled: true },
+    publicAccessPrevention: 'enforced',
+  },
+  versioning: { enabled: true },
+  retentionPolicy: {
+    retentionPeriod: String(ISOLATED_CUTOVER_CONTRACT.retentionPeriodSeconds),
+  },
+  softDeletePolicy: {
+    retentionDurationSeconds: String(ISOLATED_CUTOVER_CONTRACT.softDeleteRetentionSeconds),
+  },
+});
+
+const safeIsolationEvidence = (bucketName: string, inheritedBindings: JsonRecord[] = []) => {
+  const normalizedInherited = inheritedBindings.map((binding) => ({
+    scope: binding.scope ?? null,
+    role: binding.role,
+    conditionDigestSha256: binding.conditionDigestSha256 ?? null,
+    members: [...((binding.members as string[]) || [])].sort(),
+  })).sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
+  return {
+    isolationSafe: true,
+    inheritedAccessNeutralized: true,
+    tagValueNamespacedName: isolationTagValueNamespacedName(bucketName),
+    tagBindingDigestSha256: digest(`tag-${bucketName}`),
+    denyPolicyDigestSha256: digest('isolated-deny-policy'),
+    denyRuleDigestSha256: digest(`deny-rule-${bucketName}`),
+    exceptionPrincipalDigestSha256: digest(`exceptions-${bucketName}`),
+    inheritedStorageIamBindingCount: inheritedBindings.length,
+    inheritedStorageIamDigestSha256: sha256(canonicalJson(normalizedInherited)),
+  };
+};
 
 const counterResponse = (
   totalBytes: number,
@@ -302,11 +344,23 @@ const makePreflight = (
     bucketConfigurationSafe: true,
     iamMatchesFrozenAllowlist: true,
     location: 'US-CENTRAL1',
+    storageClass: 'STANDARD',
     uniformBucketLevelAccess: true,
     publicAccessPrevention: 'enforced',
     versioningEnabled: true,
+    retentionPeriodSeconds: 604800,
+    retentionPolicyLocked: false,
+    softDeleteRetentionSeconds: 604800,
+    isolationSafe: true,
+    inheritedAccessNeutralized: true,
+    isolationTagValueNamespacedName: isolationTagValueNamespacedName(bucket.targetBucket),
+    isolationTagBindingDigestSha256: digest(`tag-${bucket.targetBucket}`),
+    isolationDenyPolicyDigestSha256: digest('isolated-deny-policy'),
+    isolationDenyRuleDigestSha256: digest(`deny-rule-${bucket.targetBucket}`),
+    isolationExceptionPrincipalDigestSha256: digest(`exceptions-${bucket.targetBucket}`),
+    isolationInheritedIamDigestSha256: sha256(canonicalJson([])),
     bucketIamEvidenceDigestSha256: digest(`bucket-iam-${bucket.targetBucket}`),
-    inheritedIamEvidenceDigestSha256: digest(`inherited-iam-${bucket.targetBucket}`),
+    inheritedIamEvidenceDigestSha256: sha256(canonicalJson([])),
     bucketIamBindingCount: bucket.allowedIamBindings.length,
     inheritedStorageIamBindingCount: 0,
     publicIamMemberCount: 0,
@@ -329,6 +383,7 @@ const makePreflight = (
     project: 'hushh-tech-uat',
     region: 'us-central1',
     contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256: isolatedCutoverContractFileDigestSha256(),
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryDigestSha256: source.digestSha256,
     sourceArtifactDigestSha256: source.sourceArtifactDigestSha256,
@@ -380,6 +435,8 @@ const makeApprovalFixture = () => {
     approvedAt: '2026-08-21T12:00:00Z',
     expiresAt: '2026-08-21T13:30:00Z',
     contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256:
+      isolatedCutoverContractFileDigestSha256(),
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryFileDigestSha256: sourceFileDigestSha256,
     sourceInventoryDigestSha256: plan.sourceInventoryDigestSha256,
@@ -473,7 +530,7 @@ describe('storage live inventory and create-only copy safety', () => {
       objectKey: 'outside-migration-namespace',
     } as never)).rejects.toMatchObject({ code: 'GCP_WRITE_TARGET_BLOCKED' });
     await expect(client.getObject(
-      'hushh-tech-assets-legal-uat',
+      'hushh-tech-cutover-v1-assets-legal-uat',
       '_hushh_migrations/supabase-cutover-v1/community-uploads/' + 'a'.repeat(64) + '/' + 'f'.repeat(64),
     )).rejects.toMatchObject({ code: 'GCP_WRITE_TARGET_BLOCKED' });
     await expect(client.listMigrationObjects('hushh-tech-prod-arbitrary'))
@@ -931,25 +988,19 @@ describe('storage live inventory and create-only copy safety', () => {
     };
     const unrelated = Array.from({ length: 563 }, (_, index) => ({
       name: `existing-community/${index}`,
-      bucket: 'hushh-tech-community-content-uat',
+      bucket: 'hushh-tech-cutover-v1-community-content-uat',
       generation: String(index + 1),
       size: '1',
     }));
     const gcsClient = {
-      getBucket: async (bucketName: string) => ({
-        name: bucketName,
-        location: 'US-CENTRAL1',
-        iamConfiguration: {
-          uniformBucketLevelAccess: { enabled: true },
-          publicAccessPrevention: 'enforced',
-        },
-        versioning: { enabled: true },
-      }),
+      getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => ({ bucketBindings: [], inheritedBindings: [] }),
+      inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+        safeIsolationEvidence(bucketName, inheritedBindings),
       listObjects: async (bucketName: string) => [
         ...(bucketName === firstBucket.targetBucket ? [existing] : []),
-        ...(bucketName === 'hushh-tech-community-content-uat' ? unrelated : []),
+        ...(bucketName === 'hushh-tech-cutover-v1-community-content-uat' ? unrelated : []),
       ],
       hashObject: async () => ({
         sizeBytes: first.sizeBytes,
@@ -983,18 +1034,12 @@ describe('storage live inventory and create-only copy safety', () => {
   it('fails closed when any unknown object occupies the migration namespace', async () => {
     const records = makeSourceRecords();
     const gcsClient = {
-      getBucket: async (bucketName: string) => ({
-        name: bucketName,
-        location: 'US-CENTRAL1',
-        iamConfiguration: {
-          uniformBucketLevelAccess: { enabled: true },
-          publicAccessPrevention: 'enforced',
-        },
-        versioning: { enabled: true },
-      }),
+      getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => ({ bucketBindings: [], inheritedBindings: [] }),
-      listObjects: async (bucketName: string) => bucketName === 'hushh-tech-assets-legal-uat'
+      inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+        safeIsolationEvidence(bucketName, inheritedBindings),
+      listObjects: async (bucketName: string) => bucketName === 'hushh-tech-cutover-v1-assets-legal-uat'
         ? [{
             name: `${COPY_POLICY_CANDIDATE.copyPolicy.migrationNamespace}/assets/${'f'.repeat(64)}`,
             bucket: bucketName,
@@ -1007,6 +1052,47 @@ describe('storage live inventory and create-only copy safety', () => {
     await expect(collectLiveTargetPreflight({ gcsClient, sourceRecords: records })).rejects.toMatchObject({
       code: 'TARGET_MIGRATION_NAMESPACE_OCCUPIED',
     });
+  });
+
+  it('rejects group and external principals added at the bucket policy layer', async () => {
+    const records = makeSourceRecords();
+    let policyIndex = 0;
+    const gcsClient = {
+      getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
+      getBucketIam: async () => ({ bindings: [] }),
+      inspectIam: () => {
+        const bucket = STORAGE_CUTOVER_CONTRACT.buckets[policyIndex];
+        policyIndex += 1;
+        return {
+          bucketBindings: policyIndex === 1
+            ? [
+                ...bucket.allowedIamBindings,
+                {
+                  role: 'roles/storage.objectViewer',
+                  members: [
+                    'group:external-storage@example.com',
+                    'principalSet://iam.googleapis.com/locations/global/workforcePools/external/*',
+                  ],
+                  conditionDigestSha256: null,
+                },
+              ]
+            : bucket.allowedIamBindings,
+          inheritedBindings: [],
+        };
+      },
+      inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+        safeIsolationEvidence(bucketName, inheritedBindings),
+      listObjects: async () => [],
+      hashObject: async () => { throw new Error('must not hash absent targets'); },
+    };
+    const preflight = await collectLiveTargetPreflight({
+      gcsClient,
+      sourceRecords: records,
+      collectedAt: '2026-08-21T12:00:00Z',
+    });
+    expect(preflight.buckets.some((bucket: JsonRecord) =>
+      bucket.iamMatchesFrozenAllowlist === false)).toBe(true);
+    expect(preflight.blockers).toContain('TARGET_IAM_NOT_FROZEN_ALLOWLIST');
   });
 
   it('creates an immutable version for same-key changed bytes and no-ops the unchanged version', async () => {
@@ -1062,21 +1148,15 @@ describe('storage live inventory and create-only copy safety', () => {
     const makeGcsClient = (objects: JsonRecord[]) => {
       let policyIndex = 0;
       return {
-        getBucket: async (bucketName: string) => ({
-          name: bucketName,
-          location: 'US-CENTRAL1',
-          iamConfiguration: {
-            uniformBucketLevelAccess: { enabled: true },
-            publicAccessPrevention: 'enforced',
-          },
-          versioning: { enabled: true },
-        }),
+        getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
         getBucketIam: async () => ({ bindings: [] }),
         inspectIam: () => {
           const bucket = STORAGE_CUTOVER_CONTRACT.buckets[policyIndex];
           policyIndex += 1;
           return { bucketBindings: bucket.allowedIamBindings, inheritedBindings: [] };
         },
+        inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+          safeIsolationEvidence(bucketName, inheritedBindings),
         listObjects: async (bucketName: string) => objects.filter(
           (object) => object.bucket === bucketName,
         ),
@@ -1232,21 +1312,15 @@ describe('storage live inventory and create-only copy safety', () => {
     });
     let policyIndex = 0;
     const gcsClient = {
-      getBucket: async (bucketName: string) => ({
-        name: bucketName,
-        location: 'US-CENTRAL1',
-        iamConfiguration: {
-          uniformBucketLevelAccess: { enabled: true },
-          publicAccessPrevention: 'enforced',
-        },
-        versioning: { enabled: true },
-      }),
+      getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => {
         const bucket = STORAGE_CUTOVER_CONTRACT.buckets[policyIndex];
         policyIndex += 1;
         return { bucketBindings: bucket.allowedIamBindings, inheritedBindings: [] };
       },
+      inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+        safeIsolationEvidence(bucketName, inheritedBindings),
       listObjects: async (bucketName: string) => baselineTargets.filter(
         (object) => object.bucket === bucketName,
       ),
@@ -1449,7 +1523,7 @@ describe('storage live inventory and create-only copy safety', () => {
       ...finalGcsClient,
       listMigrationObjects: async (bucketName: string) => [
         ...await finalGcsClient.listMigrationObjects(bucketName),
-        ...(bucketName === 'hushh-tech-assets-legal-uat' ? [{
+        ...(bucketName === 'hushh-tech-cutover-v1-assets-legal-uat' ? [{
           name: `${COPY_POLICY_CANDIDATE.copyPolicy.migrationNamespace}/assets/${'a'.repeat(64)}/${'b'.repeat(64)}`,
           bucket: bucketName,
           generation: '88888',
@@ -1657,7 +1731,7 @@ describe('storage live inventory and create-only copy safety', () => {
           return new Response(null, {
             status: 200,
             headers: {
-              location: 'https://storage.googleapis.com/upload/storage/v1/b/hushh-tech-assets-legal-uat/o?upload_id=safe',
+              location: 'https://storage.googleapis.com/upload/storage/v1/b/hushh-tech-cutover-v1-assets-legal-uat/o?upload_id=safe',
             },
           });
         }
@@ -1667,7 +1741,7 @@ describe('storage live inventory and create-only copy safety', () => {
     });
     try {
       await expect(client.uploadCreateOnly({
-        bucketName: 'hushh-tech-assets-legal-uat',
+        bucketName: 'hushh-tech-cutover-v1-assets-legal-uat',
         objectKey: '_hushh_migrations/supabase-cutover-v1/assets/' + 'a'.repeat(64) + '/' + 'f'.repeat(64),
         fileDescriptor: readDescriptor,
         sizeBytes: 3,
@@ -1702,7 +1776,7 @@ describe('storage live inventory and create-only copy safety', () => {
           return new Response(null, {
             status: 200,
             headers: {
-              location: 'https://storage.googleapis.com/upload/storage/v1/b/hushh-tech-assets-legal-uat/o?upload_id=safe',
+              location: 'https://storage.googleapis.com/upload/storage/v1/b/hushh-tech-cutover-v1-assets-legal-uat/o?upload_id=safe',
             },
           });
         }
@@ -1715,7 +1789,7 @@ describe('storage live inventory and create-only copy safety', () => {
           uploadedBytes = Buffer.concat(chunks);
           return new Response(JSON.stringify({
             name: '_hushh_migrations/test',
-            bucket: 'hushh-tech-assets-legal-uat',
+            bucket: 'hushh-tech-cutover-v1-assets-legal-uat',
             generation: '7',
             size: '3',
             crc32c: crc32c('abc'),
@@ -1730,7 +1804,7 @@ describe('storage live inventory and create-only copy safety', () => {
     renameSync(filePath, originalPath);
     writeFileSync(filePath, 'evil', { mode: 0o600 });
     await expect(client.uploadCreateOnly({
-      bucketName: 'hushh-tech-assets-legal-uat',
+      bucketName: 'hushh-tech-cutover-v1-assets-legal-uat',
       objectKey: '_hushh_migrations/supabase-cutover-v1/assets/' + 'a'.repeat(64) + '/' + 'f'.repeat(64),
       fileDescriptor: descriptor,
       sizeBytes: 3,
@@ -1768,7 +1842,7 @@ describe('storage live inventory and create-only copy safety', () => {
       },
     });
     await expect(client.uploadCreateOnly({
-      bucketName: 'hushh-tech-assets-legal-uat',
+      bucketName: 'hushh-tech-cutover-v1-assets-legal-uat',
       objectKey: '_hushh_migrations/supabase-cutover-v1/assets/' + 'a'.repeat(64) + '/' + 'f'.repeat(64),
       fileDescriptor: descriptor,
       sizeBytes: 3,
@@ -1801,7 +1875,7 @@ describe('storage live inventory and create-only copy safety', () => {
       }),
     });
     await expect(client.getObject(
-      'hushh-tech-assets-legal-uat',
+      'hushh-tech-cutover-v1-assets-legal-uat',
       '_hushh_migrations/supabase-cutover-v1/assets/' + 'a'.repeat(64) + '/' + 'f'.repeat(64),
     ))
       .rejects.toMatchObject({ code: 'TARGET_OBJECT_READ_INVALID' });

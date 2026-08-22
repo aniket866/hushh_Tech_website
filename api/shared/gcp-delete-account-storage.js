@@ -14,11 +14,11 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 const UAT_BUCKETS = Object.freeze({
   assets: Object.freeze({
-    targetBucket: "hushh-tech-assets-legal-uat",
+    targetBucket: "hushh-tech-cutover-v1-assets-legal-uat",
     targetAccessMode: "PRIVATE_SERVICE_OR_SIGNED_URL",
   }),
   "hushh-ai-media": Object.freeze({
-    targetBucket: "hushh-tech-ai-media-uat",
+    targetBucket: "hushh-tech-cutover-v1-ai-media-uat",
     targetAccessMode: "PRIVATE_OWNER_SIGNED_URL",
   }),
 });
@@ -73,6 +73,9 @@ const canonicalJson = (value) => {
   }
   return JSON.stringify(value);
 };
+
+export const gcpDeleteAccountStorageBucketMappingDigestSha256 = () =>
+  sha256(canonicalJson(UAT_BUCKETS));
 
 const fail = (code, message) => {
   const error = new Error(message);
@@ -318,6 +321,7 @@ export const buildGcpDeleteAccountStorageBindingDigest = ({
   environment,
   manifestDigestSha256,
   activationDigestSha256,
+  bucketMappingDigestSha256: gcpDeleteAccountStorageBucketMappingDigestSha256(),
 }));
 
 export function createMetadataServerTokenProvider({ fetchImpl = fetch, now = Date.now } = {}) {

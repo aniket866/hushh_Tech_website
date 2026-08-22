@@ -8,6 +8,7 @@ import {
   buildGcpDeleteAccountStorageBindingDigest,
   createGcpDeleteAccountStorageAdapterFromEnv,
   createMetadataServerTokenProvider,
+  gcpDeleteAccountStorageBucketMappingDigestSha256,
 } from "../api/shared/gcp-delete-account-storage.js";
 
 const sha256 = (value: string | Buffer) =>
@@ -129,6 +130,9 @@ describe("GCP delete-account storage adapter", () => {
   });
 
   it("is default-off and requires an exact activation binding", () => {
+    expect(gcpDeleteAccountStorageBucketMappingDigestSha256()).toBe(
+      sha256(__testing.canonicalJson(__testing.UAT_BUCKETS))
+    );
     expect(() => createGcpDeleteAccountStorageAdapterFromEnv({})).toThrowError(
       expect.objectContaining({ code: "GCP_DELETE_ACCOUNT_STORAGE_DISABLED" })
     );
@@ -140,6 +144,16 @@ describe("GCP delete-account storage adapter", () => {
       activationDigestSha256: "b".repeat(64),
       bindingDigestSha256: "c".repeat(64),
     })).toThrowError(expect.objectContaining({ code: "GCP_STORAGE_NOT_RECONCILED" }));
+  });
+
+  it("rejects immutable objects returned from the superseded UAT bucket mapping", async () => {
+    const object = createMigrationObject();
+    object.bucket = "hushh-tech-ai-media-uat";
+    const fetchMock = vi.fn(async () => jsonResponse({ items: [object] })) as typeof fetch;
+    await expect(createAdapter(fetchMock).listSourcePrefix(
+      "hushh-ai-media",
+      "user-123"
+    )).rejects.toMatchObject({ code: "GCP_STORAGE_OBJECT_INVALID" });
   });
 
   it("lists only exact immutable GCS migration objects under the requested source prefix", async () => {
@@ -166,7 +180,7 @@ describe("GCP delete-account storage adapter", () => {
     expect(objects).toHaveLength(1);
     expect(objects[0]).toMatchObject({
       sourceObjectKey: "user-123/media.png",
-      targetBucket: "hushh-tech-ai-media-uat",
+      targetBucket: "hushh-tech-cutover-v1-ai-media-uat",
       generation: "101",
     });
   });
@@ -217,7 +231,7 @@ describe("GCP delete-account storage adapter", () => {
       if (method === "POST") {
         const parsed = parseMultipartUpload(
           init || {},
-          "hushh-tech-ai-media-uat",
+          "hushh-tech-cutover-v1-ai-media-uat",
           String(tombstoneGeneration++)
         );
         calls.push({ method, url, body: parsed.bodyBytes });

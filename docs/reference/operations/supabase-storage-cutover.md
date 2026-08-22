@@ -8,16 +8,16 @@ The 2026-08-20 source snapshot is locked to six buckets, 124 objects, and 111,07
 
 | Supabase bucket | Public at freeze | Objects | Bytes | UAT Google Cloud Storage bucket | Target delivery |
 | --- | ---: | ---: | ---: | --- | --- |
-| `assets` | yes | 5 | 19,971,280 | `hushh-tech-assets-legal-uat` | private service or five-minute signed URL |
-| `community-uploads` | yes | 115 | 81,259,134 | `hushh-tech-community-content-uat` | private storage; reviewed content may use the controlled media host |
-| `hushh-agent-profile-images` | yes | 1 | 716,241 | `hushh-tech-profile-images-uat` | private original; controlled public rendition only |
-| `hushh-ai-media` | yes | 0 | 0 | `hushh-tech-ai-media-uat` | owner-scoped private access |
-| `hushh-gamma-pdf` | yes | 3 | 9,131,742 | `hushh-tech-reports-uat` | private five-minute signed URL |
-| `wa-evidence` | no | 0 | 0 | `hushh-tech-wa-evidence-uat` | Google service identity only |
+| `assets` | yes | 5 | 19,971,280 | `hushh-tech-cutover-v1-assets-legal-uat` | private service or five-minute signed URL |
+| `community-uploads` | yes | 115 | 81,259,134 | `hushh-tech-cutover-v1-community-content-uat` | private storage; reviewed content may use the controlled media host |
+| `hushh-agent-profile-images` | yes | 1 | 716,241 | `hushh-tech-cutover-v1-profile-images-uat` | private original; controlled public rendition only |
+| `hushh-ai-media` | yes | 0 | 0 | `hushh-tech-cutover-v1-ai-media-uat` | owner-scoped private access |
+| `hushh-gamma-pdf` | yes | 3 | 9,131,742 | `hushh-tech-cutover-v1-reports-uat` | private five-minute signed URL |
+| `wa-evidence` | no | 0 | 0 | `hushh-tech-cutover-v1-wa-evidence-uat` | Google service identity only |
 
-Every target bucket must use uniform bucket-level access and enforced public-access prevention. A public Supabase source bucket does not authorize a public object access control list in Google Cloud Storage. Public delivery is a separate, reviewed application/media-route decision.
+Every target bucket must use uniform bucket-level access, enforced public-access prevention, versioning, seven-day unlocked retention, and seven-day soft delete. Each cutover bucket has an exact isolation tag and a tag-scoped deny rule that neutralizes inherited storage access except for the bucket's frozen writer, reader, and audit service accounts. The preflight rejects a missing tag, changed deny rule, unexpected bucket principal, or inherited storage access on any exception identity. The six superseded UAT buckets and their 563 unrelated objects remain untouched. A public Supabase source bucket does not authorize a public object access control list in Google Cloud Storage. Public delivery is a separate, reviewed application/media-route decision.
 
-The machine-readable source of truth is `migration/storage/supabase-storage-cutover.v1.json`.
+The machine-readable sources of truth are `migration/storage/supabase-storage-cutover.v1.json` and `migration/storage/supabase-storage-isolated-cutover-uat.v1.json`.
 
 ## Private inventory input
 
@@ -64,7 +64,7 @@ The target header records the UAT project, region, current object and byte total
 Each target bucket must include this security evidence:
 
 ```json
-{"recordType":"targetBucket","bucketName":"hushh-tech-assets-legal-uat","uniformBucketLevelAccess":true,"publicAccessPrevention":"enforced","publicIamMembers":[],"location":"US-CENTRAL1","versioningEnabled":true,"iamEvidenceScope":"EFFECTIVE_PROJECT_AND_BUCKET","bucketIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"inheritedIamBindings":[],"effectiveIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"iamPolicyDigestSha256":"<lowercase-sha256>"}
+{"recordType":"targetBucket","bucketName":"hushh-tech-cutover-v1-assets-legal-uat","uniformBucketLevelAccess":true,"publicAccessPrevention":"enforced","publicIamMembers":[],"location":"US-CENTRAL1","versioningEnabled":true,"iamEvidenceScope":"EFFECTIVE_PROJECT_AND_BUCKET","bucketIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"inheritedIamBindings":[],"effectiveIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"iamPolicyDigestSha256":"<lowercase-sha256>"}
 ```
 
 The normalized bucket policy and effective project-plus-bucket policy must exactly match the per-bucket service-account/role allowlist. The evidence exporter must include every project, folder, or organization binding that grants storage data-plane or administration access; this contract requires that inherited set to be empty. Public principals, basic project principals, legacy roles, conditional bindings, domains, groups, users, external-project service identities, and unlisted service identities fail closed. The policy digest binds the evidence scope, bucket bindings, inherited bindings, and effective bindings.
@@ -74,7 +74,7 @@ Each approved signing identity has a separate evidence record that binds the buc
 Each target object record carries the original key privately, a positive Google Cloud Storage generation, and all parity fields:
 
 ```json
-{"recordType":"targetObject","sourceBucketId":"assets","sourceObjectKey":"<private-object-key>","targetBucket":"hushh-tech-assets-legal-uat","targetObjectKey":"<same-private-object-key>","generation":"123456789","sizeBytes":123,"mimeType":"application/octet-stream","sourceUpdatedAtMetadata":"2026-08-20T20:14:47Z","sourceCacheControlMetadata":"<legacy provenance or null>","servingCacheControl":"private, no-store","sha256":"<lowercase-sha256>","accessMode":"PRIVATE_SERVICE_OR_SIGNED_URL","publicAcl":false}
+{"recordType":"targetObject","sourceBucketId":"assets","sourceObjectKey":"<private-object-key>","targetBucket":"hushh-tech-cutover-v1-assets-legal-uat","targetObjectKey":"<same-private-object-key>","generation":"123456789","sizeBytes":123,"mimeType":"application/octet-stream","sourceUpdatedAtMetadata":"2026-08-20T20:14:47Z","sourceCacheControlMetadata":"<legacy provenance or null>","servingCacheControl":"private, no-store","sha256":"<lowercase-sha256>","accessMode":"PRIVATE_SERVICE_OR_SIGNED_URL","publicAcl":false}
 ```
 
 Reconciliation requires exact bucket, key, byte, Multipurpose Internet Mail Extensions (MIME) type, source timestamp metadata, legacy cache provenance, safe target serving cache policy, SHA-256, access mode, and generation-bearing target evidence. Every inventory and evidence record uses an exact field schema. A raw target `cacheControl` field that contradicts `private, no-store` is rejected; legacy public cache directives are retained only as provenance and are never installed as the serving policy for private originals.

@@ -11,6 +11,7 @@ import {
   MAXIMUM_PRIVATE_INPUT_BYTES,
   calculateSelfBoundDigest,
   canonicalJson,
+  contractFileDigestSha256,
   fail,
   readPrivateArtifact,
   requireExactKeys,
@@ -19,6 +20,7 @@ import {
   requireSha256,
   sha256,
 } from "./storage-live-common.mjs";
+import { isolatedCutoverContractFileDigestSha256 } from "./storage-isolated-cutover-contract.mjs";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 export const SEVEN_BUCKET_CONTRACT_PATH = resolve(
@@ -113,6 +115,7 @@ const CONTRACT_KEYS = [
 
 const KNOWN_SIX_KEYS = [
   "contractFileDigestSha256",
+  "isolatedCutoverContractFileDigestSha256",
   "bucketCount",
   "objectCount",
   "totalBytes",
@@ -214,7 +217,9 @@ const FROZEN_CONTRACT = {
   totalBytes: 1_574_621_367,
   knownSix: {
     contractFileDigestSha256:
-      "2dc544e786df5c640b631a24e5bd43b7e3d5e06c60715f23ab5a872d69fa39ac",
+      "8933795990bb2057a4f7a326ab95da6fec9c790d072a775e070a6ee8e29a1918",
+    isolatedCutoverContractFileDigestSha256:
+      "d7bbe1113ad0d1953a25520dfd3e8114281d6dd214ca5b40a48c03ef20d73a8c",
     bucketCount: 6,
     objectCount: 124,
     totalBytes: 111_078_397,
@@ -266,7 +271,7 @@ const FROZEN_ACTIVATION = {
   environment: "uat",
   project: "hushh-tech-uat",
   contractFileDigestSha256:
-    "89492bb9db5d29ff5b3c1c54e204fbb72039281f7be51db78d33eda0565ab188",
+    "4a8655574433c68256e66c8793c82fd9580aad9af257dee9d20141648e37b6a4",
   executionPolicy: {
     createOnly: true,
     ifGenerationMatch: 0,
@@ -278,7 +283,7 @@ const FROZEN_ACTIVATION = {
     executionActivated: true,
   },
   activationDigestSha256:
-    "ade67e814beeb2279e391e63a5b86bde4143a6bfb89cb4df2eb48f442e208919",
+    "95162b2acad16b8fc20e1350db8093911a43092597b631550fe2c8b1d9984a33",
 };
 
 export const validateSevenBucketContract = (contract = SEVEN_BUCKET_CONTRACT) => {
@@ -299,6 +304,13 @@ export const validateSevenBucketContract = (contract = SEVEN_BUCKET_CONTRACT) =>
   );
   if (canonicalJson(contract) !== canonicalJson(FROZEN_CONTRACT)) {
     fail("SEVEN_BUCKET_CONTRACT_DRIFT", "The canonical seven-bucket contract changed.");
+  }
+  if (
+    contract.knownSix.contractFileDigestSha256 !== contractFileDigestSha256() ||
+    contract.knownSix.isolatedCutoverContractFileDigestSha256 !==
+      isolatedCutoverContractFileDigestSha256()
+  ) {
+    fail("SEVEN_BUCKET_KNOWN_SIX_CONTRACT_DRIFT", "The known-six isolated target contracts changed.");
   }
   return contract;
 };

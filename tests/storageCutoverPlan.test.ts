@@ -371,12 +371,12 @@ describe('Supabase storage cutover contract', () => {
     expect(
       STORAGE_CUTOVER_CONTRACT.buckets.map((bucket: { targetBucket: string }) => bucket.targetBucket),
     ).toEqual([
-      'hushh-tech-assets-legal-uat',
-      'hushh-tech-community-content-uat',
-      'hushh-tech-profile-images-uat',
-      'hushh-tech-ai-media-uat',
-      'hushh-tech-reports-uat',
-      'hushh-tech-wa-evidence-uat',
+      'hushh-tech-cutover-v1-assets-legal-uat',
+      'hushh-tech-cutover-v1-community-content-uat',
+      'hushh-tech-cutover-v1-profile-images-uat',
+      'hushh-tech-cutover-v1-ai-media-uat',
+      'hushh-tech-cutover-v1-reports-uat',
+      'hushh-tech-cutover-v1-wa-evidence-uat',
     ]);
   });
 
@@ -903,7 +903,7 @@ describe('dry-run copy, delta, and checkpoint plans', () => {
       recordType: 'targetObject',
       sourceBucketId: 'assets',
       sourceObjectKey: changedObject?.objectKey,
-      targetBucket: 'hushh-tech-assets-legal-uat',
+      targetBucket: 'hushh-tech-cutover-v1-assets-legal-uat',
       targetObjectKey: changedObject?.objectKey,
       generation: '999999999',
       sizeBytes: changedObject?.sizeBytes,

@@ -28,6 +28,10 @@ import {
   performSeventhCreateOnlyCopy,
 } from "./storage-seventh-quarantine-executor.mjs";
 import {
+  isolatedCutoverContractFileDigestSha256,
+  validateIsolatedCutoverContract,
+} from "./storage-isolated-cutover-contract.mjs";
+import {
   calculateSelfBoundDigest,
   canonicalJson,
   fail,
@@ -51,6 +55,7 @@ const APPROVAL_KEYS = [
   "reviewedCommitSha",
   "activationFileDigestSha256",
   "activationDigestSha256",
+  "isolatedCutoverContractFileDigestSha256",
   "contractState",
   "executionActivated",
   "changeManifestFileDigestSha256",
@@ -305,6 +310,7 @@ export const buildCombinedSevenBucketPlan = ({
 }) => {
   validateSevenBucketContract();
   validateSevenBucketActivation(activation);
+  validateIsolatedCutoverContract();
   validateCombinedChangeManifest(changeManifest);
   validateKnownSixSource(knownSource);
   validateKnownSixPlan(knownSixPlan, knownSource);
@@ -357,6 +363,8 @@ export const buildCombinedSevenBucketPlan = ({
     contractFileDigestSha256: sevenBucketContractFileDigestSha256(),
     activationFileDigestSha256: sevenBucketActivationFileDigestSha256(),
     activationDigestSha256: activation.activationDigestSha256,
+    isolatedCutoverContractFileDigestSha256:
+      isolatedCutoverContractFileDigestSha256(),
     contractState: activation.contractState,
     executionActivated: activation.executionPolicy.executionActivated,
     reviewedCommitSha,
@@ -446,6 +454,7 @@ export const validateCombinedSevenBucketApproval = ({
   for (const field of [
     "activationFileDigestSha256",
     "activationDigestSha256",
+    "isolatedCutoverContractFileDigestSha256",
     "changeManifestFileDigestSha256",
     "changeManifestDigestSha256",
     "planFileDigestSha256",
@@ -464,6 +473,8 @@ export const validateCombinedSevenBucketApproval = ({
     [approval.reviewedCommitSha, plan.reviewedCommitSha],
     [approval.activationFileDigestSha256, plan.activationFileDigestSha256],
     [approval.activationDigestSha256, plan.activationDigestSha256],
+    [approval.isolatedCutoverContractFileDigestSha256,
+      plan.isolatedCutoverContractFileDigestSha256],
     [approval.contractState, plan.contractState],
     [approval.executionActivated, plan.executionActivated],
     [approval.changeManifestFileDigestSha256, plan.changeManifestFileDigestSha256],
@@ -589,7 +600,9 @@ export const executeCombinedSixPlusOne = async ({
     plan?.contractState !== activation.contractState ||
     plan?.executionActivated !== true ||
     plan?.activationDigestSha256 !== activation.activationDigestSha256 ||
-    plan?.activationFileDigestSha256 !== sevenBucketActivationFileDigestSha256()
+    plan?.activationFileDigestSha256 !== sevenBucketActivationFileDigestSha256() ||
+    plan?.isolatedCutoverContractFileDigestSha256 !==
+      isolatedCutoverContractFileDigestSha256()
   ) {
     fail(
       "COMBINED_UAT_ACTIVATION_REQUIRED",

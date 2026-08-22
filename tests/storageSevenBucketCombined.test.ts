@@ -354,6 +354,8 @@ describe("combined canonical seven-bucket migration", () => {
       reviewedCommitSha: plan.reviewedCommitSha,
       activationFileDigestSha256: plan.activationFileDigestSha256,
       activationDigestSha256: plan.activationDigestSha256,
+      isolatedCutoverContractFileDigestSha256:
+        plan.isolatedCutoverContractFileDigestSha256,
       contractState: plan.contractState,
       executionActivated: plan.executionActivated,
       changeManifestFileDigestSha256: plan.changeManifestFileDigestSha256,
@@ -442,6 +444,24 @@ describe("combined canonical seven-bucket migration", () => {
       createDependencies,
     })).rejects.toBe(constructionSentinel);
     expect(createDependencies).toHaveBeenCalledOnce();
+  });
+
+  it("touches zero dependencies when the isolated target contract digest changes", async () => {
+    const { plan, knownSource, seventhSource } = createCombinedPlan();
+    const createDependencies = vi.fn();
+    await expect(executeCombinedSixPlusOne({
+      activation: SEVEN_BUCKET_ACTIVATION,
+      approvalValidation: { valid: true },
+      plan: {
+        ...plan,
+        isolatedCutoverContractFileDigestSha256: "0".repeat(64),
+      },
+      approval: {},
+      knownSource,
+      seventhSource,
+      createDependencies,
+    })).rejects.toMatchObject({ code: "COMBINED_UAT_ACTIVATION_REQUIRED" });
+    expect(createDependencies).not.toHaveBeenCalled();
   });
 
   it("rejects a forged known-six callback instead of invoking caller-supplied copy logic", async () => {

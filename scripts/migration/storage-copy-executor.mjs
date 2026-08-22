@@ -69,6 +69,11 @@ import {
   sevenBucketActivationFileDigestSha256,
   validateSevenBucketActivation,
 } from "./storage-seven-bucket-contract.mjs";
+import {
+  ISOLATED_CUTOVER_CONTRACT,
+  isolatedCutoverContractFileDigestSha256,
+  validateIsolatedCutoverContract,
+} from "./storage-isolated-cutover-contract.mjs";
 
 export const COPY_PLAN_SCHEMA = "gcs-storage-create-only-plan-v1";
 export const COPY_APPROVAL_SCHEMA = "gcs-storage-copy-approval-v1";
@@ -118,6 +123,7 @@ const validatePreflight = (artifact, source) => {
       "project",
       "region",
       "contractFileDigestSha256",
+      "isolatedCutoverContractFileDigestSha256",
       "copyPolicyCandidateFileDigestSha256",
       "sourceInventoryDigestSha256",
       "sourceArtifactDigestSha256",
@@ -153,6 +159,8 @@ const validatePreflight = (artifact, source) => {
   requireIsoTimestamp(artifact.collectedAt, "TARGET_PREFLIGHT_TIME_INVALID", "target preflight time");
   if (
     artifact.contractFileDigestSha256 !== contractFileDigestSha256() ||
+    artifact.isolatedCutoverContractFileDigestSha256 !==
+      isolatedCutoverContractFileDigestSha256() ||
     artifact.copyPolicyCandidateFileDigestSha256 !== copyPolicyCandidateFileDigestSha256()
   ) {
     fail("TARGET_PREFLIGHT_POLICY_DRIFT", "The target preflight policy digest changed.");
@@ -211,9 +219,21 @@ const validatePreflight = (artifact, source) => {
         "bucketConfigurationSafe",
         "iamMatchesFrozenAllowlist",
         "location",
+        "storageClass",
         "uniformBucketLevelAccess",
         "publicAccessPrevention",
         "versioningEnabled",
+        "retentionPeriodSeconds",
+        "retentionPolicyLocked",
+        "softDeleteRetentionSeconds",
+        "isolationSafe",
+        "inheritedAccessNeutralized",
+        "isolationTagValueNamespacedName",
+        "isolationTagBindingDigestSha256",
+        "isolationDenyPolicyDigestSha256",
+        "isolationDenyRuleDigestSha256",
+        "isolationExceptionPrincipalDigestSha256",
+        "isolationInheritedIamDigestSha256",
         "bucketIamEvidenceDigestSha256",
         "inheritedIamEvidenceDigestSha256",
         "bucketIamBindingCount",
@@ -255,19 +275,46 @@ const validatePreflight = (artifact, source) => {
     }
     requireSha256(bucketEvidence.bucketIamEvidenceDigestSha256, "TARGET_PREFLIGHT_IAM_DIGEST_INVALID", "bucket IAM evidence digest");
     requireSha256(bucketEvidence.inheritedIamEvidenceDigestSha256, "TARGET_PREFLIGHT_IAM_DIGEST_INVALID", "inherited IAM evidence digest");
+    for (const [field, label] of [
+      ["isolationTagBindingDigestSha256", "isolation tag-binding digest"],
+      ["isolationDenyPolicyDigestSha256", "isolation deny-policy digest"],
+      ["isolationDenyRuleDigestSha256", "isolation deny-rule digest"],
+      ["isolationExceptionPrincipalDigestSha256", "isolation exception-principal digest"],
+      ["isolationInheritedIamDigestSha256", "isolation inherited-IAM digest"],
+    ]) {
+      requireSha256(
+        bucketEvidence[field],
+        "TARGET_PREFLIGHT_ISOLATION_DIGEST_INVALID",
+        label,
+      );
+    }
     requireSha256(bucketEvidence.unmanagedInventoryDigestSha256, "TARGET_PREFLIGHT_UNMANAGED_DIGEST_INVALID", "unmanaged inventory digest");
     requireSha256(bucketEvidence.retainedHistoricalObjectSetDigestSha256, "TARGET_PREFLIGHT_HISTORY_DIGEST_INVALID", "retained historical object-set digest");
     const recomputedConfigurationSafe =
       bucketEvidence.location === STORAGE_CUTOVER_CONTRACT.targetPolicy.bucketLocation &&
+      bucketEvidence.storageClass === ISOLATED_CUTOVER_CONTRACT.storageClass &&
       bucketEvidence.uniformBucketLevelAccess === true &&
       bucketEvidence.publicAccessPrevention === "enforced" &&
       bucketEvidence.versioningEnabled === true &&
+      bucketEvidence.retentionPeriodSeconds ===
+        ISOLATED_CUTOVER_CONTRACT.retentionPeriodSeconds &&
+      bucketEvidence.retentionPolicyLocked === false &&
+      bucketEvidence.softDeleteRetentionSeconds ===
+        ISOLATED_CUTOVER_CONTRACT.softDeleteRetentionSeconds &&
       bucketEvidence.publicIamMemberCount === 0;
     if (bucketEvidence.bucketConfigurationSafe !== recomputedConfigurationSafe) {
       fail("TARGET_PREFLIGHT_BUCKET_SAFETY_MISMATCH", "A target bucket safety result is inconsistent.");
     }
     if (
       typeof bucketEvidence.iamMatchesFrozenAllowlist !== "boolean" ||
+      bucketEvidence.isolationSafe !== true ||
+      bucketEvidence.inheritedAccessNeutralized !== true ||
+      bucketEvidence.isolationInheritedIamDigestSha256 !==
+        bucketEvidence.inheritedIamEvidenceDigestSha256 ||
+      typeof bucketEvidence.isolationTagValueNamespacedName !== "string" ||
+      !bucketEvidence.isolationTagValueNamespacedName.startsWith(
+        `${ISOLATED_CUTOVER_CONTRACT.isolationTagKey}/`,
+      ) ||
       bucketEvidence.expectedMigrationObjectCount !==
         expectedLiveObjectsByTargetBucket.get(bucketEvidence.bucketName) ||
       bucketEvidence.existingMigrationObjectCount > bucketEvidence.expectedMigrationObjectCount ||
@@ -293,6 +340,7 @@ const validatePreflight = (artifact, source) => {
   ) {
     fail("TARGET_PREFLIGHT_AGGREGATE_MISMATCH", "Target preflight aggregates do not reconcile.");
   }
+  validateIsolatedCutoverContract();
   const sourceByObjectId = new Map(source.objects.map((object) => [sourceObjectId(object), object]));
   const allowedHistoricalObjectIds = new Set([
     ...sourceByObjectId.keys(),
@@ -509,6 +557,8 @@ export const buildCreateOnlyCopyPlan = (source, preflight) => {
     project: "hushh-tech-uat",
     region: "us-central1",
     contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256:
+      isolatedCutoverContractFileDigestSha256(),
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryDigestSha256: source.digestSha256,
     sourceArtifactDigestSha256: source.sourceArtifactDigestSha256,
@@ -764,6 +814,7 @@ export const validateCopyApproval = ({
       "approvedAt",
       "expiresAt",
       "contractFileDigestSha256",
+      "isolatedCutoverContractFileDigestSha256",
       "copyPolicyCandidateFileDigestSha256",
       "sourceInventoryFileDigestSha256",
       "sourceInventoryDigestSha256",
@@ -818,6 +869,7 @@ export const validateCopyApproval = ({
   }
   for (const field of [
     "contractFileDigestSha256",
+    "isolatedCutoverContractFileDigestSha256",
     "copyPolicyCandidateFileDigestSha256",
     "sourceInventoryFileDigestSha256",
     "sourceInventoryDigestSha256",
@@ -841,6 +893,8 @@ export const validateCopyApproval = ({
   requireSha256(approvalFileDigestSha256, "COPY_APPROVAL_FILE_DIGEST_INVALID", "approval file digest");
   const exactBindings = [
     [approval.contractFileDigestSha256, contractFileDigestSha256()],
+    [approval.isolatedCutoverContractFileDigestSha256,
+      isolatedCutoverContractFileDigestSha256()],
     [approval.copyPolicyCandidateFileDigestSha256, copyPolicyCandidateFileDigestSha256()],
     [approval.sourceInventoryFileDigestSha256, sourceFileDigestSha256],
     [approval.sourceInventoryDigestSha256, plan.sourceInventoryDigestSha256],
@@ -2170,6 +2224,8 @@ export const buildCopyResultEvidence = ({
     project: "hushh-tech-uat",
     region: "us-central1",
     contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256:
+      isolatedCutoverContractFileDigestSha256(),
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryFileDigestSha256: sourceFileDigestSha256,
     sourceInventoryDigestSha256: source.digestSha256,

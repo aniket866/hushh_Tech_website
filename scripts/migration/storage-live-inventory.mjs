@@ -38,6 +38,12 @@ import {
   validateCopyPolicyCandidate,
 } from "./storage-live-policy.mjs";
 import { SEVEN_BUCKET_CONTRACT } from "./storage-seven-bucket-contract.mjs";
+import {
+  ISOLATED_CUTOVER_CONTRACT,
+  isolatedCutoverContractFileDigestSha256,
+  validateIsolatedBucketAccessEvidence,
+  validateIsolatedCutoverContract,
+} from "./storage-isolated-cutover-contract.mjs";
 
 export const SOURCE_COLLECTION_EVIDENCE_SCHEMA =
   "supabase-storage-live-collection-evidence-v1";
@@ -593,8 +599,10 @@ export class GoogleCloudReadOnlyStorageClient {
     this.project = project;
     this.fetchImpl = fetchImpl;
     this.roleCache = new Map();
+    this.roleDefinitionCache = new Map();
     this.accessToken = null;
     this.inheritedPolicyCache = null;
+    this.isolationDenyPolicyCache = null;
   }
 
   token() {
@@ -737,9 +745,8 @@ export class GoogleCloudReadOnlyStorageClient {
     return policies;
   }
 
-  roleIncludesStorage(role) {
-    if (isStorageRoleName(role)) return true;
-    if (this.roleCache.has(role)) return this.roleCache.get(role);
+  roleDefinition(role) {
+    if (this.roleDefinitionCache.has(role)) return this.roleDefinitionCache.get(role);
     let args;
     if (role.startsWith("projects/")) {
       const [, project, , roleName] = role.split("/");
@@ -754,6 +761,17 @@ export class GoogleCloudReadOnlyStorageClient {
     if (!Array.isArray(description.includedPermissions)) {
       fail("TARGET_IAM_ROLE_UNRESOLVED", "A target IAM role could not be resolved safely.");
     }
+    const definition = {
+      includedPermissions: [...description.includedPermissions].sort(),
+    };
+    this.roleDefinitionCache.set(role, definition);
+    return definition;
+  }
+
+  roleIncludesStorage(role) {
+    if (isStorageRoleName(role)) return true;
+    if (this.roleCache.has(role)) return this.roleCache.get(role);
+    const description = this.roleDefinition(role);
     const relevant = description.includedPermissions.some((permission) =>
       permission.startsWith("storage."),
     );
@@ -766,10 +784,51 @@ export class GoogleCloudReadOnlyStorageClient {
     const inheritedBindings = [];
     for (const { scope, policy } of this.projectAndAncestorPolicies()) {
       for (const binding of normalizePolicyBindings(policy.bindings || [])) {
-        if (this.roleIncludesStorage(binding.role)) inheritedBindings.push({ ...binding, scope });
+        if (!this.roleIncludesStorage(binding.role)) continue;
+        if (binding.role === ISOLATED_CUTOVER_CONTRACT.inspectorRole) {
+          const definition = this.roleDefinition(binding.role);
+          inheritedBindings.push({
+            ...binding,
+            scope,
+            roleIncludedPermissions: definition.includedPermissions,
+            rolePermissionDigestSha256: sha256(canonicalJson(definition.includedPermissions)),
+          });
+        } else {
+          inheritedBindings.push({ ...binding, scope });
+        }
       }
     }
     return { bucketBindings, inheritedBindings };
+  }
+
+  inspectIsolation(bucketName, inheritedBindings) {
+    validateIsolatedCutoverContract();
+    const tagBindings = runCommandJson("gcloud", [
+      "resource-manager",
+      "tags",
+      "bindings",
+      "list",
+      `--parent=//storage.googleapis.com/projects/_/buckets/${bucketName}`,
+      "--location=us-central1",
+      "--format=json",
+    ]);
+    if (!this.isolationDenyPolicyCache) {
+      this.isolationDenyPolicyCache = runCommandJson("gcloud", [
+        "iam",
+        "policies",
+        "get",
+        ISOLATED_CUTOVER_CONTRACT.denyPolicyId,
+        `--attachment-point=cloudresourcemanager.googleapis.com/projects/${ISOLATED_CUTOVER_CONTRACT.projectNumber}`,
+        "--kind=denypolicies",
+        "--format=json",
+      ]);
+    }
+    return validateIsolatedBucketAccessEvidence({
+      bucketName,
+      tagBindings,
+      denyPolicy: this.isolationDenyPolicyCache,
+      inheritedBindings,
+    });
   }
 }
 
@@ -978,6 +1037,7 @@ export const collectLiveTargetPreflight = async ({
   collectedAt = new Date().toISOString(),
 } = {}) => {
   validateCopyPolicyCandidate();
+  validateIsolatedCutoverContract();
   requireIsoTimestamp(collectedAt, "TARGET_COLLECTION_TIME_INVALID", "target collection time");
   const source = validateSourceInventory(sourceRecords, { previousCheckpoint });
   source.previousCheckpointFileDigestSha256 = previousCheckpointFileDigestSha256;
@@ -1011,6 +1071,10 @@ export const collectLiveTargetPreflight = async ({
       gcsClient.listObjects(bucket.targetBucket),
     ]);
     const iam = await gcsClient.inspectIam(bucketPolicy);
+    const isolation = await gcsClient.inspectIsolation(
+      bucket.targetBucket,
+      iam.inheritedBindings,
+    );
     const expectedObjects = expectedByBucket.get(bucket.targetBucket);
     const expectedTargetNames = new Map(expectedObjects.map((sourceObject) => [
       buildMigrationTargetObjectKey(
@@ -1095,37 +1159,59 @@ export const collectLiveTargetPreflight = async ({
     }
     const bucketBindings = normalizePolicyBindings(iam.bucketBindings);
     const inheritedBindings = normalizePolicyBindings(iam.inheritedBindings);
-    const noConditions = [...bucketBindings, ...inheritedBindings].every(
+    const noBucketConditions = bucketBindings.every(
       (binding) => binding.conditionDigestSha256 === null,
     );
     const simpleBucketBindings = mergeSimpleBindings(bucketBindings);
-    const simpleInheritedBindings = mergeSimpleBindings(inheritedBindings);
     const iamMatchesFrozenAllowlist =
-      noConditions &&
+      noBucketConditions &&
       canonicalJson(normalizeIamBindings(simpleBucketBindings)) ===
         canonicalJson(normalizeIamBindings(bucket.allowedIamBindings)) &&
-      simpleInheritedBindings.length === 0;
+      isolation.isolationSafe === true &&
+      isolation.inheritedAccessNeutralized === true;
     const publicIamMemberCount = [...bucketBindings, ...inheritedBindings]
       .flatMap((binding) => binding.members)
       .filter((member) => ["allUsers", "allAuthenticatedUsers"].includes(member)).length;
     const bucketConfigurationSafe =
       configuration.location === STORAGE_CUTOVER_CONTRACT.targetPolicy.bucketLocation &&
+      configuration.storageClass === ISOLATED_CUTOVER_CONTRACT.storageClass &&
       configuration.iamConfiguration?.uniformBucketLevelAccess?.enabled === true &&
       configuration.iamConfiguration?.publicAccessPrevention === "enforced" &&
       configuration.versioning?.enabled === true &&
+      Number(configuration.retentionPolicy?.retentionPeriod) ===
+        ISOLATED_CUTOVER_CONTRACT.retentionPeriodSeconds &&
+      configuration.retentionPolicy?.isLocked !== true &&
+      Number(configuration.softDeletePolicy?.retentionDurationSeconds) ===
+        ISOLATED_CUTOVER_CONTRACT.softDeleteRetentionSeconds &&
       publicIamMemberCount === 0;
     bucketEvidence.push({
       bucketName: bucket.targetBucket,
       bucketConfigurationSafe,
       iamMatchesFrozenAllowlist,
       location: configuration.location ?? null,
+      storageClass: configuration.storageClass ?? null,
       uniformBucketLevelAccess:
         configuration.iamConfiguration?.uniformBucketLevelAccess?.enabled === true,
       publicAccessPrevention:
         configuration.iamConfiguration?.publicAccessPrevention ?? null,
       versioningEnabled: configuration.versioning?.enabled === true,
+      retentionPeriodSeconds:
+        Number(configuration.retentionPolicy?.retentionPeriod) || null,
+      retentionPolicyLocked: configuration.retentionPolicy?.isLocked === true,
+      softDeleteRetentionSeconds:
+        Number(configuration.softDeletePolicy?.retentionDurationSeconds) || null,
+      isolationSafe: isolation.isolationSafe,
+      inheritedAccessNeutralized: isolation.inheritedAccessNeutralized,
+      isolationTagValueNamespacedName: isolation.tagValueNamespacedName,
+      isolationTagBindingDigestSha256: isolation.tagBindingDigestSha256,
+      isolationDenyPolicyDigestSha256: isolation.denyPolicyDigestSha256,
+      isolationDenyRuleDigestSha256: isolation.denyRuleDigestSha256,
+      isolationExceptionPrincipalDigestSha256:
+        isolation.exceptionPrincipalDigestSha256,
+      isolationInheritedIamDigestSha256: isolation.inheritedStorageIamDigestSha256,
       bucketIamEvidenceDigestSha256: sha256(canonicalJson(bucketBindings)),
-      inheritedIamEvidenceDigestSha256: sha256(canonicalJson(inheritedBindings)),
+      inheritedIamEvidenceDigestSha256:
+        isolation.inheritedStorageIamDigestSha256,
       bucketIamBindingCount: bucketBindings.length,
       inheritedStorageIamBindingCount: inheritedBindings.length,
       publicIamMemberCount,
@@ -1162,6 +1248,8 @@ export const collectLiveTargetPreflight = async ({
     project: "hushh-tech-uat",
     region: "us-central1",
     contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256:
+      isolatedCutoverContractFileDigestSha256(),
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryDigestSha256: source.digestSha256,
     sourceArtifactDigestSha256: source.sourceArtifactDigestSha256,
