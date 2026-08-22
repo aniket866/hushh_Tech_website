@@ -14,7 +14,7 @@ const QUERY_URL = new URL(
   import.meta.url
 );
 const SOURCE_COMPILE_EVIDENCE_URL = new URL(
-  "../../../migration/contracts/target-schema-offline-compile-evidence.v1.json",
+  "../../../migration/contracts/history/pr-1965-target-schema-offline-compile-evidence.v1.json",
   import.meta.url
 );
 
@@ -24,6 +24,8 @@ const EXPECTED_QUERY_SHA256 =
   "a287cdfe84449aaeaa1f6266c5ef19968fe815528d5c6ecb12efecf0c822f1e4";
 const EXPECTED_SOURCE_COMPILE_SHA256 =
   "3b5d53544710bd8e41f870667bed1fb645f539341be82819470c0078bf7cf666";
+const EXPECTED_SOURCE_COMPILE_PATH =
+  "migration/contracts/history/pr-1965-target-schema-offline-compile-evidence.v1.json";
 const EXPECTED_ADMIN_API_DIGESTS = Object.freeze({
   instanceCanonicalSha256:
     "0ce2feb7fdcd12be96a28e742edb35a2df65bb82a87bcbb07978c1f245af24ae",
@@ -196,7 +198,10 @@ function validateQuery() {
 function validateSourceCompileEvidence(evidence) {
   const sourceBytes = readFileSync(SOURCE_COMPILE_EVIDENCE_URL);
   if (sha256(sourceBytes) !== EXPECTED_SOURCE_COMPILE_SHA256) {
-    fail("SOURCE_COMPILE_EVIDENCE_DRIFT", "The PR 1965 compile evidence has drifted.");
+    fail(
+      "SOURCE_COMPILE_EVIDENCE_DRIFT",
+      "The byte-stable PR 1965 compile evidence has drifted."
+    );
   }
   const source = JSON.parse(sourceBytes.toString("utf8"));
   assertExactArray(
@@ -205,11 +210,13 @@ function validateSourceCompileEvidence(evidence) {
     "source compile blockers"
   );
   if (
-    evidence.compileBlockerDisposition.source !==
-      "migration/contracts/target-schema-offline-compile-evidence.v1.json" ||
+    evidence.compileBlockerDisposition.source !== EXPECTED_SOURCE_COMPILE_PATH ||
     evidence.compileBlockerDisposition.sourceSha256 !== EXPECTED_SOURCE_COMPILE_SHA256
   ) {
-    fail("SOURCE_COMPILE_EVIDENCE_DRIFT", "The attestation does not bind exact PR 1965 evidence.");
+    fail(
+      "SOURCE_COMPILE_EVIDENCE_DRIFT",
+      "The attestation does not bind the immutable PR 1965 evidence."
+    );
   }
 }
 

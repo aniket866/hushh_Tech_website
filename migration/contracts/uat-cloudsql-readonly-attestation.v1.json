@@ -219,7 +219,7 @@
     "rawPsqlOutputRetained": false
   },
   "compileBlockerDisposition": {
-    "source": "migration/contracts/target-schema-offline-compile-evidence.v1.json",
+    "source": "migration/contracts/history/pr-1965-target-schema-offline-compile-evidence.v1.json",
     "sourceSha256": "3b5d53544710bd8e41f870667bed1fb645f539341be82819470c0078bf7cf666",
     "sourceBlockers": [
       "PLAN_ONLY_EXECUTION",
@@ -242,5 +242,5 @@
     ],
     "liveTargetAttestationProgress": "INSTANCE_CONFIG_ONLY_CATALOG_BLOCKED"
   },
-  "evidenceSha256": "2150e0ad204b6fd3e4e87697772a882b07b0a1bebdcd137e68f453fc945ae238"
+  "evidenceSha256": "66d4bbd24ecf1af4cd4b3b4fb7cb841252a7af9678c09a5de8dbaef81ed8be82"
 }

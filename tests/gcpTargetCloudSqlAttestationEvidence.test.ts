@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
@@ -13,7 +14,23 @@ const queryPath = new URL(
   '../migration/sql/target_cloudsql_attestation_read_only.sql',
   import.meta.url,
 );
+const historicalSourceCompileEvidencePath = new URL(
+  '../migration/contracts/history/pr-1965-target-schema-offline-compile-evidence.v1.json',
+  import.meta.url,
+);
+const currentSourceCompileEvidencePath = new URL(
+  '../migration/contracts/target-schema-offline-compile-evidence.v1.json',
+  import.meta.url,
+);
+const historicalSourceCompileEvidenceSha256 =
+  '3b5d53544710bd8e41f870667bed1fb645f539341be82819470c0078bf7cf666';
+const currentSourceCompileEvidenceSha256 =
+  'c19dc15529429983ac2068c26468f9d4060417d903059031dc4725a13f66aa6e';
 const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+
+function sha256(bytes: Buffer) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
 
 function cloneEvidence() {
   return structuredClone(evidence);
@@ -36,14 +53,44 @@ function expectFailureCode(candidate: Record<string, unknown>, code: string) {
 }
 
 describe('fail-closed UAT Cloud SQL attestation evidence', () => {
+  it('preserves the exact PR 1965 compile evidence separately from the composed compiler evidence', () => {
+    expect(sha256(readFileSync(historicalSourceCompileEvidencePath))).toBe(
+      historicalSourceCompileEvidenceSha256,
+    );
+    expect(sha256(readFileSync(currentSourceCompileEvidencePath))).toBe(
+      currentSourceCompileEvidenceSha256,
+    );
+    expect(currentSourceCompileEvidenceSha256).not.toBe(historicalSourceCompileEvidenceSha256);
+  });
+
   it('validates the exact sanitized partial attestation', () => {
     expect(validateTargetCloudSqlAttestation(evidence)).toEqual({
       valid: true,
       state: 'LIVE_READ_ONLY_PARTIAL_ATTESTATION',
       catalogStatus: 'BLOCKED',
       blockerCount: 7,
-      evidenceSha256: '2150e0ad204b6fd3e4e87697772a882b07b0a1bebdcd137e68f453fc945ae238',
+      evidenceSha256: '66d4bbd24ecf1af4cd4b3b4fb7cb841252a7af9678c09a5de8dbaef81ed8be82',
     });
+  });
+
+  it('rejects the old mutable source path even with the historical digest', () => {
+    const candidate = cloneEvidence();
+    candidate.compileBlockerDisposition.source =
+      'migration/contracts/target-schema-offline-compile-evidence.v1.json';
+    candidate.compileBlockerDisposition.sourceSha256 = historicalSourceCompileEvidenceSha256;
+    expectFailureCode(rehash(candidate), 'SOURCE_COMPILE_EVIDENCE_DRIFT');
+  });
+
+  it('rejects an unknown compile-evidence digest at the immutable historical path', () => {
+    const candidate = cloneEvidence();
+    candidate.compileBlockerDisposition.sourceSha256 = '0'.repeat(64);
+    expectFailureCode(rehash(candidate), 'SOURCE_COMPILE_EVIDENCE_DRIFT');
+  });
+
+  it('rejects the current composed compiler digest as a rewrite of the PR 1965 attestation', () => {
+    const candidate = cloneEvidence();
+    candidate.compileBlockerDisposition.sourceSha256 = currentSourceCompileEvidenceSha256;
+    expectFailureCode(rehash(candidate), 'SOURCE_COMPILE_EVIDENCE_DRIFT');
   });
 
   it('locks the target to the exact UAT project, instance, database, region, and PG17', () => {
