@@ -8,7 +8,6 @@ import {
 import {
   SEVEN_BUCKET_ACTIVATION,
   SEVEN_BUCKET_CONTRACT,
-  validateZeroGrantPolicyEvidence,
   validateCombinedChangeManifest,
 } from "./storage-seven-bucket-contract.mjs";
 import {
@@ -22,6 +21,13 @@ import {
   buildFixedAllSevenTargetPreflight,
   collectFixedSeventhTargetPreflight,
 } from "./storage-fixed-seventh-target-collector.mjs";
+import {
+  FixedStorageGovernanceReadClient,
+  assertFixedGovernanceMatchesApprovedKnownSix,
+  assertFixedGovernanceUnchanged,
+  collectFixedStorageGovernanceSnapshot,
+  validateFixedGovernanceSnapshot,
+} from "./storage-fixed-governance-collector.mjs";
 import { performSeventhCreateOnlyCopy } from "./storage-seventh-quarantine-executor.mjs";
 import {
   MAXIMUM_APPROVAL_BYTES,
@@ -87,9 +93,7 @@ const SEVENTH_PREFLIGHT_KEYS = [
 
 const READ_ONLY_DEPENDENCY_KEYS = [
   "sourceClient",
-  "policySnapshotProvider",
   "knownSixSourceRecords",
-  "knownSixInheritedBindings",
 ];
 
 const WRITE_CLIENT_KEYS = ["knownSixGcsClient", "seventhGcsClient"];
@@ -353,12 +357,13 @@ const semanticTargetPreflight = (artifact) => ({
 
 const collectConcreteAllSevenTargetPreflight = async ({
   readDependencies,
+  governanceSnapshot,
   request,
   nowProvider,
 }) => {
   if (
     !Array.isArray(readDependencies.knownSixSourceRecords) ||
-    !Array.isArray(readDependencies.knownSixInheritedBindings)
+    !Array.isArray(governanceSnapshot.inheritedBindings)
   ) {
     fail(
       "FIXED_ALL_SEVEN_TARGET_COLLECTOR_REQUIRED",
@@ -367,7 +372,7 @@ const collectConcreteAllSevenTargetPreflight = async ({
   }
   const knownSixTargetClient = new InCloudStoragePreflightClient({
     fetchImpl: FIXED_PLATFORM_FETCH,
-    inheritedBindings: readDependencies.knownSixInheritedBindings,
+    inheritedBindings: governanceSnapshot.inheritedBindings,
   });
   const seventhTargetClient = new FixedSeventhTargetReadClient({
     fetchImpl: FIXED_PLATFORM_FETCH,
@@ -391,6 +396,12 @@ const collectConcreteAllSevenTargetPreflight = async ({
     seventhPreflight,
   }).raw;
 };
+
+const collectConcreteGovernanceSnapshot = ({ nowProvider }) =>
+  collectFixedStorageGovernanceSnapshot({
+    client: new FixedStorageGovernanceReadClient({ fetchImpl: FIXED_PLATFORM_FETCH }),
+    now: nowProvider,
+  });
 
 export const assertLiveAllSevenTargetMatchesApproval = ({ approved, live }) => {
   if (canonicalJson(semanticTargetPreflight(live)) !== canonicalJson(semanticTargetPreflight(approved))) {
@@ -571,6 +582,7 @@ const executeSevenBucketCore = async ({
   nowProvider,
   verifyLiveSource = verifyAllSevenLiveSource,
   collectLiveAllSevenTargetPreflight = collectConcreteAllSevenTargetPreflight,
+  collectLiveGovernanceSnapshot = collectConcreteGovernanceSnapshot,
 }) => {
   if (
     request &&
@@ -602,20 +614,18 @@ const executeSevenBucketCore = async ({
     "COMBINED_READ_DEPENDENCY_SCHEMA",
     "combined six-plus-one read-only dependencies",
   );
+  const governanceForTarget = validateFixedGovernanceSnapshot({
+    snapshot: await collectLiveGovernanceSnapshot({ nowProvider }),
+    now: nowProvider(),
+  });
+  assertFixedGovernanceMatchesApprovedKnownSix({
+    snapshot: governanceForTarget,
+    approved: prepared.freshTargetPreflight.knownSixPreflight,
+  });
+  const targetPolicy = governanceForTarget.policyEvidence;
   if (
-    typeof readDependencies.policySnapshotProvider !== "function"
-  ) {
-    fail(
-      "COMBINED_READ_DEPENDENCY_SCHEMA",
-      "The combined read-only dependencies are incomplete.",
-    );
-  }
-  const policyBefore = validateZeroGrantPolicyEvidence(
-    await readDependencies.policySnapshotProvider("before"),
-  );
-  if (
-    policyBefore.projectPolicyCanonicalDigestSha256 !== prepared.plan.projectPolicyCanonicalDigestSha256 ||
-    policyBefore.migrationServiceAccountPolicyCanonicalDigestSha256 !==
+    targetPolicy.projectPolicyCanonicalDigestSha256 !== prepared.plan.projectPolicyCanonicalDigestSha256 ||
+    targetPolicy.migrationServiceAccountPolicyCanonicalDigestSha256 !==
       prepared.plan.migrationServiceAccountPolicyCanonicalDigestSha256
   ) {
     fail("COMBINED_POLICY_APPROVAL_MISMATCH", "The fresh zero-grant policy evidence changed after approval.");
@@ -627,6 +637,7 @@ const executeSevenBucketCore = async ({
   });
   const liveTargetRaw = await collectLiveAllSevenTargetPreflight({
     readDependencies,
+    governanceSnapshot: governanceForTarget,
     request,
     nowProvider,
   });
@@ -648,6 +659,16 @@ const executeSevenBucketCore = async ({
     approved: prepared.freshTargetPreflight,
     live: liveTargetPreflight,
   });
+  const governanceBefore = validateFixedGovernanceSnapshot({
+    snapshot: await collectLiveGovernanceSnapshot({ nowProvider }),
+    now: nowProvider(),
+  });
+  assertFixedGovernanceMatchesApprovedKnownSix({
+    snapshot: governanceBefore,
+    approved: prepared.freshTargetPreflight.knownSixPreflight,
+  });
+  assertFixedGovernanceUnchanged(governanceForTarget, governanceBefore);
+  const policyBefore = governanceBefore.policyEvidence;
   if (typeof request.createWriteClients !== "function") {
     fail(
       "COMBINED_WRITE_CLIENT_FACTORY_REQUIRED",
@@ -690,9 +711,12 @@ const executeSevenBucketCore = async ({
     seventhSource: request.planInputs.seventhSource,
     sourceClient: readDependencies.sourceClient,
   });
-  const policyAfter = validateZeroGrantPolicyEvidence(
-    await readDependencies.policySnapshotProvider("after"),
-  );
+  const governanceAfter = validateFixedGovernanceSnapshot({
+    snapshot: await collectLiveGovernanceSnapshot({ nowProvider }),
+    now: nowProvider(),
+  });
+  assertFixedGovernanceUnchanged(governanceBefore, governanceAfter);
+  const policyAfter = governanceAfter.policyEvidence;
   return buildCombinedPostCopyEvidence({
     plan: prepared.plan,
     approval: prepared.approval,
@@ -719,6 +743,7 @@ export const __testing = Object.freeze({
     now,
     verifyLiveSource,
     collectLiveAllSevenTargetPreflight,
+    collectLiveGovernanceSnapshot,
   }) => {
     if (process.env.NODE_ENV !== "test") {
       fail(
@@ -732,6 +757,7 @@ export const __testing = Object.freeze({
       nowProvider: () => now,
       verifyLiveSource,
       collectLiveAllSevenTargetPreflight,
+      collectLiveGovernanceSnapshot,
     });
   },
 });

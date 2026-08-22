@@ -62,6 +62,43 @@ const createPolicyEvidence = () => {
   return evidence as typeof evidence & { evidenceDigestSha256: string };
 };
 
+const createGovernanceSnapshot = (
+  policy: ReturnType<typeof createPolicyEvidence>,
+  capturedAt = "2026-08-22T01:30:00.000Z",
+  inheritedBindings: Array<Record<string, unknown>> = [],
+) => {
+  const policyEvidence = {
+    ...policy,
+    capturedAt,
+    evidenceDigestSha256: null as string | null,
+  };
+  policyEvidence.evidenceDigestSha256 = calculateSelfBoundDigest(
+    policyEvidence,
+    "evidenceDigestSha256",
+  );
+  const sortedBindings = [...inheritedBindings]
+    .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
+  const snapshot = {
+    schemaVersion: "hushh-tech-storage-fixed-governance-snapshot-v1",
+    capturedAt,
+    collectionStartedAt: capturedAt,
+    collectionCompletedAt: capturedAt,
+    collectionDurationMs: 0,
+    project: "hushh-tech-uat",
+    projectNumber: "175298245599",
+    hierarchyScopes: ["projects/hushh-tech-uat", "organizations/369781862791"],
+    inheritedBindings: sortedBindings,
+    inheritedBindingsDigestSha256: sha256(canonicalJson(sortedBindings)),
+    policyEvidence,
+    snapshotDigestSha256: null as string | null,
+  };
+  snapshot.snapshotDigestSha256 = calculateSelfBoundDigest(
+    snapshot,
+    "snapshotDigestSha256",
+  );
+  return snapshot as typeof snapshot & { snapshotDigestSha256: string };
+};
+
 const createKnownSource = () => ({
   bucketCount: 6,
   objectCount: 124,
@@ -602,10 +639,10 @@ describe("seven-bucket detached approval execution entrypoint", () => {
         variant === "malformed" ? "{" : Buffer.from(JSON.stringify(live)));
       const createReadOnlyDependencies = vi.fn(async () => ({
         sourceClient: {},
-        policySnapshotProvider: vi.fn(async () => fixture.policy),
         knownSixSourceRecords: [],
-        knownSixInheritedBindings: [],
       }));
+      const collectLiveGovernanceSnapshot = vi.fn(async () =>
+        createGovernanceSnapshot(fixture.policy));
       const createWriteClients = vi.fn();
       const verifyLiveSource = vi.fn(async () => ({ verified: true }));
       const request = {
@@ -619,6 +656,7 @@ describe("seven-bucket detached approval execution entrypoint", () => {
         now,
         verifyLiveSource,
         collectLiveAllSevenTargetPreflight,
+        collectLiveGovernanceSnapshot,
       })).rejects.toMatchObject({
         code: variant === "stale"
           ? "ALL_SEVEN_TARGET_PREFLIGHT_STALE"
@@ -635,6 +673,7 @@ describe("seven-bucket detached approval execution entrypoint", () => {
                     : "SEVENTH_FRESH_TARGET_PREFLIGHT_DURATION_INVALID",
       });
       expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
+      expect(collectLiveGovernanceSnapshot).toHaveBeenCalledOnce();
       expect(verifyLiveSource).toHaveBeenCalledOnce();
       expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
       expect(collectLiveAllSevenTargetPreflight.mock.calls[0][0]).not.toHaveProperty(
@@ -654,10 +693,10 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       Buffer.from(JSON.stringify(live)));
     const createReadOnlyDependencies = vi.fn(async () => ({
       sourceClient: {},
-      policySnapshotProvider: vi.fn(async () => fixture.policy),
       knownSixSourceRecords: [],
-      knownSixInheritedBindings: [],
     }));
+    const collectLiveGovernanceSnapshot = vi.fn(async () =>
+      createGovernanceSnapshot(fixture.policy));
     const writeFactoryReached = new Error("write-factory-reached");
     const createWriteClients = vi.fn(async () => {
       throw writeFactoryReached;
@@ -672,21 +711,95 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       now: Date.parse("2026-08-22T01:30:00.000Z"),
       verifyLiveSource: vi.fn(async () => ({ verified: true })),
       collectLiveAllSevenTargetPreflight,
+      collectLiveGovernanceSnapshot,
     })).rejects.toBe(writeFactoryReached);
     expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
     expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
+    expect(collectLiveGovernanceSnapshot).toHaveBeenCalledTimes(2);
     expect(createWriteClients).toHaveBeenCalledOnce();
   });
 
-  it("rejects caller-supplied target clients before write construction", async () => {
+  it("rejects caller-supplied target or governance evidence before write construction", async () => {
+    for (const forbidden of [
+      { policySnapshotProvider: vi.fn() },
+      { knownSixInheritedBindings: [] },
+      { seventhTargetClient: {} },
+    ]) {
+      const fixture = createFixture();
+      const createReadOnlyDependencies = vi.fn(async () => ({
+        sourceClient: {},
+        knownSixSourceRecords: [],
+        ...forbidden,
+      }));
+      const collectLiveGovernanceSnapshot = vi.fn();
+      const createWriteClients = vi.fn();
+      await expect(__testing.executeSevenBucketWithTrustAnchor({
+        request: {
+          ...fixture.request,
+          createReadOnlyDependencies,
+          createWriteClients,
+        },
+        trustAnchor: fixture.trustAnchor,
+        now: Date.parse("2026-08-22T01:30:00.000Z"),
+        verifyLiveSource: vi.fn(async () => ({ verified: true })),
+        collectLiveGovernanceSnapshot,
+      })).rejects.toMatchObject({ code: "COMBINED_READ_DEPENDENCY_SCHEMA" });
+      expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
+      expect(collectLiveGovernanceSnapshot).not.toHaveBeenCalled();
+      expect(createWriteClients).not.toHaveBeenCalled();
+    }
+  });
+
+  it("recollects governance after target proof and blocks intervening inherited-IAM drift", async () => {
     const fixture = createFixture();
+    const liveTarget = refreshTargetProof(fixture, "2026-08-22T01:30:00.000Z");
+    const safe = createGovernanceSnapshot(fixture.policy);
+    const drifted = createGovernanceSnapshot(fixture.policy, undefined, [{
+      scope: "organizations/369781862791",
+      role: "roles/storage.objectViewer",
+      members: ["user:unexpected@example.com"],
+      conditionDigestSha256: null,
+    }]);
+    const governanceSnapshots = [safe, drifted];
+    const collectLiveGovernanceSnapshot = vi.fn(async () => governanceSnapshots.shift()!);
+    const collectLiveAllSevenTargetPreflight = vi.fn(async () =>
+      Buffer.from(JSON.stringify(liveTarget)));
+    const createWriteClients = vi.fn();
+    await expect(__testing.executeSevenBucketWithTrustAnchor({
+      request: {
+        ...fixture.request,
+        createReadOnlyDependencies: vi.fn(async () => ({
+          sourceClient: {},
+          knownSixSourceRecords: [],
+        })),
+        createWriteClients,
+      },
+      trustAnchor: fixture.trustAnchor,
+      now: Date.parse("2026-08-22T01:30:00.000Z"),
+      verifyLiveSource: vi.fn(async () => ({ verified: true })),
+      collectLiveAllSevenTargetPreflight,
+      collectLiveGovernanceSnapshot,
+    })).rejects.toMatchObject({ code: "INHERITED_IAM_MUTATED_AFTER_APPROVAL" });
+    expect(collectLiveGovernanceSnapshot).toHaveBeenCalledTimes(2);
+    expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
+    expect(createWriteClients).not.toHaveBeenCalled();
+  });
+
+  it("rejects live inherited writer access even when the caller omits all IAM evidence", async () => {
+    const fixture = createFixture();
+    const migrationWriter =
+      "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com";
+    const liveGovernance = createGovernanceSnapshot(fixture.policy, undefined, [{
+      scope: "projects/hushh-tech-uat",
+      role: "roles/storage.objectAdmin",
+      members: [migrationWriter],
+      conditionDigestSha256: null,
+    }]);
     const createReadOnlyDependencies = vi.fn(async () => ({
       sourceClient: {},
-      policySnapshotProvider: vi.fn(async () => fixture.policy),
       knownSixSourceRecords: [],
-      knownSixInheritedBindings: [],
-      seventhTargetClient: {},
     }));
+    const collectLiveAllSevenTargetPreflight = vi.fn();
     const createWriteClients = vi.fn();
     await expect(__testing.executeSevenBucketWithTrustAnchor({
       request: {
@@ -697,8 +810,13 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       trustAnchor: fixture.trustAnchor,
       now: Date.parse("2026-08-22T01:30:00.000Z"),
       verifyLiveSource: vi.fn(async () => ({ verified: true })),
-    })).rejects.toMatchObject({ code: "COMBINED_READ_DEPENDENCY_SCHEMA" });
+      collectLiveAllSevenTargetPreflight,
+      collectLiveGovernanceSnapshot: vi.fn(async () => liveGovernance),
+    })).rejects.toMatchObject({
+      code: "FIXED_GOVERNANCE_EXCEPTION_INHERITED_ACCESS",
+    });
     expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
+    expect(collectLiveAllSevenTargetPreflight).not.toHaveBeenCalled();
     expect(createWriteClients).not.toHaveBeenCalled();
   });
 
