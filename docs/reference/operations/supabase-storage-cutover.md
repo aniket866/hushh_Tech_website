@@ -8,14 +8,14 @@ The 2026-08-20 source snapshot is locked to six buckets, 124 objects, and 111,07
 
 | Supabase bucket | Public at freeze | Objects | Bytes | UAT Google Cloud Storage bucket | Target delivery |
 | --- | ---: | ---: | ---: | --- | --- |
-| `assets` | yes | 5 | 19,971,280 | `hushh-tech-cutover-v1-assets-legal-uat` | private service or five-minute signed URL |
+| `assets` | yes | 5 | 19,971,280 | `hushh-tech-cutover-v1-assets-legal-uat` | private; runtime unbound before copy |
 | `community-uploads` | yes | 115 | 81,259,134 | `hushh-tech-cutover-v1-community-content-uat` | private storage; reviewed content may use the controlled media host |
 | `hushh-agent-profile-images` | yes | 1 | 716,241 | `hushh-tech-cutover-v1-profile-images-uat` | private original; controlled public rendition only |
 | `hushh-ai-media` | yes | 0 | 0 | `hushh-tech-cutover-v1-ai-media-uat` | owner-scoped private access |
-| `hushh-gamma-pdf` | yes | 3 | 9,131,742 | `hushh-tech-cutover-v1-reports-uat` | private five-minute signed URL |
+| `hushh-gamma-pdf` | yes | 3 | 9,131,742 | `hushh-tech-cutover-v1-reports-uat` | private; runtime unbound before copy |
 | `wa-evidence` | no | 0 | 0 | `hushh-tech-cutover-v1-wa-evidence-uat` | Google service identity only |
 
-Every target bucket must use uniform bucket-level access, enforced public-access prevention, versioning, seven-day unlocked retention, and seven-day soft delete. Each cutover bucket has an exact isolation tag and a tag-scoped deny rule that neutralizes inherited storage access except for the bucket's frozen writer, reader, and audit service accounts. The preflight rejects a missing tag, changed deny rule, unexpected bucket principal, or inherited storage access on any exception identity. The six superseded UAT buckets and their 563 unrelated objects remain untouched. A public Supabase source bucket does not authorize a public object access control list in Google Cloud Storage. Public delivery is a separate, reviewed application/media-route decision.
+Every target bucket must use uniform bucket-level access, enforced public-access prevention, versioning, seven-day unlocked retention, and seven-day soft delete. Before copy, each bucket permits only the migration service account through the exact custom create/get/list role and the audit service account through object read/list. Runtime and rollback identities are absent from bucket IAM and from deny exceptions, so the tag-scoped deny policy neutralizes any inherited access they hold. The preflight rejects a missing tag, changed deny rule, unexpected bucket principal, delete/update permission, custom-writer drift, or inherited storage access on either exception identity. The six superseded UAT buckets and their 563 unrelated objects remain untouched. A public Supabase source bucket does not authorize a public object access control list in Google Cloud Storage. Public delivery is a separate, reviewed application/media-route decision.
 
 The machine-readable sources of truth are `migration/storage/supabase-storage-cutover.v1.json` and `migration/storage/supabase-storage-isolated-cutover-uat.v1.json`.
 
@@ -58,18 +58,18 @@ The tombstone must match the prior fingerprint and current evidence/artifact. Mi
 The target header records the UAT project, region, current object and byte totals, and the source inventory digest:
 
 ```json
-{"recordType":"targetInventory","schemaVersion":"gcs-storage-target-jsonl-v1","environment":"uat","project":"hushh-tech-uat","region":"us-central1","bucketCount":6,"objectCount":124,"totalBytes":111078397,"signedUrlIssuerCount":5,"signedUrlIssuerEvidenceDigestSha256":"<lowercase-sha256>","sourceInventoryDigestSha256":"<lowercase-sha256>","inventoryDigestSha256":"<lowercase-sha256>"}
+{"recordType":"targetInventory","schemaVersion":"gcs-storage-target-jsonl-v1","environment":"uat","project":"hushh-tech-uat","region":"us-central1","bucketCount":6,"objectCount":124,"totalBytes":111078397,"signedUrlIssuerCount":0,"signedUrlIssuerEvidenceDigestSha256":"<lowercase-sha256>","sourceInventoryDigestSha256":"<lowercase-sha256>","inventoryDigestSha256":"<lowercase-sha256>"}
 ```
 
 Each target bucket must include this security evidence:
 
 ```json
-{"recordType":"targetBucket","bucketName":"hushh-tech-cutover-v1-assets-legal-uat","uniformBucketLevelAccess":true,"publicAccessPrevention":"enforced","publicIamMembers":[],"location":"US-CENTRAL1","versioningEnabled":true,"iamEvidenceScope":"EFFECTIVE_PROJECT_AND_BUCKET","bucketIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"inheritedIamBindings":[],"effectiveIamBindings":[{"role":"roles/storage.objectViewer","members":["serviceAccount:<allowlisted-runtime>"]}],"iamPolicyDigestSha256":"<lowercase-sha256>"}
+{"recordType":"targetBucket","bucketName":"hushh-tech-cutover-v1-assets-legal-uat","uniformBucketLevelAccess":true,"publicAccessPrevention":"enforced","publicIamMembers":[],"location":"US-CENTRAL1","versioningEnabled":true,"iamEvidenceScope":"EFFECTIVE_PROJECT_AND_BUCKET","bucketIamBindings":[{"role":"projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter","members":["serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"]},{"role":"roles/storage.objectViewer","members":["serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"]}],"inheritedIamBindings":[],"effectiveIamBindings":[{"role":"projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter","members":["serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"]},{"role":"roles/storage.objectViewer","members":["serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"]}],"iamPolicyDigestSha256":"<lowercase-sha256>"}
 ```
 
-The normalized bucket policy and effective project-plus-bucket policy must exactly match the per-bucket service-account/role allowlist. The evidence exporter must include every project, folder, or organization binding that grants storage data-plane or administration access; this contract requires that inherited set to be empty. Public principals, basic project principals, legacy roles, conditional bindings, domains, groups, users, external-project service identities, and unlisted service identities fail closed. The policy digest binds the evidence scope, bucket bindings, inherited bindings, and effective bindings.
+The normalized bucket policy must exactly match the two pre-copy bindings above. The live preflight separately enumerates every project, folder, or organization binding that grants storage data-plane or administration access. Those inherited bindings may remain only when the exact bucket tag and deny rule neutralize them, neither audit nor migration receives inherited storage access, and runtime and rollback identities are absent from every deny exception. Missing tags, conditional or custom-role drift, groups, external principals, exception drift, or any unneutralized inherited access fail closed. The policy digests bind the bucket policy, inherited-policy evidence, tag binding, deny rule, and exact three-permission writer role.
 
-Each approved signing identity has a separate evidence record that binds the bucket, exact enabled service account and project, verified `signBlob` permission, `GET`/`HEAD`, 300-second maximum, generation pin, bucket/key allowlist, `private, no-store`, no browser credentials, and an evidence digest.
+There are no approved signing identities before copy and reconciliation. A later runtime activation must provide a separate reviewed evidence record that binds the bucket, exact enabled service account and project, verified `signBlob` permission, `GET`/`HEAD`, 300-second maximum, generation pin, bucket/key allowlist, `private, no-store`, no browser credentials, and an evidence digest.
 
 Each target object record carries the original key privately, a positive Google Cloud Storage generation, and all parity fields:
 
@@ -254,7 +254,7 @@ Anything else fails closed.
 
 ## Signed access and archive plan
 
-Private downloads are issued only by an allowlisted server service identity whose live evidence is bound into the target inventory. A signed URL allows only `GET` or `HEAD`, expires within 300 seconds, pins the exact object generation, uses a bucket/object allowlist, and forces `private, no-store`. Browser credentials are forbidden.
+No runtime identity or signed-URL issuer is bound before copy and reconciliation. A later activation would require separate reviewed IAM evidence and may issue private downloads only through an allowlisted server identity. Any future signed URL must allow only `GET` or `HEAD`, expire within 300 seconds, pin the exact object generation, use a bucket/object allowlist, and force `private, no-store`. Browser credentials are forbidden.
 
 The later production archive remains planning-only here. It requires Cloud Key Management Service customer-managed encryption, object versioning, a successful restore drill, a locked 90-day retention period, and separate approval before deletion at expiry. The retention lock must not be applied until the restore evidence is complete because locking is irreversible.
 

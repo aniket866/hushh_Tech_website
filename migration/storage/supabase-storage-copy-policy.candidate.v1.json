@@ -1,8 +1,8 @@
 {
   "schemaVersion": "storage-copy-policy-candidate-v1",
   "candidateState": "CODE_AND_INDEPENDENT_REVIEW_REQUIRED",
-  "baseContractCanonicalDigestSha256": "dd096fce35504c4354b69c597ab380bf9dd957bb608ac0bceca8aa6cd5d59add",
-  "baseContractFileDigestSha256": "8933795990bb2057a4f7a326ab95da6fec9c790d072a775e070a6ee8e29a1918",
+  "baseContractCanonicalDigestSha256": "dd92960188d66adc7c19543b8fc78b6ba93afc640a657be28d369dfcb8be32d0",
+  "baseContractFileDigestSha256": "aacd6157950e2b358517a1c7266d4216108ae7aa077a7c8cbf7942fb66e659bd",
   "environment": "uat",
   "project": "hushh-tech-uat",
   "region": "us-central1",

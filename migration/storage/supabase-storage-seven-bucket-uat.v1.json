@@ -10,8 +10,8 @@
   "objectCount": 140,
   "totalBytes": 1574621367,
   "knownSix": {
-    "contractFileDigestSha256": "8933795990bb2057a4f7a326ab95da6fec9c790d072a775e070a6ee8e29a1918",
-    "isolatedCutoverContractFileDigestSha256": "d7bbe1113ad0d1953a25520dfd3e8114281d6dd214ca5b40a48c03ef20d73a8c",
+    "contractFileDigestSha256": "aacd6157950e2b358517a1c7266d4216108ae7aa077a7c8cbf7942fb66e659bd",
+    "isolatedCutoverContractFileDigestSha256": "a0e4ffe18738c857bd776f21b39bcb10d62605bf55d25ddb96fc659562387a5c",
     "bucketCount": 6,
     "objectCount": 124,
     "totalBytes": 111078397

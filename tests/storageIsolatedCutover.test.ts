@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ISOLATED_CUTOVER_CONTRACT,
+  expectedPreCopyBucketIamBindings,
   isolatedCutoverContractFileDigestSha256,
   isolationDenialConditionExpression,
   isolationExceptionPrincipals,
@@ -9,6 +10,7 @@ import {
   validateIsolatedBucketAccessEvidence,
   validateIsolatedCutoverContract,
 } from "../scripts/migration/storage-isolated-cutover-contract.mjs";
+import { STORAGE_CUTOVER_CONTRACT } from "../scripts/migration/storage-cutover-contract.mjs";
 import { canonicalJson, sha256 } from "../scripts/migration/storage-live-common.mjs";
 
 const bucketMapping = (bucketName: string) => {
@@ -73,6 +75,18 @@ describe("isolated UAT storage cutover", () => {
       ]),
     );
     expect(ISOLATED_CUTOVER_CONTRACT.deniedPermissions).toHaveLength(40);
+    expect(ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions).toEqual([
+      "storage.objects.create",
+      "storage.objects.get",
+      "storage.objects.list",
+    ]);
+    expect(ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions).not.toEqual(
+      expect.arrayContaining(["storage.objects.delete", "storage.objects.update"]),
+    );
+    expect(STORAGE_CUTOVER_CONTRACT.buckets.every((bucket: Record<string, unknown>) =>
+      canonicalJson(bucket.allowedIamBindings) ===
+        canonicalJson(expectedPreCopyBucketIamBindings()) &&
+      (bucket.signedUrlIssuers as unknown[]).length === 0)).toBe(true);
     expect(new Set(ISOLATED_CUTOVER_CONTRACT.buckets.map(
       (bucket: Record<string, string>) => bucket.targetBucket,
     )).size).toBe(6);
@@ -134,6 +148,35 @@ describe("isolated UAT storage cutover", () => {
         code: expect.stringMatching(/^ISOLATED_CUTOVER_DENY_/),
       }));
     }
+  });
+
+  it("keeps rollback and every runtime identity out of bucket IAM and deny exceptions", () => {
+    const prohibited = new Set(
+      ISOLATED_CUTOVER_CONTRACT.prohibitedPreCopyBucketPrincipals,
+    );
+    for (const bucket of STORAGE_CUTOVER_CONTRACT.buckets) {
+      const bucketMembers = bucket.allowedIamBindings.flatMap(
+        (binding: Record<string, unknown>) => binding.members as string[],
+      );
+      expect(bucketMembers.some((member: string) => prohibited.has(member))).toBe(false);
+      const exceptions = isolationExceptionPrincipals(bucket.targetBucket);
+      expect(exceptions).toHaveLength(2);
+      expect(exceptions.some((principal: string) => [...prohibited].some(
+        (member) => principal.endsWith(member.slice("serviceAccount:".length)),
+      ))).toBe(false);
+    }
+    const denyPolicy = exactDenyPolicy();
+    denyPolicy.rules[0].denyRule.exceptionPrincipals.push(
+      "principal://iam.googleapis.com/projects/-/serviceAccounts/hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    );
+    expect(() => validateIsolatedBucketAccessEvidence({
+      bucketName,
+      tagBindings: tagsFor(bucketName),
+      denyPolicy,
+      inheritedBindings: [],
+    })).toThrowError(expect.objectContaining({
+      code: "ISOLATED_CUTOVER_DENY_RULE_MISMATCH",
+    }));
   });
 
   it("neutralizes custom organization roles, conditions, groups, and external principals", () => {

@@ -3,7 +3,7 @@
   "contractState": "UAT_CREATE_ONLY_ACTIVATED",
   "environment": "uat",
   "project": "hushh-tech-uat",
-  "contractFileDigestSha256": "4a8655574433c68256e66c8793c82fd9580aad9af257dee9d20141648e37b6a4",
+  "contractFileDigestSha256": "41659b1401897fb81345a84351d94512cfb2658305abb47017121947b522508f",
   "executionPolicy": {
     "createOnly": true,
     "ifGenerationMatch": 0,
@@ -14,5 +14,5 @@
     "runtimeRoutingAllowed": false,
     "executionActivated": true
   },
-  "activationDigestSha256": "95162b2acad16b8fc20e1350db8093911a43092597b631550fe2c8b1d9984a33"
+  "activationDigestSha256": "2a5413ee962ee78b96f6ca3d40b5604d9628b10d620925b15e2ab273f57ce345"
 }

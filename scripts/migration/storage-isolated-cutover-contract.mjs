@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { STORAGE_CUTOVER_CONTRACT } from "./storage-cutover-contract.mjs";
+import {
+  FROZEN_AUDIT_PRINCIPAL,
+  FROZEN_MIGRATION_WRITER_PRINCIPAL,
+  FROZEN_MIGRATION_WRITER_ROLE,
+  STORAGE_CUTOVER_CONTRACT,
+} from "./storage-cutover-contract.mjs";
 import {
   canonicalJson,
   fail,
@@ -47,6 +52,11 @@ const CONTRACT_KEYS = [
   "inspectorRole",
   "inspectorPrincipal",
   "inspectorPermissions",
+  "migrationWriterRole",
+  "migrationWriterPrincipal",
+  "migrationWriterPermissions",
+  "auditObjectRole",
+  "prohibitedPreCopyBucketPrincipals",
   "deniedPermissions",
   "deniedPrincipals",
   "buckets",
@@ -131,6 +141,33 @@ const EXPECTED_DENIED_PERMISSIONS = [
   "storage.googleapis.com/objects.updateContext",
 ];
 
+const EXPECTED_MIGRATION_WRITER_PERMISSIONS = [
+  "storage.objects.create",
+  "storage.objects.get",
+  "storage.objects.list",
+];
+
+const EXPECTED_PROHIBITED_PRECOPY_PRINCIPALS = [
+  "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com",
+];
+
+export const expectedPreCopyBucketIamBindings = () => [
+  {
+    role: FROZEN_MIGRATION_WRITER_ROLE,
+    members: [FROZEN_MIGRATION_WRITER_PRINCIPAL],
+  },
+  {
+    role: "roles/storage.objectViewer",
+    members: [FROZEN_AUDIT_PRINCIPAL],
+  },
+];
+
 export const isolatedCutoverContractFileDigestSha256 = () =>
   sha256(readFileSync(ISOLATED_CUTOVER_CONTRACT_PATH));
 
@@ -172,6 +209,9 @@ export const validateIsolatedCutoverContract = (
     inspectorRole: "projects/hushh-tech-uat/roles/hushhTechStorageCutoverInspector",
     inspectorPrincipal:
       "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    migrationWriterRole: FROZEN_MIGRATION_WRITER_ROLE,
+    migrationWriterPrincipal: FROZEN_MIGRATION_WRITER_PRINCIPAL,
+    auditObjectRole: "roles/storage.objectViewer",
   };
   if (Object.entries(expectedTop).some(([key, value]) => contract[key] !== value)) {
     fail("ISOLATED_CUTOVER_CONTRACT_DRIFT", "The isolated UAT cutover scope changed.");
@@ -179,6 +219,10 @@ export const validateIsolatedCutoverContract = (
   if (
     canonicalJson(contract.buckets) !== canonicalJson(EXPECTED_MAPPINGS) ||
     canonicalJson(contract.deniedPermissions) !== canonicalJson(EXPECTED_DENIED_PERMISSIONS) ||
+    canonicalJson(contract.migrationWriterPermissions) !==
+      canonicalJson(EXPECTED_MIGRATION_WRITER_PERMISSIONS) ||
+    canonicalJson(contract.prohibitedPreCopyBucketPrincipals) !==
+      canonicalJson(EXPECTED_PROHIBITED_PRECOPY_PRINCIPALS) ||
     canonicalJson(contract.inspectorPermissions) !== canonicalJson([
       "iam.denypolicies.get",
       "storage.buckets.get",
@@ -202,6 +246,15 @@ export const validateIsolatedCutoverContract = (
   }));
   if (canonicalJson(baseMappings) !== canonicalJson(isolatedMappings)) {
     fail("ISOLATED_CUTOVER_BASE_MAPPING_MISMATCH", "The base storage contract is not bound to isolated targets.");
+  }
+  const expectedPreCopyBindings = expectedPreCopyBucketIamBindings();
+  if (STORAGE_CUTOVER_CONTRACT.buckets.some((bucket) =>
+    canonicalJson(bucket.allowedIamBindings) !== canonicalJson(expectedPreCopyBindings) ||
+    bucket.signedUrlIssuers.length !== 0)) {
+    fail(
+      "ISOLATED_CUTOVER_PRECOPY_IAM_DRIFT",
+      "Pre-copy bucket IAM must contain only the exact migration writer and audit reader.",
+    );
   }
   return contract;
 };
@@ -230,9 +283,11 @@ const principalForMember = (member) => {
 };
 
 export const isolationExceptionPrincipals = (bucketName) => {
-  const { base } = bucketContract(bucketName);
-  return [...new Set(base.allowedIamBindings.flatMap((binding) =>
-    binding.members.map(principalForMember)))].sort();
+  bucketContract(bucketName);
+  return [
+    ISOLATED_CUTOVER_CONTRACT.inspectorPrincipal,
+    ISOLATED_CUTOVER_CONTRACT.migrationWriterPrincipal,
+  ].map(principalForMember).sort();
 };
 
 export const isolationTagValueNamespacedName = (bucketName) => {
@@ -321,7 +376,10 @@ export const validateIsolatedBucketAccessEvidence = ({
   ) {
     fail("ISOLATED_CUTOVER_DENY_RULE_MISMATCH", "The isolated bucket deny rule changed.");
   }
-  const exceptionMembers = new Set(mapping.base.allowedIamBindings.flatMap((binding) => binding.members));
+  const exceptionMembers = new Set([
+    ISOLATED_CUTOVER_CONTRACT.inspectorPrincipal,
+    ISOLATED_CUTOVER_CONTRACT.migrationWriterPrincipal,
+  ]);
   for (const binding of inheritedBindings) {
     requireSafeText(binding?.role, "ISOLATED_CUTOVER_INHERITED_IAM_INVALID", "inherited role", 512);
     if (

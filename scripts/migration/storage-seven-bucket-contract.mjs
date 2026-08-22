@@ -217,9 +217,9 @@ const FROZEN_CONTRACT = {
   totalBytes: 1_574_621_367,
   knownSix: {
     contractFileDigestSha256:
-      "8933795990bb2057a4f7a326ab95da6fec9c790d072a775e070a6ee8e29a1918",
+      "aacd6157950e2b358517a1c7266d4216108ae7aa077a7c8cbf7942fb66e659bd",
     isolatedCutoverContractFileDigestSha256:
-      "d7bbe1113ad0d1953a25520dfd3e8114281d6dd214ca5b40a48c03ef20d73a8c",
+      "a0e4ffe18738c857bd776f21b39bcb10d62605bf55d25ddb96fc659562387a5c",
     bucketCount: 6,
     objectCount: 124,
     totalBytes: 111_078_397,
@@ -271,7 +271,7 @@ const FROZEN_ACTIVATION = {
   environment: "uat",
   project: "hushh-tech-uat",
   contractFileDigestSha256:
-    "4a8655574433c68256e66c8793c82fd9580aad9af257dee9d20141648e37b6a4",
+    "41659b1401897fb81345a84351d94512cfb2658305abb47017121947b522508f",
   executionPolicy: {
     createOnly: true,
     ifGenerationMatch: 0,
@@ -283,7 +283,7 @@ const FROZEN_ACTIVATION = {
     executionActivated: true,
   },
   activationDigestSha256:
-    "95162b2acad16b8fc20e1350db8093911a43092597b631550fe2c8b1d9984a33",
+    "2a5413ee962ee78b96f6ca3d40b5604d9628b10d620925b15e2ab273f57ce345",
 };
 
 export const validateSevenBucketContract = (contract = SEVEN_BUCKET_CONTRACT) => {

@@ -25,6 +25,22 @@ export const MAXIMUM_CONTINUITY_HISTORY_ENTRIES = 256;
 const FROZEN_TARGET_PROJECT = "hushh-tech-uat";
 const FROZEN_TARGET_REGION = "us-central1";
 const FROZEN_BUCKET_LOCATION = "US-CENTRAL1";
+export const FROZEN_MIGRATION_WRITER_ROLE =
+  "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter";
+export const FROZEN_MIGRATION_WRITER_PRINCIPAL =
+  "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com";
+export const FROZEN_AUDIT_PRINCIPAL =
+  "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com";
+const FROZEN_PRECOPY_IAM_BINDINGS = Object.freeze([
+  {
+    role: FROZEN_MIGRATION_WRITER_ROLE,
+    members: [FROZEN_MIGRATION_WRITER_PRINCIPAL],
+  },
+  {
+    role: "roles/storage.objectViewer",
+    members: [FROZEN_AUDIT_PRINCIPAL],
+  },
+]);
 
 // These expectations are deliberately independent of the checked-in JSON contract. The
 // validator must reject a contract edit that widens an allowlist or silently changes a target.
@@ -38,25 +54,8 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetAccessMode: "PRIVATE_SERVICE_OR_SIGNED_URL",
     targetServingCacheControl: "private, no-store",
     publicDelivery: "CONTROLLED_MEDIA_ROUTE_ONLY",
-    signedUrlIssuers: [
-      "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-    ],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    signedUrlIssuers: [],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
   {
     sourceBucket: "community-uploads",
@@ -67,25 +66,8 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetAccessMode: "PRIVATE_OR_CONTROLLED_PUBLIC_MEDIA",
     targetServingCacheControl: "private, no-store",
     publicDelivery: "MEDIA_HOST_AFTER_CONTENT_REVIEW",
-    signedUrlIssuers: [
-      "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-    ],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    signedUrlIssuers: [],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
   {
     sourceBucket: "hushh-agent-profile-images",
@@ -96,25 +78,8 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetAccessMode: "PRIVATE_OR_CONTROLLED_PUBLIC_RENDITION",
     targetServingCacheControl: "private, no-store",
     publicDelivery: "RENDITION_ONLY_AFTER_OWNER_AND_CONTENT_REVIEW",
-    signedUrlIssuers: [
-      "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-    ],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    signedUrlIssuers: [],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
   {
     sourceBucket: "hushh-ai-media",
@@ -125,25 +90,8 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetAccessMode: "PRIVATE_OWNER_SIGNED_URL",
     targetServingCacheControl: "private, no-store",
     publicDelivery: "NONE",
-    signedUrlIssuers: [
-      "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-    ],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    signedUrlIssuers: [],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
   {
     sourceBucket: "hushh-gamma-pdf",
@@ -154,26 +102,8 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetAccessMode: "PRIVATE_SIGNED_URL",
     targetServingCacheControl: "private, no-store",
     publicDelivery: "NONE",
-    signedUrlIssuers: [
-      "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-    ],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    signedUrlIssuers: [],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
   {
     sourceBucket: "wa-evidence",
@@ -185,28 +115,7 @@ const FROZEN_BUCKET_EXPECTATIONS = [
     targetServingCacheControl: "private, no-store",
     publicDelivery: "NONE",
     signedUrlIssuers: [],
-    allowedIamBindings: [
-      {
-        role: "roles/storage.objectAdmin",
-        members: [
-          "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectCreator",
-        members: [
-          "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-      {
-        role: "roles/storage.objectViewer",
-        members: [
-          "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-          "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com",
-        ],
-      },
-    ],
+    allowedIamBindings: FROZEN_PRECOPY_IAM_BINDINGS,
   },
 ];
 
@@ -1085,7 +994,10 @@ export function validateStorageContract(contract = STORAGE_CUTOVER_CONTRACT) {
     }
     const normalizedBindings = normalizeIamBindings(bucket.allowedIamBindings);
     for (const binding of normalizedBindings) {
-      if (!binding.role.startsWith("roles/storage.")) {
+      if (
+        binding.role !== FROZEN_MIGRATION_WRITER_ROLE &&
+        !binding.role.startsWith("roles/storage.")
+      ) {
         fail("CONTRACT_TARGET_IAM_UNSAFE", `${bucket.sourceBucket} has a non-storage IAM role.`);
       }
       for (const member of binding.members) {
@@ -1568,7 +1480,8 @@ const validateTargetBucket = (record, expected) => {
     if (
       ["roles/owner", "roles/editor", "roles/viewer"].includes(binding.role) ||
       binding.role.includes("legacy") ||
-      !binding.role.startsWith("roles/storage.")
+      (binding.role !== FROZEN_MIGRATION_WRITER_ROLE &&
+        !binding.role.startsWith("roles/storage."))
     ) {
       fail("TARGET_IAM_ROLE_FORBIDDEN", `${bucketName} has a forbidden IAM role.`);
     }

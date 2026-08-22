@@ -25,6 +25,23 @@
     "storage.buckets.getIamPolicy",
     "storage.buckets.listTagBindings"
   ],
+  "migrationWriterRole": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
+  "migrationWriterPrincipal": "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "migrationWriterPermissions": [
+    "storage.objects.create",
+    "storage.objects.get",
+    "storage.objects.list"
+  ],
+  "auditObjectRole": "roles/storage.objectViewer",
+  "prohibitedPreCopyBucketPrincipals": [
+    "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com"
+  ],
   "deniedPermissions": [
     "storage.googleapis.com/bucketOperations.cancel",
     "storage.googleapis.com/buckets.createTagBinding",

@@ -40,6 +40,7 @@ import {
 import { SEVEN_BUCKET_CONTRACT } from "./storage-seven-bucket-contract.mjs";
 import {
   ISOLATED_CUTOVER_CONTRACT,
+  expectedPreCopyBucketIamBindings,
   isolatedCutoverContractFileDigestSha256,
   validateIsolatedBucketAccessEvidence,
   validateIsolatedCutoverContract,
@@ -1040,6 +1041,24 @@ export const collectLiveTargetPreflight = async ({
   validateIsolatedCutoverContract();
   requireIsoTimestamp(collectedAt, "TARGET_COLLECTION_TIME_INVALID", "target collection time");
   const source = validateSourceInventory(sourceRecords, { previousCheckpoint });
+  if (typeof gcsClient?.roleDefinition !== "function") {
+    fail(
+      "TARGET_MIGRATION_WRITER_ROLE_UNRESOLVED",
+      "The exact migration writer role definition is unavailable.",
+    );
+  }
+  const migrationWriterRoleDefinition = gcsClient.roleDefinition(
+    ISOLATED_CUTOVER_CONTRACT.migrationWriterRole,
+  );
+  const migrationWriterRolePermissions = [
+    ...(migrationWriterRoleDefinition?.includedPermissions || []),
+  ].sort();
+  const migrationWriterRoleExact =
+    canonicalJson(migrationWriterRolePermissions) ===
+    canonicalJson(ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions);
+  const migrationWriterRolePermissionDigestSha256 = sha256(
+    canonicalJson(migrationWriterRolePermissions),
+  );
   source.previousCheckpointFileDigestSha256 = previousCheckpointFileDigestSha256;
   if (
     (source.snapshotKind === "RECORDED_DELTA" &&
@@ -1163,10 +1182,18 @@ export const collectLiveTargetPreflight = async ({
       (binding) => binding.conditionDigestSha256 === null,
     );
     const simpleBucketBindings = mergeSimpleBindings(bucketBindings);
+    const prohibitedPreCopyPrincipals = new Set(
+      ISOLATED_CUTOVER_CONTRACT.prohibitedPreCopyBucketPrincipals,
+    );
+    const prohibitedPreCopyBucketPrincipalCount = bucketBindings
+      .flatMap((binding) => binding.members)
+      .filter((member) => prohibitedPreCopyPrincipals.has(member)).length;
     const iamMatchesFrozenAllowlist =
       noBucketConditions &&
       canonicalJson(normalizeIamBindings(simpleBucketBindings)) ===
-        canonicalJson(normalizeIamBindings(bucket.allowedIamBindings)) &&
+        canonicalJson(normalizeIamBindings(expectedPreCopyBucketIamBindings())) &&
+      prohibitedPreCopyBucketPrincipalCount === 0 &&
+      migrationWriterRoleExact &&
       isolation.isolationSafe === true &&
       isolation.inheritedAccessNeutralized === true;
     const publicIamMemberCount = [...bucketBindings, ...inheritedBindings]
@@ -1215,6 +1242,7 @@ export const collectLiveTargetPreflight = async ({
       bucketIamBindingCount: bucketBindings.length,
       inheritedStorageIamBindingCount: inheritedBindings.length,
       publicIamMemberCount,
+      prohibitedPreCopyBucketPrincipalCount,
       expectedMigrationObjectCount: expectedObjects.length,
       existingMigrationObjectCount: objectEvidence.filter(
         (entry) => entry.targetBucket === bucket.targetBucket && entry.state === "PRESENT_EXACT",
@@ -1239,6 +1267,7 @@ export const collectLiveTargetPreflight = async ({
   const blockers = [];
   if (bucketEvidence.some((bucket) => !bucket.bucketConfigurationSafe)) blockers.push("TARGET_BUCKET_CONFIGURATION_UNSAFE");
   if (bucketEvidence.some((bucket) => !bucket.iamMatchesFrozenAllowlist)) blockers.push("TARGET_IAM_NOT_FROZEN_ALLOWLIST");
+  if (!migrationWriterRoleExact) blockers.push("TARGET_MIGRATION_WRITER_ROLE_DRIFT");
   if (!COPY_POLICY_CANDIDATE.executionActivated) blockers.push("COPY_POLICY_NOT_ACTIVATED");
   if (!COPY_POLICY_CANDIDATE.copyExecutionAllowed) blockers.push("COPY_EXECUTION_NOT_ALLOWED");
   const artifact = {
@@ -1250,6 +1279,10 @@ export const collectLiveTargetPreflight = async ({
     contractFileDigestSha256: contractFileDigestSha256(),
     isolatedCutoverContractFileDigestSha256:
       isolatedCutoverContractFileDigestSha256(),
+    migrationWriterRole: ISOLATED_CUTOVER_CONTRACT.migrationWriterRole,
+    migrationWriterRolePermissions,
+    migrationWriterRolePermissionDigestSha256,
+    migrationWriterRoleExact,
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryDigestSha256: source.digestSha256,
     sourceArtifactDigestSha256: source.sourceArtifactDigestSha256,

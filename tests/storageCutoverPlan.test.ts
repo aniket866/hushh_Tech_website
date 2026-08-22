@@ -645,23 +645,27 @@ describe('target inventory and parity', () => {
       'TARGET_RAW_CACHE_METADATA_UNSAFE',
     );
 
-    const extraSignerField = makeTargetInventory(source);
-    const signer = extraSignerField.find(
-      (record) => record.recordType === 'signedUrlIssuerEvidence',
-    );
-    if (signer) signer.actualMaximumTtlSeconds = 86_400;
-    expectCode(
-      () => validateTargetInventory(extraSignerField),
-      'INVALID_SIGNED_URL_ISSUER_EVIDENCE_SCHEMA',
-    );
   });
 
-  it('binds five-minute signed URL behavior to an approved live issuer evidence record', () => {
+  it('rejects every signed URL issuer before runtime activation', () => {
     const source = makeSourceInventory();
     const target = makeTargetInventory(source);
-    const evidence = target.find((record) => record.recordType === 'signedUrlIssuerEvidence');
-    if (evidence) evidence.issuerMember = 'serviceAccount:unapproved@hushh-tech-uat.iam.gserviceaccount.com';
-    expectCode(() => validateTargetInventory(target), 'SIGNED_URL_ISSUER_NOT_ALLOWED');
+    target.push({
+      recordType: 'signedUrlIssuerEvidence',
+      targetBucket: STORAGE_CUTOVER_CONTRACT.buckets[0].targetBucket,
+      issuerMember: 'serviceAccount:unapproved@hushh-tech-uat.iam.gserviceaccount.com',
+      issuerProject: 'hushh-tech-uat',
+      serviceAccountEnabled: true,
+      signBlobPermissionVerified: true,
+      allowedMethods: ['GET', 'HEAD'],
+      maximumTtlSeconds: 300,
+      generationPinned: true,
+      bucketAndObjectAllowlistEnforced: true,
+      responseCacheControl: 'private, no-store',
+      browserCredentialExposure: false,
+      evidenceDigestSha256: digest('unapproved-pre-copy-signer'),
+    });
+    expectCode(() => validateTargetInventory(target), 'SIGNED_URL_ISSUER_COUNT_MISMATCH');
   });
 
   it('fails when any target object gains a public ACL', () => {
@@ -769,23 +773,23 @@ describe('dry-run copy, delta, and checkpoint plans', () => {
     });
   });
 
-  it('binds the exact target and signer evidence digests through the checkpoint', () => {
+  it('binds the exact target evidence digest through the checkpoint', () => {
     const baseline = makeSourceInventory();
     const target = makeTargetInventory(baseline);
     const checkpoint = buildCheckpointPlan(baseline, target);
     const delta = makeNoChangeDelta(baseline, checkpoint);
     const swappedEvidence = clone(target);
-    const signer = swappedEvidence.find(
-      (record) => record.recordType === 'signedUrlIssuerEvidence',
+    const object = swappedEvidence.find(
+      (record) => record.recordType === 'targetObject',
     );
-    if (signer) signer.evidenceDigestSha256 = digest('different-live-signer-evidence');
+    if (object) object.generation = String(Number(object.generation) + 1);
     refreshTargetDigest(swappedEvidence);
     expect(swappedEvidence[0].inventoryDigestSha256).not.toBe(
       checkpoint.targetInventoryDigestSha256,
     );
     expectCode(
       () => buildDeltaPlan(delta, swappedEvidence, checkpoint),
-      'TARGET_EVIDENCE_CHANGED_AFTER_CHECKPOINT',
+      'TARGET_GENERATION_CHANGED',
     );
   });
 

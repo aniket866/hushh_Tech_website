@@ -125,6 +125,10 @@ const safeBucketConfiguration = (bucketName: string) => ({
   },
 });
 
+const exactMigrationWriterRoleDefinition = () => ({
+  includedPermissions: [...ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions],
+});
+
 const safeIsolationEvidence = (bucketName: string, inheritedBindings: JsonRecord[] = []) => {
   const normalizedInherited = inheritedBindings.map((binding) => ({
     scope: binding.scope ?? null,
@@ -364,6 +368,7 @@ const makePreflight = (
     bucketIamBindingCount: bucket.allowedIamBindings.length,
     inheritedStorageIamBindingCount: 0,
     publicIamMemberCount: 0,
+    prohibitedPreCopyBucketPrincipalCount: 0,
     expectedMigrationObjectCount: bucket.objectCount,
     existingMigrationObjectCount: source.objects.filter(
       (object) => object.bucketId === bucket.sourceBucket && presentIds.has(sourceObjectId(object)),
@@ -384,6 +389,14 @@ const makePreflight = (
     region: 'us-central1',
     contractFileDigestSha256: contractFileDigestSha256(),
     isolatedCutoverContractFileDigestSha256: isolatedCutoverContractFileDigestSha256(),
+    migrationWriterRole: ISOLATED_CUTOVER_CONTRACT.migrationWriterRole,
+    migrationWriterRolePermissions: [
+      ...ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions,
+    ],
+    migrationWriterRolePermissionDigestSha256: sha256(canonicalJson(
+      ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions,
+    )),
+    migrationWriterRoleExact: true,
     copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
     sourceInventoryDigestSha256: source.digestSha256,
     sourceArtifactDigestSha256: source.sourceArtifactDigestSha256,
@@ -993,6 +1006,7 @@ describe('storage live inventory and create-only copy safety', () => {
       size: '1',
     }));
     const gcsClient = {
+      roleDefinition: exactMigrationWriterRoleDefinition,
       getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => ({ bucketBindings: [], inheritedBindings: [] }),
@@ -1034,6 +1048,7 @@ describe('storage live inventory and create-only copy safety', () => {
   it('fails closed when any unknown object occupies the migration namespace', async () => {
     const records = makeSourceRecords();
     const gcsClient = {
+      roleDefinition: exactMigrationWriterRoleDefinition,
       getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => ({ bucketBindings: [], inheritedBindings: [] }),
@@ -1058,6 +1073,7 @@ describe('storage live inventory and create-only copy safety', () => {
     const records = makeSourceRecords();
     let policyIndex = 0;
     const gcsClient = {
+      roleDefinition: exactMigrationWriterRoleDefinition,
       getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => {
@@ -1072,6 +1088,7 @@ describe('storage live inventory and create-only copy safety', () => {
                   members: [
                     'group:external-storage@example.com',
                     'principalSet://iam.googleapis.com/locations/global/workforcePools/external/*',
+                    'serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com',
                   ],
                   conditionDigestSha256: null,
                 },
@@ -1092,7 +1109,45 @@ describe('storage live inventory and create-only copy safety', () => {
     });
     expect(preflight.buckets.some((bucket: JsonRecord) =>
       bucket.iamMatchesFrozenAllowlist === false)).toBe(true);
+    expect(preflight.buckets.some((bucket: JsonRecord) =>
+      Number(bucket.prohibitedPreCopyBucketPrincipalCount) > 0)).toBe(true);
     expect(preflight.blockers).toContain('TARGET_IAM_NOT_FROZEN_ALLOWLIST');
+  });
+
+  it('blocks a migration writer role that gains delete or update permission', async () => {
+    const records = makeSourceRecords();
+    let policyIndex = 0;
+    const gcsClient = {
+      roleDefinition: () => ({
+        includedPermissions: [
+          ...ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions,
+          'storage.objects.delete',
+          'storage.objects.update',
+        ],
+      }),
+      getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
+      getBucketIam: async () => ({ bindings: [] }),
+      inspectIam: () => {
+        const bucket = STORAGE_CUTOVER_CONTRACT.buckets[policyIndex];
+        policyIndex += 1;
+        return { bucketBindings: bucket.allowedIamBindings, inheritedBindings: [] };
+      },
+      inspectIsolation: (bucketName: string, inheritedBindings: JsonRecord[]) =>
+        safeIsolationEvidence(bucketName, inheritedBindings),
+      listObjects: async () => [],
+      hashObject: async () => { throw new Error('must not hash absent targets'); },
+    };
+    const preflight = await collectLiveTargetPreflight({
+      gcsClient,
+      sourceRecords: records,
+      collectedAt: '2026-08-21T12:00:00Z',
+    });
+    expect(preflight.migrationWriterRoleExact).toBe(false);
+    expect(preflight.blockers).toEqual(expect.arrayContaining([
+      'TARGET_IAM_NOT_FROZEN_ALLOWLIST',
+      'TARGET_MIGRATION_WRITER_ROLE_DRIFT',
+    ]));
+    expect(preflight.safeForCopy).toBe(false);
   });
 
   it('creates an immutable version for same-key changed bytes and no-ops the unchanged version', async () => {
@@ -1148,6 +1203,7 @@ describe('storage live inventory and create-only copy safety', () => {
     const makeGcsClient = (objects: JsonRecord[]) => {
       let policyIndex = 0;
       return {
+        roleDefinition: exactMigrationWriterRoleDefinition,
         getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
         getBucketIam: async () => ({ bindings: [] }),
         inspectIam: () => {
@@ -1312,6 +1368,7 @@ describe('storage live inventory and create-only copy safety', () => {
     });
     let policyIndex = 0;
     const gcsClient = {
+      roleDefinition: exactMigrationWriterRoleDefinition,
       getBucket: async (bucketName: string) => safeBucketConfiguration(bucketName),
       getBucketIam: async () => ({ bindings: [] }),
       inspectIam: () => {

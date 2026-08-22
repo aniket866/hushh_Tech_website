@@ -139,22 +139,18 @@
       "targetAccessMode": "PRIVATE_SERVICE_OR_SIGNED_URL",
       "targetServingCacheControl": "private, no-store",
       "publicDelivery": "CONTROLLED_MEDIA_ROUTE_ONLY",
-      "signedUrlIssuers": [
-        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
-      ],
+      "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
           "role": "roles/storage.objectViewer",
           "members": [
-            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         }
       ]
@@ -168,16 +164,12 @@
       "targetAccessMode": "PRIVATE_OR_CONTROLLED_PUBLIC_MEDIA",
       "targetServingCacheControl": "private, no-store",
       "publicDelivery": "MEDIA_HOST_AFTER_CONTENT_REVIEW",
-      "signedUrlIssuers": [
-        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
-      ],
+      "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
@@ -197,16 +189,12 @@
       "targetAccessMode": "PRIVATE_OR_CONTROLLED_PUBLIC_RENDITION",
       "targetServingCacheControl": "private, no-store",
       "publicDelivery": "RENDITION_ONLY_AFTER_OWNER_AND_CONTENT_REVIEW",
-      "signedUrlIssuers": [
-        "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
-      ],
+      "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
@@ -226,16 +214,12 @@
       "targetAccessMode": "PRIVATE_OWNER_SIGNED_URL",
       "targetServingCacheControl": "private, no-store",
       "publicDelivery": "NONE",
-      "signedUrlIssuers": [
-        "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
-      ],
+      "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
@@ -255,23 +239,18 @@
       "targetAccessMode": "PRIVATE_SIGNED_URL",
       "targetServingCacheControl": "private, no-store",
       "publicDelivery": "NONE",
-      "signedUrlIssuers": [
-        "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
-      ],
+      "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
           "role": "roles/storage.objectViewer",
           "members": [
-            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         }
       ]
@@ -288,23 +267,15 @@
       "signedUrlIssuers": [],
       "allowedIamBindings": [
         {
-          "role": "roles/storage.objectAdmin",
+          "role": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
           "members": [
-            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com"
-          ]
-        },
-        {
-          "role": "roles/storage.objectCreator",
-          "members": [
-            "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         },
         {
           "role": "roles/storage.objectViewer",
           "members": [
-            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
-            "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com"
+            "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com"
           ]
         }
       ]

@@ -124,6 +124,10 @@ const validatePreflight = (artifact, source) => {
       "region",
       "contractFileDigestSha256",
       "isolatedCutoverContractFileDigestSha256",
+      "migrationWriterRole",
+      "migrationWriterRolePermissions",
+      "migrationWriterRolePermissionDigestSha256",
+      "migrationWriterRoleExact",
       "copyPolicyCandidateFileDigestSha256",
       "sourceInventoryDigestSha256",
       "sourceArtifactDigestSha256",
@@ -164,6 +168,20 @@ const validatePreflight = (artifact, source) => {
     artifact.copyPolicyCandidateFileDigestSha256 !== copyPolicyCandidateFileDigestSha256()
   ) {
     fail("TARGET_PREFLIGHT_POLICY_DRIFT", "The target preflight policy digest changed.");
+  }
+  if (
+    artifact.migrationWriterRole !== ISOLATED_CUTOVER_CONTRACT.migrationWriterRole ||
+    canonicalJson(artifact.migrationWriterRolePermissions) !==
+      canonicalJson(ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions) ||
+    artifact.migrationWriterRolePermissionDigestSha256 !== sha256(
+      canonicalJson(ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions),
+    ) ||
+    typeof artifact.migrationWriterRoleExact !== "boolean"
+  ) {
+    fail(
+      "TARGET_PREFLIGHT_WRITER_ROLE_MISMATCH",
+      "The target preflight migration writer role changed.",
+    );
   }
   if (
     artifact.sourceInventoryDigestSha256 !== source.digestSha256 ||
@@ -239,6 +257,7 @@ const validatePreflight = (artifact, source) => {
         "bucketIamBindingCount",
         "inheritedStorageIamBindingCount",
         "publicIamMemberCount",
+        "prohibitedPreCopyBucketPrincipalCount",
         "expectedMigrationObjectCount",
         "existingMigrationObjectCount",
         "unknownMigrationObjectCount",
@@ -261,6 +280,7 @@ const validatePreflight = (artifact, source) => {
       "bucketIamBindingCount",
       "inheritedStorageIamBindingCount",
       "publicIamMemberCount",
+      "prohibitedPreCopyBucketPrincipalCount",
       "expectedMigrationObjectCount",
       "existingMigrationObjectCount",
       "unknownMigrationObjectCount",
@@ -309,6 +329,7 @@ const validatePreflight = (artifact, source) => {
       typeof bucketEvidence.iamMatchesFrozenAllowlist !== "boolean" ||
       bucketEvidence.isolationSafe !== true ||
       bucketEvidence.inheritedAccessNeutralized !== true ||
+      bucketEvidence.prohibitedPreCopyBucketPrincipalCount !== 0 ||
       bucketEvidence.isolationInheritedIamDigestSha256 !==
         bucketEvidence.inheritedIamEvidenceDigestSha256 ||
       typeof bucketEvidence.isolationTagValueNamespacedName !== "string" ||
@@ -493,6 +514,9 @@ const validatePreflight = (artifact, source) => {
   }
   if (artifact.buckets.some((bucket) => !bucket.iamMatchesFrozenAllowlist)) {
     expectedBlockers.push("TARGET_IAM_NOT_FROZEN_ALLOWLIST");
+  }
+  if (!artifact.migrationWriterRoleExact) {
+    expectedBlockers.push("TARGET_MIGRATION_WRITER_ROLE_DRIFT");
   }
   if (!COPY_POLICY_CANDIDATE.executionActivated) expectedBlockers.push("COPY_POLICY_NOT_ACTIVATED");
   if (!COPY_POLICY_CANDIDATE.copyExecutionAllowed) expectedBlockers.push("COPY_EXECUTION_NOT_ALLOWED");
