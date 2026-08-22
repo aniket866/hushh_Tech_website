@@ -269,6 +269,8 @@ const ENGAGEMENT_RUNTIME_COUNT_FIELDS = Object.freeze([
   "inherited_privileged_role_count",
   "non_dml_table_privilege_count",
   "executable_application_routine_count",
+  "executable_security_definer_routine_count",
+  "executable_procedure_count",
   "accessible_table_rls_disabled_count",
   "accessible_table_rls_not_forced_count",
   "owned_application_schema_count",
@@ -276,6 +278,12 @@ const ENGAGEMENT_RUNTIME_COUNT_FIELDS = Object.freeze([
   "owned_application_sequence_count",
   "owned_application_routine_count",
 ]);
+const ENGAGEMENT_RUNTIME_ZERO_COUNT_FIELDS = new Set(
+  ENGAGEMENT_RUNTIME_COUNT_FIELDS.filter((field) => ![
+    "executable_application_routine_count",
+    "executable_procedure_count",
+  ].includes(field)),
+);
 
 function normalizedPrivilegeRows(value, fields) {
   if (!Array.isArray(value)) fail("ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
@@ -302,6 +310,7 @@ export function assessEngagementRuntimeBoundary(observed, expectedRole) {
     "effective_table_dml_privileges",
     "effective_column_privileges",
     "effective_sequence_privileges",
+    "executable_security_definer_routines",
     ...ENGAGEMENT_RUNTIME_COUNT_FIELDS,
   ], "ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
   const tablePrivileges = normalizedPrivilegeRows(observed.effective_table_dml_privileges, [
@@ -312,6 +321,9 @@ export function assessEngagementRuntimeBoundary(observed, expectedRole) {
   ]);
   const sequencePrivileges = normalizedPrivilegeRows(observed.effective_sequence_privileges, [
     "schema", "sequence", "privilege", "grantable",
+  ]);
+  const securityDefinerRoutines = normalizedPrivilegeRows(observed.executable_security_definer_routines, [
+    "schema", "name", "identityArguments", "kind", "owner",
   ]);
   const expectedColumns = ["id", "nda_version", "pdf_url", "signed_at", "user_id"].map((column) => ({
     schema: "public",
@@ -331,7 +343,12 @@ export function assessEngagementRuntimeBoundary(observed, expectedRole) {
     const value = Number(observed[field]);
     if (!Number.isSafeInteger(value) || value < 0) fail("ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
     counts[field] = value;
-    if (value !== 0) reasons.push(`${field.toUpperCase()}_NONZERO`);
+    if (ENGAGEMENT_RUNTIME_ZERO_COUNT_FIELDS.has(field) && value !== 0) {
+      reasons.push(`${field.toUpperCase()}_NONZERO`);
+    }
+  }
+  if (counts.executable_security_definer_routine_count !== securityDefinerRoutines.length) {
+    fail("ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
   }
   if (tablePrivileges.length !== 0) reasons.push("TABLE_PRIVILEGES_NOT_EXACT");
   if (canonicalHash(columnPrivileges) !== canonicalHash(expectedColumns)) reasons.push("COLUMN_PRIVILEGES_NOT_EXACT");
@@ -343,6 +360,7 @@ export function assessEngagementRuntimeBoundary(observed, expectedRole) {
     effective_table_dml_privileges: tablePrivileges,
     effective_column_privileges: columnPrivileges,
     effective_sequence_privileges: sequencePrivileges,
+    executable_security_definer_routines: securityDefinerRoutines,
     ...counts,
     reasons,
   });
@@ -577,6 +595,16 @@ async function inspectEngagementRuntimeBoundary(client, role) {
       UNION
       SELECT DISTINCT relation_oid,relrowsecurity,relforcerowsecurity
         FROM effective_column_privileges WHERE relkind IN ('r','p')
+    ), accessible_routines AS (
+      SELECT routines.oid,schemas.nspname AS schema_name,routines.proname,
+             pg_catalog.pg_get_function_identity_arguments(routines.oid) AS identity_arguments,
+             routines.prokind,routines.prosecdef,owners.rolname AS owner_name
+        FROM pg_catalog.pg_proc routines
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=routines.pronamespace
+        JOIN pg_catalog.pg_roles owners ON owners.oid=routines.proowner
+       WHERE schemas.nspname NOT IN ('pg_catalog','information_schema') AND EXISTS(
+         SELECT 1 FROM effective_roles inherited
+          WHERE has_function_privilege(inherited.rolname,routines.oid,'EXECUTE'))
     )
     SELECT $1::text AS "current_user",
       roles.rolsuper,roles.rolcreaterole,roles.rolcreatedb,roles.rolreplication,roles.rolbypassrls,
@@ -598,6 +626,13 @@ async function inspectEngagementRuntimeBoundary(client, role) {
         'privilege',privileges.privilege_type,'grantable',privileges.is_grantable)
         ORDER BY privileges.schema_name,privileges.sequence_name,privileges.privilege_type)
         FROM effective_sequence_privileges privileges),'[]'::jsonb) AS effective_sequence_privileges,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'schema',routines.schema_name,'name',routines.proname,
+        'identityArguments',routines.identity_arguments,
+        'kind',routines.prokind,'owner',routines.owner_name)
+        ORDER BY routines.schema_name,routines.proname,routines.identity_arguments)
+        FROM accessible_routines routines WHERE routines.prosecdef),'[]'::jsonb)
+        AS executable_security_definer_routines,
       (SELECT count(*) FROM accessible_base_relations WHERE relrowsecurity IS NOT TRUE) AS accessible_table_rls_disabled_count,
       (SELECT count(*) FROM accessible_base_relations WHERE relforcerowsecurity IS NOT TRUE) AS accessible_table_rls_not_forced_count,
       (SELECT count(*) FROM pg_catalog.pg_namespace owned
@@ -632,12 +667,9 @@ async function inspectEngagementRuntimeBoundary(client, role) {
           AND grants.table_schema<>'information_schema' AND grants.table_schema NOT LIKE 'pg\\_%' ESCAPE '\\'
           AND (grants.grantee='PUBLIC' OR grants.grantee IN (SELECT inherited.rolname FROM effective_roles inherited)))
         AS non_dml_table_privilege_count,
-      (SELECT count(*) FROM pg_catalog.pg_proc routines
-        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=routines.pronamespace
-        WHERE schemas.nspname NOT IN ('pg_catalog','information_schema') AND EXISTS(
-          SELECT 1 FROM effective_roles inherited
-           WHERE has_function_privilege(inherited.rolname,routines.oid,'EXECUTE')))
-        AS executable_application_routine_count
+      (SELECT count(*) FROM accessible_routines) AS executable_application_routine_count,
+      (SELECT count(*) FROM accessible_routines WHERE prosecdef) AS executable_security_definer_routine_count,
+      (SELECT count(*) FROM accessible_routines WHERE prokind='p') AS executable_procedure_count
     FROM pg_catalog.pg_roles roles WHERE roles.rolname=$1`,
     values: [role],
     rowMode: "object",

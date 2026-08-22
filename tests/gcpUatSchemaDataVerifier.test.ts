@@ -78,10 +78,13 @@ function exactEngagementRuntimeObservation() {
       grantable: false,
     })),
     effective_sequence_privileges: [],
+    executable_security_definer_routines: [],
     application_schema_create_count: '0',
     inherited_privileged_role_count: '0',
     non_dml_table_privilege_count: '0',
-    executable_application_routine_count: '0',
+    executable_application_routine_count: '164',
+    executable_security_definer_routine_count: '0',
+    executable_procedure_count: '0',
     accessible_table_rls_disabled_count: '0',
     accessible_table_rls_not_forced_count: '0',
     owned_application_schema_count: '0',
@@ -215,7 +218,9 @@ describe('reproducible UAT schema/data verifier input', () => {
       application_schema_create_count: 0,
       inherited_privileged_role_count: 0,
       non_dml_table_privilege_count: 0,
-      executable_application_routine_count: 0,
+      executable_application_routine_count: 164,
+      executable_security_definer_routine_count: 0,
+      executable_procedure_count: 0,
       accessible_table_rls_disabled_count: 0,
       accessible_table_rls_not_forced_count: 0,
       owned_application_schema_count: 0,
@@ -227,7 +232,12 @@ describe('reproducible UAT schema/data verifier input', () => {
   });
 
   it.each([
-    ['routine EXECUTE', (observed: Record<string, any>) => { observed.executable_application_routine_count = '1'; }],
+    ['SECURITY DEFINER routine EXECUTE', (observed: Record<string, any>) => {
+      observed.executable_security_definer_routine_count = '1';
+      observed.executable_security_definer_routines = [{
+        schema: 'public', name: 'unsafe', identityArguments: '', kind: 'f', owner: 'hushh_tech_schema_owner',
+      }];
+    }],
     ['inherited privilege', (observed: Record<string, any>) => { observed.inherited_privileged_role_count = '1'; }],
     ['relation without FORCE RLS', (observed: Record<string, any>) => { observed.accessible_table_rls_not_forced_count = '1'; }],
     ['sequence grant', (observed: Record<string, any>) => {
@@ -239,5 +249,17 @@ describe('reproducible UAT schema/data verifier input', () => {
     const observed = exactEngagementRuntimeObservation();
     mutate(observed);
     expect(assessEngagementRuntimeBoundary(observed, observed.current_user)).toMatchObject({ ready: false });
+  });
+
+  it('allows PUBLIC EXECUTE on security-invoker routines without treating it as role elevation', () => {
+    const observed = exactEngagementRuntimeObservation();
+    observed.executable_application_routine_count = '999';
+    observed.executable_procedure_count = '7';
+    expect(assessEngagementRuntimeBoundary(observed, observed.current_user)).toMatchObject({
+      ready: true,
+      executable_application_routine_count: 999,
+      executable_security_definer_routine_count: 0,
+      executable_procedure_count: 7,
+    });
   });
 });
