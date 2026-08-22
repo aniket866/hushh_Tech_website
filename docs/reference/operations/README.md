@@ -12,6 +12,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 6. [Supabase Retirement Contract](./supabase-retirement-contract.md) for the
    frozen no-hybrid migration inventory and its blocking CI contract
 7. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
+8. [No-Hybrid Runtime Gate](./no-hybrid-runtime-gate.md) for the blocking source, artifact, native, workflow, and browser proof that the deployable product cannot reach Supabase
 
 ## Canonical workflow and governance
 

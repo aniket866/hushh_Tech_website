@@ -55,16 +55,17 @@ Current `PR Validation` check surface:
 2. `Secret Scan`
 3. `Env Contract Check`
 4. `Supabase Retirement Contract`
-5. `Reviewer Context & Compliance`
-6. `PR Hygiene`
-7. `Semantic PR Guard` (advisory-first; not yet in `CI Status Gate`)
-8. `GCP Service Foundation`
-9. `GCP Cloud SQL Attestor`
-10. `Web Validation`
-11. `Lint`
-12. `Security Audit`
-13. `Sensitive NDA Gate`
-14. `CI Status Gate`
+5. `No-Hybrid Runtime Gate`
+6. `Reviewer Context & Compliance`
+7. `PR Hygiene`
+8. `Semantic PR Guard` (advisory-first; not yet in `CI Status Gate`)
+9. `GCP Service Foundation`
+10. `GCP Cloud SQL Attestor`
+11. `Web Validation`
+12. `Lint`
+13. `Security Audit`
+14. `Sensitive NDA Gate`
+15. `CI Status Gate`
 
 ## Queue and post-merge lanes
 
@@ -119,3 +120,7 @@ That check creates a temporary test user, proves sensitive community posts fail 
 11. `Supabase Retirement Contract` is blocking in pull requests and merge
     groups and runs again post-merge. It freezes scope; it does not prove that
     any source data has migrated or that Supabase is outside the serving path.
+12. `No-Hybrid Runtime Gate` is blocking in pull requests and merge groups,
+    runs again post-merge, and is embedded in the root Cloud Run image builds.
+    It scans source, generated artifacts, native assets, release wiring, and a
+    Chromium network trace. It must be green before a no-hybrid cutover claim.

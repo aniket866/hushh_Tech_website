@@ -32,6 +32,11 @@ RUN node --input-type=module -e "\
 # Copy server and API routes
 COPY server.js ./
 COPY api/ api/
+COPY scripts/ci/check-no-hybrid-runtime.mjs scripts/ci/no-hybrid-runtime-policy.json scripts/ci/
+
+# Re-scan exactly what the runtime image can serve. This is intentionally
+# independent from GitHub so direct Cloud Build and local image builds fail closed.
+RUN node scripts/ci/check-no-hybrid-runtime.mjs --artifact-only --require-dist
 
 ENV PORT=8080
 ENV NODE_ENV=production

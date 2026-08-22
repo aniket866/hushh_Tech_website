@@ -71,6 +71,27 @@ jobs:
       - name: Validate frozen migration inventory
         run: bash scripts/ci/orchestrate.sh retirement
 
+  no-hybrid-runtime:
+    name: No-Hybrid Runtime Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove source, build, and browser are GCP-only
+        run: bash scripts/ci/orchestrate.sh no-hybrid
+
   gcp-service-foundation:
     name: GCP Service Foundation
     runs-on: ubuntu-latest
@@ -196,6 +217,7 @@ jobs:
       - secret-scan
       - env-contract
       - supabase-retirement-contract
+      - no-hybrid-runtime
       - gcp-service-foundation
       - gcp-cloudsql-attestor
       - web-validation
@@ -212,6 +234,7 @@ jobs:
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
             ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
+            ["No-Hybrid Runtime Gate"]="${{ needs.no-hybrid-runtime.result }}"
             ["GCP Service Foundation"]="${{ needs.gcp-service-foundation.result }}"
             ["GCP Cloud SQL Attestor"]="${{ needs.gcp-cloudsql-attestor.result }}"
             ["Web Validation"]="${{ needs.web-validation.result }}"

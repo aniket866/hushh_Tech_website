@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "contract_id": "hushh-tech-no-hybrid-runtime-v1",
+  "source_surfaces": [
+    { "path": "src", "kind": "browser-source" },
+    { "path": "api", "kind": "cloud-run-api-source" },
+    { "path": "cloud-run", "kind": "standalone-cloud-run-source" },
+    { "path": "scripts", "kind": "runtime-and-release-automation" },
+    { "path": ".github/workflows", "kind": "release-workflow" },
+    { "path": "public", "kind": "browser-public-artifact" },
+    { "path": "server.js", "kind": "cloud-run-entrypoint" },
+    { "path": "index.html", "kind": "browser-entrypoint" },
+    { "path": "vite.config.ts", "kind": "browser-build-config" },
+    { "path": "package.json", "kind": "root-runtime-manifest" },
+    { "path": "package-lock.json", "kind": "root-runtime-lock" },
+    { "path": "package-server.json", "kind": "cloud-run-runtime-manifest" },
+    { "path": ".env.local.example", "kind": "environment-contract" },
+    { "path": "Dockerfile", "kind": "cloud-run-image" },
+    { "path": "Dockerfile.gcp", "kind": "cloud-run-image" },
+    { "path": "cloudbuild.yaml", "kind": "cloud-build-release" },
+    { "path": "cloudbuild-uat.yaml", "kind": "cloud-build-release" },
+    { "path": "cloudbuild-prod.yaml", "kind": "cloud-build-release" },
+    { "path": "vercel.json", "kind": "legacy-release-config" },
+    { "path": "ios", "kind": "native-ios-source" },
+    { "path": "android", "kind": "native-android-source" },
+    { "path": "capacitor.config.ts", "kind": "native-build-config" },
+    { "path": "capacitor.config.js", "kind": "native-build-config" }
+  ],
+  "runtime_entrypoints": [
+    "src/main.tsx",
+    "server.js",
+    "vite.config.ts",
+    "cloud-run/email-template-api/index.js",
+    "cloud-run/hushh-tech-app-services/src/server.js",
+    "cloud-run/deep-intelligence-api/src/index.js",
+    "cloud-run/ria-intelligence-api/app/main.py"
+  ],
+  "generated_artifact_roots": [
+    "dist",
+    "ios/App/App/public",
+    "android/app/src/main/assets/public"
+  ],
+  "classified_non_runtime": [
+    { "path": "supabase", "classification": "legacy-provider-source-archive" },
+    { "path": "migration", "classification": "migration-contract-evidence" },
+    { "path": "scripts/migration", "classification": "migration-tooling" },
+    { "path": "scripts/gcp/migration", "classification": "migration-tooling" },
+    { "path": "scripts/gcp/audit-hushh-tech-secret-manager.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/gcp/migrate-hushh-tech-uat-env-to-secrets.mjs", "classification": "migration-tooling" },
+    { "path": "scripts/ci/capture-supabase-current-function-bundles.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/check-supabase-current-function-bundle-evidence.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/check-supabase-function-evidence-orchestration.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/check-supabase-function-traffic-evidence.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/check-supabase-retirement-manifest.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/generate-supabase-function-traffic-evidence.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/generate-supabase-retirement-function-registry.mjs", "classification": "migration-evidence-tooling" },
+    { "path": "scripts/ci/check-no-hybrid-runtime.mjs", "classification": "automated-gate-evidence" },
+    { "path": "scripts/ci/no-hybrid-runtime-policy.json", "classification": "automated-gate-evidence" },
+    { "path": "tests", "classification": "automated-test-evidence" },
+    { "path": "playwright.no-hybrid.config.ts", "classification": "automated-test-evidence" },
+    { "path": "docs/archive", "classification": "documentation-archive" },
+    { "path": "docs/reference/operations/supabase-retirement-contract.md", "classification": "migration-contract-evidence" },
+    { "path": "docs/reference/operations/supabase-native-cutover.md", "classification": "migration-contract-evidence" }
+  ],
+  "forbidden_direct_dependencies": [
+    "@supabase/supabase-js",
+    "supabase"
+  ],
+  "forbidden_project_refs": [
+    "ibsisfnjxeowvdtvgzff",
+    "gsqmwxqgqrgzhlhmbscg",
+    "hkdlmkpqwbjnmcwlxczv",
+    "jbvfjyxpjyspafqzohmi",
+    "qoeqfmeimagulpzjptbj",
+    "rpmzykoxqnbozgdoqbpc",
+    "spmxyqxjqxcyywkapong"
+  ],
+  "browser_coverage": {
+    "mode": "network-guard-mechanism-only",
+    "sample_routes": ["/", "/login", "/signup", "/metrics", "/delete-account"],
+    "full_route_inventory": false,
+    "authenticated_fixture": false
+  },
+  "frozen_compatibility_contract": {
+    "registry_path": "api/shared/supabaseRetirementFunctionRegistry.generated.js",
+    "expected_route_count": 112,
+    "server_path": "server.js",
+    "server_route": "/functions/v1/*"
+  },
+  "required_wiring": {
+    "orchestrator": "scripts/ci/orchestrate.sh",
+    "pull_request_workflow": ".github/workflows/ci.yml",
+    "queue_workflow": ".github/workflows/queue-validation.yml",
+    "post_merge_workflow": ".github/workflows/main-post-merge-smoke.yml",
+    "deploy_workflows": [
+      ".github/workflows/deploy-uat.yml",
+      ".github/workflows/deploy-prod.yml"
+    ],
+    "runtime_dockerfiles": [
+      "Dockerfile",
+      "Dockerfile.gcp"
+    ]
+  }
+}

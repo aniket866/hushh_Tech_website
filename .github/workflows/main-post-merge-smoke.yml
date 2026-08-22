@@ -37,11 +37,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate no-hybrid source contract
+        run: npm run migration:no-hybrid:source
+
       - name: Validate frozen migration inventory
         run: bash scripts/ci/orchestrate.sh retirement
 
       - name: Build green main artifact
         run: npm run build:web
+
+      - name: Validate no-hybrid deploy artifact
+        run: npm run migration:no-hybrid:check
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate no-hybrid browser network
+        run: npm run test:e2e:no-hybrid
 
       - name: Run compact smoke suite
         env:
