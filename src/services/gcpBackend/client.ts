@@ -64,7 +64,7 @@ function backendError(error: unknown, status?: number): BackendError {
   return { name: "GcpBackendError", message: "GCP backend request failed.", status };
 }
 
-function toUser(
+export function firebaseUserToSessionUser(
   value: FirebaseUser,
   claims: Readonly<Record<string, unknown>> = {},
 ): User {
@@ -112,7 +112,7 @@ async function toSession(value: FirebaseUser | null, forceRefresh = false): Prom
     token_type: "bearer",
     expires_in: Math.max(0, expiresAt - Math.floor(Date.now() / 1000)),
     expires_at: expiresAt,
-    user: toUser(value, token.claims),
+    user: firebaseUserToSessionUser(value, token.claims),
   };
 }
 
