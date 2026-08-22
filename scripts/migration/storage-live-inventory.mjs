@@ -37,6 +37,7 @@ import {
   copyPolicyCandidateFileDigestSha256,
   validateCopyPolicyCandidate,
 } from "./storage-live-policy.mjs";
+import { SEVEN_BUCKET_CONTRACT } from "./storage-seven-bucket-contract.mjs";
 
 export const SOURCE_COLLECTION_EVIDENCE_SCHEMA =
   "supabase-storage-live-collection-evidence-v1";
@@ -99,7 +100,20 @@ const parseBoundedJsonResponse = async (response, code) => {
   }
 };
 
-const responseBodySha256 = async (response, expectedBytes, code) => {
+export const hashBoundedObjectResponse = async (
+  response,
+  expectedBytes,
+  maximumBytes = MAXIMUM_OBJECT_BYTES,
+  code = "SOURCE_OBJECT_DOWNLOAD_INVALID",
+) => {
+  if (
+    !Number.isSafeInteger(expectedBytes) ||
+    expectedBytes < 0 ||
+    !Number.isSafeInteger(maximumBytes) ||
+    maximumBytes < 0
+  ) {
+    fail(code, "An object response has an invalid byte bound.");
+  }
   if (!response.body) fail(code, "An object response did not include a body.");
   const digest = createHash("sha256");
   const md5 = createHash("md5");
@@ -118,7 +132,7 @@ const responseBodySha256 = async (response, expectedBytes, code) => {
       if (done) break;
       const bytes = Buffer.from(value);
       sizeBytes += bytes.length;
-      if (sizeBytes > MAXIMUM_OBJECT_BYTES || sizeBytes > expectedBytes) {
+      if (sizeBytes > Math.min(expectedBytes, maximumBytes)) {
         await reader.cancel();
         fail(code, "An object response exceeded its exact byte bound.");
       }
@@ -279,7 +293,37 @@ export class SupabaseReadOnlyStorageClient {
     if (declaredLength !== null && Number.isFinite(declaredLength) && declaredLength !== expectedBytes) {
       fail("SOURCE_OBJECT_SIZE_CHANGED", "A source object changed size during collection.");
     }
-    return responseBodySha256(response, expectedBytes, "SOURCE_OBJECT_DOWNLOAD_INVALID");
+    return hashBoundedObjectResponse(
+      response,
+      expectedBytes,
+      MAXIMUM_OBJECT_BYTES,
+      "SOURCE_OBJECT_DOWNLOAD_INVALID",
+    );
+  }
+
+  async hashSeventhObject(bucketId, objectKey, expectedBytes) {
+    if (sha256(bucketId) !== SEVEN_BUCKET_CONTRACT.seventh.sourceBucketIdSha256) {
+      fail(
+        "SEVENTH_SOURCE_BUCKET_IDENTITY_MISMATCH",
+        "The higher object cap is restricted to the frozen seventh source bucket.",
+      );
+    }
+    const response = await this.request(
+      `/object/authenticated/${encodeURIComponent(bucketId)}/${encodeSourceObjectPath(objectKey)}`,
+    );
+    if (!response.ok) fail("SEVENTH_SOURCE_OBJECT_DOWNLOAD_FAILED", "A seventh source object read failed.");
+    const rawDeclaredLength = response.headers.get("content-length");
+    const declaredLength = rawDeclaredLength === null ? null : Number(rawDeclaredLength);
+    if (declaredLength !== null && Number.isFinite(declaredLength) && declaredLength !== expectedBytes) {
+      await response.body?.cancel();
+      fail("SEVENTH_SOURCE_OBJECT_SIZE_CHANGED", "A seventh source object changed size during collection.");
+    }
+    return hashBoundedObjectResponse(
+      response,
+      expectedBytes,
+      Math.min(expectedBytes, SEVEN_BUCKET_CONTRACT.seventh.maximumObjectBytes),
+      "SEVENTH_SOURCE_OBJECT_DOWNLOAD_INVALID",
+    );
   }
 }
 
@@ -640,7 +684,12 @@ export class GoogleCloudReadOnlyStorageClient {
       { code: "TARGET_OBJECT_READ_FAILED" },
     );
     if (!response.ok) fail("TARGET_OBJECT_READ_FAILED", "A target object read failed.");
-    return responseBodySha256(response, Number(object.size), "TARGET_OBJECT_READ_INVALID");
+    return hashBoundedObjectResponse(
+      response,
+      Number(object.size),
+      MAXIMUM_OBJECT_BYTES,
+      "TARGET_OBJECT_READ_INVALID",
+    );
   }
 
   projectAndAncestorPolicies() {

@@ -55,6 +55,7 @@ import {
   collectLiveSourceInventory,
   collectLiveTargetPreflight,
   encodeSourceObjectPath,
+  hashBoundedObjectResponse,
   runLiveInventoryCli,
   sourceObjectId,
   verifyExistingTargetObject,
@@ -79,6 +80,7 @@ import {
 } from '../scripts/migration/storage-copy-executor.mjs';
 import {
   SEVEN_BUCKET_ACTIVATION,
+  SEVEN_BUCKET_CONTRACT,
   sevenBucketActivationFileDigestSha256,
 } from '../scripts/migration/storage-seven-bucket-contract.mjs';
 
@@ -100,6 +102,28 @@ afterEach(() => {
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const md5 = (value: string | Buffer) => createHash('md5').update(value).digest('base64');
 const crc32c = (value: string | Buffer) => createCrc32c().update(value).digestBase64();
+
+const counterResponse = (
+  totalBytes: number,
+  onCancel: () => void = () => {},
+  chunkBytes = 1_048_576,
+) => {
+  let remaining = totalBytes;
+  return new Response(new ReadableStream({
+    pull(controller) {
+      if (remaining === 0) {
+        controller.close();
+        return;
+      }
+      const size = Math.min(remaining, chunkBytes);
+      remaining -= size;
+      controller.enqueue(new Uint8Array(size));
+    },
+    cancel() {
+      onCancel();
+    },
+  }, { highWaterMark: 0 }), { status: 200 });
+};
 
 const makeSourceRecords = (): JsonRecord[] => {
   const records: JsonRecord[] = [{
@@ -550,6 +574,66 @@ describe('storage live inventory and create-only copy safety', () => {
       code: 'SOURCE_OBJECT_DOWNLOAD_INVALID',
     });
     expect(cancelled).toBe(true);
+  });
+
+  it('streams an exact 130270442-byte seventh object under only its frozen 1 GiB cap', async () => {
+    const exactBytes = 130_270_442;
+    const result = await hashBoundedObjectResponse(
+      counterResponse(exactBytes),
+      exactBytes,
+      Math.min(exactBytes, SEVEN_BUCKET_CONTRACT.seventh.maximumObjectBytes),
+      'SEVENTH_SOURCE_OBJECT_DOWNLOAD_INVALID',
+    );
+    expect(result).toMatchObject({ sizeBytes: exactBytes });
+    expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('cancels a seventh stream at exact approved bytes plus one', async () => {
+    const exactBytes = 130_270_442;
+    let cancelled = false;
+    await expect(hashBoundedObjectResponse(
+      counterResponse(exactBytes + 1, () => { cancelled = true; }),
+      exactBytes,
+      Math.min(exactBytes, SEVEN_BUCKET_CONTRACT.seventh.maximumObjectBytes),
+      'SEVENTH_SOURCE_OBJECT_DOWNLOAD_INVALID',
+    )).rejects.toMatchObject({ code: 'SEVENTH_SOURCE_OBJECT_DOWNLOAD_INVALID' });
+    expect(cancelled).toBe(true);
+  });
+
+  it('keeps the original six-bucket reader capped at 111078397 bytes', async () => {
+    let cancelled = false;
+    const client = new SupabaseReadOnlyStorageClient({
+      serviceRoleKey: 'x'.repeat(40),
+      sleepImpl: async () => {},
+      fetchImpl: async () => counterResponse(
+        STORAGE_CUTOVER_CONTRACT.sourceSnapshot.totalBytes + 1,
+        () => { cancelled = true; },
+      ),
+    });
+    await expect(client.hashObject(
+      STORAGE_CUTOVER_CONTRACT.buckets[0].sourceBucket,
+      'oversized-six-object.bin',
+      130_270_442,
+    )).rejects.toMatchObject({ code: 'SOURCE_OBJECT_DOWNLOAD_INVALID' });
+    expect(cancelled).toBe(true);
+  });
+
+  it('rejects a wrong bucket before it can select the seventh higher cap', async () => {
+    let providerTouched = false;
+    const client = new SupabaseReadOnlyStorageClient({
+      serviceRoleKey: 'x'.repeat(40),
+      sleepImpl: async () => {},
+      fetchImpl: async () => {
+        providerTouched = true;
+        return counterResponse(0);
+      },
+    });
+    await expect(client.hashSeventhObject(
+      'not-the-private-seventh-bucket',
+      'object.bin',
+      130_270_442,
+    )).rejects.toMatchObject({ code: 'SEVENTH_SOURCE_BUCKET_IDENTITY_MISMATCH' });
+    expect(providerTouched).toBe(false);
   });
 
   it('collects the exact 6/124/111078397 source evidence with two stable metadata passes', async () => {

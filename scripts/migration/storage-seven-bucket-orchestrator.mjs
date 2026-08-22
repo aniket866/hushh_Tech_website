@@ -198,7 +198,18 @@ export const verifyAllSevenLiveSource = async ({ knownSource, seventhSource, sou
   }
   const hashes = [];
   for (const object of approvedObjects) {
-    const hashed = await sourceClient.hashObject(object.bucketId, object.objectKey, object.sizeBytes);
+    const seventh = object.bucketId === seventhSource.rawBucketId;
+    const hashed = seventh
+      ? await sourceClient.hashSeventhObject(
+          object.bucketId,
+          object.objectKey,
+          object.sizeBytes,
+        )
+      : await sourceClient.hashObject(
+          object.bucketId,
+          object.objectKey,
+          object.sizeBytes,
+        );
     if (
       hashed.sizeBytes !== object.sizeBytes ||
       hashed.sha256 !== object.sha256 ||
@@ -207,7 +218,6 @@ export const verifyAllSevenLiveSource = async ({ knownSource, seventhSource, sou
     ) {
       fail("SOURCE_MUTATED_AFTER_APPROVAL", "A seven-bucket source object changed after approval.");
     }
-    const seventh = object.bucketId === seventhSource.rawBucketId;
     hashes.push({
       objectId: seventh ? seventhSourceObjectId(object) : sourceObjectId(object),
       sourceFingerprintSha256: seventh

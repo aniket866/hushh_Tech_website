@@ -549,7 +549,7 @@ describe("combined canonical seven-bucket migration", () => {
     })).toThrowError(expect.objectContaining({ code: "COMBINED_POSTCOPY_SOURCE_DELTA" }));
   });
 
-  it("validates the real private seventh artifact without exposing its raw identity", () => {
+  it("validates the real private seventh artifact without exposing its raw identity", async () => {
     const latest = "/private/tmp/hushh-storage-lane4.latest";
     if (!existsSync(latest)) return;
     let directory;
@@ -572,5 +572,64 @@ describe("combined canonical seven-bucket migration", () => {
     expect(validated.metadataDigestSha256).toBe(
       "312038de08a37dc4c521600f77722e98787f694e36076ae8e8513e719d365021"
     );
+    const knownSource = createKnownSource();
+    const knownHashObject = vi.fn(async (bucketId: string, objectKey: string) => {
+      const object = knownSource.objects.find((candidate) =>
+        candidate.bucketId === bucketId && candidate.objectKey === objectKey)!;
+      return {
+        sizeBytes: object.sizeBytes,
+        sha256: object.sha256,
+        md5Base64: Buffer.alloc(16).toString("base64"),
+        crc32cBase64: Buffer.alloc(4).toString("base64"),
+      };
+    });
+    const seventhHashObject = vi.fn(async (bucketId: string, objectKey: string) => {
+      const object = validated.objects.find((candidate) =>
+        candidate.bucketId === bucketId && candidate.objectKey === objectKey)!;
+      return {
+        sizeBytes: object.sizeBytes,
+        sha256: object.sha256,
+        md5Base64: object.md5Base64,
+        crc32cBase64: object.crc32cBase64,
+      };
+    });
+    const verified = await verifyAllSevenLiveSource({
+      knownSource,
+      seventhSource: validated,
+      sourceClient: {
+        listBuckets: vi.fn(async () => [
+          ...STORAGE_CUTOVER_CONTRACT.buckets.map((bucket) => ({
+            id: bucket.sourceBucket,
+            public: bucket.sourcePublic,
+          })),
+          { id: validated.rawBucketId, public: validated.public },
+        ]),
+        listObjects: vi.fn(async (bucketId: string) => [
+          ...knownSource.objects,
+          ...validated.objects,
+        ].filter((object) => object.bucketId === bucketId).map((object) => ({
+          recordType: "sourceObject",
+          bucketId: object.bucketId,
+          objectKey: object.objectKey,
+          sizeBytes: object.sizeBytes,
+          mimeType: object.mimeType,
+          sourceUpdatedAt: object.sourceUpdatedAt,
+          cacheControl: object.cacheControl,
+        }))),
+        hashObject: knownHashObject,
+        hashSeventhObject: seventhHashObject,
+      },
+    });
+    expect(verified).toMatchObject({
+      bucketCount: 7,
+      objectCount: 140,
+      totalBytes: 1_574_621_367,
+    });
+    expect(knownHashObject).toHaveBeenCalledTimes(124);
+    expect(seventhHashObject).toHaveBeenCalledTimes(16);
+    expect(knownHashObject.mock.calls.every(([bucketId]) =>
+      bucketId !== validated.rawBucketId)).toBe(true);
+    expect(seventhHashObject.mock.calls.every(([bucketId]) =>
+      bucketId === validated.rawBucketId)).toBe(true);
   });
 });
