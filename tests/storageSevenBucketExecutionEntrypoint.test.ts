@@ -35,6 +35,9 @@ import {
   validateDetachedSevenBucketExecution,
 } from "../scripts/migration/storage-seven-bucket-execution-entrypoint.mjs";
 import {
+  SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS,
+} from "../scripts/migration/storage-fixed-governance-collector.mjs";
+import {
   calculateSelfBoundDigest,
   canonicalJson,
   contractFileDigestSha256,
@@ -89,6 +92,11 @@ const createGovernanceSnapshot = (
     hierarchyScopes: ["projects/hushh-tech-uat", "organizations/369781862791"],
     inheritedBindings: sortedBindings,
     inheritedBindingsDigestSha256: sha256(canonicalJson(sortedBindings)),
+    resolvedRoleCount: 0,
+    resolvedRolePermissionsDigestSha256: sha256(canonicalJson([])),
+    tokenCreationPermissions: [...SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS],
+    tokenCapabilityBindingCount: 0,
+    tokenCapabilityBindingsDigestSha256: sha256(canonicalJson([])),
     policyEvidence,
     snapshotDigestSha256: null as string | null,
   };
@@ -97,6 +105,28 @@ const createGovernanceSnapshot = (
     "snapshotDigestSha256",
   );
   return snapshot as typeof snapshot & { snapshotDigestSha256: string };
+};
+
+const createUnsafeTokenGovernanceSnapshot = (
+  policy: ReturnType<typeof createPolicyEvidence>,
+) => {
+  const snapshot = createGovernanceSnapshot(policy);
+  snapshot.policyEvidence.migrationTokenCreatorBindingCount = 1;
+  snapshot.policyEvidence.evidenceDigestSha256 = calculateSelfBoundDigest(
+    snapshot.policyEvidence,
+    "evidenceDigestSha256",
+  );
+  snapshot.tokenCapabilityBindingCount = 1;
+  snapshot.tokenCapabilityBindingsDigestSha256 = sha256(canonicalJson([{
+    scope: "serviceAccounts/hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    role: "roles/iam.serviceAccountTokenCreator",
+    operator: true,
+  }]));
+  snapshot.snapshotDigestSha256 = calculateSelfBoundDigest(
+    snapshot,
+    "snapshotDigestSha256",
+  );
+  return snapshot;
 };
 
 const createKnownSource = () => ({
@@ -818,6 +848,57 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
     expect(collectLiveAllSevenTargetPreflight).not.toHaveBeenCalled();
     expect(createWriteClients).not.toHaveBeenCalled();
+  });
+
+  it("keeps writer factories at zero for initial, recollected, or omitted token evidence", async () => {
+    for (const phase of ["initial", "recollected", "omitted"] as const) {
+      const fixture = createFixture();
+      const safe = createGovernanceSnapshot(fixture.policy);
+      const unsafe = createUnsafeTokenGovernanceSnapshot(fixture.policy);
+      const omitted = createGovernanceSnapshot(fixture.policy) as Record<string, unknown>;
+      delete omitted.tokenCreationPermissions;
+      omitted.snapshotDigestSha256 = calculateSelfBoundDigest(
+        omitted,
+        "snapshotDigestSha256",
+      );
+      const snapshots = phase === "initial"
+        ? [unsafe]
+        : phase === "recollected"
+          ? [safe, unsafe]
+          : [omitted];
+      const collectLiveGovernanceSnapshot = vi.fn(async () => snapshots.shift()!);
+      const collectLiveAllSevenTargetPreflight = vi.fn(async () =>
+        Buffer.from(JSON.stringify(
+          refreshTargetProof(fixture, "2026-08-22T01:30:00.000Z"),
+        )));
+      const createWriteClients = vi.fn();
+      await expect(__testing.executeSevenBucketWithTrustAnchor({
+        request: {
+          ...fixture.request,
+          createReadOnlyDependencies: vi.fn(async () => ({
+            sourceClient: {},
+            knownSixSourceRecords: [],
+          })),
+          createWriteClients,
+        },
+        trustAnchor: fixture.trustAnchor,
+        now: Date.parse("2026-08-22T01:30:00.000Z"),
+        verifyLiveSource: vi.fn(async () => ({ verified: true })),
+        collectLiveAllSevenTargetPreflight,
+        collectLiveGovernanceSnapshot,
+      })).rejects.toMatchObject({
+        code: phase === "omitted"
+          ? "FIXED_GOVERNANCE_SNAPSHOT_SCHEMA"
+          : "TEMPORARY_GRANT_PRESENT",
+      });
+      expect(collectLiveGovernanceSnapshot).toHaveBeenCalledTimes(
+        phase === "recollected" ? 2 : 1,
+      );
+      expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledTimes(
+        phase === "recollected" ? 1 : 0,
+      );
+      expect(createWriteClients).not.toHaveBeenCalled();
+    }
   });
 
   it("rejects duplicate and prototype-like raw JSON keys before validation or delegation", () => {

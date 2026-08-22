@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   FixedStorageGovernanceReadClient,
+  SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS,
   collectFixedStorageGovernanceSnapshot,
 } from "../scripts/migration/storage-fixed-governance-collector.mjs";
 import { ISOLATED_CUTOVER_CONTRACT } from
@@ -18,6 +19,7 @@ const organizationScope = "organizations/369781862791";
 const migrationWriter = ISOLATED_CUTOVER_CONTRACT.migrationWriterPrincipal;
 const operator =
   "serviceAccount:claude-code-gcp-operator@hussh-developer-platform.iam.gserviceaccount.com";
+type TokenGrantScope = "project" | "folder" | "organization" | "service-account";
 
 const response = (url: string, value: unknown, finalUrl = url) => {
   const result = new Response(JSON.stringify(value), {
@@ -34,11 +36,26 @@ const response = (url: string, value: unknown, finalUrl = url) => {
 const fixedFetch = ({
   inheritedWriter = false,
   operatorStorageAdmin = false,
-  tokenCreator = false,
+  tokenGrantScope = null as TokenGrantScope | null,
+  tokenRole = "roles/iam.serviceAccountTokenCreator",
+  tokenPermission = "iam.serviceAccounts.getAccessToken",
+  conditionalTokenGrant = false,
+  omitTokenRoleDefinition = false,
+  tokenCreatorRoleDrift = false,
   hierarchyCycle = false,
   organizationDrift = false,
   redirectProject = false,
 } = {}) => vi.fn(async (input: string | URL, init?: RequestInit) => {
+  const tokenBinding = {
+    role: tokenRole,
+    members: [operator],
+    ...(conditionalTokenGrant ? {
+      condition: {
+        title: "Temporary conditional impersonation",
+        expression: "request.time < timestamp('2099-01-01T00:00:00Z')",
+      },
+    } : {}),
+  };
   const url = String(input);
   if (url.startsWith("http://metadata.google.internal/")) {
     expect(init?.method).toBe("GET");
@@ -74,10 +91,9 @@ const fixedFetch = ({
     if (parsed.pathname.includes("serviceAccounts")) {
       expect(init?.body).toBeUndefined();
       expect(parsed.searchParams.get("options.requestedPolicyVersion")).toBe("3");
-      return response(url, tokenCreator ? { bindings: [{
-        role: "roles/iam.serviceAccountTokenCreator",
-        members: [operator],
-      }] } : {});
+      return response(url, tokenGrantScope === "service-account"
+        ? { bindings: [tokenBinding] }
+        : {});
     }
     expect(init?.body).toBe(JSON.stringify({ options: { requestedPolicyVersion: 3 } }));
     if (parsed.pathname === `/v3/${projectScope}:getIamPolicy`) {
@@ -91,13 +107,22 @@ const fixedFetch = ({
           members: [inheritedWriter ? migrationWriter : operator],
         });
       }
+      if (tokenGrantScope === "project") bindings.push(tokenBinding);
       return response(url, { version: 3, bindings, etag: "project-etag" });
     }
     if (parsed.pathname === `/v3/${organizationScope}:getIamPolicy`) {
-      return response(url, { version: 3, bindings: [], etag: "organization-etag" });
+      return response(url, {
+        version: 3,
+        bindings: tokenGrantScope === "organization" ? [tokenBinding] : [],
+        etag: "organization-etag",
+      });
     }
     if (parsed.pathname === "/v3/folders/123:getIamPolicy") {
-      return response(url, { version: 3, bindings: [], etag: "folder-etag" });
+      return response(url, {
+        version: 3,
+        bindings: tokenGrantScope === "folder" ? [tokenBinding] : [],
+        etag: "folder-etag",
+      });
     }
   }
   if (parsed.pathname === `/v1/${ISOLATED_CUTOVER_CONTRACT.inspectorRole}`) {
@@ -121,6 +146,33 @@ const fixedFetch = ({
       ],
       stage: "GA",
     });
+  }
+  if (parsed.pathname === "/v1/roles/iam.serviceAccountTokenCreator") {
+    expect(init?.method).toBe("GET");
+    return response(url, {
+      name: "roles/iam.serviceAccountTokenCreator",
+      includedPermissions: tokenCreatorRoleDrift
+        ? SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS.slice(0, -1)
+        : [
+            "iam.serviceAccounts.get",
+            ...SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS,
+            "iam.serviceAccounts.list",
+          ],
+      stage: "GA",
+    });
+  }
+  if (
+    parsed.pathname === `/v1/${tokenRole}` &&
+    /^(?:projects\/hushh-tech-uat|organizations\/369781862791)\/roles\//.test(tokenRole)
+  ) {
+    expect(init?.method).toBe("GET");
+    return response(url, omitTokenRoleDefinition
+      ? { name: tokenRole }
+      : {
+          name: tokenRole,
+          includedPermissions: [tokenPermission],
+          stage: "GA",
+        });
   }
   throw new Error(`Unexpected fixed governance endpoint: ${url}`);
 });
@@ -153,6 +205,14 @@ describe("fixed storage governance collector", () => {
     );
     expect(snapshot.policyEvidence.operatorStorageAdminBindingCount).toBe(0);
     expect(snapshot.policyEvidence.migrationTokenCreatorBindingCount).toBe(0);
+    expect(snapshot.tokenCreationPermissions).toEqual(
+      SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS,
+    );
+    expect(snapshot.tokenCapabilityBindingCount).toBe(0);
+    expect(snapshot.tokenCapabilityBindingsDigestSha256).toBe(
+      sha256(canonicalJson([])),
+    );
+    expect(snapshot.resolvedRoleCount).toBe(1);
     expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(4);
     expect(fetchImpl.mock.calls.every(([, init]) =>
       new Set(["GET", "POST"]).has(String(init?.method)))).toBe(true);
@@ -169,16 +229,79 @@ describe("fixed storage governance collector", () => {
     });
   });
 
-  it("rejects temporary operator storage-admin and token-creator grants", async () => {
+  it("rejects temporary operator storage-admin and direct token-creator grants", async () => {
     for (const options of [
       { operatorStorageAdmin: true },
-      { tokenCreator: true },
+      { tokenGrantScope: "service-account" as const },
     ]) {
       await expect(collectFixedStorageGovernanceSnapshot({
         client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch(options) }),
         now: 1_777_000_000_000,
       })).rejects.toMatchObject({ code: "TEMPORARY_GRANT_PRESENT" });
     }
+  });
+
+  it("rejects token mint, sign, or delegation roles at every inherited and direct scope", async () => {
+    const projectCustomRole = "projects/hushh-tech-uat/roles/customTokenCapability";
+    const organizationCustomRole =
+      "organizations/369781862791/roles/customTokenCapability";
+    for (const options of [
+      {
+        tokenGrantScope: "project" as const,
+        tokenRole: "roles/iam.serviceAccountTokenCreator",
+      },
+      {
+        tokenGrantScope: "folder" as const,
+        tokenRole: organizationCustomRole,
+        tokenPermission: "iam.serviceAccounts.getAccessToken",
+      },
+      {
+        tokenGrantScope: "organization" as const,
+        tokenRole: organizationCustomRole,
+        tokenPermission: "iam.serviceAccounts.signBlob",
+        conditionalTokenGrant: true,
+      },
+      {
+        tokenGrantScope: "service-account" as const,
+        tokenRole: projectCustomRole,
+        tokenPermission: "iam.serviceAccounts.signJwt",
+      },
+      {
+        tokenGrantScope: "service-account" as const,
+        tokenRole: projectCustomRole,
+        tokenPermission: "iam.serviceAccounts.implicitDelegation",
+        conditionalTokenGrant: true,
+      },
+      {
+        tokenGrantScope: "project" as const,
+        tokenRole: projectCustomRole,
+        tokenPermission: "iam.serviceAccounts.getOpenIdToken",
+      },
+    ]) {
+      await expect(collectFixedStorageGovernanceSnapshot({
+        client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch(options) }),
+        now: 1_777_000_000_000,
+      })).rejects.toMatchObject({ code: "TEMPORARY_GRANT_PRESENT" });
+    }
+  });
+
+  it("fails closed when a bound custom role is omitted or token-creator closure drifts", async () => {
+    await expect(collectFixedStorageGovernanceSnapshot({
+      client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch({
+        tokenGrantScope: "folder",
+        tokenRole: "organizations/369781862791/roles/customTokenCapability",
+        omitTokenRoleDefinition: true,
+      }) }),
+      now: 1_777_000_000_000,
+    })).rejects.toMatchObject({ code: "FIXED_GOVERNANCE_ROLE_INVALID" });
+
+    await expect(collectFixedStorageGovernanceSnapshot({
+      client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch({
+        tokenGrantScope: "organization",
+        tokenCreatorRoleDrift: true,
+      }) }),
+      now: 1_777_000_000_000,
+    })).rejects.toMatchObject({ code: "FIXED_GOVERNANCE_TOKEN_ROLE_DRIFT" });
   });
 
   it("fails closed on hierarchy cycles", async () => {

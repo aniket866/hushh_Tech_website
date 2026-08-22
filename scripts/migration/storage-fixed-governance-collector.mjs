@@ -36,6 +36,20 @@ const REQUESTED_POLICY_VERSION_BODY = JSON.stringify({
   options: { requestedPolicyVersion: 3 },
 });
 
+export const SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS = Object.freeze([
+  "iam.serviceAccounts.getAccessToken",
+  "iam.serviceAccounts.getOpenIdToken",
+  "iam.serviceAccounts.implicitDelegation",
+  "iam.serviceAccounts.signBlob",
+  "iam.serviceAccounts.signJwt",
+]);
+
+const OPERATOR_EFFECTIVE_MEMBERS = new Set([
+  OPERATOR_PRINCIPAL,
+  "allAuthenticatedUsers",
+  "allUsers",
+]);
+
 export const FIXED_GOVERNANCE_REQUIRED_PERMISSIONS = Object.freeze([
   "iam.roles.get",
   "iam.serviceAccounts.getIamPolicy",
@@ -58,6 +72,11 @@ const SNAPSHOT_KEYS = [
   "hierarchyScopes",
   "inheritedBindings",
   "inheritedBindingsDigestSha256",
+  "resolvedRoleCount",
+  "resolvedRolePermissionsDigestSha256",
+  "tokenCreationPermissions",
+  "tokenCapabilityBindingCount",
+  "tokenCapabilityBindingsDigestSha256",
   "policyEvidence",
   "snapshotDigestSha256",
 ];
@@ -152,6 +171,16 @@ const normalizeRole = (role, response) => {
   const includedPermissions = [...response.includedPermissions].sort();
   if (new Set(includedPermissions).size !== includedPermissions.length) {
     fail("FIXED_GOVERNANCE_ROLE_INVALID", "An inherited IAM role repeated a permission.");
+  }
+  if (
+    role === "roles/iam.serviceAccountTokenCreator" &&
+    SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS.some((permission) =>
+      !includedPermissions.includes(permission))
+  ) {
+    fail(
+      "FIXED_GOVERNANCE_TOKEN_ROLE_DRIFT",
+      "The predefined service-account token creator role lost an official permission.",
+    );
   }
   return includedPermissions;
 };
@@ -506,6 +535,13 @@ export const validateFixedGovernanceSnapshot = ({ snapshot, now = Date.now() }) 
     snapshot.hierarchyScopes[0] !== PROJECT_SCOPE ||
     snapshot.hierarchyScopes.at(-1) !== ORGANIZATION_SCOPE ||
     new Set(snapshot.hierarchyScopes).size !== snapshot.hierarchyScopes.length ||
+    !Number.isSafeInteger(snapshot.resolvedRoleCount) ||
+    snapshot.resolvedRoleCount < 0 ||
+    snapshot.resolvedRoleCount > MAXIMUM_ROLES ||
+    canonicalJson(snapshot.tokenCreationPermissions) !==
+      canonicalJson(SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS) ||
+    !Number.isSafeInteger(snapshot.tokenCapabilityBindingCount) ||
+    snapshot.tokenCapabilityBindingCount < 0 ||
     normalizedInheritedBindings === null ||
     canonicalJson(snapshot.inheritedBindings) !== canonicalJson(normalizedInheritedBindings) ||
     snapshot.inheritedBindingsDigestSha256 !==
@@ -523,7 +559,26 @@ export const validateFixedGovernanceSnapshot = ({ snapshot, now = Date.now() }) 
     "FIXED_GOVERNANCE_SNAPSHOT_INVALID",
     "governance snapshot digest",
   );
+  requireSha256(
+    snapshot.resolvedRolePermissionsDigestSha256,
+    "FIXED_GOVERNANCE_SNAPSHOT_INVALID",
+    "resolved role permissions digest",
+  );
+  requireSha256(
+    snapshot.tokenCapabilityBindingsDigestSha256,
+    "FIXED_GOVERNANCE_SNAPSHOT_INVALID",
+    "token capability bindings digest",
+  );
   validateZeroGrantPolicyEvidence(snapshot.policyEvidence);
+  if (
+    snapshot.tokenCapabilityBindingCount !== 0 ||
+    snapshot.tokenCapabilityBindingsDigestSha256 !== sha256(canonicalJson([]))
+  ) {
+    fail(
+      "TEMPORARY_GRANT_PRESENT",
+      "Token minting, signing, or delegation access is still present.",
+    );
+  }
   if (
     snapshot.snapshotDigestSha256 !==
       calculateSelfBoundDigest(snapshot, "snapshotDigestSha256")
@@ -566,8 +621,10 @@ export const collectFixedStorageGovernanceSnapshot = async ({
     `serviceAccounts/${MIGRATION_SERVICE_ACCOUNT}`,
     "FIXED_MIGRATION_SERVICE_ACCOUNT_POLICY_INVALID",
   );
+  const hierarchyBindings = normalizedByScope.flatMap(({ bindings }) => bindings);
+  const allPolicyBindings = [...hierarchyBindings, ...migrationBindings];
   const roles = [...new Set(
-    normalizedByScope.flatMap(({ bindings }) => bindings.map(({ role }) => role)),
+    allPolicyBindings.map(({ role }) => role),
   )].sort();
   if (roles.length > MAXIMUM_ROLES) {
     fail("FIXED_GOVERNANCE_ROLE_LIMIT", "The fixed hierarchy exceeded its role bound.");
@@ -577,8 +634,34 @@ export const collectFixedStorageGovernanceSnapshot = async ({
     return [role, normalizeRole(role, response.value)];
   }));
   const permissionsByRole = new Map(roleEntries);
-  const inheritedBindings = normalizedByScope
-    .flatMap(({ bindings }) => bindings)
+  const resolvedRolePermissions = roleEntries
+    .map(([role, includedPermissions]) => ({ role, includedPermissions }))
+    .sort((left, right) => left.role.localeCompare(right.role));
+  const tokenCapabilityBindings = allPolicyBindings
+    .filter((binding) =>
+      binding.members.some((member) => OPERATOR_EFFECTIVE_MEMBERS.has(member)))
+    .map((binding) => {
+      const includedPermissions = permissionsByRole.get(binding.role);
+      const tokenPermissions = SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS
+        .filter((permission) => includedPermissions.includes(permission));
+      return {
+        ...binding,
+        exactTokenCreatorRole:
+          binding.role === "roles/iam.serviceAccountTokenCreator",
+        tokenPermissions,
+        rolePermissionDigestSha256: sha256(canonicalJson(includedPermissions)),
+      };
+    })
+    .filter((binding) =>
+      binding.exactTokenCreatorRole || binding.tokenPermissions.length !== 0)
+    .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
+  if (tokenCapabilityBindings.length !== 0) {
+    fail(
+      "TEMPORARY_GRANT_PRESENT",
+      "The operator still has token minting, signing, or delegation access.",
+    );
+  }
+  const inheritedBindings = hierarchyBindings
     .filter(({ role }) =>
       permissionsByRole.get(role).some((permission) => permission.startsWith("storage.")))
     .map((binding) => {
@@ -598,10 +681,8 @@ export const collectFixedStorageGovernanceSnapshot = async ({
   }
   const operatorStorageAdminBindingCount = inheritedBindings
     .filter((binding) =>
-      binding.members.includes(OPERATOR_PRINCIPAL)).length;
-  const migrationTokenCreatorBindingCount = migrationBindings.filter((binding) =>
-    binding.role === "roles/iam.serviceAccountTokenCreator" &&
-    binding.members.includes(OPERATOR_PRINCIPAL)).length;
+      binding.members.some((member) => OPERATOR_EFFECTIVE_MEMBERS.has(member))).length;
+  const migrationTokenCreatorBindingCount = tokenCapabilityBindings.length;
   const completedMs = clock();
   const durationMs = completedMs - startedMs;
   if (
@@ -645,6 +726,11 @@ export const collectFixedStorageGovernanceSnapshot = async ({
     hierarchyScopes,
     inheritedBindings,
     inheritedBindingsDigestSha256: normalizedInheritedDigest(inheritedBindings),
+    resolvedRoleCount: resolvedRolePermissions.length,
+    resolvedRolePermissionsDigestSha256: sha256(canonicalJson(resolvedRolePermissions)),
+    tokenCreationPermissions: [...SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS],
+    tokenCapabilityBindingCount: tokenCapabilityBindings.length,
+    tokenCapabilityBindingsDigestSha256: sha256(canonicalJson(tokenCapabilityBindings)),
     policyEvidence,
     snapshotDigestSha256: null,
   };
@@ -676,6 +762,10 @@ export const assertFixedGovernanceMatchesApprovedKnownSix = ({ snapshot, approve
 export const assertFixedGovernanceUnchanged = (before, after) => {
   if (
     before.inheritedBindingsDigestSha256 !== after.inheritedBindingsDigestSha256 ||
+    before.resolvedRolePermissionsDigestSha256 !==
+      after.resolvedRolePermissionsDigestSha256 ||
+    before.tokenCapabilityBindingsDigestSha256 !==
+      after.tokenCapabilityBindingsDigestSha256 ||
     before.policyEvidence.projectPolicyCanonicalDigestSha256 !==
       after.policyEvidence.projectPolicyCanonicalDigestSha256 ||
     before.policyEvidence.migrationServiceAccountPolicyCanonicalDigestSha256 !==
