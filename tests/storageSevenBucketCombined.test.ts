@@ -35,6 +35,7 @@ import {
 import {
   buildCombinedPostCopyEvidence,
   buildCombinedSevenBucketPlan,
+  buildSeventhCreateOnlyAction,
   executeCombinedSixPlusOne,
   validateCombinedSevenBucketApproval,
   verifyAllSevenLiveSource,
@@ -203,6 +204,7 @@ const createCombinedPlan = () => {
       knownSixPreflightDigestSha256: "a".repeat(64),
       seventhPreflightFileDigestSha256: "b".repeat(64),
       seventhPreflightDigestSha256: "c".repeat(64),
+      allSevenTargetPreflightFileDigestSha256: "f".repeat(64),
       seventhPreflightSafe: true,
       seventhNamespaceObjectCount: 0,
       zeroGrantPolicyEvidence: createZeroGrantEvidence(),
@@ -321,6 +323,7 @@ describe("combined canonical seven-bucket migration", () => {
       knownSixPreflightDigestSha256: "a".repeat(64),
       seventhPreflightFileDigestSha256: "b".repeat(64),
       seventhPreflightDigestSha256: "c".repeat(64),
+      allSevenTargetPreflightFileDigestSha256: "f".repeat(64),
       seventhPreflightSafe: true,
       seventhNamespaceObjectCount: 0,
       zeroGrantPolicyEvidence: createZeroGrantEvidence(),
@@ -511,17 +514,14 @@ describe("combined canonical seven-bucket migration", () => {
         knownSource,
         seventhSource,
         createDependencies,
-      })).rejects.toMatchObject({ code: "SEVEN_BUCKET_ACTIVATION_STATE_MISMATCH" });
+      })).rejects.toMatchObject({ code: "COMBINED_DIRECT_EXECUTION_FORBIDDEN" });
       expect(createDependencies).not.toHaveBeenCalled();
     }
   });
 
-  it("constructs dependencies only for the exact true UAT activation state", async () => {
+  it("blocks the legacy direct route even for the exact true UAT activation state", async () => {
     const { plan, knownSource, seventhSource } = createCombinedPlan();
-    const constructionSentinel = new Error("dependency-construction-reached");
-    const createDependencies = vi.fn(async () => {
-      throw constructionSentinel;
-    });
+    const createDependencies = vi.fn();
     await expect(executeCombinedSixPlusOne({
       activation: SEVEN_BUCKET_ACTIVATION,
       approvalValidation: { valid: true },
@@ -530,8 +530,8 @@ describe("combined canonical seven-bucket migration", () => {
       knownSource,
       seventhSource,
       createDependencies,
-    })).rejects.toBe(constructionSentinel);
-    expect(createDependencies).toHaveBeenCalledOnce();
+    })).rejects.toMatchObject({ code: "COMBINED_DIRECT_EXECUTION_FORBIDDEN" });
+    expect(createDependencies).not.toHaveBeenCalled();
   });
 
   it("touches zero dependencies when the isolated target contract digest changes", async () => {
@@ -548,7 +548,7 @@ describe("combined canonical seven-bucket migration", () => {
       knownSource,
       seventhSource,
       createDependencies,
-    })).rejects.toMatchObject({ code: "COMBINED_UAT_ACTIVATION_REQUIRED" });
+    })).rejects.toMatchObject({ code: "COMBINED_DIRECT_EXECUTION_FORBIDDEN" });
     expect(createDependencies).not.toHaveBeenCalled();
   });
 
@@ -575,8 +575,8 @@ describe("combined canonical seven-bucket migration", () => {
       knownSource,
       seventhSource,
       createDependencies,
-    })).rejects.toMatchObject({ code: "COMBINED_DEPENDENCY_SCHEMA" });
-    expect(createDependencies).toHaveBeenCalledOnce();
+    })).rejects.toMatchObject({ code: "COMBINED_DIRECT_EXECUTION_FORBIDDEN" });
+    expect(createDependencies).not.toHaveBeenCalled();
     expect(forgedKnownSix).not.toHaveBeenCalled();
   });
 
@@ -623,6 +623,7 @@ describe("combined canonical seven-bucket migration", () => {
     };
     const result = await performSeventhCreateOnlyCopy({
       seventhSource: { objectCount: 2, objects },
+      seventhActions: objects.map(buildSeventhCreateOnlyAction),
       sourceClient,
       gcsClient,
     });

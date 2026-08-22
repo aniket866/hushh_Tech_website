@@ -1,10 +1,8 @@
 import { verify as verifySignature } from "node:crypto";
 
 import { STORAGE_CUTOVER_CONTRACT } from "./storage-cutover-contract.mjs";
-import {
-  executeActivatedKnownSixCreateOnly,
-} from "./storage-copy-executor.mjs";
 import { sourceObjectId, sourceObjectMetadataRecord } from "./storage-live-inventory.mjs";
+import { buildMigrationTargetObjectKey } from "./storage-live-policy.mjs";
 import {
   SEVEN_BUCKET_APPROVAL_SCHEMA,
   SEVEN_BUCKET_ACTIVATION,
@@ -24,9 +22,6 @@ import {
   validateSevenBucketContract,
   validateZeroGrantPolicyEvidence,
 } from "./storage-seven-bucket-contract.mjs";
-import {
-  performSeventhCreateOnlyCopy,
-} from "./storage-seventh-quarantine-executor.mjs";
 import {
   isolatedCutoverContractFileDigestSha256,
   validateIsolatedCutoverContract,
@@ -71,18 +66,6 @@ const APPROVAL_KEYS = [
   "reviewerPublicKeySha256",
   "signatureBase64",
   "approvalDigestSha256",
-];
-
-const COMBINED_DEPENDENCY_KEYS = [
-  "sourceClient",
-  "knownSixGcsClient",
-  "seventhGcsClient",
-  "policySnapshotProvider",
-  "knownSixSourceFileDigestSha256",
-  "knownSixPreflight",
-  "knownSixPreflightFileDigestSha256",
-  "knownSixPlan",
-  "knownSixPlanFileDigestSha256",
 ];
 
 const normalizeLiveMetadata = (bucketId, entry, maximumObjectBytes) => {
@@ -142,6 +125,20 @@ const normalizeLiveMetadata = (bucketId, entry, maximumObjectBytes) => {
 
 const sortedMetadata = (records) => [...records].sort((left, right) =>
   `${left.bucketId}\0${left.objectKey}`.localeCompare(`${right.bucketId}\0${right.objectKey}`));
+
+export const buildSeventhCreateOnlyAction = (object) => ({
+  action: "CREATE_IF_ABSENT",
+  sourceClass: "PRIVATE_SEVENTH_QUARANTINE",
+  objectId: seventhSourceObjectId(object),
+  sourceFingerprintSha256: seventhSourceFingerprint(object),
+  targetBucket: SEVEN_BUCKET_CONTRACT.seventh.targetBucket,
+  targetObjectKeyDigestSha256: sha256(seventhTargetObjectKey(object)),
+  targetPrecondition: "ifGenerationMatch=0",
+  expectedBytes: object.sizeBytes,
+  expectedSha256: object.sha256,
+  expectedMd5Base64: object.md5Base64,
+  expectedCrc32cBase64: object.crc32cBase64,
+});
 
 export const verifyAllSevenLiveSource = async ({ knownSource, seventhSource, sourceClient }) => {
   validateKnownSixSource(knownSource);
@@ -303,6 +300,7 @@ export const buildCombinedSevenBucketPlan = ({
   knownSixPreflightDigestSha256,
   seventhPreflightFileDigestSha256,
   seventhPreflightDigestSha256,
+  allSevenTargetPreflightFileDigestSha256,
   seventhPreflightSafe,
   seventhNamespaceObjectCount,
   zeroGrantPolicyEvidence,
@@ -326,6 +324,7 @@ export const buildCombinedSevenBucketPlan = ({
     [knownSixPreflightDigestSha256, "COMBINED_PLAN_BINDING_INVALID", "known-six preflight digest"],
     [seventhPreflightFileDigestSha256, "COMBINED_PLAN_BINDING_INVALID", "seventh preflight file digest"],
     [seventhPreflightDigestSha256, "COMBINED_PLAN_BINDING_INVALID", "seventh preflight digest"],
+    [allSevenTargetPreflightFileDigestSha256, "COMBINED_PLAN_BINDING_INVALID", "fresh all-seven target preflight file digest"],
     [changeManifestFileDigestSha256, "COMBINED_PLAN_BINDING_INVALID", "change manifest file digest"],
   ]) requireSha256(value, code, label);
   if (!/^[a-f0-9]{40}$/.test(reviewedCommitSha || "")) {
@@ -340,19 +339,7 @@ export const buildCombinedSevenBucketPlan = ({
   if (seventhPreflightSafe !== true || seventhNamespaceObjectCount !== 0) {
     fail("SEVENTH_PREFLIGHT_UNSAFE", "The quarantine namespace is not empty and safe.");
   }
-  const seventhActions = seventhSource.objects.map((object) => ({
-    action: "CREATE_IF_ABSENT",
-    sourceClass: "PRIVATE_SEVENTH_QUARANTINE",
-    objectId: seventhSourceObjectId(object),
-    sourceFingerprintSha256: seventhSourceFingerprint(object),
-    targetBucket: SEVEN_BUCKET_CONTRACT.seventh.targetBucket,
-    targetObjectKeyDigestSha256: sha256(seventhTargetObjectKey(object)),
-    targetPrecondition: "ifGenerationMatch=0",
-    expectedBytes: object.sizeBytes,
-    expectedSha256: object.sha256,
-    expectedMd5Base64: object.md5Base64,
-    expectedCrc32cBase64: object.crc32cBase64,
-  }));
+  const seventhActions = seventhSource.objects.map(buildSeventhCreateOnlyAction);
   const plan = {
     schemaVersion: SEVEN_BUCKET_PLAN_SCHEMA,
     planState: "AWAITING_INDEPENDENT_LANE_7_REVIEW_EXECUTION_DISABLED",
@@ -372,13 +359,23 @@ export const buildCombinedSevenBucketPlan = ({
     changeManifestDigestSha256: changeManifest.manifestDigestSha256,
     combinedSourceDigestSha256: sourceSummary.combinedSourceDigestSha256,
     knownSixSourceFileDigestSha256: knownSourceFileDigestSha256,
+    knownSixSourceInventoryDigestSha256: knownSource.digestSha256,
+    knownSixSourceArtifactDigestSha256: knownSource.sourceArtifactDigestSha256,
     seventhSourceFileDigestSha256: seventhSource.sourceFileDigestSha256,
+    seventhSourceArtifactDigestSha256: seventhSource.sourceArtifactDigestSha256,
+    seventhSourceMetadataDigestSha256: seventhSource.metadataDigestSha256,
+    seventhSourceContentSetDigestSha256: seventhSource.contentSetDigestSha256,
     knownSixPlanFileDigestSha256,
     knownSixPlanDigestSha256: knownSixPlan.planDigestSha256,
     knownSixPreflightFileDigestSha256,
     knownSixPreflightDigestSha256,
     seventhPreflightFileDigestSha256,
     seventhPreflightDigestSha256,
+    allSevenTargetPreflightFileDigestSha256,
+    allSevenTargetPreflightBindingDigestSha256: sha256(canonicalJson({
+      knownSixPreflightDigestSha256,
+      seventhPreflightDigestSha256,
+    })),
     zeroGrantPolicyEvidenceDigestSha256: zeroGrantPolicyEvidence.evidenceDigestSha256,
     projectPolicyCanonicalDigestSha256:
       zeroGrantPolicyEvidence.projectPolicyCanonicalDigestSha256,
@@ -400,10 +397,95 @@ export const buildCombinedSevenBucketPlan = ({
     ifGenerationMatch: 0,
     knownSixActions: knownSixPlan.actions,
     seventhActions,
+    knownSixActionSetDigestSha256: sha256(canonicalJson(knownSixPlan.actions)),
+    seventhActionSetDigestSha256: sha256(canonicalJson(seventhActions)),
     planDigestSha256: null,
   };
   plan.planDigestSha256 = calculateSelfBoundDigest(plan, "planDigestSha256");
   return plan;
+};
+
+export const bindCombinedPlanToExactSources = ({
+  plan,
+  knownSource,
+  knownSourceFileDigestSha256,
+  knownSixPlan,
+  seventhSource,
+}) => {
+  validateKnownSixSource(knownSource);
+  const sourceSummary = buildCombinedSourceSummary({
+    knownSource,
+    knownSourceFileDigestSha256,
+    seventhSource,
+  });
+  if (
+    plan?.schemaVersion !== SEVEN_BUCKET_PLAN_SCHEMA ||
+    plan?.planDigestSha256 !== calculateSelfBoundDigest(plan, "planDigestSha256") ||
+    plan.combinedSourceDigestSha256 !== sourceSummary.combinedSourceDigestSha256 ||
+    plan.knownSixSourceFileDigestSha256 !== knownSourceFileDigestSha256 ||
+    plan.knownSixSourceInventoryDigestSha256 !== knownSource.digestSha256 ||
+    plan.knownSixSourceArtifactDigestSha256 !== knownSource.sourceArtifactDigestSha256 ||
+    plan.seventhSourceFileDigestSha256 !== seventhSource.sourceFileDigestSha256 ||
+    plan.seventhSourceArtifactDigestSha256 !== seventhSource.sourceArtifactDigestSha256 ||
+    plan.seventhSourceMetadataDigestSha256 !== seventhSource.metadataDigestSha256 ||
+    plan.seventhSourceContentSetDigestSha256 !== seventhSource.contentSetDigestSha256 ||
+    canonicalJson(plan.knownSixActions) !== canonicalJson(knownSixPlan?.actions) ||
+    plan.knownSixActionSetDigestSha256 !== sha256(canonicalJson(plan.knownSixActions)) ||
+    plan.seventhActionSetDigestSha256 !== sha256(canonicalJson(plan.seventhActions))
+  ) {
+    fail("COMBINED_SIGNED_SOURCE_BINDING_MISMATCH", "The signed plan does not bind the exact source artifacts and actions.");
+  }
+
+  const knownById = new Map(knownSource.objects.map((object) => [sourceObjectId(object), object]));
+  if (knownById.size !== knownSource.objectCount || plan.knownSixActions.length !== knownSource.objectCount) {
+    fail("COMBINED_KNOWN_SIX_ACTION_BINDING_MISMATCH", "The signed known-six actions are not one-to-one with the exact source.");
+  }
+  const seenKnown = new Set();
+  const knownSixBindings = plan.knownSixActions.map((action) => {
+    const object = knownById.get(action?.objectId);
+    const bucket = object && STORAGE_CUTOVER_CONTRACT.buckets.find(
+      (candidate) => candidate.sourceBucket === object.bucketId,
+    );
+    const targetKey = object && buildMigrationTargetObjectKey(
+      object.bucketId,
+      object.objectKey,
+      object.fingerprint,
+    );
+    if (
+      !object || !bucket || seenKnown.has(action.objectId) ||
+      action.sourceFingerprintSha256 !== object.fingerprint ||
+      action.expectedBytes !== object.sizeBytes ||
+      action.expectedSha256 !== object.sha256 ||
+      action.targetBucket !== bucket.targetBucket ||
+      action.targetObjectKeyDigestSha256 !== sha256(targetKey)
+    ) {
+      fail("COMBINED_KNOWN_SIX_ACTION_BINDING_MISMATCH", "A signed known-six action changed from its exact source object.");
+    }
+    seenKnown.add(action.objectId);
+    return Object.freeze({ action, sourceObject: object });
+  });
+
+  const seventhById = new Map(seventhSource.objects.map((object) => [seventhSourceObjectId(object), object]));
+  if (seventhById.size !== seventhSource.objectCount || plan.seventhActions.length !== seventhSource.objectCount) {
+    fail("COMBINED_SEVENTH_ACTION_BINDING_MISMATCH", "The signed seventh actions are not one-to-one with the exact source.");
+  }
+  const seenSeventh = new Set();
+  const seventhBindings = plan.seventhActions.map((action) => {
+    const object = seventhById.get(action?.objectId);
+    if (
+      !object || seenSeventh.has(action.objectId) ||
+      canonicalJson(action) !== canonicalJson(buildSeventhCreateOnlyAction(object))
+    ) {
+      fail("COMBINED_SEVENTH_ACTION_BINDING_MISMATCH", "A signed seventh action changed from its exact source object.");
+    }
+    seenSeventh.add(action.objectId);
+    return Object.freeze({ action, sourceObject: object });
+  });
+  return Object.freeze({
+    knownSixBindings: Object.freeze(knownSixBindings),
+    seventhBindings: Object.freeze(seventhBindings),
+    combinedSourceDigestSha256: sourceSummary.combinedSourceDigestSha256,
+  });
 };
 
 const approvalPayload = (approval) => {
@@ -584,98 +666,9 @@ export const buildCombinedPostCopyEvidence = ({
   return evidence;
 };
 
-export const executeCombinedSixPlusOne = async ({
-  activation,
-  approvalValidation,
-  plan,
-  approval,
-  knownSource,
-  seventhSource,
-  createDependencies,
-}) => {
-  validateSevenBucketActivation(activation);
-  if (
-    activation.contractState !== "UAT_CREATE_ONLY_ACTIVATED" ||
-    activation.executionPolicy.executionActivated !== true ||
-    plan?.contractState !== activation.contractState ||
-    plan?.executionActivated !== true ||
-    plan?.activationDigestSha256 !== activation.activationDigestSha256 ||
-    plan?.activationFileDigestSha256 !== sevenBucketActivationFileDigestSha256() ||
-    plan?.isolatedCutoverContractFileDigestSha256 !==
-      isolatedCutoverContractFileDigestSha256()
-  ) {
-    fail(
-      "COMBINED_UAT_ACTIVATION_REQUIRED",
-      "The combined copy requires the exact UAT create-only activation state.",
-    );
-  }
-  if (approvalValidation?.valid !== true) {
-    fail("COMBINED_APPROVAL_REQUIRED", "The combined copy requires a validated independent approval.");
-  }
-  if (typeof createDependencies !== "function") {
-    fail(
-      "COMBINED_DEPENDENCY_FACTORY_REQUIRED",
-      "The combined copy requires a post-activation dependency factory.",
-    );
-  }
-  const {
-    sourceClient,
-    knownSixGcsClient,
-    seventhGcsClient,
-    policySnapshotProvider,
-    knownSixSourceFileDigestSha256,
-    knownSixPreflight,
-    knownSixPreflightFileDigestSha256,
-    knownSixPlan,
-    knownSixPlanFileDigestSha256,
-  } = await createDependencies().then((dependencies) => {
-    requireExactKeys(
-      dependencies,
-      COMBINED_DEPENDENCY_KEYS,
-      "COMBINED_DEPENDENCY_SCHEMA",
-      "combined six-plus-one dependencies",
-    );
-    return dependencies;
-  });
-  const policyBefore = validateZeroGrantPolicyEvidence(await policySnapshotProvider("before"));
-  if (
-    policyBefore.projectPolicyCanonicalDigestSha256 !==
-      plan.projectPolicyCanonicalDigestSha256 ||
-    policyBefore.migrationServiceAccountPolicyCanonicalDigestSha256 !==
-      plan.migrationServiceAccountPolicyCanonicalDigestSha256
-  ) {
-    fail("COMBINED_POLICY_APPROVAL_MISMATCH", "The fresh zero-grant policy evidence changed after approval.");
-  }
-  const sourceBefore = await verifyAllSevenLiveSource({ knownSource, seventhSource, sourceClient });
-  const knownSixResult = await executeActivatedKnownSixCreateOnly({
-    activation,
-    approvalValidation,
-    combinedApproval: approval,
-    combinedPlan: plan,
-    source: knownSource,
-    sourceFileDigestSha256: knownSixSourceFileDigestSha256,
-    preflight: knownSixPreflight,
-    preflightFileDigestSha256: knownSixPreflightFileDigestSha256,
-    plan: knownSixPlan,
-    planFileDigestSha256: knownSixPlanFileDigestSha256,
-    sourceClient,
-    gcsClient: knownSixGcsClient,
-  });
-  const seventhResult = await performSeventhCreateOnlyCopy({
-    seventhSource,
-    sourceClient,
-    gcsClient: seventhGcsClient,
-  });
-  const sourceAfter = await verifyAllSevenLiveSource({ knownSource, seventhSource, sourceClient });
-  const policyAfter = validateZeroGrantPolicyEvidence(await policySnapshotProvider("after"));
-  return buildCombinedPostCopyEvidence({
-    plan,
-    approval,
-    sourceBefore,
-    sourceAfter,
-    knownSixResult,
-    seventhResult,
-    policyBefore,
-    policyAfter,
-  });
+export const executeCombinedSixPlusOne = async () => {
+  fail(
+    "COMBINED_DIRECT_EXECUTION_FORBIDDEN",
+    "Combined execution is only available through the detached-approval entrypoint.",
+  );
 };

@@ -476,16 +476,65 @@ export const verifySeventhTargetObject = async (gcsClient, sourceObject, targetO
   };
 };
 
+export const bindSeventhPlanActions = ({ seventhSource, seventhActions }) => {
+  if (
+    !Array.isArray(seventhSource?.objects) ||
+    !Number.isSafeInteger(seventhSource.objectCount) ||
+    seventhSource.objects.length !== seventhSource.objectCount ||
+    !Array.isArray(seventhActions) ||
+    seventhActions.length !== seventhSource.objectCount
+  ) {
+    fail("SEVENTH_SIGNED_ACTION_SET_MISMATCH", "The signed seventh action set is not one-to-one with the exact source.");
+  }
+  const sourceById = new Map(
+    seventhSource.objects.map((object) => [seventhSourceObjectId(object), object]),
+  );
+  if (sourceById.size !== seventhSource.objectCount) {
+    fail("SEVENTH_SIGNED_ACTION_SET_MISMATCH", "The exact seventh source contains a duplicate object identity.");
+  }
+  const seen = new Set();
+  return Object.freeze(seventhActions.map((action) => {
+    const sourceObject = sourceById.get(action?.objectId);
+    const expected = sourceObject && {
+      action: "CREATE_IF_ABSENT",
+      sourceClass: "PRIVATE_SEVENTH_QUARANTINE",
+      objectId: seventhSourceObjectId(sourceObject),
+      sourceFingerprintSha256: seventhSourceFingerprint(sourceObject),
+      targetBucket: SEVEN_BUCKET_CONTRACT.seventh.targetBucket,
+      targetObjectKeyDigestSha256: sha256(seventhTargetObjectKey(sourceObject)),
+      targetPrecondition: "ifGenerationMatch=0",
+      expectedBytes: sourceObject.sizeBytes,
+      expectedSha256: sourceObject.sha256,
+      expectedMd5Base64: sourceObject.md5Base64,
+      expectedCrc32cBase64: sourceObject.crc32cBase64,
+    };
+    if (
+      !sourceObject ||
+      seen.has(action.objectId) ||
+      canonicalJson(action) !== canonicalJson(expected)
+    ) {
+      fail("SEVENTH_SIGNED_ACTION_SET_MISMATCH", "A signed seventh action changed from its exact source object.");
+    }
+    seen.add(action.objectId);
+    return Object.freeze({ action, sourceObject });
+  }));
+};
+
 export const performSeventhCreateOnlyCopy = async ({
   seventhSource,
+  seventhActions,
   sourceClient,
   gcsClient,
   onProgress,
 }) => {
+  const boundActions = bindSeventhPlanActions({ seventhSource, seventhActions });
   const outcomes = [];
   let createdCount = 0;
   let noopCount = 0;
-  for (const [index, sourceObject] of seventhSource.objects.entries()) {
+  for (const [index, { action, sourceObject }] of boundActions.entries()) {
+    if (action.action !== "CREATE_IF_ABSENT") {
+      fail("SEVENTH_SIGNED_ACTION_SET_MISMATCH", "The seventh writer only accepts signed create-if-absent actions.");
+    }
     const objectKey = seventhTargetObjectKey(sourceObject);
     let target = await gcsClient.getObject(SEVEN_BUCKET_CONTRACT.seventh.targetBucket, objectKey);
     let outcome = "NOOP_PRESENT_EXACT";
@@ -511,7 +560,7 @@ export const performSeventhCreateOnlyCopy = async ({
     onProgress?.({ completed: index + 1, total: seventhSource.objectCount, objectId: verified.objectId, outcome });
   }
   const liveNamespace = await gcsClient.listObjects();
-  const expectedNames = new Set(seventhSource.objects.map(seventhTargetObjectKey));
+  const expectedNames = new Set(boundActions.map(({ sourceObject }) => seventhTargetObjectKey(sourceObject)));
   const seen = new Set();
   for (const object of liveNamespace) {
     if (!expectedNames.has(object.name) || seen.has(object.name)) {
@@ -519,7 +568,7 @@ export const performSeventhCreateOnlyCopy = async ({
     }
     seen.add(object.name);
   }
-  if (seen.size !== expectedNames.size || outcomes.length !== seventhSource.objectCount) {
+  if (seen.size !== expectedNames.size || outcomes.length !== boundActions.length) {
     fail("SEVENTH_TARGET_RECONCILIATION_FAILED", "The quarantine namespace did not fully reconcile.");
   }
   outcomes.sort((left, right) => left.objectId.localeCompare(right.objectId));

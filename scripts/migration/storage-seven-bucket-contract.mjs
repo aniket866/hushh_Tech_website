@@ -50,7 +50,7 @@ export const SEVEN_BUCKET_ACTIVATION = Object.freeze(
 );
 
 export const SEVEN_BUCKET_PLAN_SCHEMA =
-  "hushh-tech-storage-seven-bucket-create-only-plan-v1";
+  "hushh-tech-storage-seven-bucket-create-only-plan-v2";
 export const SEVEN_BUCKET_APPROVAL_SCHEMA =
   "hushh-tech-storage-seven-bucket-approval-v1";
 export const ZERO_GRANT_POLICY_EVIDENCE_SCHEMA =
