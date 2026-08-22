@@ -37,8 +37,12 @@ const CAPTURE_CORE_SOURCE_URL = new URL(
   "../../../scripts/ci/capture-supabase-current-function-bundles.mjs",
   import.meta.url
 );
+const STANDARD_EVIDENCE_SOURCE_URL = new URL(
+  "../../../scripts/ci/generate-supabase-current-function-bundle-evidence.mjs",
+  import.meta.url
+);
 const TRUST_ANCHOR_FILE_SHA256 =
-  "6b9e589d36e9923714a95e4b5291691ed965278cc56d119d888008f73864cf37";
+  "f0abd5feb3736b841f656fc7b966bd140e270bb94812a4ebf868bc174ea8d9c3";
 const TRUST_ANCHOR_KEYS = Object.freeze([
   "schema_version",
   "provisioning_status",
@@ -52,8 +56,13 @@ const TRUST_ANCHOR_KEYS = Object.freeze([
   "docker_image_id",
   "docker_image_os",
   "docker_image_architecture",
+  "docker_context_class",
+  "docker_context_endpoint_sha256",
+  "docker_server_version",
   "provider_metadata_digest_sha256",
   "raw_body_attempts_digest_sha256",
+  "recovered_source_tree_digest_sha256",
+  "raw_archive_to_recovered_tree_digest_sha256",
 ]);
 const PROVISIONED_TRUST_FIELDS = Object.freeze([
   "collector_closure_digest_sha256",
@@ -61,8 +70,12 @@ const PROVISIONED_TRUST_FIELDS = Object.freeze([
   "docker_image_id",
   "docker_image_os",
   "docker_image_architecture",
+  "docker_context_endpoint_sha256",
+  "docker_server_version",
   "provider_metadata_digest_sha256",
   "raw_body_attempts_digest_sha256",
+  "recovered_source_tree_digest_sha256",
+  "raw_archive_to_recovered_tree_digest_sha256",
 ]);
 
 const assert = (condition, message) => {
@@ -107,8 +120,61 @@ const digestRawBodyAttempts = (attempts) =>
       String(attempt.status),
       String(attempt.bytes),
       attempt.sha256 ?? "NULL",
+      attempt.recovered_tree_digest_sha256 ?? "NULL",
+      attempt.recovered_file_count === null ? "NULL" : String(attempt.recovered_file_count),
+      attempt.recovered_total_bytes === null ? "NULL" : String(attempt.recovered_total_bytes),
     ])
   );
+
+const digestRecoveredSourceMembers = (sourceFilesBySlug) =>
+  digestCanonicalTrustRecords(
+    "recovered-source-tree-members-v1",
+    [...sourceFilesBySlug.entries()]
+      .sort(([left], [right]) => compareUtf8(left, right))
+      .flatMap(([slug, files]) =>
+        files.map((file) => [slug, file.relativePath, file.digest, String(file.size)])
+      )
+  );
+
+const digestRecoveredSlugMembers = (files) =>
+  digestCanonicalTrustRecords(
+    "recovered-source-tree-per-slug-v1",
+    files.map((file) => [file.relativePath, file.digest, String(file.size)])
+  );
+
+const digestRawArchiveToRecoveredTree = ({ receipt, rawBodyAttempts, sourceFilesBySlug }) => {
+  let attemptOffset = 0;
+  const records = [];
+  for (const outcome of receipt.outcomes) {
+    const attempts = rawBodyAttempts.slice(attemptOffset, attemptOffset + outcome.attempts);
+    attemptOffset += outcome.attempts;
+    if (outcome.status !== "EXTRACTED") continue;
+    const successfulAttempt = attempts.at(-1);
+    const files = sourceFilesBySlug.get(outcome.slug);
+    assert(
+      successfulAttempt?.status === 200 && Array.isArray(files) && files.length > 0,
+      `Raw archive mapping is incomplete for ${outcome.slug}.`
+    );
+    const recoveredTreeDigest = digestRecoveredSlugMembers(files);
+    const recoveredTotalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    assert(
+      successfulAttempt.recovered_tree_digest_sha256 === recoveredTreeDigest &&
+        successfulAttempt.recovered_file_count === files.length &&
+        successfulAttempt.recovered_total_bytes === recoveredTotalBytes,
+      `Raw archive does not bind every recovered source member for ${outcome.slug}.`
+    );
+    records.push([
+      outcome.slug,
+      successfulAttempt.sha256,
+      String(successfulAttempt.bytes),
+      successfulAttempt.recovered_tree_digest_sha256,
+      String(successfulAttempt.recovered_file_count),
+      String(successfulAttempt.recovered_total_bytes),
+    ]);
+  }
+  assert(attemptOffset === rawBodyAttempts.length, "Raw archive mapping contains trailing attempts.");
+  return digestCanonicalTrustRecords("raw-archive-to-recovered-source-tree-v1", records);
+};
 
 const digestCollectorClosure = () =>
   digestCanonicalTrustRecords(
@@ -121,6 +187,10 @@ const digestCollectorClosure = () =>
       [
         "scripts/ci/capture-supabase-current-function-bundles.mjs",
         fs.readFileSync(CAPTURE_CORE_SOURCE_URL),
+      ],
+      [
+        "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs",
+        fs.readFileSync(STANDARD_EVIDENCE_SOURCE_URL),
       ],
     ].map(([relativePath, bytes]) => [
       relativePath,
@@ -155,6 +225,9 @@ const assertReviewedTrustAnchor = (anchor) => {
     "collector_closure_digest_sha256",
     "provider_metadata_digest_sha256",
     "raw_body_attempts_digest_sha256",
+    "docker_context_endpoint_sha256",
+    "recovered_source_tree_digest_sha256",
+    "raw_archive_to_recovered_tree_digest_sha256",
   ]) {
     assert(
       typeof anchor[field] === "string" && /^[a-f0-9]{64}$/.test(anchor[field]),
@@ -174,6 +247,15 @@ const assertReviewedTrustAnchor = (anchor) => {
   assert(
     anchor.docker_image_architecture === "amd64" || anchor.docker_image_architecture === "arm64",
     "Local-Docker trust-anchor image architecture is invalid."
+  );
+  assert(
+    anchor.docker_context_class === "ABSOLUTE_LOCAL_UNIX_SOCKET",
+    "Local-Docker trust-anchor context class is invalid."
+  );
+  assert(
+    typeof anchor.docker_server_version === "string" &&
+      /^[0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?$/.test(anchor.docker_server_version),
+    "Local-Docker trust-anchor server version is invalid."
   );
   assert(
     anchor.collector_closure_digest_sha256 === digestCollectorClosure(),
@@ -340,7 +422,7 @@ const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
     ]),
     "Local-Docker transport receipt fields are invalid."
   );
-  assert(transportReceipt.schema_version === 1, "Local-Docker transport schema is invalid.");
+  assert(transportReceipt.schema_version === 2, "Local-Docker transport schema is invalid.");
   assert(transportReceipt.project_ref === EXPECTED_PROJECT_REF, "Local-Docker transport project is invalid.");
   assert(
     transportReceipt.tool === "supabase_cli_metadata_plus_direct_management_api_body",
@@ -361,6 +443,9 @@ const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
     "docker_image_id",
     "docker_image_os",
     "docker_image_architecture",
+    "docker_context_class",
+    "docker_context_endpoint_sha256",
+    "docker_server_version",
   ]) {
     assert(
       transportReceipt[field] === reviewedTrustAnchor[field],
@@ -434,7 +519,15 @@ const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
     assert(attempts.length === outcome.attempts, `Raw body attempts are missing for ${outcome.slug}.`);
     for (const attempt of attempts) {
       assert(
-        exactKeys(attempt, ["slug", "status", "bytes", "sha256"]) &&
+        exactKeys(attempt, [
+          "slug",
+          "status",
+          "bytes",
+          "sha256",
+          "recovered_tree_digest_sha256",
+          "recovered_file_count",
+          "recovered_total_bytes",
+        ]) &&
           attempt.slug === outcome.slug &&
           [200, 404, 500].includes(attempt.status),
         `Raw body attempt is invalid for ${outcome.slug}.`
@@ -445,12 +538,22 @@ const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
             attempt.bytes > 0 &&
             attempt.bytes <= 32 * 1024 * 1024 &&
             typeof attempt.sha256 === "string" &&
-            /^[a-f0-9]{64}$/.test(attempt.sha256),
+            /^[a-f0-9]{64}$/.test(attempt.sha256) &&
+            typeof attempt.recovered_tree_digest_sha256 === "string" &&
+            /^[a-f0-9]{64}$/.test(attempt.recovered_tree_digest_sha256) &&
+            Number.isSafeInteger(attempt.recovered_file_count) &&
+            attempt.recovered_file_count > 0 &&
+            Number.isSafeInteger(attempt.recovered_total_bytes) &&
+            attempt.recovered_total_bytes > 0,
           `Raw body success receipt is invalid for ${outcome.slug}.`
         );
       } else {
         assert(
-          attempt.bytes === 0 && attempt.sha256 === null,
+          attempt.bytes === 0 &&
+            attempt.sha256 === null &&
+            attempt.recovered_tree_digest_sha256 === null &&
+            attempt.recovered_file_count === null &&
+            attempt.recovered_total_bytes === null,
           `Raw body failure receipt is invalid for ${outcome.slug}.`
         );
       }
@@ -531,6 +634,19 @@ const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
     manifest,
     ...(limits ? { limits } : {}),
   });
+  assert(
+    digestRecoveredSourceMembers(legacyInventory.sourceFilesBySlug) ===
+      reviewedTrustAnchor.recovered_source_tree_digest_sha256,
+    "Recovered source tree changed from the reviewed trust anchor."
+  );
+  assert(
+    digestRawArchiveToRecoveredTree({
+      receipt,
+      rawBodyAttempts: transportReceipt.raw_body_attempts,
+      sourceFilesBySlug: legacyInventory.sourceFilesBySlug,
+    }) === reviewedTrustAnchor.raw_archive_to_recovered_tree_digest_sha256,
+    "Raw archive to recovered source-tree mapping changed from the reviewed trust anchor."
+  );
   return Object.freeze({
     ...legacyInventory,
     rawMetadata,

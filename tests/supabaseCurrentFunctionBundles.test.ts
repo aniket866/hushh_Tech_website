@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -38,6 +39,7 @@ import {
   captureLocalDockerCurrentFunctionBundles,
 } from "../migration/scripts/ci/capture-supabase-current-function-bundles-local-docker.mjs";
 import {
+  CANONICAL_RECORD_ENCODING,
   DEFAULT_RECOVERY_LIMITS,
   assertSafeCanonicalString,
   digestAttemptEvidence,
@@ -99,21 +101,58 @@ const TEST_REVIEWED_TRUST_ANCHOR = Object.freeze({
   bundle_transport: BUNDLE_TRANSPORT,
   raw_body_surface: RAW_BODY_SURFACE,
   collector_closure_digest_sha256:
-    "58abeea1f76f19a3174d5e77e25675d852d01038bae88a363cfd1def3765ec14",
+    "9b8fce785d55a0b8e509fc14f0d95ff679516448e6bfef24e1f077205a21760a",
   docker_image: TEST_EDGE_RUNTIME_IMAGE,
   docker_image_id: TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id,
   docker_image_os: "linux",
   docker_image_architecture: "amd64",
+  docker_context_class: "ABSOLUTE_LOCAL_UNIX_SOCKET",
+  docker_context_endpoint_sha256:
+    "13c4025c96f36e94b3481db3214765a35981f4e484bc53b1524d51c1ecaad5c6",
+  docker_server_version: "29.7.2",
   provider_metadata_digest_sha256:
     "47ad5e82de3257e34576693907f35c81a7568a820c70dc2307ffc90f818cf88a",
   raw_body_attempts_digest_sha256:
-    "376e0fc0eca4387c74b6ab1a1df42efb79adaa257200d5ce5669ae4dbcd06039",
+    "bc1c0aa7e02fd6172f1f2b7942c7e4c87140c408cbaf9c61b227b1a5fd8ef9e4",
+  recovered_source_tree_digest_sha256:
+    "8c790c1a7722457837fcfbe6676b8a4336c05878529b5ec0722dbf1d033fb44c",
+  raw_archive_to_recovered_tree_digest_sha256:
+    "20ee2a5532317b69817f2b2b2d20fea8d734bce5246cc707e9b52dbceabed7a7",
 });
 const TEST_SYNTHETIC_TRUST_ANCHOR = Object.freeze({
   ...TEST_REVIEWED_TRUST_ANCHOR,
+  docker_context_endpoint_sha256: "a".repeat(64),
   raw_body_attempts_digest_sha256:
-    "64a5ab027b15488bee7fdba944d3bdde31b3e4cc2301c0e72d5124f4505f3bf5",
+    "9772f9d53d7ea7ff33090dbbafbe5dd646a0cff3bab454d0b15c3cdffb04746a",
+  recovered_source_tree_digest_sha256:
+    "76e2ab859cb82e5b9583cedd9688d83a0d05f60315466eb66a7420d20d774618",
+  raw_archive_to_recovered_tree_digest_sha256:
+    "1ddf80518b0bdf9fea7a2bd82bf45b194d141e3e7cb0aebcdf9ad98494f8d5af",
 });
+
+const testRecoveredTreeReceipt = (slug: string) => {
+  const bytes = Buffer.from(`export const slug = ${JSON.stringify(slug)};\n`);
+  const record = encodeCanonicalRecord([
+    `supabase/functions/${slug}/index.ts`,
+    sha256(bytes),
+    String(bytes.length),
+  ]);
+  const hash = crypto.createHash("sha256");
+  hash.update(
+    encodeCanonicalRecord([
+      "hushh-local-docker-function-bundle-trust-anchor",
+      CANONICAL_RECORD_ENCODING,
+      "recovered-source-tree-per-slug-v1",
+      "1",
+    ])
+  );
+  hash.update(record);
+  return {
+    recovered_tree_digest_sha256: hash.digest("hex"),
+    recovered_file_count: 1,
+    recovered_total_bytes: bytes.length,
+  };
+};
 
 const clone = <T>(value: T): T => structuredClone(value);
 const validate = (
@@ -835,8 +874,18 @@ describe("read-only Supabase function capture transport", () => {
       expect(result.transportReceipt.raw_body_attempts).toHaveLength(112);
       expect(
         result.transportReceipt.raw_body_attempts.every(
-          ({ status, sha256: digest }: { status: number; sha256: string }) =>
-            status === 200 && /^[a-f0-9]{64}$/.test(digest)
+          (attempt: {
+            status: number;
+            sha256: string;
+            recovered_tree_digest_sha256: string;
+            recovered_file_count: number;
+            recovered_total_bytes: number;
+          }) =>
+            attempt.status === 200 &&
+            /^[a-f0-9]{64}$/.test(attempt.sha256) &&
+            /^[a-f0-9]{64}$/.test(attempt.recovered_tree_digest_sha256) &&
+            attempt.recovered_file_count === 1 &&
+            attempt.recovered_total_bytes > 0
         )
       ).toBe(true);
       const snapshot = snapshotRecoveryTree({ recoveryRoot });
@@ -925,7 +974,7 @@ describe("read-only Supabase function capture transport", () => {
     expect(RAW_BODY_SURFACE).toContain("ACCEPT_APPLICATION_OCTET_STREAM");
   });
 
-  it("accounts for and binds exact end metadata in local-Docker evidence", () => {
+  it("binds exact metadata, recovered sources, raw archives, and Docker runtime", () => {
     const snapshot = makeSyntheticRecoverySnapshot();
     const startMetadata = JSON.parse(snapshot.files.get("functions-list.json")!.toString("utf8"));
     snapshot.files.set(
@@ -948,7 +997,7 @@ describe("read-only Supabase function capture transport", () => {
       Buffer.from(
         JSON.stringify(
           {
-            schema_version: 1,
+            schema_version: 2,
             project_ref: EXPECTED_PROJECT_REF,
             tool: "supabase_cli_metadata_plus_direct_management_api_body",
             tool_version: "2.115.0",
@@ -980,6 +1029,13 @@ describe("read-only Supabase function capture transport", () => {
                     status,
                     bytes: status === 200 ? 123 : 0,
                     sha256: status === 200 ? "c".repeat(64) : null,
+                    ...(status === 200
+                      ? testRecoveredTreeReceipt(outcome.slug)
+                      : {
+                          recovered_tree_digest_sha256: null,
+                          recovered_file_count: null,
+                          recovered_total_bytes: null,
+                        }),
                   };
                 })
             ),
@@ -1145,6 +1201,29 @@ describe("read-only Supabase function capture transport", () => {
       })
     ).toThrow("Raw function body receipts changed from the reviewed trust anchor");
 
+    const archiveMappingForgery = clone(snapshot);
+    const forgedArchiveMapping = JSON.parse(
+      Buffer.from(archiveMappingForgery.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
+    );
+    forgedArchiveMapping.raw_body_attempts.find(
+      (attempt: { status: number }) => attempt.status === 200
+    ).recovered_tree_digest_sha256 = "7".repeat(64);
+    archiveMappingForgery.files.set(
+      TRANSPORT_RECEIPT_FILE,
+      Buffer.from(JSON.stringify(forgedArchiveMapping, null, 2) + "\n")
+    );
+    archiveMappingForgery.counts.total_bytes = [...archiveMappingForgery.files.values()].reduce(
+      (sum, bytes) => sum + Buffer.from(bytes).length,
+      0
+    );
+    expect(() =>
+      localDockerEvidenceTesting.inspectLocalDockerRecoverySnapshotWithTrustAnchor({
+        snapshot: archiveMappingForgery,
+        manifest: clone(manifest),
+        trustAnchor: TEST_SYNTHETIC_TRUST_ANCHOR,
+      })
+    ).toThrow("Raw function body receipts changed from the reviewed trust anchor");
+
     const coordinatedImageForgery = clone(snapshot);
     const forgedImageTransport = JSON.parse(
       Buffer.from(coordinatedImageForgery.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
@@ -1166,6 +1245,68 @@ describe("read-only Supabase function capture transport", () => {
         trustAnchor: TEST_SYNTHETIC_TRUST_ANCHOR,
       })
     ).toThrow("docker_image changed from the reviewed trust anchor");
+
+    const recoveredSourceForgery = clone(snapshot);
+    const recoveredSourcePath = [...recoveredSourceForgery.files.keys()].find((relativePath) =>
+      relativePath.endsWith("/index.ts")
+    );
+    recoveredSourceForgery.files.set(
+      recoveredSourcePath!,
+      Buffer.from('export const forged = "shape-valid-source";\n')
+    );
+    recoveredSourceForgery.counts.total_bytes = [
+      ...recoveredSourceForgery.files.values(),
+    ].reduce((sum, bytes) => sum + Buffer.from(bytes).length, 0);
+    expect(() =>
+      localDockerEvidenceTesting.inspectLocalDockerRecoverySnapshotWithTrustAnchor({
+        snapshot: recoveredSourceForgery,
+        manifest: clone(manifest),
+        trustAnchor: TEST_SYNTHETIC_TRUST_ANCHOR,
+      })
+    ).toThrow("Recovered source tree changed from the reviewed trust anchor");
+
+    const dockerRuntimeForgery = clone(snapshot);
+    const forgedDockerRuntime = JSON.parse(
+      Buffer.from(dockerRuntimeForgery.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
+    );
+    forgedDockerRuntime.docker_context_endpoint_sha256 = "8".repeat(64);
+    forgedDockerRuntime.docker_server_version = "30.0.0";
+    dockerRuntimeForgery.files.set(
+      TRANSPORT_RECEIPT_FILE,
+      Buffer.from(JSON.stringify(forgedDockerRuntime, null, 2) + "\n")
+    );
+    dockerRuntimeForgery.counts.total_bytes = [...dockerRuntimeForgery.files.values()].reduce(
+      (sum, bytes) => sum + Buffer.from(bytes).length,
+      0
+    );
+    expect(() =>
+      localDockerEvidenceTesting.inspectLocalDockerRecoverySnapshotWithTrustAnchor({
+        snapshot: dockerRuntimeForgery,
+        manifest: clone(manifest),
+        trustAnchor: TEST_SYNTHETIC_TRUST_ANCHOR,
+      })
+    ).toThrow("docker_context_endpoint_sha256 changed from the reviewed trust anchor");
+
+    const dockerVersionForgery = clone(snapshot);
+    const forgedDockerVersion = JSON.parse(
+      Buffer.from(dockerVersionForgery.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
+    );
+    forgedDockerVersion.docker_server_version = "30.0.0";
+    dockerVersionForgery.files.set(
+      TRANSPORT_RECEIPT_FILE,
+      Buffer.from(JSON.stringify(forgedDockerVersion, null, 2) + "\n")
+    );
+    dockerVersionForgery.counts.total_bytes = [...dockerVersionForgery.files.values()].reduce(
+      (sum, bytes) => sum + Buffer.from(bytes).length,
+      0
+    );
+    expect(() =>
+      localDockerEvidenceTesting.inspectLocalDockerRecoverySnapshotWithTrustAnchor({
+        snapshot: dockerVersionForgery,
+        manifest: clone(manifest),
+        trustAnchor: TEST_SYNTHETIC_TRUST_ANCHOR,
+      })
+    ).toThrow("docker_server_version changed from the reviewed trust anchor");
 
     const drifted = clone(snapshot);
     const endMetadata = JSON.parse(

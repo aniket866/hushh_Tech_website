@@ -14,6 +14,11 @@ import {
   captureCurrentFunctionBundles,
   createPrivateRecoveryRoot,
 } from "../../../scripts/ci/capture-supabase-current-function-bundles.mjs";
+import {
+  CANONICAL_RECORD_ENCODING,
+  encodeCanonicalRecord,
+  snapshotRecoveryTree,
+} from "../../../scripts/ci/generate-supabase-current-function-bundle-evidence.mjs";
 
 export const BUNDLE_TRANSPORT =
   "DIRECT_MANAGEMENT_API_RAW_ESZIP_GET_LOCAL_DOCKER_UNBUNDLE_NO_CLI_FALLBACK";
@@ -27,12 +32,78 @@ const MAX_RAW_BODY_BYTES = 32 * 1024 * 1024;
 const COMMAND_TIMEOUT_MS = 45_000;
 const DOCKER_TIMEOUT_MS = 10_000;
 const SAFE_SLUG = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+const APPROVED_DEPENDENCY_DIRECTORIES = new Set([
+  "_shared",
+  "fund-payment-request",
+  "kyc-agent-a2a-protocol",
+]);
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+
+const compareUtf8 = (left, right) =>
+  Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+
+const digestCanonicalBindingRecords = (domain, records) => {
+  const hash = crypto.createHash("sha256");
+  hash.update(
+    encodeCanonicalRecord([
+      "hushh-local-docker-function-bundle-trust-anchor",
+      CANONICAL_RECORD_ENCODING,
+      domain,
+      String(records.length),
+    ])
+  );
+  for (const record of records) hash.update(encodeCanonicalRecord(record));
+  return hash.digest("hex");
+};
+
+const canonicalExtractedSourcePath = ({ slug, relativePath }) => {
+  const components = relativePath.split("/");
+  assert(components.every(Boolean), `Recovered source path is malformed for ${slug}.`);
+  const direct = components[0];
+  if (direct === "import_map.json") {
+    assert(components.length === 1, `Recovered import map path is malformed for ${slug}.`);
+    return `supabase/functions/${slug}/__dependencies__/import_map.json`;
+  }
+  if (direct === slug) {
+    assert(components.length >= 2, `Recovered source path lacks a file for ${slug}.`);
+    return `supabase/functions/${slug}/${components.slice(1).join("/")}`;
+  }
+  assert(
+    APPROVED_DEPENDENCY_DIRECTORIES.has(direct) && components.length >= 2,
+    `Recovered source has an unapproved direct child for ${slug}.`
+  );
+  return `supabase/functions/${slug}/__dependencies__/${components.join("/")}`;
+};
+
+const captureRecoveredSourceTreeReceipt = ({ slug, cwd }) => {
+  const functionsRoot = path.join(cwd, "supabase", "functions");
+  const snapshot = snapshotRecoveryTree({ recoveryRoot: functionsRoot });
+  const files = [...snapshot.files.entries()]
+    .map(([relativePath, bytes]) => ({
+      relativePath: canonicalExtractedSourcePath({ slug, relativePath }),
+      digest: sha256(bytes),
+      size: bytes.length,
+    }))
+    .sort((left, right) => compareUtf8(left.relativePath, right.relativePath));
+  assert(files.length > 0, `Recovered source tree is empty for ${slug}.`);
+  assert(
+    new Set(files.map(({ relativePath }) => relativePath)).size === files.length,
+    `Recovered source paths collide for ${slug}.`
+  );
+  return Object.freeze({
+    recoveredTreeDigestSha256: digestCanonicalBindingRecords(
+      "recovered-source-tree-per-slug-v1",
+      files.map((file) => [file.relativePath, file.digest, String(file.size)])
+    ),
+    recoveredFileCount: files.length,
+    recoveredTotalBytes: files.reduce((sum, file) => sum + file.size, 0),
+  });
+};
 
 const isAbsoluteLocalDockerSocket = (value) =>
   typeof value === "string" &&
@@ -615,6 +686,7 @@ const captureLocalDockerCore = async ({
       rawBody && Number.isInteger(rawBody.status) && rawBody.status >= 100 && rawBody.status <= 599,
       "Raw function body result is invalid."
     );
+    let recoveredTree = null;
     if (rawBody.status === 200) {
       assert(
         typeof rawBody.eszipPath === "string" &&
@@ -632,6 +704,7 @@ const captureLocalDockerCore = async ({
           eszipPath: rawBody.eszipPath,
           edgeRuntimeImage,
         });
+        recoveredTree = captureRecoveredSourceTreeReceipt({ slug, cwd });
       } finally {
         removeExactEszip(rawBody.eszipPath);
       }
@@ -646,6 +719,9 @@ const captureLocalDockerCore = async ({
       status: rawBody.status,
       bytes: rawBody.bytes,
       sha256: rawBody.sha256,
+      recovered_tree_digest_sha256: recoveredTree?.recoveredTreeDigestSha256 ?? null,
+      recovered_file_count: recoveredTree?.recoveredFileCount ?? null,
+      recovered_total_bytes: recoveredTree?.recoveredTotalBytes ?? null,
     });
     return responseForRawBodyStatus({ slug, status: rawBody.status });
   };
@@ -683,7 +759,7 @@ const captureLocalDockerCore = async ({
   const startMetadataBytes = fs.readFileSync(path.join(result.recoveryRoot, "functions-list.json"));
   const endMetadataBytes = fs.readFileSync(path.join(result.recoveryRoot, "functions-list-end.json"));
   const transportReceipt = {
-    schema_version: 1,
+    schema_version: 2,
     project_ref: projectRef,
     tool: "supabase_cli_metadata_plus_direct_management_api_body",
     tool_version: CAPTURE_TOOL_VERSION,

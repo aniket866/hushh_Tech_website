@@ -11,6 +11,11 @@
   "docker_image_id": null,
   "docker_image_os": null,
   "docker_image_architecture": null,
+  "docker_context_class": "ABSOLUTE_LOCAL_UNIX_SOCKET",
+  "docker_context_endpoint_sha256": null,
+  "docker_server_version": null,
   "provider_metadata_digest_sha256": null,
-  "raw_body_attempts_digest_sha256": null
+  "raw_body_attempts_digest_sha256": null,
+  "recovered_source_tree_digest_sha256": null,
+  "raw_archive_to_recovered_tree_digest_sha256": null
 }
