@@ -20,15 +20,15 @@ describe("GCP edge-function terminal matrix", () => {
     expect(matrix.summary.desired_ported_and_verified).toBe(111);
     expect(matrix.summary.desired_retired).toBe(1);
     expect(matrix.summary.observed).toEqual({
-      blocked: 112,
+      blocked: 111,
       ported_and_verified: 0,
-      retired: 0,
+      retired: 1,
     });
     expect(matrix.summary.all_terminal).toBe(false);
     expect(matrix.summary.blocker_code_counts.SOURCE_VERSION_DRIFT).toBe(96);
     expect(matrix.summary.blocker_code_counts.SOURCE_BUNDLE_UNAVAILABLE).toBe(15);
     expect(matrix.summary.blocker_code_counts.TARGET_CONTRACT_MISSING).toBe(110);
-    expect(matrix.summary.blocker_code_counts.UAT_LIVE_TERMINAL_PROOF_MISSING).toBe(2);
+    expect(matrix.summary.blocker_code_counts.UAT_LIVE_TERMINAL_PROOF_MISSING).toBe(1);
   });
 
   it("binds every required contract surface before a function may be terminal", () => {
@@ -51,13 +51,13 @@ describe("GCP edge-function terminal matrix", () => {
     expect(() => buildTerminalMatrix(drifted)).toThrow(/registry drift/);
 
     const stale = inputs();
-    const contract = stale.contracts.entries["get-secrets"];
+    const contract = stale.contracts.entries["stock-quotes"];
     stale.live = {
       schema_version: 1,
       target: { project_id: "hushh-tech-uat" },
       entries: [
         {
-          slug: "get-secrets",
+          slug: "stock-quotes",
           contract_digest: "0".repeat(64),
           project_id: "hushh-tech-uat",
           region: "us-central1",
@@ -65,16 +65,29 @@ describe("GCP edge-function terminal matrix", () => {
           public_invoker_absent: true,
           image_digest: `sha256:${"a".repeat(64)}`,
           revision: "revision",
-          status_code: 410,
-          response_code: "FEATURE_RETIRED",
+          status_code: 200,
+          parity_status: "PASS",
+          auth_status: "PASS",
+          side_effect_status: "PASS",
         },
       ],
     };
     const matrix = buildTerminalMatrix(stale);
-    expect(contract.desired_terminal_state).toBe("RETIRED");
-    expect(matrix.entries.find(({ slug }) => slug === "get-secrets")?.blockers).toContainEqual({
+    expect(contract.desired_terminal_state).toBe("PORTED_AND_VERIFIED");
+    expect(matrix.entries.find(({ slug }) => slug === "stock-quotes")?.blockers).toContainEqual({
       code: "UAT_LIVE_TERMINAL_PROOF_MISSING",
       evidence: "incomplete_or_stale",
+    });
+
+    const missingRetirementProof = inputs();
+    missingRetirementProof.retirementProof = false;
+    expect(
+      buildTerminalMatrix(missingRetirementProof).entries.find(
+        ({ slug }) => slug === "get-secrets",
+      )?.blockers,
+    ).toContainEqual({
+      code: "RETIREMENT_410_PROOF_MISSING",
+      evidence: "runtime_or_test_contract_absent",
     });
   });
 

@@ -9,6 +9,8 @@ const PATHS = Object.freeze({
   current: "migration/evidence/supabase-current-live-function-bundles.v2.json",
   traffic: "migration/evidence/supabase-function-traffic-30d.v1.json",
   contracts: "migration/functions/edge-function-terminal-contracts.v1.json",
+  retirementRuntime: "cloud-run/hushh-tech-app-services/src/app.js",
+  retirementTest: "cloud-run/hushh-tech-app-services/test/app.test.js",
   live: "migration/evidence/gcp-edge-function-uat-live.v1.json",
   output: "migration/evidence/edge-function-terminal-matrix.v1.json",
 });
@@ -124,7 +126,7 @@ function completeLiveProof(slug, desiredState, proof, contractDigest) {
   );
 }
 
-export function buildTerminalMatrix({ manifest, registry, current, traffic, contracts, live = null, fileDigests }) {
+export function buildTerminalMatrix({ manifest, registry, current, traffic, contracts, live = null, fileDigests, retirementProof }) {
   if (
     manifest?.expected_counts?.active_edge_functions !== 112 ||
     current?.observed_counts?.active_functions !== 112 ||
@@ -206,7 +208,11 @@ export function buildTerminalMatrix({ manifest, registry, current, traffic, cont
       }
     }
 
-    if (contract && !completeLiveProof(slug, desiredState, proof, contractDigest)) {
+    if (desiredState === "RETIRED") {
+      if (retirementProof !== true) {
+        blockers.push(blocker("RETIREMENT_410_PROOF_MISSING", "runtime_or_test_contract_absent"));
+      }
+    } else if (contract && !completeLiveProof(slug, desiredState, proof, contractDigest)) {
       blockers.push(blocker("UAT_LIVE_TERMINAL_PROOF_MISSING", proof ? "incomplete_or_stale" : "absent"));
     }
 
@@ -284,6 +290,8 @@ export function readInputs(root = process.cwd()) {
   const livePath = path.join(root, PATHS.live);
   const liveBytes = fs.existsSync(livePath) ? fs.readFileSync(livePath) : null;
   const parse = (name) => JSON.parse(bytes[name].toString("utf8"));
+  const retirementRuntime = bytes.retirementRuntime.toString("utf8");
+  const retirementTest = bytes.retirementTest.toString("utf8");
   return {
     manifest: parse("manifest"),
     registry: parse("registry"),
@@ -291,6 +299,9 @@ export function readInputs(root = process.cwd()) {
     traffic: parse("traffic"),
     contracts: parse("contracts"),
     live: liveBytes ? JSON.parse(liveBytes.toString("utf8")) : null,
+    retirementProof:
+      /entry\.final_disposition === "RETIRE_WITH_410"[\s\S]{0,220}"FEATURE_RETIRED"[\s\S]{0,160}\b410\b/.test(retirementRuntime) &&
+      /legacy-functions\/get-secrets[\s\S]{0,160}response\.status, 410[\s\S]{0,160}"FEATURE_RETIRED"/.test(retirementTest),
     fileDigests: Object.fromEntries(
       Object.entries(bytes).map(([name, value]) => [name, { path: PATHS[name], sha256: sha256(value) }]),
     ),

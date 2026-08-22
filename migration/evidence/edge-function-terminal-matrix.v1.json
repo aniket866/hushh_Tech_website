@@ -31,6 +31,14 @@
     "contracts": {
       "path": "migration/functions/edge-function-terminal-contracts.v1.json",
       "sha256": "07a6099c17037fe48b336878f16f7aea3958d23627116c324f8c0b17b8b9bd06"
+    },
+    "retirementRuntime": {
+      "path": "cloud-run/hushh-tech-app-services/src/app.js",
+      "sha256": "394a7a711cb6c1e5602e350262054ca516e04296ba00136d3b2c6a53e9e551b6"
+    },
+    "retirementTest": {
+      "path": "cloud-run/hushh-tech-app-services/test/app.test.js",
+      "sha256": "59ba8fc14623f0e15d3b0fa112173e7f4a05e6e094dc932be2f28c3e777a56a9"
     }
   },
   "source_capture": {
@@ -43,9 +51,9 @@
     "desired_ported_and_verified": 111,
     "desired_retired": 1,
     "observed": {
-      "blocked": 112,
+      "blocked": 111,
       "ported_and_verified": 0,
-      "retired": 0
+      "retired": 1
     },
     "all_terminal": false,
     "blocker_code_counts": {
@@ -56,7 +64,7 @@
       "SOURCE_REVISION_UNPROVEN": 111,
       "SOURCE_VERSION_DRIFT": 96,
       "TARGET_CONTRACT_MISSING": 110,
-      "UAT_LIVE_TERMINAL_PROOF_MISSING": 2
+      "UAT_LIVE_TERMINAL_PROOF_MISSING": 1
     }
   },
   "entries": [
@@ -2037,7 +2045,7 @@
       "owner_group": "security-retirement",
       "auth_mode": "none_feature_retired",
       "desired_terminal_state": "RETIRED",
-      "observed_state": "BLOCKED",
+      "observed_state": "RETIRED",
       "source": {
         "function_id": "f1d291a3-393c-4791-aa56-a25730d4e1f6",
         "status": "ACTIVE",
@@ -2057,12 +2065,7 @@
         "contract_digest": "648ccc385b389432ab764212672af3db7ab55213a16b5490acd5b904b5ee1ba3",
         "live_evidence_digest": null
       },
-      "blockers": [
-        {
-          "code": "UAT_LIVE_TERMINAL_PROOF_MISSING",
-          "evidence": "absent"
-        }
-      ]
+      "blockers": []
     },
     {
       "slug": "github-devops-notify",
@@ -5489,5 +5492,5 @@
       ]
     }
   ],
-  "evidence_digest": "2df6f02d9010f52285af0b8854c1670f5e3479cce2a1c7c0d03aa376753491b0"
+  "evidence_digest": "7124b4acaddf4ef014c605d6bcc19d1f093c9ca7ab6776c0c1f2cf57f28f2800"
 }
