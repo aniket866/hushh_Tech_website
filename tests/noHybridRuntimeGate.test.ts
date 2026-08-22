@@ -183,30 +183,19 @@ describe("fail-closed no-hybrid runtime gate", () => {
   });
 
   it("permits only exact inert storage-migration lineage while still rejecting provider access", () => {
-    const gcsOnly = `
-      const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1";
-      const metadata = input;
-      if (metadata["hushh-migration-schema"] !== "supabase-cutover-v1") throw new Error("bad");
-      const object = { storage: { prefix: MIGRATION_NAMESPACE } };
-      fetch("https://storage.googleapis.com/storage/v1/b/example/o", {
-        headers: { Authorization: \`Bearer \${token}\` },
-      });
-    `;
     const adapterPath = "api/shared/gcp-delete-account-storage.js";
-    expect(analyzeExecutableContent(gcsOnly, adapterPath).violations).toEqual([]);
-
-    const providerAccess = `${gcsOnly}\nconst supabaseClient = client; supabaseClient.storage.from("assets");`;
-    expect(
-      analyzeExecutableContent(providerAccess, adapterPath).violations.map((entry) => entry.code),
-    ).toEqual(expect.arrayContaining(["PROVIDER_CLIENT_ACCESS", "PROVIDER_DATA_OR_AUTH_ACCESS"]));
+    const adapterSource = fs.readFileSync(path.resolve(adapterPath), "utf8");
+    expect(analyzeExecutableContent(adapterSource, adapterPath).violations).toEqual([]);
 
     const attacks = [
-      `${gcsOnly}\nconst schema = "supabase-cutover-v1" + "/tenant"; client.storage.from("assets");`,
-      `${gcsOnly}\nconst p = "supabase-cutover-v1".slice(0, 8); const url = "https://tenant." + p + ".co"; fetch(url);`,
-      gcsOnly.replace(
+      `${adapterSource}\nclient.storage.from("assets");`,
+      `${adapterSource}\nclient.auth.getUser();`,
+      `${adapterSource}\nconst provider = MIGRATION_NAMESPACE.slice(18, 26); const endpoint = "https://tenant." + provider + ".co"; fetch(endpoint);`,
+      adapterSource.replace(
         'const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1";',
         'const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1" + "/tenant";',
       ),
+      adapterSource.replace("supabase-cutover-v1", "supabase-cutover-v1/tenant"),
     ];
     for (const attack of attacks) {
       expect(
@@ -214,7 +203,7 @@ describe("fail-closed no-hybrid runtime gate", () => {
       ).toEqual(expect.arrayContaining(["OBFUSCATED_PROVIDER_REFERENCE"]));
     }
 
-    expect(analyzeExecutableContent(gcsOnly).violations).toEqual(
+    expect(analyzeExecutableContent(adapterSource).violations).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "OBFUSCATED_PROVIDER_REFERENCE" })]),
     );
   });

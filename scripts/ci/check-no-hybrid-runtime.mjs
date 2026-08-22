@@ -142,13 +142,19 @@ const PROVIDER_ENV_RE = /\b(?:VITE_|NEXT_PUBLIC_)?(?:MARKET_|LEGACY_)?SUPABASE_(
 const PROVIDER_SDK_RE = /(?:@supabase\/supabase-js|npm:\s*@?supabase|jsr:\s*@?supabase|from\s*["']supabase["'])/i;
 const PROVIDER_CLI_RE = /(?:^|\s)(?:npx\s+)?supabase\s+(?:db|functions|gen|inspect|link|migration|projects|secrets|start|status|stop)\b/i;
 const PROVIDER_CLIENT_RE = /\bsupabaseClient\b|\bsupabase\s*(?:\?\.|\.)\s*(?:auth|from|functions|rpc|storage)\b/i;
+const INERT_LINEAGE_ADAPTER_PATH = "api/shared/gcp-delete-account-storage.js";
+const INERT_LINEAGE_ADAPTER_SHA256 =
+  "a264f6e8022d3521c309300fda7ef3b8a25a2f3e6e2e4f8be5a93b9cc2952937";
 
 // These two exact statements are inert provenance checks inside the reviewed
 // Google Cloud Storage adapter. The exception is deliberately bound to that
 // file and complete syntax. Any renamed variable, concatenation, escaping,
 // extension, or additional executable reference remains visible below.
 function stripInertStorageMigrationLineageStatements(source, relativePath) {
-  if (normalizeRelative(relativePath) !== "api/shared/gcp-delete-account-storage.js") {
+  if (
+    normalizeRelative(relativePath) !== INERT_LINEAGE_ADAPTER_PATH ||
+    crypto.createHash("sha256").update(source).digest("hex") !== INERT_LINEAGE_ADAPTER_SHA256
+  ) {
     return source;
   }
   return source
@@ -501,7 +507,7 @@ export function analyzeExecutableContent(source, relativePath = "fixture.ts") {
   const derived = collectDerivedStrings(executable);
   const directSignals = matchSignals(`${executable}\n${decoded}\n${compact}`);
   if (
-    normalizeRelative(relativePath) === "api/shared/gcp-delete-account-storage.js" &&
+    normalizeRelative(relativePath) === INERT_LINEAGE_ADAPTER_PATH &&
     /\bsupabase\b/i.test(executable)
   ) {
     directSignals.push("OBFUSCATED_PROVIDER_REFERENCE");
