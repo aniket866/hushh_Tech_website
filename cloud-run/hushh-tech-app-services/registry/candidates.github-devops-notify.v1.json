@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "base_commit": "37b59a4aa60366b439df248668340f0d7b04ac2c",
+  "deployment_state": "DEFAULT_OFF",
+  "required_registry_state": "INVENTORY_FROZEN",
+  "target_project": "hushh-tech-uat",
+  "target_region": "us-central1",
+  "slug": "github-devops-notify",
+  "target_owner_group": "signed-webhook-service",
+  "target_auth": "provider_signature_raw_body",
+  "method": "POST",
+  "media_type": "application/json",
+  "body_limit_bytes": 1048576,
+  "cors_policy": "forbidden",
+  "cache_policy": "private, no-store",
+  "repository_allowlist": [
+    "hushh-labs/hushh_Tech_website"
+  ],
+  "base_branch_allowlist": [
+    "main"
+  ],
+  "source_files": [
+    {
+      "path": "supabase/functions/github-devops-notify/deno.json",
+      "sha256": "97b3d617ef4f0bd44f19b58558de08f519801c488fc1edc7cb2a09c147a86c4e",
+      "bytes": 160
+    },
+    {
+      "path": "supabase/functions/github-devops-notify/gmail.ts",
+      "sha256": "c0a4e14977b503947d45debafd33084925363218521d9707d415eba2e7b65383",
+      "bytes": 7782
+    },
+    {
+      "path": "supabase/functions/github-devops-notify/index.ts",
+      "sha256": "700a38fbde5f5d4c1b2073182ebe74d48c8ddf86edb69adb9085adab3bcc2edc",
+      "bytes": 10739
+    }
+  ],
+  "source": {
+    "function_id": "9d5b0e1a-d76d-4dcd-a3a2-14afb19d09b4",
+    "manifest_version": 6164,
+    "current_version": 6207,
+    "version_delta": 43,
+    "verify_jwt": true,
+    "provider_bundle_digest": "38369fb468d2830f6ac5646c864c1d5d1868dd0d465c300ff662392ff9f7cdfa",
+    "live_bundle_sha256": "c0ba88aa56b479ef5ae5ccea04ad0a3f1dbab407f807188d79ca27cb7e55cecd",
+    "file_count": 3,
+    "total_bytes": 18681,
+    "deployment_binding_sha256": "dda6e2a6cbe7688626467f83f1d648253c94d191c0cb325f94a43d62189a8440"
+  },
+  "source_evidence": {
+    "status": "BLOCKED",
+    "metadata_end_check_passed": false,
+    "source_evidence_file_sha256": "54d9535f80d3954902da8f99cf84c46609cd7d971d6344c16704bad5e0963703",
+    "source_evidence_digest": "abce166ff5f1af61b1ff7fa8f3839b21ff55d8a255efdf520fd724cfa8bba219",
+    "canonical_source_tree_digest": "2f203e524b8749272f49ae9c4051fefe73e7a877458ac34c2a3cf7b9c322b7d0",
+    "current_metadata_digest": "b15f57a658b2ae2a1e8399551ae9af92db1a652ade7401ad08b1a148567c798b",
+    "traffic_evidence_file_sha256": "5db78b99f880423c88528817ca422ab862aa1a42f93699e37b0e4ce03fc90ac0",
+    "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
+    "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
+    "terminal_matrix_file_sha256": "d6331e9229ad3002cd5568c69d80d2c078ad3791b23fba7ccab50ef667b4b40f",
+    "terminal_matrix_evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8"
+  },
+  "traffic_30d": {
+    "request_count": 56,
+    "post": 56,
+    "status_2xx": 0,
+    "status_4xx": 56,
+    "jwt_present": 0,
+    "jwt_absent": 56
+  },
+  "source_behavior": {
+    "signature_can_be_skipped_when_secret_missing": true,
+    "cors_wildcard": true,
+    "base_branches": [
+      "main",
+      "master"
+    ],
+    "hardcoded_recipient_count": 5,
+    "service_account_private_key_environment_variable": true,
+    "external_template_fetch": true,
+    "durable_replay_ledger": false,
+    "provider_error_details_returned": true
+  },
+  "target_contract": {
+    "signature": "mandatory GitHub HMAC SHA-256 over exact raw bytes using Secret Manager and Cloud KMS governed secret",
+    "event": "pull_request with UUID delivery id",
+    "trigger": "closed and merged=true to exact main branch in exact repository allowlist",
+    "template": "local escaped bounded projection with no external URL fetch",
+    "delivery": "Workspace group resource through keyless Gmail delegation",
+    "idempotency": "Cloud SQL leased fenced delivery ledger keyed by delivery UUID and raw-body SHA-256",
+    "timeout": "durable UNKNOWN before Gmail provider call; no automatic resend",
+    "response": "PII-free delivery disposition only",
+    "logging": "hashes and bounded codes only; no raw payload, recipients, credentials, or provider body"
+  },
+  "runtime_byte_lock": {
+    "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
+    "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
+    "cloud-run/hushh-tech-app-services/src/app.js": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086",
+    "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
+    "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
+    "server.js": "5b9ebf2f7d65d20434368a65f50839cd177b628e3e8ac79ca9cff695afaaaff3"
+  },
+  "blockers": [
+    {
+      "code": "SOURCE_BUNDLE_VERSION_UNBOUND",
+      "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"
+    },
+    {
+      "code": "SOURCE_METADATA_END_CHECK_MISSING",
+      "evidence": "NOT_PERFORMED_IN_V2_BLOCKING"
+    },
+    {
+      "code": "SOURCE_REVISION_UNPROVEN",
+      "evidence": "NOT_PROVEN"
+    },
+    {
+      "code": "SOURCE_VERSION_DRIFT",
+      "evidence": "manifest=6164;current=6207"
+    },
+    {
+      "code": "TARGET_CONTRACT_MISSING",
+      "evidence": "terminal contract entry absent"
+    },
+    {
+      "code": "TARGET_REGISTRY_NOT_ENABLED",
+      "evidence": "INVENTORY_FROZEN"
+    },
+    {
+      "code": "DETACHED_CANDIDATE_APPROVAL_MISSING",
+      "evidence": "no independently signed approval"
+    },
+    {
+      "code": "SOURCE_LIVE_FAILURE_PARITY_UNRESOLVED",
+      "evidence": "56/56 observed requests were 4xx"
+    },
+    {
+      "code": "GITHUB_REPOSITORY_AND_SIGNATURE_LIVE_PROOF_MISSING",
+      "evidence": "exact repository and KMS-backed webhook secret not proven"
+    },
+    {
+      "code": "CLOUD_SQL_FENCED_DELIVERY_LEDGER_LIVE_PROOF_MISSING",
+      "evidence": "leased/fenced UNKNOWN reconciliation not live proven"
+    },
+    {
+      "code": "WORKSPACE_GROUP_GMAIL_DELEGATION_LIVE_PROOF_MISSING",
+      "evidence": "keyless sender and group membership not live proven"
+    },
+    {
+      "code": "PROVIDER_ADAPTER_NOT_RUNTIME_WIRED",
+      "evidence": "detached handler has no serving import"
+    },
+    {
+      "code": "PRIVATE_UAT_LIVE_PARITY_MISSING",
+      "evidence": "no authenticated private UAT terminal proof"
+    }
+  ]
+}
