@@ -35,6 +35,8 @@
     "migration:storage:copy": "node scripts/migration/storage-copy-executor.mjs",
     "gcp:secrets:audit": "node scripts/gcp/audit-hushh-tech-secret-manager.mjs",
     "gcp:secrets:migrate-uat": "node scripts/gcp/migrate-hushh-tech-uat-env-to-secrets.mjs",
+    "migration:edge-functions:matrix": "node scripts/gcp/migration/edge-function-terminal-matrix.mjs",
+    "migration:edge-functions:gate": "node scripts/gcp/migration/edge-function-terminal-matrix.mjs --require-terminal",
     "gcp:migration:plan": "node scripts/gcp/migration/plan-cutover.mjs",
     "gcp:migration:bind-schema-evidence": "node scripts/gcp/migration/schema-capture-evidence.mjs",
     "gcp:migration:compile-target-schema": "node scripts/gcp/migration/target-schema-compiler.mjs",

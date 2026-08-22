@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "evidence_id": "hushh-tech-edge-function-terminal-contracts",
+  "target": {
+    "stage": "uat",
+    "project_id": "hushh-tech-uat",
+    "region": "us-central1"
+  },
+  "entries": {
+    "get-secrets": {
+      "desired_terminal_state": "RETIRED",
+      "service_owner": "identity-api",
+      "route": {
+        "kind": "private_legacy_tombstone",
+        "path": "/api/v1/legacy-functions/get-secrets"
+      },
+      "request": {
+        "methods": [
+          "GET",
+          "HEAD",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "query": "ignored",
+        "max_bytes": 1048576
+      },
+      "response": {
+        "status_codes": [
+          410
+        ],
+        "media_types": [
+          "application/json"
+        ],
+        "schema": "detail.code=FEATURE_RETIRED and detail.message contains no source payload"
+      },
+      "auth": {
+        "outer": "google_service_identity",
+        "allowed_callers": [
+          "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "user": "none_feature_retired"
+      },
+      "body": {
+        "policy": "never_parsed_or_returned",
+        "raw_body_required": false
+      },
+      "cache": {
+        "cache_control": "private, no-store",
+        "etag": false
+      },
+      "cors": {
+        "policy": "none_private_service",
+        "allow_origin": null
+      },
+      "idempotency": {
+        "policy": "side_effect_free_tombstone",
+        "key_required": false
+      },
+      "side_effects": [],
+      "target_dependencies": [
+        {
+          "id": "private_cloud_run_ingress",
+          "required": true
+        },
+        {
+          "id": "web_gateway_invoker_iam",
+          "required": true
+        }
+      ]
+    },
+    "stock-quotes": {
+      "desired_terminal_state": "PORTED_AND_VERIFIED",
+      "service_owner": "investor-api",
+      "route": {
+        "kind": "private_candidate_no_legacy_route",
+        "path": "/api/v1/public/stock-quotes"
+      },
+      "request": {
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "query": "none",
+        "max_bytes": 8192
+      },
+      "response": {
+        "status_codes": [
+          200,
+          400,
+          403,
+          413,
+          415,
+          429,
+          502,
+          503,
+          504
+        ],
+        "media_types": [
+          "application/json"
+        ],
+        "schema": "legacy stock quote response parity contract"
+      },
+      "auth": {
+        "outer": "google_service_identity",
+        "allowed_callers": [
+          "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "user": "public_hmac_rate_key_no_browser_credential"
+      },
+      "body": {
+        "policy": "optional_application_json",
+        "raw_body_required": false
+      },
+      "cache": {
+        "cache_control": "private, no-store",
+        "etag": false
+      },
+      "cors": {
+        "policy": "none_same_origin_gateway_only",
+        "allow_origin": null
+      },
+      "idempotency": {
+        "policy": "read_only_no_mutation",
+        "key_required": false
+      },
+      "side_effects": [
+        "firestore_rate_limit_counter"
+      ],
+      "target_dependencies": [
+        {
+          "id": "private_cloud_run_ingress",
+          "required": true
+        },
+        {
+          "id": "web_gateway_invoker_iam",
+          "required": true
+        },
+        {
+          "id": "firestore_rate_limit_database_ttl_and_iam",
+          "required": true
+        },
+        {
+          "id": "finnhub_secret_manager_binding",
+          "required": true
+        },
+        {
+          "id": "hosted_gateway_forwarding_spoof_rejection",
+          "required": true
+        }
+      ]
+    }
+  }
+}
