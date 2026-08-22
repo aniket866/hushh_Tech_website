@@ -4,6 +4,26 @@ import { createHash } from "node:crypto";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const ZERO_SHA256 = "0".repeat(64);
 
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+const EXPECTED_BASE_COMMIT = "ce487c15773e5795e641e282cf394224fe294cd9";
+const EXPECTED_TARGET_PROJECT = "hushh-tech-uat";
+const EXPECTED_RUNTIME_PROVIDERS = deepFreeze([
+  "Firebase Auth",
+  "Cloud SQL",
+  "Cloud Storage",
+  "Vertex AI",
+]);
+const EXPECTED_RLS_CONTRACT = deepFreeze({
+  public_profile: "is_public IS TRUE AND user_confirmed IS TRUE",
+  fund_admin: "verified Firebase actor and fund_admin claim is exactly boolean true",
+  caller_owned_context: "app.firebase_uid transaction-local context; exact grants and forced RLS required before enablement",
+});
+
 export const REQUIRED_DRIFT_BLOCKERS = Object.freeze([
   "SOURCE_BUNDLE_VERSION_UNBOUND",
   "SOURCE_METADATA_END_CHECK_MISSING",
@@ -125,13 +145,113 @@ const EXPECTED_TARGET_AUTH = Object.freeze({
   "generate-investor-profile": "firebase_user",
 });
 
+const EXPECTED_CANDIDATE_CONTRACTS = deepFreeze({
+  "get-locations": {
+    request: { method: "GET", query: ["type", "country", "state"], body: "forbidden" },
+    response: "json_data_or_sanitized_error",
+    cache: "public, max-age=86400",
+    cors: "same_origin_gateway_only",
+    dependencies: ["generation_and_sha256_pinned_gcs_json_catalog"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "licensed_catalog_artifact_not_staged",
+      "public_caller_auth_parity_unresolved",
+      "private_live_uat_parity_missing",
+    ],
+  },
+  "chat-check-access": {
+    request: { method: "POST", content_type: "application/json", required: ["visitorId", "slug"] },
+    response: "chat_access_decision",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql_transaction", "advisory_lock", "unique_visitor_slug_constraint"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "chat_access_tokens_table_not_in_target_manifest",
+      "public_caller_auth_parity_unresolved",
+      "private_live_uat_parity_missing",
+    ],
+  },
+  "investor-og-image": {
+    request: { method: "GET", query: ["slug"], body: "forbidden" },
+    response: "escaped_svg_or_text_error",
+    cache: "public, max-age=3600, s-maxage=86400",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "public_caller_auth_parity_unresolved",
+      "public_media_abuse_and_live_visibility_proof_missing",
+    ],
+  },
+  "fund-payment-admin-analytics": {
+    request: { method: "POST", content_type: "application/json", body: "optional_object" },
+    response: "fund_analytics_json",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "fund_admin_claim_and_rls_live_proof_missing",
+      "optional_kyc_table_absent",
+    ],
+  },
+  "fund-payment-admin-overview": {
+    request: { method: "POST", content_type: "application/json", body: "optional_object" },
+    response: "funnel_and_investor_rows_json",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "fund_admin_claim_and_rls_live_proof_missing",
+      "optional_kyc_table_absent",
+    ],
+  },
+  "fund-payment-admin-overview-list": {
+    request: { method: "POST", content_type: "application/json", optional: ["page", "pageSize", "tab", "search"] },
+    response: "paginated_investor_rows_json",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "fund_admin_claim_and_rls_live_proof_missing",
+      "optional_kyc_table_absent",
+    ],
+  },
+  "fund-payment-admin-overview-metrics": {
+    request: { method: "POST", content_type: "application/json", body: "optional_object" },
+    response: "fund_overview_metrics_json",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["cloud_sql"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "fund_admin_claim_and_rls_live_proof_missing",
+      "optional_kyc_table_absent",
+    ],
+  },
+  "generate-investor-profile": {
+    request: { method: "POST", content_type: "application/json", required: ["input", "context"] },
+    response: "strict_twelve_field_investor_profile_json",
+    cache: "private, no-store",
+    cors: "same_origin_gateway_only",
+    dependencies: ["vertex_ai_gemini_2_5_flash_us_central1"],
+    blockers: [
+      ...REQUIRED_DRIFT_BLOCKERS,
+      "vertex_iam_quota_and_private_live_uat_parity_missing",
+    ],
+  },
+});
+
 function assertDigest(value, label) {
   assert.match(value, SHA256_PATTERN, `${label} must be a SHA-256 digest`);
   assert.notEqual(value, ZERO_SHA256, `${label} must not be the zero digest`);
 }
 
 function assertExact(actual, expected, label) {
-  assert.deepEqual(actual, expected, `${label} does not match the checked-in source contract`);
+  assert.deepEqual(actual, expected, `${label} does not match the pinned contract`);
 }
 
 export function validateGcpReadBatchCandidateMatrix({
@@ -152,6 +272,10 @@ export function validateGcpReadBatchCandidateMatrix({
     "target_project",
   ]);
   assert.equal(matrix?.schema_version, 1);
+  assert.equal(matrix?.base_commit, EXPECTED_BASE_COMMIT, "base commit drifted");
+  assert.equal(matrix?.target_project, EXPECTED_TARGET_PROJECT, "target project drifted");
+  assertExact(matrix?.runtime_providers, EXPECTED_RUNTIME_PROVIDERS, "runtime providers");
+  assertExact(matrix?.rls_contract, EXPECTED_RLS_CONTRACT, "RLS contract");
   assert.equal(matrix?.deployment_state, "DEFAULT_OFF");
   assert.equal(matrix?.required_registry_state, "INVENTORY_FROZEN");
   assert.equal(matrix?.source_evidence?.path, "migration/evidence/supabase-current-live-function-bundles.v2.json");
@@ -240,6 +364,14 @@ export function validateGcpReadBatchCandidateMatrix({
     for (const blocker of REQUIRED_DRIFT_BLOCKERS) {
       assert.ok(row.blockers.includes(blocker), `${slug} is missing blocker ${blocker}`);
     }
+    assertExact({
+      request: row.request,
+      response: row.response,
+      cache: row.cache,
+      cors: row.cors,
+      dependencies: row.dependencies,
+      blockers: row.blockers,
+    }, EXPECTED_CANDIDATE_CONTRACTS[slug], `${slug} request/response/cache/CORS/dependency/blocker contract`);
   }
 
   return true;

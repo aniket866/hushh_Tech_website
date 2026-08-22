@@ -95,3 +95,57 @@ test("candidate evidence retains every cutover blocker while current metadata is
     .bundle_evidence.canonical_digest = "f".repeat(64);
   assert.throws(() => validate(matrix, driftedEvidence), /current v2 evidence binding/);
 });
+
+test("candidate evidence rejects root target, base, provider, and RLS forgery", () => {
+  const targetProd = structuredClone(matrix);
+  targetProd.target_project = "hushh-tech-prod";
+  assert.throws(() => validate(targetProd), /target project drifted/);
+
+  const fakeBase = structuredClone(matrix);
+  fakeBase.base_commit = "0".repeat(40);
+  assert.throws(() => validate(fakeBase), /base commit drifted/);
+
+  const missingProvider = structuredClone(matrix);
+  missingProvider.runtime_providers.pop();
+  assert.throws(() => validate(missingProvider), /runtime providers/);
+
+  const weakenedRls = structuredClone(matrix);
+  weakenedRls.rls_contract.fund_admin = "fund_admin claim is truthy";
+  assert.throws(() => validate(weakenedRls), /RLS contract/);
+});
+
+test("candidate evidence rejects dependency, request, response, cache, and CORS drift", () => {
+  const mutations = [
+    (candidate) => candidate.functions[0].dependencies.push("unpinned_catalog"),
+    (candidate) => { candidate.functions[0].request.method = "POST"; },
+    (candidate) => { candidate.functions[0].response = "arbitrary_json"; },
+    (candidate) => { candidate.functions[0].cache = "public, max-age=604800"; },
+    (candidate) => { candidate.functions[0].cors = "wildcard"; },
+  ];
+  for (const mutate of mutations) {
+    const candidate = structuredClone(matrix);
+    mutate(candidate);
+    assert.throws(
+      () => validate(candidate),
+      /request\/response\/cache\/CORS\/dependency\/blocker contract/,
+    );
+  }
+});
+
+test("candidate evidence rejects removal of every function-specific blocker", () => {
+  const driftBlockers = new Set(REQUIRED_DRIFT_BLOCKERS);
+  for (const row of matrix.functions) {
+    const functionSpecific = row.blockers.filter((code) => !driftBlockers.has(code));
+    assert.ok(functionSpecific.length > 0, `${row.slug} must retain a function-specific blocker`);
+    for (const blocker of functionSpecific) {
+      const candidate = structuredClone(matrix);
+      const candidateRow = candidate.functions.find(({ slug }) => slug === row.slug);
+      candidateRow.blockers = candidateRow.blockers.filter((code) => code !== blocker);
+      assert.throws(
+        () => validate(candidate),
+        /request\/response\/cache\/CORS\/dependency\/blocker contract/,
+        `${row.slug} accepted removal of ${blocker}`,
+      );
+    }
+  }
+});
