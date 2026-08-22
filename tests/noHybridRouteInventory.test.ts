@@ -1,9 +1,13 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildNoHybridRouteInventory } from "../scripts/ci/generate-no-hybrid-route-inventory.mjs";
+import {
+  buildNoHybridRouteInventory,
+  clientRoutes,
+} from "../scripts/ci/generate-no-hybrid-route-inventory.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const generatedPath = path.join(root, "tests/noHybridRouteInventory.generated.json");
@@ -14,8 +18,8 @@ describe("no-hybrid exhaustive route inventory", () => {
     const generated = JSON.parse(fs.readFileSync(generatedPath, "utf8"));
     expect(observed).toEqual(generated);
     expect(observed.counts).toEqual({
-      client: 93,
-      client_anonymous: 68,
+      client: 94,
+      client_anonymous: 69,
       client_user: 22,
       client_admin: 3,
       server: 32,
@@ -38,6 +42,60 @@ describe("no-hybrid exhaustive route inventory", () => {
     ]);
     expect(inventory.client.filter((route: any) => route.access === "firebase-user")).toHaveLength(22);
     expect(inventory.client.filter((route: any) => route.access === "firebase-admin")).toHaveLength(3);
+    expect(inventory.client.find((route: any) => route.pattern === "/profile/:id")).toMatchObject({
+      sample: "/profile/fixture-id",
+      terminal: "/profile/fixture-id",
+      access: "firebase-user",
+      render: { selector: "#root > *", text: "Verified Investor" },
+    });
+    expect(inventory.client.find((route: any) => route.pattern === "/user-registration")).toMatchObject({
+      terminal: "/hushh-user-profile",
+      access: "firebase-user",
+    });
+    expect(inventory.client.find((route: any) => route.pattern === "/career/:jobId")).toMatchObject({
+      sample: "/career/quantitative-research-scientist",
+      terminal: "/career/quantitative-research-scientist",
+      source_owner: "src/pages/career/index.tsx",
+      render: { selector: "#root > *", text: "Quantitative Research Scientist" },
+    });
+    for (const [pattern, terminal] of Object.entries({
+      "/a2a-playground": "/",
+      "/kyc": "/",
+      "/kyc-demo": "/",
+      "/kyc-flow": "/",
+      "/kyc-form": "/",
+      "/kyc-verification": "/",
+      "/metric": "/metrics",
+      "/onboarding/step-7": "/login",
+      "/onboarding/step-8": "/login",
+      "/onboarding/step-9": "/login",
+    })) {
+      expect(inventory.client.find((route: any) => route.pattern === pattern)?.terminal).toBe(
+        terminal,
+      );
+    }
+  });
+
+  it("fails closed when a new React Routes owner is not registered", () => {
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hushh-route-owners-"));
+    try {
+      fs.mkdirSync(path.join(temporaryRoot, "src/pages/career"), { recursive: true });
+      fs.writeFileSync(
+        path.join(temporaryRoot, "src/App.tsx"),
+        '<Routes><Route path="/" element={<main />} /></Routes>',
+      );
+      fs.writeFileSync(
+        path.join(temporaryRoot, "src/pages/career/index.tsx"),
+        '<Routes><Route path="/:jobId" element={<main />} /></Routes>',
+      );
+      fs.writeFileSync(
+        path.join(temporaryRoot, "src/hidden-router.tsx"),
+        '<Routes><Route path="/hidden" element={<main />} /></Routes>',
+      );
+      expect(() => clientRoutes(temporaryRoot)).toThrow(/React Routes owners drifted/);
+    } finally {
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
   });
 
   it("keeps the cutover red while 111 function routes are not implemented", async () => {

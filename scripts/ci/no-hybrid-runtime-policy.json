@@ -78,10 +78,14 @@
     "spmxyqxjqxcyywkapong"
   ],
   "browser_coverage": {
-    "mode": "network-guard-mechanism-only",
+    "mode": "exhaustive-route-and-local-auth-fixtures",
     "sample_routes": ["/", "/login", "/signup", "/metrics", "/delete-account"],
-    "full_route_inventory": false,
-    "authenticated_fixture": false
+    "inventory_path": "tests/noHybridRouteInventory.generated.json",
+    "playwright_spec": "tests/noHybridNetwork.spec.ts",
+    "browsers": ["chromium", "webkit"],
+    "personas": ["firebase-user-a", "firebase-user-b", "firebase-admin"],
+    "full_route_inventory": true,
+    "authenticated_fixture": true
   },
   "frozen_compatibility_contract": {
     "registry_path": "api/shared/supabaseRetirementFunctionRegistry.generated.js",

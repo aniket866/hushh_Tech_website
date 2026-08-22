@@ -24,6 +24,10 @@ import type {
   Session,
   User,
 } from "./types";
+import {
+  clearNoHybridBrowserFixture,
+  resolveNoHybridBrowserFixture,
+} from "../../auth/noHybridBrowserFixture";
 
 const APP_NAME = "hushh-tech-gcp";
 const DATA_PATH = "/api/gcp/data";
@@ -125,8 +129,7 @@ async function authenticatedFetch(
   path: string,
   init: RequestInit,
 ): Promise<BackendResult<any>> {
-  await auth.authStateReady();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const token = await requestAccessToken(auth);
   if (!token) {
     return { data: null, error: { name: "AuthError", message: "Sign in required.", status: 401 }, status: 401 };
   }
@@ -161,6 +164,13 @@ async function authenticatedFetch(
   } catch (error) {
     return { data: null, error: backendError(error), status: 0, statusText: "NETWORK_ERROR" };
   }
+}
+
+async function requestAccessToken(auth: Auth): Promise<string | null> {
+  const fixture = resolveNoHybridBrowserFixture();
+  if (fixture?.session?.access_token) return fixture.session.access_token;
+  await auth.authStateReady();
+  return auth.currentUser ? auth.currentUser.getIdToken() : null;
 }
 
 class GcpQueryBuilder<T = unknown> implements QueryBuilder<T> {
@@ -213,17 +223,26 @@ function createAuthFacade(auth: Auth) {
   return {
     storageKey: "hushh-tech-firebase-auth",
     async getSession() {
+      const fixture = resolveNoHybridBrowserFixture();
+      if (fixture) return { data: { session: fixture.session }, error: null };
       await auth.authStateReady();
       try { return { data: { session: await toSession(auth.currentUser) }, error: null }; }
       catch (error) { return { data: { session: null }, error: backendError(error) }; }
     },
     async getUser() {
+      const fixture = resolveNoHybridBrowserFixture();
+      if (fixture) return { data: { user: fixture.user }, error: null };
       await auth.authStateReady();
       return auth.currentUser
         ? { data: { user: toUser(auth.currentUser) }, error: null }
         : { data: { user: null }, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
     },
     onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {
+      const fixture = resolveNoHybridBrowserFixture();
+      if (fixture) {
+        queueMicrotask(() => callback("INITIAL_SESSION", fixture.session));
+        return { data: { subscription: { unsubscribe() {} } } };
+      }
       let initialized = false;
       const unsubscribe = onIdTokenChanged(auth, async (user) => {
         const event: AuthChangeEvent = initialized ? (user ? "TOKEN_REFRESHED" : "SIGNED_OUT") : "INITIAL_SESSION";
@@ -254,12 +273,20 @@ function createAuthFacade(auth: Auth) {
     },
     async setSession() { return { data: { session: null, user: null }, error: { name: "AuthError", message: "Raw session injection is disabled." } }; },
     async refreshSession() {
+      const fixture = resolveNoHybridBrowserFixture();
+      if (fixture) {
+        return { data: { session: fixture.session, user: fixture.user }, error: null };
+      }
       try {
         const session = await toSession(auth.currentUser, true);
         return { data: { session, user: session?.user || null }, error: session ? null : { name: "AuthError", message: "Sign in required.", status: 401 } };
       } catch (error) { return { data: { session: null, user: null }, error: backendError(error) }; }
     },
     async signOut() {
+      if (resolveNoHybridBrowserFixture()) {
+        clearNoHybridBrowserFixture();
+        return { error: null };
+      }
       try { await firebaseSignOut(auth); return { error: null }; }
       catch (error) { return { error: backendError(error) }; }
     },
@@ -306,8 +333,7 @@ export function createGcpBackendClient(config: GcpClientConfig): GcpBackendClien
       from(bucket: string) {
         return {
           upload: async (path: string, body: Blob | ArrayBuffer, options: Record<string, unknown> = {}) => {
-            await auth.authStateReady();
-            const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+            const token = await requestAccessToken(auth);
             if (!token) return { data: null, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
             const response = await fetch(`${STORAGE_PATH}/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`, {
               method: "PUT",
@@ -322,8 +348,7 @@ export function createGcpBackendClient(config: GcpClientConfig): GcpBackendClien
             return { data: { publicUrl: `${STORAGE_PATH}/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}` } };
           },
           async download(path: string) {
-            await auth.authStateReady();
-            const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+            const token = await requestAccessToken(auth);
             if (!token) return { data: null, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
             try {
               const response = await fetch(`${STORAGE_PATH}/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`, {
@@ -373,8 +398,7 @@ export function createGcpBackendClient(config: GcpClientConfig): GcpBackendClien
           }
           if (value !== undefined) query.append(key, String(value));
         }
-        await auth.authStateReady();
-        const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+        const token = await requestAccessToken(auth);
         const pathname = ["", "functions", "v1", name, ...subpath]
           .map((segment, index) => (index === 0 ? segment : encodeURIComponent(segment)))
           .join("/");

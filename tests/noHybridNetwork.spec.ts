@@ -1,4 +1,10 @@
-import { expect, test } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -7,6 +13,131 @@ import { installNoHybridNetworkGate } from "./noHybridNetworkGuard";
 const inventory = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), "tests/noHybridRouteInventory.generated.json"), "utf8"),
 );
+
+type FixturePersona = "firebase-user-a" | "firebase-user-b" | "firebase-admin";
+type InventoryClientRoute = {
+  pattern: string;
+  sample: string;
+  terminal: string;
+  access: "anonymous" | "firebase-user" | "firebase-admin";
+  render: { selector: string; text?: string };
+};
+
+async function installAuthFixture(
+  context: BrowserContext,
+  persona: FixturePersona,
+) {
+  await context.addInitScript((selectedPersona) => {
+    window.__HUSHH_NO_HYBRID_AUTH_FIXTURE__ = {
+      schema_version: 1,
+      contract_id: "hushh-tech-no-hybrid-browser-auth-v1",
+      authority: "hushh-tech-uat",
+      persona: selectedPersona,
+    };
+  }, persona);
+}
+
+function investorProfileFixture(persona: FixturePersona) {
+  return {
+    user_id: `no-hybrid-${persona}`,
+    name: "Automated Investor",
+    email: `${persona}@example.test`,
+    age: 35,
+    phone_country_code: "+1",
+    phone_number: "5550100000",
+    organisation: null,
+    confirmed_at: "2026-01-01T00:00:00.000Z",
+    investor_profile: {
+      primary_goal: {
+        value: "long_term_growth",
+        confidence: 0.9,
+        rationale: "Deterministic browser fixture.",
+      },
+    },
+  };
+}
+
+async function installAuthenticatedApiFixture(
+  context: BrowserContext,
+  persona: FixturePersona,
+) {
+  const authorization = new Set<string>();
+  context.on("request", (request) => {
+    const header = request.headers().authorization;
+    if (header) authorization.add(header);
+  });
+  await context.route("**/api/**", async (route) => {
+    let data: unknown = [];
+    if (new URL(route.request().url()).pathname === "/api/gcp/data") {
+      let body: Record<string, unknown> = {};
+      try {
+        body = route.request().postDataJSON() as Record<string, unknown>;
+      } catch {
+        body = {};
+      }
+      if (body.table === "onboarding_data") {
+        data = {
+          current_step: 13,
+          is_completed: true,
+          financial_link_status: "completed",
+          fund_payment_status: "paid",
+          fund_investor_verification_status: "verified_investor",
+        };
+      } else if (body.table === "user_financial_data") {
+        data = { status: "complete" };
+      } else if (body.table === "investor_profiles") {
+        data = investorProfileFixture(persona);
+      } else if (body.kind === "rpc" && body.name === "check_user_nda_status") {
+        data = {
+          hasSignedNda: true,
+          signedAt: "2026-01-01T00:00:00.000Z",
+          ndaVersion: "fixture-v1",
+          signerName: "Automated fixture",
+        };
+      } else if (body.cardinality === "single" || body.cardinality === "maybe-single") {
+        data = null;
+      }
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data, count: Array.isArray(data) ? data.length : null }),
+    });
+  });
+  return authorization;
+}
+
+async function assertRouteReady(page: Page, route: InventoryClientRoute) {
+  await expect.poll(() => new URL(page.url()).pathname, {
+    message: `${route.pattern} did not reach terminal ${route.terminal}`,
+  }).toBe(route.terminal);
+  const rendered = page.locator(route.render.selector).first();
+  await expect(rendered, `${route.pattern} rendered an empty application root`).toBeAttached();
+  await expect.poll(
+    () => rendered.evaluate((node) => {
+      const text = node.textContent?.trim() || "";
+      return text.length > 0 || Boolean(node.querySelector("button, canvas, img, input, svg, video"));
+    }),
+    { message: `${route.pattern} has no observable rendered surface` },
+  ).toBe(true);
+  if (route.render.text) {
+    await expect(
+      page.getByText(route.render.text, { exact: false }).first(),
+      `${route.pattern} is missing its route-specific rendered contract`,
+    ).toBeVisible();
+  }
+  await expect.poll(() => page.evaluate(() => document.readyState)).toBe("complete");
+}
+
+async function newFixtureContext(browser: Browser, persona: FixturePersona) {
+  const context = await browser.newContext({
+    baseURL: "http://127.0.0.1:5173",
+    bypassCSP: true,
+    serviceWorkers: "block",
+  });
+  await installAuthFixture(context, persona);
+  return context;
+}
 
 test("synthetic GCP-only browser fixture stays clean", async ({ context, page }) => {
   const networkGate = await installNoHybridNetworkGate(context);
@@ -123,7 +254,7 @@ test("network guard samples five unauthenticated application routes", async ({ c
   }
 });
 
-test("generated anonymous inventory reaches every React route without provider egress", async ({ context, page }) => {
+test("generated anonymous routes reach their exact terminal surfaces without provider egress", async ({ context, page }) => {
   test.setTimeout(120_000);
   const networkGate = await installNoHybridNetworkGate(context);
   await context.route("**/api/**", async (route) => {
@@ -141,18 +272,77 @@ test("generated anonymous inventory reaches every React route without provider e
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  for (const route of inventory.client) {
+  const anonymousRoutes = inventory.client.filter(
+    (entry: InventoryClientRoute) => entry.access === "anonymous",
+  );
+  for (const route of anonymousRoutes) {
     await page.goto(route.sample, { waitUntil: "domcontentloaded" });
-    await expect(page.locator("#root"), route.pattern).toBeAttached();
-    // WebKit reports fetches aborted by the next navigation as page errors.
-    // Let route-started same-origin work settle so the assertion observes the
-    // route itself instead of an artificial cancellation from this sweep.
-    await page.waitForTimeout(100);
+    await assertRouteReady(page, route);
     networkGate.assertClean();
   }
 
   expect(pageErrors).toEqual([]);
-  expect(inventory.counts.client).toBe(93);
+  expect(anonymousRoutes).toHaveLength(inventory.counts.client_anonymous);
+});
+
+test("two isolated Firebase users reach every authenticated React route without provider egress", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const observedTokens = new Set<string>();
+
+  for (const persona of ["firebase-user-a", "firebase-user-b"] as const) {
+    const context = await newFixtureContext(browser, persona);
+    const networkGate = await installNoHybridNetworkGate(context);
+    const authorization = await installAuthenticatedApiFixture(context, persona);
+    const page = await context.newPage();
+
+    for (const route of inventory.client.filter((entry: { access: string }) => entry.access === "firebase-user")) {
+      await page.goto(route.sample, { waitUntil: "domcontentloaded" });
+      await assertRouteReady(page, route);
+      networkGate.assertClean();
+    }
+
+    for (const token of authorization) observedTokens.add(token);
+    expect([...authorization]).toEqual([`Bearer no-hybrid-local-fixture:${persona}`]);
+    await context.close();
+  }
+
+  expect([...observedTokens].sort()).toEqual([
+    "Bearer no-hybrid-local-fixture:firebase-user-a",
+    "Bearer no-hybrid-local-fixture:firebase-user-b",
+  ]);
+  expect(inventory.counts.client_user).toBe(22);
+});
+
+test("Firebase fund admin reaches every admin route and a regular user is denied", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const adminContext = await newFixtureContext(browser, "firebase-admin");
+  const adminGate = await installNoHybridNetworkGate(adminContext);
+  const adminAuthorization = await installAuthenticatedApiFixture(adminContext, "firebase-admin");
+  const adminPage = await adminContext.newPage();
+
+  const adminRoutes = inventory.client.filter(
+    (entry: { access: string }) => entry.access === "firebase-admin",
+  );
+  for (const route of adminRoutes) {
+    await adminPage.goto(route.sample, { waitUntil: "domcontentloaded" });
+    await assertRouteReady(adminPage, route);
+    adminGate.assertClean();
+  }
+  expect([...adminAuthorization]).toEqual([
+    "Bearer no-hybrid-local-fixture:firebase-admin",
+  ]);
+  await adminContext.close();
+
+  const userContext = await newFixtureContext(browser, "firebase-user-a");
+  const userGate = await installNoHybridNetworkGate(userContext);
+  await installAuthenticatedApiFixture(userContext, "firebase-user-a");
+  const userPage = await userContext.newPage();
+  await userPage.goto(adminRoutes[0].sample, { waitUntil: "domcontentloaded" });
+  await expect.poll(() => new URL(userPage.url()).pathname).toBe("/");
+  userGate.assertClean();
+  await userContext.close();
+
+  expect(inventory.counts.client_admin).toBe(3);
 });
 
 test("all 112 compatibility routes have an explicit terminal or blocking response", async ({ context, page }) => {

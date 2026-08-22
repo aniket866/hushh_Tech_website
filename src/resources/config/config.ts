@@ -2,6 +2,7 @@ import { normalizeOAuthRedirectUrl } from "../../auth/authHost";
 import { getOAuthRedirectUrl } from "../../utils/platform";
 import { createGcpBackendClient } from "../../services/gcpBackend/client";
 import type { GcpBackendClient } from "../../services/gcpBackend/types";
+import { resolveNoHybridBrowserFixture } from "../../auth/noHybridBrowserFixture";
 
 export interface ClientEnvConfig {
   VITE_FIREBASE_API_KEY?: string;
@@ -40,10 +41,19 @@ export function buildClientConfig(
     ),
   };
 
-  const apiKey = readClientEnv(env.VITE_FIREBASE_API_KEY, "VITE_FIREBASE_API_KEY");
-  const authDomain = readClientEnv(env.VITE_FIREBASE_AUTH_DOMAIN, "VITE_FIREBASE_AUTH_DOMAIN");
-  const projectId = readClientEnv(env.VITE_FIREBASE_PROJECT_ID, "VITE_FIREBASE_PROJECT_ID");
-  const appId = readClientEnv(env.VITE_FIREBASE_APP_ID, "VITE_FIREBASE_APP_ID");
+  const browserFixture = resolveNoHybridBrowserFixture();
+  const apiKey = browserFixture
+    ? "no-hybrid-local-fixture-api-key"
+    : readClientEnv(env.VITE_FIREBASE_API_KEY, "VITE_FIREBASE_API_KEY");
+  const authDomain = browserFixture
+    ? "hushh-tech-uat.firebaseapp.com"
+    : readClientEnv(env.VITE_FIREBASE_AUTH_DOMAIN, "VITE_FIREBASE_AUTH_DOMAIN");
+  const projectId = browserFixture
+    ? "hushh-tech-uat"
+    : readClientEnv(env.VITE_FIREBASE_PROJECT_ID, "VITE_FIREBASE_PROJECT_ID");
+  const appId = browserFixture
+    ? "no-hybrid-local-fixture-app"
+    : readClientEnv(env.VITE_FIREBASE_APP_ID, "VITE_FIREBASE_APP_ID");
   if (apiKey && authDomain && projectId && appId) {
     base.gcpBackendClient = createGcpBackendClient({
       apiKey,

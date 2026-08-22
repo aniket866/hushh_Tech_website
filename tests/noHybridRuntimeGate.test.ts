@@ -421,10 +421,18 @@ describe("fail-closed no-hybrid runtime gate", () => {
     ).toBe(true);
   });
 
-  it("keeps incomplete full-route and authenticated browser proof blocking", () => {
-    expect(validatePolicy(loadNoHybridPolicy()).map((entry) => entry.code)).toContain(
+  it("requires exhaustive route inventory and all three authenticated fixtures", () => {
+    expect(validatePolicy(loadNoHybridPolicy()).map((entry) => entry.code)).not.toContain(
       "FULL_ROUTE_AND_AUTH_BROWSER_COVERAGE",
     );
+
+    for (const key of ["full_route_inventory", "authenticated_fixture"] as const) {
+      const incomplete = structuredClone(loadNoHybridPolicy());
+      incomplete.browser_coverage[key] = false;
+      const observed = validatePolicy(incomplete).map((entry) => entry.code);
+      expect(observed).toContain("BROWSER_COVERAGE_POLICY_INVALID");
+      expect(observed).toContain("FULL_ROUTE_AND_AUTH_BROWSER_COVERAGE");
+    }
   });
 
   it("keeps the production API loader graph statically bounded", () => {
@@ -440,6 +448,38 @@ describe("fail-closed no-hybrid runtime gate", () => {
 
   it("keeps package, PR, queue, post-merge, deploy, image, and 112-route wiring fail closed", () => {
     expect(validateGateWiring(process.cwd(), loadNoHybridPolicy())).toEqual([]);
+  });
+
+  it("binds both Playwright engines in config, PR, queue, and post-merge", () => {
+    const configRoot = temporaryRoot();
+    const configPolicy = copyWiringFixture(configRoot);
+    const configPath = "playwright.no-hybrid.config.ts";
+    const config = fs
+      .readFileSync(path.join(configRoot, configPath), "utf8")
+      .replace('name: "webkit"', 'name: "webkit-disabled"');
+    write(configRoot, configPath, config);
+    expect(validateGateWiring(configRoot, configPolicy).map((entry) => entry.code)).toContain(
+      "BROWSER_CONFIG_DIGEST_DRIFT",
+    );
+
+    for (const workflowPath of [
+      configPolicy.required_wiring.pull_request_workflow,
+      configPolicy.required_wiring.queue_workflow,
+      configPolicy.required_wiring.post_merge_workflow,
+    ]) {
+      const root = temporaryRoot();
+      const policy = copyWiringFixture(root);
+      const workflow = fs
+        .readFileSync(path.join(root, workflowPath), "utf8")
+        .replace(
+          "npx playwright install --with-deps chromium webkit",
+          "npx playwright install --with-deps chromium",
+        );
+      write(root, workflowPath, workflow);
+      expect(validateGateWiring(root, policy).map((entry) => entry.code)).toContain(
+        "BROWSER_ENGINE_INSTALL_INVALID",
+      );
+    }
   });
 
   it("does not accept workflow or Docker gate markers that survive only in comments", () => {

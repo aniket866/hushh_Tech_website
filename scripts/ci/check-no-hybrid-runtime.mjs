@@ -87,13 +87,31 @@ const EXPECTED_BROWSER_SAMPLE_ROUTES = Object.freeze([
   "/metrics",
   "/delete-account",
 ]);
+const EXPECTED_BROWSER_COVERAGE = Object.freeze({
+  mode: "exhaustive-route-and-local-auth-fixtures",
+  sample_routes: EXPECTED_BROWSER_SAMPLE_ROUTES,
+  inventory_path: "tests/noHybridRouteInventory.generated.json",
+  playwright_spec: "tests/noHybridNetwork.spec.ts",
+  browsers: Object.freeze(["chromium", "webkit"]),
+  personas: Object.freeze([
+    "firebase-user-a",
+    "firebase-user-b",
+    "firebase-admin",
+  ]),
+  full_route_inventory: true,
+  authenticated_fixture: true,
+});
 
 // This digest covers the complete parsed policy envelope: source surfaces,
 // entrypoints, generated roots, classifications, forbidden dependencies,
 // project refs, browser contract, frozen route contract, and every wiring
 // path. A policy edit therefore cannot silently narrow what this checker sees.
 const EXPECTED_CANONICAL_POLICY_SHA256 =
-  "de91cf4f5731b642e42b42f3bc32f6274c22ed3dec3ef959e58c00e0214f6918";
+  "8b48cf8176b6453340afa4b101b774cffcfeb8e0bc4ca478f8eb83ebf72e0f3e";
+const EXPECTED_PLAYWRIGHT_CONFIG_SHA256 =
+  "4a990df407c5a260198c6fe82fed7b745b9e403cf636da887e48344f262dc47b";
+const EXPECTED_BROWSER_INSTALL =
+  "run: npx playwright install --with-deps chromium webkit";
 
 const FORBIDDEN_CLASSIFICATION_ROOTS = [
   ".github/workflows",
@@ -707,13 +725,7 @@ export function validatePolicy(
     );
   }
   const browserCoverage = policy?.browser_coverage;
-  if (
-    !browserCoverage ||
-    browserCoverage.mode !== "network-guard-mechanism-only" ||
-    JSON.stringify(browserCoverage.sample_routes) !== JSON.stringify(EXPECTED_BROWSER_SAMPLE_ROUTES) ||
-    browserCoverage.full_route_inventory !== false ||
-    browserCoverage.authenticated_fixture !== false
-  ) {
+  if (JSON.stringify(browserCoverage) !== JSON.stringify(EXPECTED_BROWSER_COVERAGE)) {
     addViolation(
       violations,
       "BROWSER_COVERAGE_POLICY_INVALID",
@@ -721,12 +733,16 @@ export function validatePolicy(
       "browser coverage classification is malformed",
     );
   }
-  if (enforceBrowserCoverage) {
+  if (
+    enforceBrowserCoverage &&
+    (browserCoverage?.full_route_inventory !== true ||
+      browserCoverage?.authenticated_fixture !== true)
+  ) {
     addViolation(
       violations,
       "FULL_ROUTE_AND_AUTH_BROWSER_COVERAGE",
       "scripts/ci/no-hybrid-runtime-policy.json",
-      "network interception is proven, but full route inventory and authenticated fixtures are not yet automated",
+      "full route inventory and authenticated browser fixtures must both be automated",
     );
   }
   if (!Array.isArray(policy?.classified_non_runtime)) {
@@ -911,7 +927,19 @@ export function validateGateWiring(root, policy) {
     }
   }
   const browserConfigPath = "playwright.no-hybrid.config.ts";
-  const browserConfig = activeContents(readRequired(root, browserConfigPath, violations), browserConfigPath);
+  const browserConfigRaw = readRequired(root, browserConfigPath, violations);
+  const browserConfig = activeContents(browserConfigRaw, browserConfigPath);
+  if (
+    crypto.createHash("sha256").update(browserConfigRaw).digest("hex") !==
+    EXPECTED_PLAYWRIGHT_CONFIG_SHA256
+  ) {
+    addViolation(
+      violations,
+      "BROWSER_CONFIG_DIGEST_DRIFT",
+      browserConfigPath,
+      "the exact Chromium and WebKit Playwright project configuration changed",
+    );
+  }
   if (!browserConfig.includes('serviceWorkers: "block"')) {
     addViolation(
       violations,
@@ -969,6 +997,7 @@ export function validateGateWiring(root, policy) {
     const statusJob = yamlJobBlock(workflow, "ci-status", workflowPath);
     for (const [marker, block] of [
       ["name: No-Hybrid Runtime Gate", gateJob],
+      [EXPECTED_BROWSER_INSTALL, gateJob],
       ["run: bash scripts/ci/orchestrate.sh no-hybrid", gateJob],
       ["- no-hybrid-runtime", statusJob],
       ['["No-Hybrid Runtime Gate"]="${{ needs.no-hybrid-runtime.result }}"', statusJob],
@@ -979,6 +1008,20 @@ export function validateGateWiring(root, policy) {
     }
     if (!isUnconditionalYamlStep(gateJob, "run: bash scripts/ci/orchestrate.sh no-hybrid")) {
       addViolation(violations, "AUTHORITATIVE_WORKFLOW_GATE_CONDITIONAL", workflowPath, `${kind} no-hybrid command must be unconditional`);
+    }
+    if (
+      !yamlMarkersInOrder(gateJob, [
+        EXPECTED_BROWSER_INSTALL,
+        "run: bash scripts/ci/orchestrate.sh no-hybrid",
+      ]) ||
+      !isUnconditionalYamlStep(gateJob, EXPECTED_BROWSER_INSTALL)
+    ) {
+      addViolation(
+        violations,
+        "BROWSER_ENGINE_INSTALL_INVALID",
+        workflowPath,
+        `${kind} must install Chromium and WebKit before the no-hybrid browser gate`,
+      );
     }
     if (/^ {4}if:\s*/m.test(gateJob)) {
       addViolation(violations, "AUTHORITATIVE_WORKFLOW_GATE_DISABLED", workflowPath, `${kind} no-hybrid job must not have a job-level condition`);
@@ -992,6 +1035,7 @@ export function validateGateWiring(root, policy) {
     "npm run migration:no-hybrid:source",
     "npm run build:web",
     "npm run migration:no-hybrid:check",
+    "npx playwright install --with-deps chromium webkit",
     "npm run test:e2e:no-hybrid",
     "bash scripts/ci/orchestrate.sh smoke",
   ];
@@ -1000,6 +1044,19 @@ export function validateGateWiring(root, policy) {
     postMergeMarkers.some((marker) => !isUnconditionalYamlStep(postMerge, marker))
   ) {
     addViolation(violations, "POST_MERGE_GATE_ORDER_INVALID", wiring.post_merge_workflow, "source, build, artifact, browser, and smoke gates must run in order");
+  }
+  if (
+    !isUnconditionalYamlStep(
+      postMerge,
+      "npx playwright install --with-deps chromium webkit",
+    )
+  ) {
+    addViolation(
+      violations,
+      "BROWSER_ENGINE_INSTALL_INVALID",
+      wiring.post_merge_workflow,
+      "post-merge must install Chromium and WebKit before the browser gate",
+    );
   }
 
   for (const deployPath of wiring.deploy_workflows) {

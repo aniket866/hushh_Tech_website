@@ -31,6 +31,10 @@ import {
   parseAuthBroadcastEvent,
   startUnifiedOAuth,
 } from "./session";
+import {
+  clearNoHybridBrowserFixture,
+  resolveNoHybridBrowserFixture,
+} from "./noHybridBrowserFixture";
 
 interface AuthSessionContextValue extends AuthSessionSnapshot {
   startOAuth: (provider: OAuthProvider) => Promise<OAuthStartResult>;
@@ -58,8 +62,15 @@ export const AuthSessionProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const gcpBackend = config.gcpBackendClient;
+  const noHybridBrowserFixture = useMemo(
+    () => resolveNoHybridBrowserFixture(),
+    [],
+  );
+  const fixtureSignedOutRef = useRef(false);
   const [snapshot, setSnapshot] =
-    useState<AuthSessionSnapshot>(INITIAL_SNAPSHOT);
+    useState<AuthSessionSnapshot>(
+      () => noHybridBrowserFixture || INITIAL_SNAPSHOT,
+    );
   const pendingSignedOutStateRef = useRef<PendingSignedOutState | null>(null);
   const researchModeRef = useRef(isHushhResearchAuthMode());
   const sessionGenerationRef = useRef(0);
@@ -109,6 +120,18 @@ export const AuthSessionProvider: React.FC<{
       const generation = ++sessionGenerationRef.current;
       pendingSignedOutStateRef.current = { status, reason };
       clearLegacyAuthStorage();
+      if (noHybridBrowserFixture) {
+        fixtureSignedOutRef.current = true;
+        clearNoHybridBrowserFixture();
+        applyClearedState(status, reason);
+        if (broadcast) broadcastAuthEvent(reason);
+        return {
+          status,
+          session: null,
+          user: null,
+          reason,
+        } satisfies AuthSessionSnapshot;
+      }
       const isResearchSession =
         researchModeRef.current || isHushhResearchAuthMode();
       if (isResearchSession) {
@@ -133,10 +156,18 @@ export const AuthSessionProvider: React.FC<{
         reason,
       } satisfies AuthSessionSnapshot;
     },
-    [applyClearedState, gcpBackend]
+    [applyClearedState, gcpBackend, noHybridBrowserFixture]
   );
 
   const revalidateSession = useCallback(async () => {
+    if (noHybridBrowserFixture) {
+      const nextSnapshot: AuthSessionSnapshot = fixtureSignedOutRef.current
+        ? { status: "anonymous", session: null, user: null, reason: "signed_out" }
+        : noHybridBrowserFixture;
+      applySnapshot(nextSnapshot);
+      return nextSnapshot;
+    }
+
     const generation = sessionGenerationRef.current;
     const staleSnapshot = (): AuthSessionSnapshot => {
       const pendingState = pendingSignedOutStateRef.current;
@@ -197,13 +228,19 @@ export const AuthSessionProvider: React.FC<{
 
     applySnapshot(nextSnapshot);
     return nextSnapshot;
-  }, [applySnapshot, clearLocalSession, gcpBackend]);
+  }, [applySnapshot, clearLocalSession, gcpBackend, noHybridBrowserFixture]);
 
   // Boot: Instantly resolve from localStorage (no network call).
   // This eliminates the 'booting' state almost immediately.
   // onAuthStateChange below handles INITIAL_SESSION for the definitive state.
   useEffect(() => {
     const bootFromLocalStorage = async () => {
+      if (noHybridBrowserFixture) {
+        if (!fixtureSignedOutRef.current) {
+          applySnapshot(noHybridBrowserFixture);
+        }
+        return;
+      }
       if (researchModeRef.current) {
         if (isHushhResearchCallbackRoute(window.location.pathname)) {
           applySnapshot({ status: "anonymous", session: null, user: null });
@@ -218,9 +255,13 @@ export const AuthSessionProvider: React.FC<{
       applySnapshot(localSnapshot);
     };
     void bootFromLocalStorage();
-  }, [applySnapshot, revalidateSession, gcpBackend]);
+  }, [applySnapshot, revalidateSession, gcpBackend, noHybridBrowserFixture]);
 
   useEffect(() => {
+    if (noHybridBrowserFixture) {
+      return;
+    }
+
     if (researchModeRef.current) {
       const handleResearchRevalidation = () => {
         void revalidateSession();
@@ -376,7 +417,7 @@ export const AuthSessionProvider: React.FC<{
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [applySnapshot, clearLocalSession, revalidateSession, gcpBackend]);
+  }, [applySnapshot, clearLocalSession, revalidateSession, gcpBackend, noHybridBrowserFixture]);
 
   const startOAuth = useCallback(
     async (provider: OAuthProvider) => {
@@ -398,6 +439,14 @@ export const AuthSessionProvider: React.FC<{
   const signOut = useCallback(async () => {
     const generation = ++sessionGenerationRef.current;
     clearLegacyAuthStorage();
+
+    if (noHybridBrowserFixture) {
+      fixtureSignedOutRef.current = true;
+      clearNoHybridBrowserFixture();
+      applyClearedState("anonymous", "signed_out");
+      broadcastAuthEvent("signed_out");
+      return;
+    }
 
     if (researchModeRef.current || isHushhResearchAuthMode()) {
       researchModeRef.current = true;
@@ -435,7 +484,7 @@ export const AuthSessionProvider: React.FC<{
       applyClearedState("anonymous", "signed_out");
       broadcastAuthEvent("signed_out");
     }
-  }, [applyClearedState, gcpBackend]);
+  }, [applyClearedState, gcpBackend, noHybridBrowserFixture]);
 
   const handleAccountDeleted = useCallback(async () => {
     await clearLocalSession("invalidated", "deleted", true, {

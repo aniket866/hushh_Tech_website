@@ -54,8 +54,8 @@ jobs:
       - name: Validate no-hybrid deploy artifact
         run: npm run migration:no-hybrid:check
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Validate no-hybrid browser network
         run: npm run test:e2e:no-hybrid

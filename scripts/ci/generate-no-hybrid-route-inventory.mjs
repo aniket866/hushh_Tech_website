@@ -13,6 +13,24 @@ const ROUTE_WRAPPERS = Object.freeze([
   "InvestorAccessRoute",
   "ProtectedRoute",
 ]);
+const ROUTE_OWNER_PREFIXES = Object.freeze({
+  "src/App.tsx": "",
+  "src/pages/career/index.tsx": "/career",
+});
+const TERMINAL_OVERRIDES = Object.freeze({
+  "/onboarding/step-7": "/login",
+  "/onboarding/step-8": "/login",
+  "/onboarding/step-9": "/login",
+  "/user-registration": "/hushh-user-profile",
+});
+const PARAMETER_SAMPLES = Object.freeze({
+  jobId: "quantitative-research-scientist",
+});
+const READY_TEXT_BY_PATTERN = Object.freeze({
+  "/career/:jobId": "Quantitative Research Scientist",
+  "/hushh-user-profile/view": "Verified Investor",
+  "/profile/:id": "Verified Investor",
+});
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -22,6 +40,7 @@ function concreteRoute(pattern) {
   if (pattern === "*") return "/__no_hybrid_not_found_fixture__";
   let route = pattern.replace(/\/\*$/, "/__no_hybrid_wildcard_fixture__");
   route = route.replace(/:([A-Za-z0-9_]+)/g, (_match, name) => {
+    if (PARAMETER_SAMPLES[name]) return PARAMETER_SAMPLES[name];
     if (/token/i.test(name)) return "invalid-fixture-token";
     if (/slug/i.test(name)) return "fixture-slug";
     if (/user/i.test(name)) return "fixture-user-a";
@@ -38,36 +57,130 @@ function stringAttribute(opening, name) {
   return attribute.initializer.text;
 }
 
-function clientRoutes(root) {
-  const relative = "src/App.tsx";
-  const sourceText = fs.readFileSync(path.join(root, relative), "utf8");
-  const source = ts.createSourceFile(relative, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const routes = [];
-  const visit = (node) => {
-    const opening = ts.isJsxElement(node)
-      ? node.openingElement
-      : ts.isJsxSelfClosingElement(node)
-        ? node
-        : null;
-    if (opening?.tagName?.getText(source) === "Route") {
-      const pattern = stringAttribute(opening, "path");
-      if (!pattern) throw new Error("Every React Route must use a static string path.");
-      const text = node.getText(source);
-      const wrappers = ROUTE_WRAPPERS.filter((name) => text.includes(`<${name}`));
-      routes.push({
-        pattern,
-        sample: concreteRoute(pattern),
-        access: wrappers.includes("FundAdminRoute")
-          ? "firebase-admin"
-          : wrappers.length
-            ? "firebase-user"
-            : "anonymous",
-        wrappers,
-      });
+function jsxTagName(opening, source) {
+  return opening?.tagName?.getText(source) || "";
+}
+
+function sourceRouteOwners(root) {
+  const sourceRoot = path.join(root, "src");
+  const owners = [];
+  const visitDirectory = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visitDirectory(absolute);
+        continue;
+      }
+      if (!entry.isFile() || !/\.(?:jsx|tsx)$/.test(entry.name)) continue;
+      const relative = path.relative(root, absolute).split(path.sep).join("/");
+      const sourceText = fs.readFileSync(absolute, "utf8");
+      const source = ts.createSourceFile(
+        relative,
+        sourceText,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      let ownsRoutes = false;
+      const visit = (node) => {
+        const opening = ts.isJsxElement(node)
+          ? node.openingElement
+          : ts.isJsxSelfClosingElement(node)
+            ? node
+            : null;
+        if (jsxTagName(opening, source) === "Routes") ownsRoutes = true;
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+      if (ownsRoutes) owners.push(relative);
     }
-    ts.forEachChild(node, visit);
   };
-  visit(source);
+  visitDirectory(sourceRoot);
+  return owners.sort();
+}
+
+function prefixedPattern(prefix, pattern) {
+  if (!prefix) return pattern;
+  if (pattern === "*") return `${prefix}/*`;
+  return `${prefix}${pattern.startsWith("/") ? "" : "/"}${pattern}`;
+}
+
+function staticNavigateTarget(node, source) {
+  const targets = [];
+  const visit = (candidate) => {
+    const opening = ts.isJsxElement(candidate)
+      ? candidate.openingElement
+      : ts.isJsxSelfClosingElement(candidate)
+        ? candidate
+        : null;
+    if (jsxTagName(opening, source) === "Navigate") {
+      const target = stringAttribute(opening, "to");
+      if (!target) throw new Error("Every Navigate target inside a Route must be static.");
+      targets.push(target);
+    }
+    ts.forEachChild(candidate, visit);
+  };
+  visit(node);
+  if (targets.length > 1) throw new Error("A React Route contains multiple Navigate targets.");
+  return targets[0] || null;
+}
+
+export function clientRoutes(root) {
+  const observedOwners = sourceRouteOwners(root);
+  const expectedOwners = Object.keys(ROUTE_OWNER_PREFIXES).sort();
+  if (JSON.stringify(observedOwners) !== JSON.stringify(expectedOwners)) {
+    throw new Error(
+      `React Routes owners drifted: expected ${expectedOwners.join(", ")}; found ${observedOwners.join(", ")}`,
+    );
+  }
+  const routes = [];
+  for (const relative of expectedOwners) {
+    const sourceText = fs.readFileSync(path.join(root, relative), "utf8");
+    const source = ts.createSourceFile(
+      relative,
+      sourceText,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const prefix = ROUTE_OWNER_PREFIXES[relative];
+    const visit = (node) => {
+      const opening = ts.isJsxElement(node)
+        ? node.openingElement
+        : ts.isJsxSelfClosingElement(node)
+          ? node
+          : null;
+      if (jsxTagName(opening, source) === "Route") {
+        const localPattern = stringAttribute(opening, "path");
+        if (!localPattern) throw new Error("Every React Route must use a static string path.");
+        const pattern = prefixedPattern(prefix, localPattern);
+        const text = node.getText(source);
+        const wrappers = ROUTE_WRAPPERS.filter((name) => text.includes(`<${name}`));
+        const sample = concreteRoute(pattern);
+        const navigateTarget = staticNavigateTarget(node, source);
+        routes.push({
+          pattern,
+          sample,
+          terminal: TERMINAL_OVERRIDES[pattern] || navigateTarget || sample,
+          access: wrappers.includes("FundAdminRoute")
+            ? "firebase-admin"
+            : wrappers.length
+              ? "firebase-user"
+              : "anonymous",
+          wrappers,
+          source_owner: relative,
+          render: {
+            selector: "#root > *",
+            ...(READY_TEXT_BY_PATTERN[pattern]
+              ? { text: READY_TEXT_BY_PATTERN[pattern] }
+              : {}),
+          },
+        });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
   routes.sort((a, b) => a.pattern.localeCompare(b.pattern));
   if (new Set(routes.map((route) => route.pattern)).size !== routes.length) {
     throw new Error("React route inventory contains duplicate patterns.");

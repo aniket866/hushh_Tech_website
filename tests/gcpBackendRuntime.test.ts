@@ -121,6 +121,17 @@ describe("GCP backend runtime boundary", () => {
     await expect(verifyFirebaseBearer("")).rejects.toMatchObject({ status: 401, code: "AUTH_REQUIRED" });
   });
 
+  it.each([
+    "firebase-user-a",
+    "firebase-user-b",
+    "firebase-admin",
+  ])("rejects the local browser fixture token for %s at the real verifier", async (persona) => {
+    process.env = { ...process.env, ...validEnv() };
+    await expect(
+      verifyFirebaseBearer(`Bearer no-hybrid-local-fixture:${persona}`),
+    ).rejects.toThrow();
+  });
+
   it("fails closed before opening Cloud SQL when the switch is off", async () => {
     process.env.GCP_DATA_RUNTIME_ENABLED = "false";
     await expect(executeDataRequest({ kind: "table", table: "users", operation: "select" }, "uid"))

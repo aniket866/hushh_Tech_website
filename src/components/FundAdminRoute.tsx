@@ -2,7 +2,6 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthSession } from '../auth/AuthSessionProvider';
 import { buildLoginRedirectPath } from '../auth/routePolicy';
-import { isFundAdminEmail } from '../services/fundAdmin/allowlist';
 
 interface FundAdminRouteProps {
   children: React.ReactNode;
@@ -12,8 +11,8 @@ interface FundAdminRouteProps {
  * Gate for the internal Hushh Fund verification dashboard (`/fund-admin`).
  * Unlike ProtectedRoute, this must NOT run the investor onboarding flow —
  * team members are not investors, so we never bounce them to financial-link.
- * The real authorization lives server-side in the fund-payment-admin-* edge
- * functions; this guard just keeps non-team members out of the UI shell.
+ * The real authorization lives server-side. This guard mirrors the exact
+ * Firebase custom claim and never treats an email address as authority.
  */
 const FundAdminRoute: React.FC<FundAdminRouteProps> = ({ children }) => {
   const { status, user } = useAuthSession();
@@ -39,7 +38,7 @@ const FundAdminRoute: React.FC<FundAdminRouteProps> = ({ children }) => {
     );
   }
 
-  if (!isFundAdminEmail(user.email)) {
+  if (user.app_metadata?.fund_admin !== true) {
     return <Navigate to="/" replace />;
   }
 
