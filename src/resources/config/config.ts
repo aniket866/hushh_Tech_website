@@ -3,6 +3,7 @@ import { getOAuthRedirectUrl } from "../../utils/platform";
 import { createGcpBackendClient } from "../../services/gcpBackend/client";
 import type { GcpBackendClient } from "../../services/gcpBackend/types";
 import { resolveNoHybridBrowserFixture } from "../../auth/noHybridBrowserFixture";
+import { isHushhResearchAuthRoute } from "../../services/hushhResearch/contracts";
 
 export interface ClientEnvConfig {
   VITE_FIREBASE_API_KEY?: string;
@@ -31,6 +32,7 @@ function readClientEnv(value: string | undefined, name: string, fallback = ""): 
 export function buildClientConfig(
   env: ClientEnvConfig,
   fallbackRedirectUrl = getOAuthRedirectUrl(),
+  pathname = "",
 ): Config {
   const apiBase = (env.VITE_GCP_API_BASE_URL || "").trim().replace(/\/$/, "");
   const base: Config = {
@@ -40,6 +42,14 @@ export function buildClientConfig(
       fallbackRedirectUrl,
     ),
   };
+
+  // A Research launch uses its own Firebase authority. On a direct auth entry,
+  // do not initialize the ordinary Hushh Tech client at all. If the user
+  // reaches the route through SPA navigation, HushhResearchHardEntryGuard
+  // performs one reload and this branch makes that reload a clean boundary.
+  if (isHushhResearchAuthRoute(pathname)) {
+    return base;
+  }
 
   const browserFixture = resolveNoHybridBrowserFixture();
   const apiKey = browserFixture
@@ -66,5 +76,9 @@ export function buildClientConfig(
   return base;
 }
 
-const config = buildClientConfig(import.meta.env);
+const config = buildClientConfig(
+  import.meta.env,
+  getOAuthRedirectUrl(),
+  typeof window === "undefined" ? "" : window.location.pathname,
+);
 export default config;

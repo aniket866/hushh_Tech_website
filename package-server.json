@@ -6,7 +6,7 @@
   "description": "Express server for GCP Cloud Run — serves SPA + API routes",
   "dependencies": {
     "@google-cloud/cloud-sql-connector": "^1.8.3",
-    "@google-cloud/storage": "^7.17.0",
+    "@google-cloud/storage": "^7.22.0",
     "@google/genai": "^1.36.0",
     "express": "^4.21.0",
     "firebase-admin": "^13.4.0",
@@ -14,5 +14,8 @@
     "nodemailer": "^6.9.7",
     "libphonenumber-js": "^1.12.31",
     "pg": "^8.16.3"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

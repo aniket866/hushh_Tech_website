@@ -300,7 +300,13 @@ jobs:
       - name: Deploy to Cloud Run
         shell: bash
         run: |
-          runtime_env="^|^NODE_ENV=staging|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=false|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
+          deploy_sha="${{ steps.resolve-sha.outputs.sha }}"
+          if ! [[ "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Resolved deployment SHA is not a full lowercase Git SHA."
+            exit 1
+          fi
+          short_sha="${deploy_sha:0:8}"
+          runtime_env="^|^NODE_ENV=staging|DEPLOY_COMMIT_SHA=${deploy_sha}|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=false|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
           runtime_secrets="GCP_SERVER_ACTOR_UID=hushh-tech-server-actor-uid:latest"
           runtime_secrets+=",DELETE_ACCOUNT_AUDIT_SECRET=hushh-tech-delete-account-audit-secret:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
@@ -321,7 +327,7 @@ jobs:
           runtime_secrets+=",HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY=hushh-tech-uat-research-x25519-private-key:latest"
           runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_API_KEY=hushh-tech-uat-research-firebase-api-key:latest"
           runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_APP_ID=hushh-tech-uat-research-firebase-app-id:latest"
-          build_tag="build-$(echo '${{ steps.resolve-sha.outputs.sha }}' | cut -c1-8)"
+          build_tag="build-${short_sha}"
           gcloud run deploy hushh-tech-website \
             --source . \
             --project=hushh-tech-uat \
@@ -338,8 +344,71 @@ jobs:
             --timeout=240s \
             --update-env-vars="$runtime_env" \
             --update-secrets="$runtime_secrets" \
+            --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}" \
             --clear-base-image \
             --quiet
+
+      - name: Verify exact UAT release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_sha="${{ steps.resolve-sha.outputs.sha }}"
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          serving_revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          positive_traffic_targets="$(jq '[.status.traffic[]? | select((.percent // 0) > 0)] | length' <<<"$service_json")"
+          if [ -z "$serving_revision" ] || [ "$positive_traffic_targets" -ne 1 ]; then
+            echo "::error::Expected exactly one UAT revision at 100% traffic after deploy."
+            exit 1
+          fi
+
+          revision_json="$(gcloud run revisions describe "$serving_revision" \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          label_sha="$(jq -r '.metadata.labels["deploy-commit"] // empty' <<<"$revision_json")"
+          env_sha="$(jq -r '
+            [.spec.containers[0].env[]?
+              | select(.name == "DEPLOY_COMMIT_SHA")
+              | .value
+              | select(type == "string")]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$revision_json")"
+          image_digest="$(jq -r '.status.imageDigest // empty' <<<"$revision_json")"
+          if [ "$label_sha" != "$deploy_sha" ] || [ "$env_sha" != "$deploy_sha" ]; then
+            echo "::error::Cloud Run revision does not bind the exact deployment SHA."
+            exit 1
+          fi
+          if ! [[ "$image_digest" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Cloud Run revision does not expose an immutable image digest."
+            exit 1
+          fi
+
+          release_json="$(curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors --max-time 15 \
+            "$SMOKE_BASE_URL/api/release")"
+          if [ "$(jq -r '.status // empty' <<<"$release_json")" != "ok" ] || \
+             [ "$(jq -r '.service // empty' <<<"$release_json")" != "hushh-tech-website" ] || \
+             [ "$(jq -r '.revision // empty' <<<"$release_json")" != "$serving_revision" ] || \
+             [ "$(jq -r '.commit_sha // empty' <<<"$release_json")" != "$deploy_sha" ]; then
+            echo "::error::The served UAT release identity does not match the deployed revision."
+            exit 1
+          fi
+
+          jq -n \
+            --arg sha "$deploy_sha" \
+            --arg revision "$serving_revision" \
+            --arg image "$image_digest" \
+            '{status:"verified",commit_sha:$sha,serving_revision:$revision,image_digest:$image,traffic_percent:100}' \
+            > /tmp/uat-release-identity.json
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -358,7 +427,44 @@ jobs:
           EXPECTED_HUSHH_RESEARCH_CLIENT_ENABLED: ${{ env.HUSHH_RESEARCH_CLIENT_ENABLED }}
         run: node scripts/smoke-hushh-research-client.mjs "$SMOKE_BASE_URL" > /tmp/uat-hushh-research-client-smoke.json
 
-      - name: Restore captured revision after a failed deploy or smoke
+      - name: Upload UAT smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-oauth-smoke
+          if-no-files-found: error
+          path: /tmp/uat-oauth-smoke.json
+
+      - name: Upload UAT sensitive NDA gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-sensitive-nda-gate
+          if-no-files-found: warn
+          path: /tmp/uat-sensitive-nda-gate.json
+
+      - name: Upload UAT Research client smoke artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-hushh-research-client-smoke
+          if-no-files-found: error
+          path: /tmp/uat-hushh-research-client-smoke.json
+
+      - name: Upload UAT predeploy and release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-revision-safety
+          if-no-files-found: warn
+          path: |
+            /tmp/uat-predeploy-state.json
+            /tmp/uat-release-identity.json
+
+      # Keep rollback after every required evidence upload. If GitHub artifact
+      # storage is unavailable, that release-proof failure must restore the
+      # previously serving revision instead of leaving an unproven revision live.
+      - name: Restore captured revision after a failed deploy, smoke, or proof upload
         if: failure() && steps.predeploy-state.outputs.revision != ''
         shell: bash
         run: |
@@ -391,36 +497,10 @@ jobs:
             '{status:"rolled_back",serving_revision:$revision,failed_sha:$sha,traffic_percent:100}' \
             > /tmp/uat-rollback-state.json
 
-      - name: Upload UAT smoke artifact
-        if: always()
+      - name: Upload UAT rollback evidence
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: uat-oauth-smoke
-          if-no-files-found: error
-          path: /tmp/uat-oauth-smoke.json
-
-      - name: Upload UAT sensitive NDA gate artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uat-sensitive-nda-gate
+          name: uat-rollback-state
           if-no-files-found: warn
-          path: /tmp/uat-sensitive-nda-gate.json
-
-      - name: Upload UAT Research client smoke artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uat-hushh-research-client-smoke
-          if-no-files-found: error
-          path: /tmp/uat-hushh-research-client-smoke.json
-
-      - name: Upload UAT predeploy and rollback evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uat-revision-safety
-          if-no-files-found: warn
-          path: |
-            /tmp/uat-predeploy-state.json
-            /tmp/uat-rollback-state.json
+          path: /tmp/uat-rollback-state.json

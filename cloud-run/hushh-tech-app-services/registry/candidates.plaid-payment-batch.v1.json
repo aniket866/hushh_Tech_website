@@ -33,7 +33,7 @@
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
     "cloud-run/hushh-tech-app-services/src/webhook-ledger.js": "428028e89f0061f0aa57998741b435b9e4c086a1a9c9fbb8dc109be8708f2168",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
-    "server.js": "5b9ebf2f7d65d20434368a65f50839cd177b628e3e8ac79ca9cff695afaaaff3"
+    "server.js": "416620e69b436b97077baa3db5223a6c07803c972c9800f21a8e6cdaf86c081e"
   },
   "raw_signature_contract": {
     "slug": "plaid-data-webhook",

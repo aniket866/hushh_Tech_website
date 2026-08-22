@@ -7,6 +7,7 @@ import {
   openSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   unlinkSync,
   writeFileSync,
   writeSync,
@@ -335,7 +336,9 @@ describe("combined canonical seven-bucket migration", () => {
   });
 
   it("rejects hardlinked private artifacts", () => {
-    const directory = mkdtempSync("/private/tmp/seven-bucket-hardlink-");
+    const directory = mkdtempSync(
+      join(realpathSync(tmpdir()), "seven-bucket-hardlink-"),
+    );
     const original = join(directory, "source.json");
     const linked = join(directory, "source-linked.json");
     writeFileSync(original, "{}", { mode: 0o600 });

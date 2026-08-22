@@ -1292,6 +1292,13 @@
       ]
     },
     {
+      "pattern": "/api/release",
+      "sample": "/api/release",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "pattern": "/api/send-email-notification",
       "sample": "/api/send-email-notification",
       "methods": [
@@ -2132,11 +2139,11 @@
     "client_anonymous": 69,
     "client_user": 22,
     "client_admin": 3,
-    "server": 32,
+    "server": 33,
     "functions": 112,
     "functions_ported": 1,
     "functions_retired": 1,
     "functions_blocked": 110
   },
-  "sha256": "ee014d8fc5a96e71f5f28f5e2e03c2521a6c43b7e4634f9b5ab604d365ee7185"
+  "sha256": "4bb6a04723218e6c7e7bf80f90917f071e141120b7514ff5ea4aa9716cbdd6c0"
 }

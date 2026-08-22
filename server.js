@@ -24,6 +24,8 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 const DIST_DIR = join(__dirname, 'dist');
+const FULL_GIT_SHA = /^[0-9a-f]{40}$/;
+const CLOUD_RUN_REVISION = /^[a-z][a-z0-9-]{0,62}$/;
 
 // Adapt Vercel-style handlers to the Cloud Run Express runtime.
 const wrapHandler = (handlerModule) => async (req, res) => {
@@ -135,6 +137,35 @@ app.use(legacyFunctionParserError);
 // ---------------------------------------------------------------------------
 // API Routes — adapt Vercel handler(req, res) → Express route
 // ---------------------------------------------------------------------------
+
+// Public, non-secret release identity. The UAT deploy workflow binds the full
+// reviewed Git SHA into both the Cloud Run revision and this live response.
+// A missing or malformed binding is unhealthy rather than silently reporting
+// a stale short SHA from an older revision label.
+app.get('/api/release', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  const commitSha = process.env.DEPLOY_COMMIT_SHA ?? '';
+  const revision = process.env.K_REVISION ?? '';
+  const service = process.env.K_SERVICE ?? '';
+  if (
+    !FULL_GIT_SHA.test(commitSha) ||
+    !CLOUD_RUN_REVISION.test(revision) ||
+    service !== 'hushh-tech-website'
+  ) {
+    return res.status(503).json({
+      status: 'unavailable',
+      code: 'RELEASE_IDENTITY_UNAVAILABLE',
+    });
+  }
+
+  return res.status(200).json({
+    status: 'ok',
+    service,
+    revision,
+    commit_sha: commitSha,
+  });
+});
 
 app.all('/api/career-application', async (req, res) => wrapHandler(await loadApi('career-application'))(req, res));
 app.all('/api/enrich-preferences', async (req, res) => wrapHandler(await loadApi('enrich-preferences'))(req, res));

@@ -67,4 +67,23 @@ describe("client auth config", () => {
 
     expect(clientConfig.redirect_url).toBe("http://localhost:5173/auth/callback");
   });
+
+  it.each([
+    "/auth/hushh-research/start",
+    "/AUTH/HUSHH-RESEARCH/CALLBACK/",
+  ])("does not initialize the ordinary Firebase client on %s", (pathname) => {
+    const clientConfig = buildClientConfig(
+      {
+        VITE_FIREBASE_API_KEY: "public-api-key",
+        VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com",
+        VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat",
+        VITE_FIREBASE_APP_ID: "1:123:web:test",
+      },
+      "https://uat.hushhtech.com/auth/callback",
+      pathname,
+    );
+
+    expect(clientConfig.gcpBackendClient).toBeUndefined();
+    expect(createGcpBackendClientMock).not.toHaveBeenCalled();
+  });
 });

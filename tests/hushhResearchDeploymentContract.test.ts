@@ -10,6 +10,7 @@ describe("Hushh Research UAT deployment contract", () => {
   const uat = read(".github/workflows/deploy-uat.yml");
   const production = read(".github/workflows/deploy-prod.yml");
   const ci = read(".github/workflows/ci.yml");
+  const queue = read(".github/workflows/queue-validation.yml");
   const smoke = read(".github/workflows/main-post-merge-smoke.yml");
 
   it("pins UAT to the shared Research Firebase authority and exact callback", () => {
@@ -82,10 +83,10 @@ describe("Hushh Research UAT deployment contract", () => {
       "Upload UAT smoke artifact",
       "Upload UAT sensitive NDA gate artifact",
       "Upload UAT Research client smoke artifact",
-      "Upload UAT predeploy and rollback evidence",
+      "Upload UAT predeploy and release evidence",
     ];
     const rollbackIndex = uat.indexOf(
-      "- name: Restore captured revision after a failed deploy or smoke"
+      "- name: Restore captured revision after a failed deploy, smoke, or proof upload"
     );
     expect(rollbackIndex).toBeGreaterThan(-1);
 
@@ -103,7 +104,45 @@ describe("Hushh Research UAT deployment contract", () => {
 
     for (const stepName of uploadSteps) {
       const stepIndex = uat.indexOf(`- name: ${stepName}`);
-      expect(stepIndex).toBeGreaterThan(rollbackIndex);
+      expect(stepIndex).toBeGreaterThan(-1);
+      expect(stepIndex).toBeLessThan(rollbackIndex);
+    }
+    expect(uat.indexOf("- name: Upload UAT rollback evidence")).toBeGreaterThan(
+      rollbackIndex,
+    );
+  });
+
+  it("binds the served UAT revision to one exact full Git SHA", () => {
+    expect(uat).toContain("DEPLOY_COMMIT_SHA=${deploy_sha}");
+    expect(uat).toContain(
+      "--update-labels=\"deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}\"",
+    );
+    expect(uat).toContain("- name: Verify exact UAT release identity");
+    expect(uat).toContain('select(.name == "DEPLOY_COMMIT_SHA")');
+    expect(uat).toContain("$SMOKE_BASE_URL/api/release");
+    expect(uat).toContain("/tmp/uat-release-identity.json");
+
+    const identityIndex = uat.indexOf("- name: Verify exact UAT release identity");
+    const oauthIndex = uat.indexOf("- name: Smoke OAuth startup on deployed host");
+    const rollbackIndex = uat.indexOf(
+      "- name: Restore captured revision after a failed deploy, smoke, or proof upload",
+    );
+    expect(identityIndex).toBeGreaterThan(-1);
+    expect(identityIndex).toBeLessThan(oauthIndex);
+    expect(identityIndex).toBeLessThan(rollbackIndex);
+  });
+
+  it("checks out full Git history in migration-aware validation lanes", () => {
+    for (const workflow of [ci, queue]) {
+      for (const job of ["gcp-service-foundation", "web-validation"]) {
+        const match = workflow.match(
+          new RegExp(`(?:^|\\n)  ${job}:\\n[\\s\\S]*?(?=\\n  [a-z0-9-]+:\\n|$)`),
+        );
+        expect(match).not.toBeNull();
+        const jobBlock = match?.[0] ?? "";
+        expect(jobBlock).toContain("uses: actions/checkout@v4");
+        expect(jobBlock).toContain("fetch-depth: 0");
+      }
     }
   });
 

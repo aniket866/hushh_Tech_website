@@ -37,20 +37,14 @@ describe("Hushh Research unified Firebase bootstrap", () => {
     HUSHH_RESEARCH_CALLBACK_PATH,
     "/AUTH/HUSHH-RESEARCH/START/",
     "/Auth/Hushh-Research/Callback///",
-  ])("constructs only the unified Firebase client on %s", async (pathname) => {
+  ])("suppresses the ordinary Firebase client on %s", async (pathname) => {
     window.history.replaceState({}, "", pathname);
 
     const { default: config } = await import("../src/resources/config/config");
 
-    expect(config.gcpBackendClient).toEqual({ kind: "firebase-gcp-client" });
+    expect(config.gcpBackendClient).toBeUndefined();
     expect(config).not.toHaveProperty("supabaseClient");
-    expect(createGcpBackendClientMock).toHaveBeenCalledOnce();
-    expect(createGcpBackendClientMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        projectId: "hushh-tech-uat",
-        authDomain: "hushh-tech-uat.firebaseapp.com",
-      }),
-    );
+    expect(createGcpBackendClientMock).not.toHaveBeenCalled();
   });
 
   it("ignores retired provider environment variables", async () => {

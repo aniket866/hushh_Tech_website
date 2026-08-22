@@ -158,6 +158,9 @@ describe("CI workflow scripts", () => {
     const runtimePackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package-server.json"), "utf8")
     );
+    const rootPackage = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
+    );
 
     expect(gcpDataRuntime).toContain('from "@google-cloud/cloud-sql-connector"');
     expect(gcpDataRuntime).toContain('from "firebase-admin/app"');
@@ -168,6 +171,10 @@ describe("CI workflow scripts", () => {
     expect(runtimePackage.dependencies).toHaveProperty("@google-cloud/storage");
     expect(runtimePackage.dependencies).toHaveProperty("firebase-admin");
     expect(runtimePackage.dependencies).toHaveProperty("pg");
+    expect(runtimePackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
+    expect(rootPackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
+    expect(runtimePackage.overrides).toEqual({ uuid: "11.1.1" });
+    expect(rootPackage.overrides).toEqual({ uuid: "11.1.1" });
 
     const investorProfileRoute = fs.readFileSync(
       path.join(repoRoot, "api/generate-investor-profile.js"),
