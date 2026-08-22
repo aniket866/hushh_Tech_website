@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import test from "node:test";
 
 import { RuntimeError } from "../src/errors.js";
@@ -77,6 +77,7 @@ function approvalVerifier(overrides = {}) {
     targetRegion,
     expiresAtMs: NOW.getTime() + 300_000,
     reviewerIdentity: "independent-edge-reviewer",
+    independentReviewer: true,
     ...overrides,
   });
 }
@@ -345,7 +346,10 @@ test("abort before durable dispatch becomes retryable; provider ambiguity remain
   const first = candidate({ operationLedger: preProviderLedger, mailer: preProviderMailer });
   await assert.rejects(
     first.handle({ request: request(), signal: abort.signal }),
-    /client left/,
+    (error) => {
+      assert.equal(error.message.includes("client left"), false);
+      return runtimeCode(error, "HANDLER_ABORTED", 503);
+    },
   );
   assert.equal(preProviderMailer.calls.length, 0);
   assert.equal(preProviderLedger.operations.get(`github:${DELIVERY}`).state, "RETRYABLE");
@@ -391,6 +395,55 @@ test("approval, dependency, and repository allowlist gates fail before provider 
     () => candidate({ repositoryAllowlist: ["hushh-labs/hushh_Tech_website", "hushh-labs/hushh_Tech_website"] }),
     (error) => runtimeCode(error, "REPOSITORY_ALLOWLIST_INVALID", 503),
   );
+  assert.throws(
+    () => candidate({ repositoryAllowlist: ["attacker/repo"] }),
+    (error) => runtimeCode(error, "REPOSITORY_ALLOWLIST_INVALID", 503),
+  );
+  assert.throws(
+    () => candidate({ recipientGroup: "groups/attacker-notify" }),
+    (error) => runtimeCode(error, "RECIPIENT_GROUP_UNAVAILABLE", 503),
+  );
   assert.equal(typeof __testing.approvalBinding(), "string");
   assert.match(__testing.approvalBinding(), /^[a-f0-9]{64}$/);
+});
+
+test("raw ledger failures and corrupted replay rows never escape or reach mail", async () => {
+  const brokenLedger = ledger({
+    beforeClaim: () => {
+      throw new Error("postgres host and password leaked");
+    },
+  });
+  const firstMailer = mailer();
+  const first = candidate({ operationLedger: brokenLedger, mailer: firstMailer });
+  await assert.rejects(
+    first.handle({ request: request(), signal: SIGNAL }),
+    (error) => {
+      assert.equal(error.message.includes("postgres"), false);
+      return runtimeCode(error, "DURABLE_LEDGER_UNAVAILABLE", 503);
+    },
+  );
+  assert.equal(firstMailer.calls.length, 0);
+
+  const corruptLedger = ledger();
+  corruptLedger.operations.set(`github:${DELIVERY}`, {
+    state: "COMPLETED",
+    payloadHash: "placeholder",
+    attempt: 1,
+    fencingToken: "github-fence-corrupt",
+    response: {
+      status: 200,
+      headers: { "cache-control": "public", "content-type": "application/json" },
+      body: { success: true, delivery_id: DELIVERY, notification_state: "sent", email: "private@example.com" },
+    },
+  });
+  const body = rawBody();
+  corruptLedger.operations.get(`github:${DELIVERY}`).payloadHash =
+    createHash("sha256").update(body).digest("hex");
+  const secondMailer = mailer();
+  const second = candidate({ operationLedger: corruptLedger, mailer: secondMailer });
+  await assert.rejects(
+    second.handle({ request: request(body), signal: SIGNAL }),
+    (error) => runtimeCode(error, "DURABLE_LEDGER_UNAVAILABLE", 503),
+  );
+  assert.equal(secondMailer.calls.length, 0);
 });

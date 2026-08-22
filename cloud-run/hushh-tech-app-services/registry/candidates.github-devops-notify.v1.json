@@ -16,6 +16,7 @@
   "repository_allowlist": [
     "hushh-labs/hushh_Tech_website"
   ],
+  "recipient_group_resource": "groups/hushh-tech-devops-notify",
   "base_branch_allowlist": [
     "main"
   ],

@@ -27,6 +27,8 @@ const LEDGER_DURABILITY = "cloud_sql_leased_fenced_webhook_delivery_v1";
 const TARGET_PROJECT = "hushh-tech-uat";
 const TARGET_REGION = "us-central1";
 const APPROVAL_SCOPE = "github-devops-notify-detached-candidate-v1";
+const APPROVED_REPOSITORY = "hushh-labs/hushh_Tech_website";
+const RECIPIENT_GROUP = "groups/hushh-tech-devops-notify";
 
 export const GITHUB_DEVOPS_NOTIFY_SOURCE_PIN = Object.freeze({
   slug: "github-devops-notify",
@@ -69,9 +71,9 @@ function json(status, body) {
 
 function throwIfAborted(signal) {
   if (!signal?.aborted) return;
-  throw signal.reason instanceof Error
-    ? signal.reason
-    : new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503);
+  throw new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503, {
+    cause: signal.reason instanceof Error ? signal.reason : undefined,
+  });
 }
 
 function header(headers, name) {
@@ -369,7 +371,8 @@ async function assertDetachedApproval({ verifyDetachedApproval, approvalReceipt,
     result.expiresAtMs > nowMs + 900_000 ||
     typeof result.reviewerIdentity !== "string" ||
     result.reviewerIdentity.length < 3 ||
-    result.reviewerIdentity.length > 256
+    result.reviewerIdentity.length > 256 ||
+    result.independentReviewer !== true
   ) {
     fail("DETACHED_CANDIDATE_NOT_APPROVED", "Service unavailable.", 503);
   }
@@ -397,9 +400,30 @@ function assertDependencies({ operationLedger, mailer, recipientGroup }) {
   }
 }
 
-function claimDisposition(claim) {
+function replayResponse(value, deliveryId) {
+  if (
+    value?.status !== 200 ||
+    value?.headers?.["cache-control"] !== "private, no-store" ||
+    value?.headers?.["content-type"] !== "application/json" ||
+    Object.keys(value.headers).length !== 2 ||
+    value?.body?.success !== true ||
+    value?.body?.delivery_id !== deliveryId ||
+    value?.body?.notification_state !== "sent" ||
+    Object.keys(value.body).length !== 3 ||
+    Object.keys(value).length !== 3
+  ) {
+    fail("DURABLE_LEDGER_UNAVAILABLE", "Service unavailable.", 503);
+  }
+  return json(200, {
+    success: true,
+    delivery_id: deliveryId,
+    notification_state: "sent",
+  });
+}
+
+function claimDisposition(claim, deliveryId) {
   if (claim?.disposition === "COMPLETED" && claim.response) {
-    return claim.response;
+    return replayResponse(claim.response, deliveryId);
   }
   if (claim?.disposition === "PAYLOAD_CONFLICT") {
     fail("DELIVERY_PAYLOAD_CONFLICT", "Webhook rejected.", 409);
@@ -427,15 +451,19 @@ export function createGithubDevopsNotifyCandidate({
   operationLedger,
   mailer,
   recipientGroup,
-  repositoryAllowlist = ["hushh-labs/hushh_Tech_website"],
+  repositoryAllowlist = [APPROVED_REPOSITORY],
   now = () => new Date(),
 } = {}) {
   const allowedRepositories = new Set(repositoryAllowlist);
   if (
-    allowedRepositories.size !== repositoryAllowlist.length ||
-    [...allowedRepositories].some((value) => !REPOSITORY_PATTERN.test(value))
+    repositoryAllowlist.length !== 1 ||
+    repositoryAllowlist[0] !== APPROVED_REPOSITORY ||
+    allowedRepositories.size !== 1
   ) {
     fail("REPOSITORY_ALLOWLIST_INVALID", "Service unavailable.", 503);
+  }
+  if (recipientGroup !== RECIPIENT_GROUP) {
+    fail("RECIPIENT_GROUP_UNAVAILABLE", "Service unavailable.", 503);
   }
 
   return async function githubDevopsNotify({ request, signal } = {}) {
@@ -463,12 +491,22 @@ export function createGithubDevopsNotifyCandidate({
     const bodyHash = sha256(request.body);
     const projection = projectPayload(parseUniqueJson(request.body), allowedRepositories);
     const operationKey = `github:${deliveryId}`;
-    const claim = await operationLedger.claim({
-      operationKey,
-      payloadHash: bodyHash,
-      leaseDurationMs: DELIVERY_LEASE_MS,
-    });
-    const prior = claimDisposition(claim);
+    let claim;
+    try {
+      claim = await operationLedger.claim({
+        operationKey,
+        payloadHash: bodyHash,
+        leaseDurationMs: DELIVERY_LEASE_MS,
+      });
+    } catch (error) {
+      throw new RuntimeError(
+        "DURABLE_LEDGER_UNAVAILABLE",
+        "Service unavailable.",
+        503,
+        { cause: error },
+      );
+    }
+    const prior = claimDisposition(claim, deliveryId);
     if (prior) return prior;
     const ownership = Object.freeze({
       operationKey,
@@ -501,21 +539,30 @@ export function createGithubDevopsNotifyCandidate({
       ) {
         fail("DELIVERY_RECONCILIATION_REQUIRED", "Webhook pending.", 503);
       }
-      await operationLedger.markSent({
+      const sent = await operationLedger.markSent({
         ...ownership,
         providerMessageIdSha256: sha256(result.providerMessageId),
       });
+      if (sent?.state !== "SENT") {
+        fail("DELIVERY_RECONCILIATION_REQUIRED", "Webhook pending.", 503);
+      }
       const response = json(200, {
         success: true,
         delivery_id: deliveryId,
         notification_state: "sent",
       });
-      await operationLedger.complete({ ...ownership, response });
+      const completed = await operationLedger.complete({ ...ownership, response });
+      if (completed?.state !== "COMPLETED") {
+        fail("DELIVERY_RECONCILIATION_REQUIRED", "Webhook pending.", 503);
+      }
       return response;
     } catch (error) {
       if (!providerInvoked) {
         try {
-          await operationLedger.markRetryable(ownership);
+          const retryable = await operationLedger.markRetryable(ownership);
+          if (retryable?.state !== "RETRYABLE") {
+            throw new Error("retry state not persisted", { cause: error });
+          }
         } catch (ledgerError) {
           throw new RuntimeError(
             "DURABLE_LEDGER_UNAVAILABLE",
@@ -533,7 +580,21 @@ export function createGithubDevopsNotifyCandidate({
           { cause: error },
         );
       }
-      throw error;
+      if (!providerInvoked && signal?.aborted) {
+        throw new RuntimeError(
+          "HANDLER_ABORTED",
+          "Service unavailable.",
+          503,
+          { cause: signal.reason instanceof Error ? signal.reason : error },
+        );
+      }
+      if (error instanceof RuntimeError) throw error;
+      throw new RuntimeError(
+        "DURABLE_LEDGER_UNAVAILABLE",
+        "Service unavailable.",
+        503,
+        { cause: error },
+      );
     }
   };
 }

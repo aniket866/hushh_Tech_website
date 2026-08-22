@@ -22,6 +22,7 @@ type CandidateManifest = {
   cache_policy: string;
   base_branch_allowlist: string[];
   repository_allowlist: string[];
+  recipient_group_resource: string;
   source_files: Array<{ sha256: string }>;
   source: {
     current_version: number;
@@ -58,6 +59,7 @@ describe("default-off GitHub DevOps notification candidate", () => {
       ["public cache", (value) => { value.cache_policy = "public, max-age=3600"; }],
       ["master branch", (value) => { value.base_branch_allowlist = ["main", "master"]; }],
       ["repository widening", (value) => { value.repository_allowlist.push("attacker/repo"); }],
+      ["recipient redirect", (value) => { value.recipient_group_resource = "groups/attacker-notify"; }],
       ["source digest", (value) => { value.source_files[0].sha256 = "0".repeat(64); }],
       ["bundle digest", (value) => { value.source.live_bundle_sha256 = "0".repeat(64); }],
       ["version parity", (value) => { value.source.current_version = value.source.manifest_version; }],

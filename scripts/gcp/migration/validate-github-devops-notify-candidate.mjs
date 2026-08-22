@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json";
 const EXPECTED_DOCUMENT_DIGEST =
-  "a2647d58a80b818a7b31cc2baf0b11fafea833982944d2e23c0d2819d72630f7";
+  "96ab86beb9813e88c0f02b57cd39a53804bab7a52a58d0caeec98a443636e8ee";
 const AUTHORITATIVE_BLOCKERS = Object.freeze([
   "SOURCE_BUNDLE_VERSION_UNBOUND",
   "SOURCE_METADATA_END_CHECK_MISSING",
@@ -170,6 +170,10 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
   assert.deepEqual(manifest.repository_allowlist, [
     "hushh-labs/hushh_Tech_website",
   ]);
+  assert.equal(
+    manifest.recipient_group_resource,
+    "groups/hushh-tech-devops-notify",
+  );
   assert.deepEqual(manifest.base_branch_allowlist, ["main"]);
   assert.deepEqual(
     manifest.blockers.slice(0, 6).map(({ code }) => code),
