@@ -748,7 +748,6 @@ export function validateLiveFunctionBundleEvidence(manifest, evidence) {
       verify_jwt: manifestEntry.source?.verify_jwt,
       source_recovery_mode: manifestEntry.source_recovery?.mode,
       final_disposition: manifestEntry.final_disposition,
-      migration_state: manifestEntry.migration_state,
     };
     for (const [field, expected] of Object.entries(expectedCommon)) {
       if (entry[field] !== expected) {
@@ -756,6 +755,11 @@ export function validateLiveFunctionBundleEvidence(manifest, evidence) {
           `Live bundle evidence ${entry.slug}.${field} must match the retirement manifest.`
         );
       }
+    }
+    if (entry.migration_state !== "INVENTORY_FROZEN") {
+      errors.push(
+        `Live bundle evidence ${entry.slug}.migration_state must preserve its historical capture state.`
+      );
     }
 
     if (entry.capture_status === "EXTRACTED") {

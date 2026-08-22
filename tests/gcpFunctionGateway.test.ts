@@ -83,16 +83,26 @@ const enabledEnv = {
 };
 
 describe("GCP function registry", () => {
-  it("stages two exact contracts while all live registry entries stay frozen", () => {
+  it("enables geocode while stock and NDA remain frozen", () => {
     expect([...GCP_FUNCTION_CONTRACTS.keys()].sort()).toEqual([
       "hushh-location-geocode",
       "stock-quotes",
     ]);
     expect(
-      GCP_BACKEND_RETIREMENT_FUNCTIONS.filter(
-        (entry) => GCP_FUNCTION_CONTRACTS.has(entry.slug),
-      ).every((entry) => entry.migration_state === "INVENTORY_FROZEN"),
-    ).toBe(true);
+      GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
+        (entry) => entry.slug === "hushh-location-geocode",
+      )?.migration_state,
+    ).toBe("PORTED_AND_VERIFIED");
+    expect(
+      GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
+        (entry) => entry.slug === "stock-quotes",
+      )?.migration_state,
+    ).toBe("INVENTORY_FROZEN");
+    expect(
+      GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
+        (entry) => entry.slug === "nda-admin-fetch",
+      )?.migration_state,
+    ).toBe("INVENTORY_FROZEN");
     expect(GCP_FUNCTION_CONTRACTS.get("hushh-location-geocode")).toMatchObject({
       methods: ["POST"],
       contentTypes: ["application/json"],
@@ -762,6 +772,90 @@ describe("generated retirement registry integration", () => {
         HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda",
       }),
     ).toBeNull();
+  });
+
+  it("routes the generated geocode entry through the real same-origin contract", async () => {
+    const fetchImpl = vi.fn(async (url, init) => {
+      expect(url).toBe(
+        "https://hushh-tech-investor-api-175298245599.us-central1.run.app/api/v1/legacy-functions/hushh-location-geocode",
+      );
+      const headers = init?.headers as Headers;
+      expect(headers.get("authorization")).toBe("Bearer website-service-token");
+      expect(headers.get("x-hushh-firebase-authorization")).toBe(
+        "Bearer firebase-user-token",
+      );
+      expect(headers.get("x-hushh-firebase-uid")).toBe("firebase-user-1");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+            countryCode: "US",
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    const handler = createLegacyFunctionsHandler({
+      env: enabledEnv,
+      fetchImpl,
+      now: () => 1_000_000,
+      requestId: () => "same-origin-request-1",
+      verifyFirebaseToken: async () => ({
+        uid: "firebase-user-1",
+        authTime: 999,
+      }),
+      getServiceIdentityToken: async () => "website-service-token",
+    });
+    const res = responseRecorder();
+
+    await handler(
+      {
+        method: "POST",
+        url: "/functions/v1/hushh-location-geocode",
+        headers: {
+          authorization: "Bearer firebase-user-token",
+          "content-type": "application/json",
+        },
+        rawBody: Buffer.from(
+          JSON.stringify({ latitude: 37.7749, longitude: -122.4194 }),
+        ),
+      },
+      res,
+    );
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(200);
+    expect(res.header("x-hushh-compatibility-source")).toBe("gcp");
+    expect(res.header("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps generated NDA and stock routes frozen without auth or metadata calls", async () => {
+    const fetchImpl = vi.fn();
+    const verifyFirebaseToken = vi.fn();
+    const getServiceIdentityToken = vi.fn();
+    const handler = createLegacyFunctionsHandler({
+      env: enabledEnv,
+      fetchImpl,
+      verifyFirebaseToken,
+      getServiceIdentityToken,
+    });
+
+    for (const slug of ["nda-admin-fetch", "stock-quotes"]) {
+      const res = responseRecorder();
+      await handler(
+        { method: "POST", url: `/functions/v1/${slug}`, headers: {} },
+        res,
+      );
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toMatchObject({
+        detail: { code: "FUNCTION_NOT_MIGRATED" },
+      });
+    }
+    expect(verifyFirebaseToken).not.toHaveBeenCalled();
+    expect(getServiceIdentityToken).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("serves the generated get-secrets retirement without Firebase or metadata", async () => {

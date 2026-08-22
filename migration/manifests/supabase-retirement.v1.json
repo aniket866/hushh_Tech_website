@@ -2700,7 +2700,7 @@
       "parity_check": "request_status_response_auth_contract",
       "rollback_treatment": "sealed_supabase_revision_only_during_72h_soak_no_per_request_fallback",
       "final_disposition": "PORT_TO_GCP",
-      "migration_state": "INVENTORY_FROZEN",
+      "migration_state": "PORTED_AND_VERIFIED",
       "owner_group": "investor-api",
       "source_recovery": {
         "mode": "CHECKED_IN_SOURCE",

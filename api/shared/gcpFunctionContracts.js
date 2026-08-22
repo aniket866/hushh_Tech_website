@@ -147,9 +147,9 @@ export function buildGcpFunctionContracts(entries = []) {
   return contracts;
 }
 
-// Contract presence is not enablement. The frozen 112-function registry is
-// checked before this map, so these two reviewed contracts remain unreachable
-// until live UAT parity moves one exact slug to PORTED_AND_VERIFIED.
+// Contract presence is not enablement. The generated 112-function registry is
+// checked before this map. Geocode is the only browser-reachable port; stock
+// quotes remains a reviewed, default-off candidate.
 export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
   {
     slug: "hushh-location-geocode",

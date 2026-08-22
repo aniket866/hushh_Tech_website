@@ -359,10 +359,14 @@ export function validateFunctionTrafficUpstream(manifest, bundleEvidence) {
       entry.version !== manifestEntry.source.version ||
       entry.verify_jwt !== manifestEntry.source.verify_jwt ||
       entry.source_recovery_mode !== manifestEntry.source_recovery?.mode ||
-      entry.final_disposition !== manifestEntry.final_disposition ||
-      entry.migration_state !== manifestEntry.migration_state
+      entry.final_disposition !== manifestEntry.final_disposition
     ) {
       errors.push("Upstream live bundle evidence entry does not match its manifest function.");
+    }
+    if (entry.migration_state !== "INVENTORY_FROZEN") {
+      errors.push(
+        "Upstream live bundle evidence must preserve its historical migration state."
+      );
     }
     if (entry.capture_status === "EXTRACTED") {
       exactKeys(errors, "Upstream extracted live bundle entry", entry, [
