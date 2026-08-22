@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json";
 const EXPECTED_DOCUMENT_DIGEST =
-  "96ab86beb9813e88c0f02b57cd39a53804bab7a52a58d0caeec98a443636e8ee";
+  "6f713f5415ad427e4a554dc2480c868dc9f9a421a7c0746f5bfe1a876aa4f570";
 const AUTHORITATIVE_BLOCKERS = Object.freeze([
   "SOURCE_BUNDLE_VERSION_UNBOUND",
   "SOURCE_METADATA_END_CHECK_MISSING",
@@ -30,6 +30,12 @@ function stableJson(value) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function manifestSelfDigest(document) {
+  const digestInput = structuredClone(document);
+  delete digestInput.detached_approval.manifest_self_digest;
+  return sha256(stableJson(digestInput));
 }
 
 function rejectDuplicateJsonObjectKeys(rawText) {
@@ -175,6 +181,24 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
     "groups/hushh-tech-devops-notify",
   );
   assert.deepEqual(manifest.base_branch_allowlist, ["main"]);
+  assert.deepEqual(manifest.detached_approval, {
+    scope: "github-devops-notify-detached-candidate-v1",
+    algorithm: "Ed25519",
+    key_id: "github-devops-notify-independent-reviewer-v1",
+    trust_anchor_state: "UNPROVISIONED",
+    handler_path:
+      "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
+    manifest_path: MANIFEST_PATH,
+    manifest_self_digest:
+      "c027158bb77d5b4745fb916b17bc42511f51ece967bc522d229384896d1673cd",
+    reviewed_commit: "2df49536f5e9c1eff3324f225e33b042eec1dea6",
+    reviewed_tree: "10aaac108dd01bea0e240d96137c8860aa1d488b",
+  });
+  assert.equal(
+    manifestSelfDigest(manifest),
+    manifest.detached_approval.manifest_self_digest,
+    "GitHub notify candidate manifest self digest drift",
+  );
   assert.deepEqual(
     manifest.blockers.slice(0, 6).map(({ code }) => code),
     AUTHORITATIVE_BLOCKERS,
@@ -261,15 +285,26 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
       `${relativePath}: runtime byte drift`,
     );
   }
+  const servicePackage = await readJson(
+    root,
+    "cloud-run/hushh-tech-app-services/package.json",
+  );
+  assert.equal(
+    servicePackage.scripts?.start,
+    "node src/server.js",
+    "Cloud Run package start entrypoint drift",
+  );
   const runtimeFiles = [
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
     "cloud-run/hushh-tech-app-services/src/app.js",
+    "cloud-run/hushh-tech-app-services/src/server.js",
     "server.js",
   ];
   for (const relativePath of runtimeFiles) {
     const runtimeSource = await readFile(path.join(root, relativePath), "utf8");
     assert.equal(
-      runtimeSource.includes("github-devops-notify.js"),
+      runtimeSource.includes("github-devops-notify") ||
+        runtimeSource.includes("githubDevopsNotify"),
       false,
       `${relativePath}: detached candidate became runtime reachable`,
     );

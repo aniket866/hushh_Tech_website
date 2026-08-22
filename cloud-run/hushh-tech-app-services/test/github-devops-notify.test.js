@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
-import { createHash, createHmac } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  generateKeyPairSync,
+  sign as signDetached,
+} from "node:crypto";
 import test from "node:test";
 
 import { RuntimeError } from "../src/errors.js";
 import {
   __testing,
+  GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR,
   createGithubDevopsNotifyCandidate,
   parseUniqueJson,
+  verifyRawDetachedApproval,
   verifyGitHubWebhookSignature,
 } from "../src/handlers/github-devops-notify.js";
 
@@ -14,6 +21,64 @@ const NOW = new Date("2026-08-22T12:00:00.000Z");
 const SECRET = "github-webhook-secret-material-000000000000000000000000";
 const DELIVERY = "123e4567-e89b-42d3-a456-426614174000";
 const SIGNAL = new AbortController().signal;
+const { publicKey: APPROVAL_PUBLIC_KEY, privateKey: APPROVAL_PRIVATE_KEY } =
+  generateKeyPairSync("ed25519");
+const APPROVAL_PUBLIC_KEY_BYTES = APPROVAL_PUBLIC_KEY.export({
+  format: "der",
+  type: "spki",
+});
+const TEST_APPROVAL_TRUST_ANCHOR = Object.freeze({
+  schemaVersion: 1,
+  provisioningState: "PROVISIONED",
+  algorithm: "Ed25519",
+  keyId: "github-devops-notify-independent-reviewer-v1",
+  publicKeySpkiDerBase64url: APPROVAL_PUBLIC_KEY_BYTES.toString("base64url"),
+  publicKeySha256: createHash("sha256")
+    .update(APPROVAL_PUBLIC_KEY_BYTES)
+    .digest("hex"),
+  reviewerIdentity: "independent-edge-reviewer",
+});
+const EXPECTED_APPROVAL_BINDING = await __testing.loadExpectedApprovalBinding();
+
+function approvalClaims(overrides = {}) {
+  return {
+    schema_version: 1,
+    scope: EXPECTED_APPROVAL_BINDING.scope,
+    target_project: EXPECTED_APPROVAL_BINDING.targetProject,
+    target_region: EXPECTED_APPROVAL_BINDING.targetRegion,
+    handler_file_sha256: EXPECTED_APPROVAL_BINDING.handlerFileSha256,
+    manifest_file_sha256: EXPECTED_APPROVAL_BINDING.manifestFileSha256,
+    manifest_self_digest: EXPECTED_APPROVAL_BINDING.manifestSelfDigest,
+    reviewed_commit: EXPECTED_APPROVAL_BINDING.reviewedCommit,
+    reviewed_tree: EXPECTED_APPROVAL_BINDING.reviewedTree,
+    source_pins: structuredClone(EXPECTED_APPROVAL_BINDING.sourcePins),
+    issued_at_ms: NOW.getTime() - 1_000,
+    expires_at_ms: NOW.getTime() + 300_000,
+    reviewer_identity: TEST_APPROVAL_TRUST_ANCHOR.reviewerIdentity,
+    independent_reviewer: true,
+    ...overrides,
+  };
+}
+
+function approvalReceipt({ claims = {}, envelope = {}, signature } = {}) {
+  const payloadBytes = Buffer.from(
+    JSON.stringify(approvalClaims(claims)),
+    "utf8",
+  );
+  const signatureBytes =
+    signature ?? signDetached(null, payloadBytes, APPROVAL_PRIVATE_KEY);
+  return Buffer.from(
+    JSON.stringify({
+      schema_version: 1,
+      algorithm: "Ed25519",
+      key_id: TEST_APPROVAL_TRUST_ANCHOR.keyId,
+      payload_base64url: payloadBytes.toString("base64url"),
+      signature_base64url: signatureBytes.toString("base64url"),
+      ...envelope,
+    }),
+    "utf8",
+  );
+}
 
 function payload(overrides = {}) {
   return {
@@ -66,20 +131,6 @@ function request(body = rawBody(), overrides = {}) {
     body,
     ...overrides.request,
   };
-}
-
-function approvalVerifier(overrides = {}) {
-  return async ({ bindingSha256, scope, targetProject, targetRegion }) => ({
-    valid: true,
-    bindingSha256,
-    scope,
-    targetProject,
-    targetRegion,
-    expiresAtMs: NOW.getTime() + 300_000,
-    reviewerIdentity: "independent-edge-reviewer",
-    independentReviewer: true,
-    ...overrides,
-  });
 }
 
 function ledger({ beforeClaim, beforeInvoked, beforeComplete } = {}) {
@@ -188,19 +239,25 @@ function mailer({ send } = {}) {
 function candidate(overrides = {}) {
   const operationLedger = overrides.operationLedger ?? ledger();
   const mailProvider = overrides.mailer ?? mailer();
+  const options = {
+    approvalReceipt: overrides.approvalReceipt ?? approvalReceipt(),
+    createOperationLedger:
+      overrides.createOperationLedger ?? (async () => operationLedger),
+    createMailer: overrides.createMailer ?? (async () => mailProvider),
+    webhookSecret: SECRET,
+    recipientGroup: "groups/hushh-tech-devops-notify",
+    now: () => NOW,
+    ...overrides,
+  };
+  delete options.operationLedger;
+  delete options.mailer;
   return {
     operationLedger,
     mailProvider,
-    handle: createGithubDevopsNotifyCandidate({
-      approvalReceipt: Buffer.from("detached-signature"),
-      verifyDetachedApproval: approvalVerifier(),
-      webhookSecret: SECRET,
-      operationLedger,
-      mailer: mailProvider,
-      recipientGroup: "groups/hushh-tech-devops-notify",
-      now: () => NOW,
-      ...overrides,
-    }),
+    handle: __testing.createGithubDevopsNotifyCandidateWithTrustAnchor(
+      TEST_APPROVAL_TRUST_ANCHOR,
+      options,
+    ),
   };
 }
 
@@ -230,6 +287,59 @@ test("GitHub HMAC is mandatory, raw-byte exact, and constant-time comparable", (
     verifyGitHubWebhookSignature({ rawBody: body, signature: signature(body), secret: "short" }),
     false,
   );
+});
+
+test("raw detached approval binds every reviewed artifact and rejects signed mutations", () => {
+  const verified = verifyRawDetachedApproval({
+    rawReceipt: approvalReceipt(),
+    trustAnchor: TEST_APPROVAL_TRUST_ANCHOR,
+    expectedBinding: EXPECTED_APPROVAL_BINDING,
+    now: () => NOW,
+  });
+  assert.equal(verified.reviewerIdentity, "independent-edge-reviewer");
+  assert.match(verified.receiptSha256, /^[a-f0-9]{64}$/);
+  assert.equal("valid" in verified, false);
+
+  const attacks = [
+    approvalReceipt({ claims: { scope: "widened-scope" } }),
+    approvalReceipt({ claims: { handler_file_sha256: "0".repeat(64) } }),
+    approvalReceipt({ claims: { manifest_file_sha256: "0".repeat(64) } }),
+    approvalReceipt({ claims: { manifest_self_digest: "0".repeat(64) } }),
+    approvalReceipt({ claims: { reviewed_commit: "1".repeat(40) } }),
+    approvalReceipt({ claims: { reviewed_tree: "2".repeat(40) } }),
+    approvalReceipt({
+      claims: {
+        source_pins: {
+          ...EXPECTED_APPROVAL_BINDING.sourcePins,
+          sourceVersion: 6208,
+        },
+      },
+    }),
+    approvalReceipt({ claims: { expires_at_ms: NOW.getTime() - 1 } }),
+    approvalReceipt({ claims: { reviewer_identity: "different-reviewer" } }),
+    approvalReceipt({ claims: { valid: true } }),
+    approvalReceipt({ envelope: { valid: true } }),
+  ];
+  const signatureAttack = JSON.parse(approvalReceipt().toString("utf8"));
+  const finalCharacter = signatureAttack.signature_base64url.at(-1);
+  signatureAttack.signature_base64url =
+    signatureAttack.signature_base64url.slice(0, -1) +
+    (finalCharacter === "A" ? "B" : "A");
+  attacks.push(Buffer.from(JSON.stringify(signatureAttack), "utf8"));
+
+  for (const attack of attacks) {
+    assert.throws(
+      () =>
+        verifyRawDetachedApproval({
+          rawReceipt: attack,
+          trustAnchor: TEST_APPROVAL_TRUST_ANCHOR,
+          expectedBinding: EXPECTED_APPROVAL_BINDING,
+          now: () => NOW,
+        }),
+      (error) =>
+        runtimeCode(error, "DETACHED_CANDIDATE_NOT_APPROVED", 503),
+    );
+  }
 });
 
 test("valid merged-main event sends one escaped local notification and records hashes only", async () => {
@@ -372,24 +482,61 @@ test("abort before durable dispatch becomes retryable; provider ambiguity remain
   assert.equal(ambiguousMailer.calls.length, 1);
 });
 
-test("approval, dependency, and repository allowlist gates fail before provider calls", async () => {
+test("prevalidated claims and unprovisioned approval fail before dependency factories", async () => {
   const operationLedger = ledger();
   const mailProvider = mailer();
-  const badApproval = createGithubDevopsNotifyCandidate({
-    approvalReceipt: Buffer.from("forged"),
-    verifyDetachedApproval: approvalVerifier({ valid: false }),
+  let ledgerFactoryCalls = 0;
+  let mailFactoryCalls = 0;
+  const prevalidatedClaim = createGithubDevopsNotifyCandidate({
+    approvalReceipt: {
+      valid: true,
+      reviewerIdentity: "caller-prevalidated",
+    },
     webhookSecret: SECRET,
-    operationLedger,
-    mailer: mailProvider,
+    createOperationLedger: async () => {
+      ledgerFactoryCalls += 1;
+      return operationLedger;
+    },
+    createMailer: async () => {
+      mailFactoryCalls += 1;
+      return mailProvider;
+    },
     recipientGroup: "groups/hushh-tech-devops-notify",
     now: () => NOW,
   });
   await assert.rejects(
-    badApproval({ request: request(), signal: SIGNAL }),
+    prevalidatedClaim({ request: request(), signal: SIGNAL }),
     (error) => runtimeCode(error, "DETACHED_CANDIDATE_NOT_APPROVED", 503),
   );
+  assert.equal(ledgerFactoryCalls, 0);
+  assert.equal(mailFactoryCalls, 0);
   assert.equal(operationLedger.calls.length, 0);
   assert.equal(mailProvider.calls.length, 0);
+
+  const signedButUnprovisioned = createGithubDevopsNotifyCandidate({
+    approvalReceipt: approvalReceipt(),
+    webhookSecret: SECRET,
+    createOperationLedger: async () => {
+      ledgerFactoryCalls += 1;
+      return operationLedger;
+    },
+    createMailer: async () => {
+      mailFactoryCalls += 1;
+      return mailProvider;
+    },
+    recipientGroup: "groups/hushh-tech-devops-notify",
+    now: () => NOW,
+  });
+  await assert.rejects(
+    signedButUnprovisioned({ request: request(), signal: SIGNAL }),
+    (error) => runtimeCode(error, "DETACHED_CANDIDATE_NOT_APPROVED", 503),
+  );
+  assert.equal(GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR.provisioningState, "UNPROVISIONED");
+  assert.equal(ledgerFactoryCalls, 0);
+  assert.equal(mailFactoryCalls, 0);
+});
+
+test("dependency and repository allowlist gates fail before provider calls", async () => {
 
   assert.throws(
     () => candidate({ repositoryAllowlist: ["hushh-labs/hushh_Tech_website", "hushh-labs/hushh_Tech_website"] }),
@@ -403,8 +550,6 @@ test("approval, dependency, and repository allowlist gates fail before provider 
     () => candidate({ recipientGroup: "groups/attacker-notify" }),
     (error) => runtimeCode(error, "RECIPIENT_GROUP_UNAVAILABLE", 503),
   );
-  assert.equal(typeof __testing.approvalBinding(), "string");
-  assert.match(__testing.approvalBinding(), /^[a-f0-9]{64}$/);
 });
 
 test("raw ledger failures and corrupted replay rows never escape or reach mail", async () => {

@@ -94,11 +94,25 @@
     "response": "PII-free delivery disposition only",
     "logging": "hashes and bounded codes only; no raw payload, recipients, credentials, or provider body"
   },
+  "detached_approval": {
+    "scope": "github-devops-notify-detached-candidate-v1",
+    "algorithm": "Ed25519",
+    "key_id": "github-devops-notify-independent-reviewer-v1",
+    "trust_anchor_state": "UNPROVISIONED",
+    "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
+    "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
+    "manifest_self_digest": "c027158bb77d5b4745fb916b17bc42511f51ece967bc522d229384896d1673cd",
+    "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
+    "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
+  },
   "runtime_byte_lock": {
+    "cloud-run/hushh-tech-app-services/package.json": "73a5a477348433b0f9c4e43b98868415dcfc94f1fec3ddcb22a9776b61dc9fb5",
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
     "cloud-run/hushh-tech-app-services/src/app.js": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086",
+    "cloud-run/hushh-tech-app-services/src/server.js": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764",
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
+    "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "87a317d64a72a148af466e7839bcc693d1d950f1ffc32b3bf05e40f5c6843bc2",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
     "server.js": "5b9ebf2f7d65d20434368a65f50839cd177b628e3e8ac79ca9cff695afaaaff3"
   },

@@ -1,4 +1,13 @@
-import { readFile } from "node:fs/promises";
+import {
+  appendFile,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -31,9 +40,43 @@ type CandidateManifest = {
   };
   traffic_30d: { status_2xx: number; status_4xx: number };
   target_contract: { signature: string; delivery: string };
+  detached_approval: {
+    trust_anchor_state: string;
+    handler_path: string;
+    manifest_path: string;
+    manifest_self_digest: string;
+    reviewed_commit: string;
+    reviewed_tree: string;
+  };
+  runtime_byte_lock: Record<string, string>;
   blockers: unknown[];
   execute?: boolean;
 };
+
+async function copyValidatorFixture() {
+  const fixtureRoot = await mkdtemp(
+    path.join(tmpdir(), "github-devops-notify-validator-"),
+  );
+  const manifest = JSON.parse(
+    await readFile(manifestUrl, "utf8"),
+  ) as CandidateManifest & {
+    source_files: Array<{ path: string }>;
+  };
+  const paths = new Set([
+    "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
+    "migration/evidence/supabase-current-live-function-bundles.v2.json",
+    "migration/evidence/supabase-function-traffic-30d.v1.json",
+    "migration/evidence/edge-function-terminal-matrix.v1.json",
+    ...manifest.source_files.map(({ path: sourcePath }) => sourcePath),
+    ...Object.keys(manifest.runtime_byte_lock),
+  ]);
+  for (const relativePath of paths) {
+    const destination = path.join(fixtureRoot, relativePath);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await copyFile(new URL(relativePath, repoRoot), destination);
+  }
+  return fixtureRoot;
+}
 
 describe("default-off GitHub DevOps notification candidate", () => {
   it("binds exact checked-in source, live-v2, traffic, terminal, registry, and runtime bytes", async () => {
@@ -66,6 +109,14 @@ describe("default-off GitHub DevOps notification candidate", () => {
       ["traffic success", (value) => { value.traffic_30d.status_2xx = 56; value.traffic_30d.status_4xx = 0; }],
       ["signature optional", (value) => { value.target_contract.signature = "optional"; }],
       ["private key", (value) => { value.target_contract.delivery = "private key"; }],
+      ["approval activation", (value) => { value.detached_approval.trust_anchor_state = "PROVISIONED"; }],
+      ["handler path", (value) => { value.detached_approval.handler_path = "src/attacker.js"; }],
+      ["manifest path", (value) => { value.detached_approval.manifest_path = "attacker.json"; }],
+      ["manifest self digest", (value) => { value.detached_approval.manifest_self_digest = "0".repeat(64); }],
+      ["reviewed commit", (value) => { value.detached_approval.reviewed_commit = "1".repeat(40); }],
+      ["reviewed tree", (value) => { value.detached_approval.reviewed_tree = "2".repeat(40); }],
+      ["handler byte lock", (value) => { value.runtime_byte_lock[value.detached_approval.handler_path] = "0".repeat(64); }],
+      ["service entrypoint byte lock", (value) => { value.runtime_byte_lock["cloud-run/hushh-tech-app-services/src/server.js"] = "0".repeat(64); }],
       ["blocker removed", (value) => { value.blockers.pop(); }],
       ["blocker reordered", (value) => { value.blockers.reverse(); }],
       ["unknown key", (value) => { value.execute = true; }],
@@ -77,6 +128,24 @@ describe("default-off GitHub DevOps notification candidate", () => {
         () => parseAndValidateGithubDevopsNotifyManifest(JSON.stringify(candidate)),
         name,
       ).toThrow(/canonical digest drift/);
+    }
+  });
+
+  it("rejects any import or wiring added to the package start entrypoint", async () => {
+    const fixtureRoot = await copyValidatorFixture();
+    try {
+      await appendFile(
+        path.join(
+          fixtureRoot,
+          "cloud-run/hushh-tech-app-services/src/server.js",
+        ),
+        '\nimport "./handlers/github-devops-notify.js";\n',
+      );
+      await expect(
+        validateGithubDevopsNotifyCandidate({ repoRoot: fixtureRoot }),
+      ).rejects.toThrow(/src\/server\.js: runtime byte drift/);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
     }
   });
 
