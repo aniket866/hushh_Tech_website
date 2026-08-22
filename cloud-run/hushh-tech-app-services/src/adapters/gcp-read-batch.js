@@ -160,8 +160,17 @@ export function createCloudSqlReadBatchAdapter() {
       });
     },
 
-    async overview({ database, actor, targetReference = null, signal }) {
+    async overview({
+      database,
+      actor,
+      targetReference = null,
+      includeUsers = true,
+      signal,
+    }) {
       requireFundAdminActor(actor);
+      if (typeof includeUsers !== "boolean") {
+        throw new RuntimeError("INVALID_REQUEST", "Invalid request.", 400);
+      }
       return requireDatabase(database).transaction(async (client) => {
         throwIfAborted(signal);
         await bestEffortAdminAudit(client, actor, targetReference);
@@ -198,7 +207,9 @@ export function createCloudSqlReadBatchAdapter() {
           productRows: await rows(client, `SELECT user_id, plaid_item_id,
             product, status, available, records_count, updated_at, completed_at
             FROM public.plaid_product_sync_statuses`),
-          userRows: await rows(client, "SELECT id, email FROM public.users"),
+          userRows: includeUsers
+            ? await rows(client, "SELECT id, email FROM public.users")
+            : [],
         };
         output.kycRows = await optionalRows(
           client,

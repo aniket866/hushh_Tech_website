@@ -194,7 +194,26 @@ test("every fund admin handler rejects non-boolean authority before data access"
   assert.equal(calls, 0);
 });
 
+test("metrics Cloud SQL loading never reads the user email table", async () => {
+  const statements = [];
+  const database = { transaction: async (work) => work({
+    async query(text) {
+      statements.push(text);
+      return { rows: [] };
+    },
+  }) };
+  const result = await createCloudSqlReadBatchAdapter().overview({
+    database,
+    actor: ADMIN,
+    includeUsers: false,
+    signal: SIGNAL,
+  });
+  assert.deepEqual(result.userRows, []);
+  assert.equal(statements.some((text) => /FROM public\.users/.test(text)), false);
+});
+
 test("admin overview/list/metrics/analytics return bounded deterministic shapes", async () => {
+  const overviewCalls = [];
   const populated = emptyOverview({
     ndaRows: [{ user_id: "u1", signer_name: "Ada", signed_at: "2026-08-20T00:00:00Z" }],
     onboardingRows: [{ user_id: "u1", is_completed: true, financial_link_status: "completed" }],
@@ -202,10 +221,14 @@ test("admin overview/list/metrics/analytics return bounded deterministic shapes"
     userRows: [{ id: "u1", email: "ada@example.com" }],
   });
   const handlers = createGcpReadBatchHandlers({
-    dataAdapter: dataAdapter({ overview: async () => populated, analytics: async () => populated }),
+    dataAdapter: dataAdapter({
+      overview: async (options) => { overviewCalls.push(options); return populated; },
+      analytics: async () => populated,
+    }),
   });
   assert.equal((await handlers["fund-payment-admin-overview"](context({ body: {} }))).body.investors.length, 1);
   assert.equal((await handlers["fund-payment-admin-overview-metrics"](context({ body: {} }))).body.funnel.verified, 1);
+  assert.equal(overviewCalls.at(-1).includeUsers, false);
   assert.equal((await handlers["fund-payment-admin-overview-list"](context({ body: { pageSize: 500, tab: "all" } }))).body.pageSize, 100);
   assert.equal((await handlers["fund-payment-admin-analytics"](context({ body: {} }))).body.success, true);
 });

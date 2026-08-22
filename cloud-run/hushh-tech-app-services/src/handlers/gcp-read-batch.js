@@ -1028,6 +1028,7 @@ export function createGcpReadBatchHandlers({
         const data = await dataAdapter.overview({
           database: context.database,
           actor,
+          includeUsers: false,
           signal: context.signal,
         });
         return json(200, {

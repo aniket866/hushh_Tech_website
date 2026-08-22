@@ -71,7 +71,7 @@
       "response": "funnel_and_investor_rows_json",
       "cache": "private, no-store",
       "cors": "same_origin_gateway_only",
-      "table_set": "fund_overview",
+      "table_set": "fund_overview_with_users",
       "side_effects": ["best_effort_admin_access_log"],
       "dependencies": ["cloud_sql"],
       "blockers": ["fund_admin_claim_and_rls_live_proof_missing", "optional_kyc_table_absent"]
