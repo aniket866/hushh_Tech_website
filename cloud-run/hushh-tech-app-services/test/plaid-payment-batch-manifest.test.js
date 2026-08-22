@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  parseAndValidatePlaidPaymentBatchManifestText,
   validatePlaidPaymentBatchCandidateManifest,
   validatePlaidPaymentBatchManifestDocument,
 } from "../../../scripts/gcp/migration/validate-plaid-payment-batch-candidates.mjs";
@@ -15,6 +16,10 @@ const manifestUrl = new URL(
 
 async function manifest() {
   return JSON.parse(await readFile(manifestUrl, "utf8"));
+}
+
+async function rawManifest() {
+  return readFile(manifestUrl, "utf8");
 }
 
 test("exact frozen manifest binds source, current-v2, traffic, terminal blockers, and runtime bytes", async () => {
@@ -55,4 +60,74 @@ test("manifest validator rejects schema drift and deployment hints fail closed",
       name,
     );
   }
+});
+
+test("raw manifest parser rejects recursive and escaped-equivalent duplicate keys", async () => {
+  const raw = await rawManifest();
+  const attacks = [
+    [
+      "top-level deployment state",
+      raw.replace(
+        '"deployment_state": "DEFAULT_OFF",',
+        '"deployment_state": "DEFAULT_OFF", "deployment_state": "DEFAULT_OFF",',
+      ),
+    ],
+    [
+      "per-slug CORS",
+      raw.replace(
+        '"cors_policy": "same-origin allowlist",',
+        '"cors_policy": "same-origin allowlist", "cors_policy": "forbidden",',
+      ),
+    ],
+    [
+      "per-slug cache",
+      raw.replace(
+        '"cache_policy": "private, no-store",',
+        '"cache_policy": "private, no-store", "cache_policy": "public",',
+      ),
+    ],
+    [
+      "nested traffic",
+      raw.replace(
+        '"request_count": 36,',
+        '"request_count": 36, "request_count": 0,',
+      ),
+    ],
+    [
+      "blocker code",
+      raw.replace(
+        '"code": "SOURCE_BUNDLE_VERSION_UNBOUND",',
+        '"code": "SOURCE_BUNDLE_VERSION_UNBOUND", "code": "REMOVED",',
+      ),
+    ],
+    [
+      "escaped-equivalent key",
+      raw.replace(
+        '"deployment_state": "DEFAULT_OFF",',
+        String.raw`"deployment_state": "DEFAULT_OFF", "\u0064eployment_state": "LIVE",`,
+      ),
+    ],
+    [
+      "prototype-like nested key",
+      raw.replace(
+        '"evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"',
+        '"__proto__": 1, "__proto__": 2, "evidence": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK"',
+      ),
+    ],
+  ];
+  for (const [name, attack] of attacks) {
+    assert.throws(
+      () => parseAndValidatePlaidPaymentBatchManifestText(attack),
+      /Duplicate JSON object key/,
+      name,
+    );
+  }
+});
+
+test("raw manifest parser treats unique object-key reorder as cosmetic", async () => {
+  const matrix = JSON.parse(await rawManifest());
+  const reordered = Object.fromEntries(Object.entries(matrix).reverse());
+  assert.doesNotThrow(() =>
+    parseAndValidatePlaidPaymentBatchManifestText(JSON.stringify(reordered)),
+  );
 });

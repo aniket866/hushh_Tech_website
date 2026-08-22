@@ -66,6 +66,125 @@ function exactKeys(value, expected, label) {
   assert.deepEqual(Object.keys(value).sort(), [...expected].sort(), `${label}: exact keys`);
 }
 
+function rejectDuplicateJsonObjectKeys(rawText) {
+  assert.equal(typeof rawText, "string", "manifest raw text");
+  let cursor = 0;
+
+  const malformed = () => {
+    throw new SyntaxError(`Malformed JSON at offset ${cursor}`);
+  };
+  const skipWhitespace = () => {
+    while (/\s/.test(rawText[cursor] ?? "")) cursor += 1;
+  };
+  const parseString = () => {
+    if (rawText[cursor] !== '"') malformed();
+    const start = cursor;
+    cursor += 1;
+    while (cursor < rawText.length) {
+      const character = rawText[cursor];
+      if (character === '"') {
+        cursor += 1;
+        return JSON.parse(rawText.slice(start, cursor));
+      }
+      if (character === "\\") {
+        cursor += 1;
+        const escape = rawText[cursor];
+        if (escape === "u") {
+          if (!/^[0-9a-fA-F]{4}$/.test(rawText.slice(cursor + 1, cursor + 5))) {
+            malformed();
+          }
+          cursor += 5;
+          continue;
+        }
+        if (!'"\\/bfnrt'.includes(escape ?? "")) malformed();
+        cursor += 1;
+        continue;
+      }
+      if (character.codePointAt(0) < 32) malformed();
+      cursor += 1;
+    }
+    malformed();
+  };
+  const parsePrimitive = () => {
+    const start = cursor;
+    while (cursor < rawText.length && !/[\s,\]}]/.test(rawText[cursor])) {
+      cursor += 1;
+    }
+    if (start === cursor) malformed();
+    JSON.parse(rawText.slice(start, cursor));
+  };
+  const parseValue = () => {
+    skipWhitespace();
+    if (rawText[cursor] === "{") {
+      parseObject();
+    } else if (rawText[cursor] === "[") {
+      parseArray();
+    } else if (rawText[cursor] === '"') {
+      parseString();
+    } else {
+      parsePrimitive();
+    }
+  };
+  const parseArray = () => {
+    cursor += 1;
+    skipWhitespace();
+    if (rawText[cursor] === "]") {
+      cursor += 1;
+      return;
+    }
+    while (cursor < rawText.length) {
+      parseValue();
+      skipWhitespace();
+      if (rawText[cursor] === "]") {
+        cursor += 1;
+        return;
+      }
+      if (rawText[cursor] !== ",") malformed();
+      cursor += 1;
+      skipWhitespace();
+    }
+    malformed();
+  };
+  const parseObject = () => {
+    cursor += 1;
+    const keys = new Set();
+    skipWhitespace();
+    if (rawText[cursor] === "}") {
+      cursor += 1;
+      return;
+    }
+    while (cursor < rawText.length) {
+      const key = parseString();
+      if (keys.has(key)) {
+        throw new SyntaxError(`Duplicate JSON object key ${JSON.stringify(key)}`);
+      }
+      keys.add(key);
+      skipWhitespace();
+      if (rawText[cursor] !== ":") malformed();
+      cursor += 1;
+      parseValue();
+      skipWhitespace();
+      if (rawText[cursor] === "}") {
+        cursor += 1;
+        return;
+      }
+      if (rawText[cursor] !== ",") malformed();
+      cursor += 1;
+      skipWhitespace();
+    }
+    malformed();
+  };
+
+  parseValue();
+  skipWhitespace();
+  if (cursor !== rawText.length) malformed();
+}
+
+export function parseAndValidatePlaidPaymentBatchManifestText(rawText) {
+  rejectDuplicateJsonObjectKeys(rawText);
+  return validatePlaidPaymentBatchManifestDocument(JSON.parse(rawText));
+}
+
 export function validatePlaidPaymentBatchManifestDocument(matrix) {
   exactKeys(matrix, TOP_KEYS, "manifest");
   exactKeys(matrix.source_approval, SOURCE_APPROVAL_KEYS, "source_approval");
@@ -118,7 +237,7 @@ export function validatePlaidPaymentBatchManifestDocument(matrix) {
 export async function validatePlaidPaymentBatchCandidateManifest({ repoRoot } = {}) {
   const root = repoRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
   const bytes = await readFile(path.join(root, MANIFEST_PATH));
-  const matrix = validatePlaidPaymentBatchManifestDocument(JSON.parse(bytes));
+  const matrix = parseAndValidatePlaidPaymentBatchManifestText(bytes.toString("utf8"));
   const [liveBytes, trafficBytes, terminalBytes] = await Promise.all([
     readFile(path.join(root, "migration/evidence/supabase-current-live-function-bundles.v2.json")),
     readFile(path.join(root, "migration/evidence/supabase-function-traffic-30d.v1.json")),
