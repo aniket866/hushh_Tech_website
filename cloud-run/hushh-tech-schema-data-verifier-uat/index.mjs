@@ -264,6 +264,90 @@ export function assessEngagementNdaBoundary(observed, expected) {
   });
 }
 
+const ENGAGEMENT_RUNTIME_COUNT_FIELDS = Object.freeze([
+  "application_schema_create_count",
+  "inherited_privileged_role_count",
+  "non_dml_table_privilege_count",
+  "executable_application_routine_count",
+  "accessible_table_rls_disabled_count",
+  "accessible_table_rls_not_forced_count",
+  "owned_application_schema_count",
+  "owned_application_table_count",
+  "owned_application_sequence_count",
+  "owned_application_routine_count",
+]);
+
+function normalizedPrivilegeRows(value, fields) {
+  if (!Array.isArray(value)) fail("ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
+  return value.map((entry) => {
+    exactKeys(entry, fields, "ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
+    return Object.fromEntries(fields.map((field) => [field, entry[field]]));
+  }).sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
+}
+
+export function assessEngagementRuntimeBoundary(observed, expectedRole) {
+  const booleanFields = [
+    "rolsuper",
+    "rolcreaterole",
+    "rolcreatedb",
+    "rolreplication",
+    "rolbypassrls",
+    "can_create_database",
+    "can_create_temporary_tables",
+    "can_create_public_schema",
+  ];
+  exactKeys(observed, [
+    "current_user",
+    ...booleanFields,
+    "effective_table_dml_privileges",
+    "effective_column_privileges",
+    "effective_sequence_privileges",
+    ...ENGAGEMENT_RUNTIME_COUNT_FIELDS,
+  ], "ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
+  const tablePrivileges = normalizedPrivilegeRows(observed.effective_table_dml_privileges, [
+    "schema", "table", "privilege", "kind", "grantable",
+  ]);
+  const columnPrivileges = normalizedPrivilegeRows(observed.effective_column_privileges, [
+    "schema", "table", "column", "privilege", "kind", "grantable",
+  ]);
+  const sequencePrivileges = normalizedPrivilegeRows(observed.effective_sequence_privileges, [
+    "schema", "sequence", "privilege", "grantable",
+  ]);
+  const expectedColumns = ["id", "nda_version", "pdf_url", "signed_at", "user_id"].map((column) => ({
+    schema: "public",
+    table: "nda_signatures",
+    column,
+    privilege: "SELECT",
+    kind: "r",
+    grantable: false,
+  }));
+  const reasons = [];
+  if (observed.current_user !== expectedRole) reasons.push("CURRENT_USER_MISMATCH");
+  for (const field of booleanFields) {
+    if (observed[field] !== false) reasons.push(`${field.toUpperCase()}_TRUE`);
+  }
+  const counts = {};
+  for (const field of ENGAGEMENT_RUNTIME_COUNT_FIELDS) {
+    const value = Number(observed[field]);
+    if (!Number.isSafeInteger(value) || value < 0) fail("ENGAGEMENT_RUNTIME_OBSERVATION_INVALID");
+    counts[field] = value;
+    if (value !== 0) reasons.push(`${field.toUpperCase()}_NONZERO`);
+  }
+  if (tablePrivileges.length !== 0) reasons.push("TABLE_PRIVILEGES_NOT_EXACT");
+  if (canonicalHash(columnPrivileges) !== canonicalHash(expectedColumns)) reasons.push("COLUMN_PRIVILEGES_NOT_EXACT");
+  if (sequencePrivileges.length !== 0) reasons.push("SEQUENCE_PRIVILEGES_NOT_EXACT");
+  return Object.freeze({
+    ready: reasons.length === 0,
+    current_user: observed.current_user,
+    ...Object.fromEntries(booleanFields.map((field) => [field, observed[field]])),
+    effective_table_dml_privileges: tablePrivileges,
+    effective_column_privileges: columnPrivileges,
+    effective_sequence_privileges: sequencePrivileges,
+    ...counts,
+    reasons,
+  });
+}
+
 async function fetchTable(client, table, expectedKey) {
   const rows = [];
   const relation = `public.${quoteIdentifier(table.name)}`;
@@ -430,6 +514,138 @@ async function inspectEngagementNdaBoundary(client, expected) {
   return assessEngagementNdaBoundary({ role, selectColumns, tableWideSelect, publicDml, forbiddenMemberships, policy }, expected);
 }
 
+async function inspectEngagementRuntimeBoundary(client, role) {
+  const result = await client.query({
+    text: `WITH RECURSIVE effective_role_oids(oid) AS (
+      SELECT oid FROM pg_catalog.pg_roles WHERE rolname=$1
+      UNION
+      SELECT memberships.roleid
+        FROM pg_catalog.pg_auth_members memberships
+        JOIN effective_role_oids inherited ON memberships.member=inherited.oid
+    ), effective_roles AS (
+      SELECT roles.* FROM pg_catalog.pg_roles roles
+      JOIN effective_role_oids effective ON effective.oid=roles.oid
+    ), application_relations AS (
+      SELECT relations.oid,schemas.nspname AS schema_name,relations.relname AS table_name,
+             relations.relkind,relations.relowner,relations.relrowsecurity,relations.relforcerowsecurity
+        FROM pg_catalog.pg_class relations
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=relations.relnamespace
+       WHERE schemas.nspname<>'information_schema'
+         AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+         AND relations.relkind IN ('r','p','v','m','f')
+    ), effective_table_dml_privileges AS (
+      SELECT DISTINCT relations.oid AS relation_oid,relations.schema_name,relations.table_name,
+             relations.relkind,relations.relrowsecurity,relations.relforcerowsecurity,
+             privilege_types.privilege_type,
+             EXISTS(SELECT 1 FROM effective_roles inherited
+                     WHERE has_table_privilege(inherited.rolname,relations.oid,privilege_types.privilege_type||' WITH GRANT OPTION')) AS is_grantable
+        FROM application_relations relations
+        CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) privilege_types(privilege_type)
+       WHERE EXISTS(SELECT 1 FROM effective_roles inherited
+                    WHERE has_table_privilege(inherited.rolname,relations.oid,privilege_types.privilege_type))
+    ), effective_column_privileges AS (
+      SELECT relations.oid AS relation_oid,relations.schema_name,relations.table_name,
+             relations.relkind,relations.relrowsecurity,relations.relforcerowsecurity,
+             attributes.attname AS column_name,upper(column_acl.privilege_type) AS privilege_type,
+             bool_or(column_acl.is_grantable) AS is_grantable
+        FROM application_relations relations
+        JOIN pg_catalog.pg_attribute attributes ON attributes.attrelid=relations.oid
+             AND attributes.attnum>0 AND attributes.attisdropped IS NOT TRUE
+        CROSS JOIN LATERAL aclexplode(attributes.attacl) column_acl
+       WHERE column_acl.grantee=0 OR column_acl.grantee IN (SELECT oid FROM effective_role_oids)
+       GROUP BY relations.oid,relations.schema_name,relations.table_name,relations.relkind,
+                relations.relrowsecurity,relations.relforcerowsecurity,attributes.attname,
+                upper(column_acl.privilege_type)
+    ), application_sequences AS (
+      SELECT sequences.oid,schemas.nspname AS schema_name,sequences.relname AS sequence_name,sequences.relowner
+        FROM pg_catalog.pg_class sequences
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=sequences.relnamespace
+       WHERE schemas.nspname<>'information_schema'
+         AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' AND sequences.relkind='S'
+    ), effective_sequence_privileges AS (
+      SELECT DISTINCT sequences.oid AS sequence_oid,sequences.schema_name,sequences.sequence_name,
+             privilege_types.privilege_type,
+             EXISTS(SELECT 1 FROM effective_roles inherited
+                     WHERE has_sequence_privilege(inherited.rolname,sequences.oid,privilege_types.privilege_type||' WITH GRANT OPTION')) AS is_grantable
+        FROM application_sequences sequences
+        CROSS JOIN (VALUES ('SELECT'),('UPDATE'),('USAGE')) privilege_types(privilege_type)
+       WHERE EXISTS(SELECT 1 FROM effective_roles inherited
+                    WHERE has_sequence_privilege(inherited.rolname,sequences.oid,privilege_types.privilege_type))
+    ), accessible_base_relations AS (
+      SELECT DISTINCT relation_oid,relrowsecurity,relforcerowsecurity
+        FROM effective_table_dml_privileges WHERE relkind IN ('r','p')
+      UNION
+      SELECT DISTINCT relation_oid,relrowsecurity,relforcerowsecurity
+        FROM effective_column_privileges WHERE relkind IN ('r','p')
+    )
+    SELECT $1::text AS "current_user",
+      roles.rolsuper,roles.rolcreaterole,roles.rolcreatedb,roles.rolreplication,roles.rolbypassrls,
+      has_database_privilege($1,current_database(),'CREATE') AS can_create_database,
+      has_database_privilege($1,current_database(),'TEMPORARY') AS can_create_temporary_tables,
+      has_schema_privilege($1,'public','CREATE') AS can_create_public_schema,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'schema',privileges.schema_name,'table',privileges.table_name,'privilege',privileges.privilege_type,
+        'kind',privileges.relkind,'grantable',privileges.is_grantable)
+        ORDER BY privileges.schema_name,privileges.table_name,privileges.privilege_type)
+        FROM effective_table_dml_privileges privileges),'[]'::jsonb) AS effective_table_dml_privileges,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'schema',privileges.schema_name,'table',privileges.table_name,'column',privileges.column_name,
+        'privilege',privileges.privilege_type,'kind',privileges.relkind,'grantable',privileges.is_grantable)
+        ORDER BY privileges.schema_name,privileges.table_name,privileges.column_name,privileges.privilege_type)
+        FROM effective_column_privileges privileges),'[]'::jsonb) AS effective_column_privileges,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'schema',privileges.schema_name,'sequence',privileges.sequence_name,
+        'privilege',privileges.privilege_type,'grantable',privileges.is_grantable)
+        ORDER BY privileges.schema_name,privileges.sequence_name,privileges.privilege_type)
+        FROM effective_sequence_privileges privileges),'[]'::jsonb) AS effective_sequence_privileges,
+      (SELECT count(*) FROM accessible_base_relations WHERE relrowsecurity IS NOT TRUE) AS accessible_table_rls_disabled_count,
+      (SELECT count(*) FROM accessible_base_relations WHERE relforcerowsecurity IS NOT TRUE) AS accessible_table_rls_not_forced_count,
+      (SELECT count(*) FROM pg_catalog.pg_namespace owned
+        WHERE owned.nspname<>'information_schema' AND owned.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND owned.nspowner IN (SELECT oid FROM effective_role_oids)) AS owned_application_schema_count,
+      (SELECT count(*) FROM pg_catalog.pg_class owned
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=owned.relnamespace
+        WHERE schemas.nspname<>'information_schema' AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND owned.relkind IN ('r','p','v','m','f')
+          AND owned.relowner IN (SELECT oid FROM effective_role_oids)) AS owned_application_table_count,
+      (SELECT count(*) FROM application_sequences owned
+        WHERE owned.relowner IN (SELECT oid FROM effective_role_oids)) AS owned_application_sequence_count,
+      (SELECT count(*) FROM pg_catalog.pg_proc owned
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=owned.pronamespace
+        WHERE schemas.nspname<>'information_schema' AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND owned.proowner IN (SELECT oid FROM effective_role_oids)) AS owned_application_routine_count,
+      (SELECT count(*) FROM effective_roles inherited
+        WHERE inherited.rolname<>$1 AND (
+          inherited.rolsuper OR inherited.rolcreaterole OR inherited.rolcreatedb OR
+          inherited.rolreplication OR inherited.rolbypassrls OR
+          has_database_privilege(inherited.rolname,current_database(),'CREATE') OR
+          has_schema_privilege(inherited.rolname,'public','CREATE') OR EXISTS(
+            SELECT 1 FROM pg_catalog.pg_namespace schemas
+             WHERE schemas.nspname<>'information_schema' AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+               AND has_schema_privilege(inherited.rolname,schemas.oid,'CREATE'))
+        )) AS inherited_privileged_role_count,
+      (SELECT count(*) FROM pg_catalog.pg_namespace schemas
+        WHERE schemas.nspname<>'information_schema' AND schemas.nspname NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND has_schema_privilege($1,schemas.oid,'CREATE')) AS application_schema_create_count,
+      (SELECT count(*) FROM information_schema.table_privileges grants
+        WHERE grants.privilege_type NOT IN ('SELECT','INSERT','UPDATE','DELETE')
+          AND grants.table_schema<>'information_schema' AND grants.table_schema NOT LIKE 'pg\\_%' ESCAPE '\\'
+          AND (grants.grantee='PUBLIC' OR grants.grantee IN (SELECT inherited.rolname FROM effective_roles inherited)))
+        AS non_dml_table_privilege_count,
+      (SELECT count(*) FROM pg_catalog.pg_proc routines
+        JOIN pg_catalog.pg_namespace schemas ON schemas.oid=routines.pronamespace
+        WHERE schemas.nspname NOT IN ('pg_catalog','information_schema') AND EXISTS(
+          SELECT 1 FROM effective_roles inherited
+           WHERE has_function_privilege(inherited.rolname,routines.oid,'EXECUTE')))
+        AS executable_application_routine_count
+    FROM pg_catalog.pg_roles roles WHERE roles.rolname=$1`,
+    values: [role],
+    rowMode: "object",
+  });
+  if (result.rowCount !== 1) fail("ENGAGEMENT_RUNTIME_ROLE_ABSENT");
+  return assessEngagementRuntimeBoundary(result.rows[0], role);
+}
+
 async function verify() {
   if (process.env.HUSHH_TECH_SCHEMA_DATA_VERIFY !== "true") fail("EXECUTION_GATE_FALSE");
   const expected = validateExpected(JSON.parse(await readFile(new URL("./expected-manifest.v1.json", import.meta.url), "utf8")));
@@ -579,8 +795,22 @@ async function verify() {
       client,
       expected.expectedAccess.engagementNdaAdminFetch,
     );
+    const engagementRuntime = await inspectEngagementRuntimeBoundary(
+      client,
+      expected.expectedAccess.engagementNdaAdminFetch.role,
+    );
+    process.stdout.write(`${JSON.stringify({
+      version: 1,
+      kind: "HUSHH_TECH_UAT_ENGAGEMENT_RUNTIME_DIAGNOSTIC",
+      status: engagementRuntime.ready ? "CAPTURED" : "BLOCKED",
+      engagementRuntime,
+    })}\n`);
     const totalPublicPolicies = Number(await scalar(client, "SELECT count(*)::integer FROM pg_catalog.pg_policies WHERE schemaname='public'"));
-    if (!engagementNdaAdminFetch.ready || totalPublicPolicies !== expected.expectedAccess.engagementNdaAdminFetch.expectedTotalPublicPolicies) {
+    if (
+      !engagementNdaAdminFetch.ready ||
+      !engagementRuntime.ready ||
+      totalPublicPolicies !== expected.expectedAccess.engagementNdaAdminFetch.expectedTotalPublicPolicies
+    ) {
       fail("ENGAGEMENT_BOUNDARY_NOT_READY");
     }
 
@@ -645,7 +875,7 @@ async function verify() {
         audienceSha256: expected.identity.firebaseAudienceSha256,
       } },
       catalog,
-      access: { engagementNdaAdminFetch, totalPublicPolicies },
+      access: { engagementNdaAdminFetch, engagementRuntime, totalPublicPolicies },
       runtime: { webRuntimeMembership: true, adminOption: false, tableSelectCount: 70, elevatedPrivileges: false },
     };
     payload.evidenceSha256 = canonicalHash(payload);

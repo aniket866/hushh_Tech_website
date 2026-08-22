@@ -6,6 +6,7 @@ import { canonicalHash } from '../scripts/gcp/migration/canonical-hash.mjs';
 import {
   PINNED_EXPECTED_SHA256,
   assessEngagementNdaBoundary,
+  assessEngagementRuntimeBoundary,
   validateExpected,
 } from '../cloud-run/hushh-tech-schema-data-verifier-uat/index.mjs';
 
@@ -53,6 +54,40 @@ function exactEngagementObservation() {
       qual: "(current_setting('app.firebase_fund_admin'::text, true) = 'true'::text)",
       withCheck: null,
     }],
+  };
+}
+
+function exactEngagementRuntimeObservation() {
+  return {
+    current_user: 'hushh-tech-engagement-api-uat@hushh-tech-uat.iam',
+    rolsuper: false,
+    rolcreaterole: false,
+    rolcreatedb: false,
+    rolreplication: false,
+    rolbypassrls: false,
+    can_create_database: false,
+    can_create_temporary_tables: false,
+    can_create_public_schema: false,
+    effective_table_dml_privileges: [],
+    effective_column_privileges: ['id', 'nda_version', 'pdf_url', 'signed_at', 'user_id'].map((column) => ({
+      schema: 'public',
+      table: 'nda_signatures',
+      column,
+      privilege: 'SELECT',
+      kind: 'r',
+      grantable: false,
+    })),
+    effective_sequence_privileges: [],
+    application_schema_create_count: '0',
+    inherited_privileged_role_count: '0',
+    non_dml_table_privilege_count: '0',
+    executable_application_routine_count: '0',
+    accessible_table_rls_disabled_count: '0',
+    accessible_table_rls_not_forced_count: '0',
+    owned_application_schema_count: '0',
+    owned_application_table_count: '0',
+    owned_application_sequence_count: '0',
+    owned_application_routine_count: '0',
   };
 }
 
@@ -170,5 +205,39 @@ describe('reproducible UAT schema/data verifier input', () => {
       rlsPolicyExact: false,
       missing: ['EXACT_RLS_POLICY_ABSENT'],
     });
+  });
+
+  it('accepts only the exact engagement runtime role privilege row', () => {
+    const observed = exactEngagementRuntimeObservation();
+    expect(assessEngagementRuntimeBoundary(observed, observed.current_user)).toEqual({
+      ready: true,
+      ...observed,
+      application_schema_create_count: 0,
+      inherited_privileged_role_count: 0,
+      non_dml_table_privilege_count: 0,
+      executable_application_routine_count: 0,
+      accessible_table_rls_disabled_count: 0,
+      accessible_table_rls_not_forced_count: 0,
+      owned_application_schema_count: 0,
+      owned_application_table_count: 0,
+      owned_application_sequence_count: 0,
+      owned_application_routine_count: 0,
+      reasons: [],
+    });
+  });
+
+  it.each([
+    ['routine EXECUTE', (observed: Record<string, any>) => { observed.executable_application_routine_count = '1'; }],
+    ['inherited privilege', (observed: Record<string, any>) => { observed.inherited_privileged_role_count = '1'; }],
+    ['relation without FORCE RLS', (observed: Record<string, any>) => { observed.accessible_table_rls_not_forced_count = '1'; }],
+    ['sequence grant', (observed: Record<string, any>) => {
+      observed.effective_sequence_privileges = [{ schema: 'public', sequence: 'unsafe', privilege: 'USAGE', grantable: false }];
+    }],
+    ['column substitution', (observed: Record<string, any>) => { observed.effective_column_privileges[0].column = 'user_id'; }],
+    ['owned routine', (observed: Record<string, any>) => { observed.owned_application_routine_count = '1'; }],
+  ])('marks engagement runtime unsafe for %s', (_label, mutate) => {
+    const observed = exactEngagementRuntimeObservation();
+    mutate(observed);
+    expect(assessEngagementRuntimeBoundary(observed, observed.current_user)).toMatchObject({ ready: false });
   });
 });
