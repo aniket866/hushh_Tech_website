@@ -10,7 +10,7 @@
   "upstream_file_bindings": {
     "retirement_manifest": {
       "path": "migration/manifests/supabase-retirement.v1.json",
-      "sha256": "2b288311ea816a39e512977de8f3161d9192113ce308e757e41540fae136d4b2"
+      "sha256": "5047e3140bce74bf1a8702208488ecc3867467b15dc7318272145888e83db3d5"
     },
     "historical_bundle_evidence": {
       "path": "migration/evidence/supabase-live-function-bundles.v1.json",
@@ -28,7 +28,7 @@
   "upstream_validator_bindings": {
     "retirement_validator": {
       "path": "scripts/ci/check-supabase-retirement-manifest.mjs",
-      "sha256": "a5093c0119bee4826bffe4cceeb380e2745a698152289c931ab21381588f6c35"
+      "sha256": "5e2cc953debe0c54cfbe69fc2fa563548475c7202e1e362440072f7ecbe01457"
     },
     "historical_bundle_generator": {
       "path": "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs",
@@ -36,7 +36,7 @@
     },
     "traffic_validator": {
       "path": "scripts/ci/check-supabase-function-traffic-evidence.mjs",
-      "sha256": "1f4fbe446f7c7196fad841e898775a74f63847230c07338dd5948f4861da24ef"
+      "sha256": "fd4171160826c0b157bd0a066b3043b61c30069a5d28f34033a85e1542dfe2a4"
     },
     "traffic_generator": {
       "path": "scripts/ci/generate-supabase-function-traffic-evidence.mjs",
@@ -48,7 +48,7 @@
     },
     "current_bundle_validator": {
       "path": "scripts/ci/check-supabase-current-function-bundle-evidence.mjs",
-      "sha256": "c7c91fbdf6d641de2e61db2b0b5cfac595d1efe9b28d986f7cd5c6332dfe93af"
+      "sha256": "5b48ac2bf58f6ad36acd183aad177ab53acf8f86dafdd9f956f231dcc0515e3f"
     },
     "current_bundle_generator": {
       "path": "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs",
@@ -78,8 +78,8 @@
   },
   "inventory_binding": {
     "active_functions": 112,
-    "frozen_functions": 112,
-    "ported_and_verified_functions": 0,
+    "frozen_functions": 111,
+    "ported_and_verified_functions": 1,
     "verify_jwt_true": 62,
     "verify_jwt_false": 50,
     "digest_algorithm": "sha256_of_sorted_utf8_length_prefixed_records_v1",
@@ -121,7 +121,7 @@
     }
   },
   "cutover_blockers": {
-    "status": "BLOCKED_ALL_112_FUNCTIONS_REMAIN_FROZEN",
+    "status": "BLOCKED_110_FUNCTIONS_NOT_TERMINAL",
     "traffic_source_contracts": {
       "count": 17,
       "digest_algorithm": "sha256_of_sorted_utf8_length_prefixed_records_v1",
@@ -137,6 +137,6 @@
   },
   "evidence_digest": {
     "digest_algorithm": "sha256_of_stable_json_without_evidence_digest_v1",
-    "digest": "e27264e79bddd826c7085b5f3b3ad3e2eba322212691985fd14109d8d383acce"
+    "digest": "898764998655b30b36160e7fbfaa17f1615e5916168a5afab2e678a21e090d9e"
   }
 }

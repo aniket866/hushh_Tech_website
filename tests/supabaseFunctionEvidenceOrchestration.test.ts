@@ -78,7 +78,7 @@ describe("Supabase function evidence orchestration", () => {
     expect(result.errors).toEqual([]);
     expect(result.observed).toMatchObject({
       active_functions: 112,
-      frozen_functions: 112,
+      frozen_functions: 111,
       verify_jwt_true: 62,
       verify_jwt_false: 50,
       traffic_version_delta_histogram: { 0: 16, 40: 96 },
@@ -306,7 +306,7 @@ describe("Supabase function evidence orchestration", () => {
     );
   });
 
-  it("rejects any function reclassified as ported while the cutover is frozen", () => {
+  it("rejects any second function reclassified as ported while the cutover is frozen", () => {
     const inputs = cloneInputs();
     const manifest = parse<any>(inputs.artifacts.retirement_manifest);
     manifest.functions[0].migration_state = "PORTED_AND_VERIFIED";
@@ -316,7 +316,7 @@ describe("Supabase function evidence orchestration", () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors.join("\n")).toContain(
-      "All 112 functions must remain frozen and unported"
+      "Exactly geocode may be ported; the other 111 functions must remain frozen"
     );
   });
 

@@ -1668,7 +1668,7 @@
       "slug": "hushh-location-geocode",
       "route": "/functions/v1/hushh-location-geocode",
       "auth": "firebase_bearer",
-      "state": "INVENTORY_FROZEN",
+      "state": "PORTED_AND_VERIFIED",
       "disposition": "PORT_TO_GCP"
     },
     {
@@ -2134,9 +2134,9 @@
     "client_admin": 3,
     "server": 32,
     "functions": 112,
-    "functions_ported": 0,
+    "functions_ported": 1,
     "functions_retired": 1,
-    "functions_blocked": 111
+    "functions_blocked": 110
   },
-  "sha256": "5d83e9c4cd60fa1e226f5094c2d1992966d157f0d3265e0fd402a4b7d97b668e"
+  "sha256": "ee014d8fc5a96e71f5f28f5e2e03c2521a6c43b7e4634f9b5ab604d365ee7185"
 }

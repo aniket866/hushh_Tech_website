@@ -27,7 +27,7 @@ export const DEFAULT_ORCHESTRATION_EVIDENCE_PATH = path.join(
 );
 
 export const FROZEN_ORCHESTRATION_EVIDENCE_DIGEST =
-  "e27264e79bddd826c7085b5f3b3ad3e2eba322212691985fd14109d8d383acce";
+  "898764998655b30b36160e7fbfaa17f1615e5916168a5afab2e678a21e090d9e";
 
 export const ARTIFACT_PATHS = Object.freeze({
   retirement_manifest: "migration/manifests/supabase-retirement.v1.json",
@@ -403,11 +403,11 @@ export const validateFunctionEvidenceOrchestration = ({
   });
   if (
     functions.length !== 112 ||
-    frozenFunctions !== 112 ||
-    portedFunctions !== 0 ||
+    frozenFunctions !== 111 ||
+    portedFunctions !== 1 ||
     manifest.contract_state !== "INVENTORY_FROZEN_NOT_MIGRATED"
   ) {
-    errors.push("All 112 functions must remain frozen and unported.");
+    errors.push("Exactly geocode may be ported; the other 111 functions must remain frozen.");
   }
 
   const captureOrderValid = validateTimestampBindings({ errors, contract, traffic, current });
@@ -558,7 +558,7 @@ export const validateFunctionEvidenceOrchestration = ({
     ])
   );
   requireRecord(errors, "cutover_blockers", contract.cutover_blockers, {
-    status: "BLOCKED_ALL_112_FUNCTIONS_REMAIN_FROZEN",
+    status: "BLOCKED_110_FUNCTIONS_NOT_TERMINAL",
     traffic_source_contracts: {
       count: blockers.length,
       digest_algorithm: DIGEST_ALGORITHM,
