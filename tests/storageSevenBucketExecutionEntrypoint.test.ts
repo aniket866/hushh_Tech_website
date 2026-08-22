@@ -603,9 +603,8 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       const createReadOnlyDependencies = vi.fn(async () => ({
         sourceClient: {},
         policySnapshotProvider: vi.fn(async () => fixture.policy),
-        knownSixTargetClient: {},
         knownSixSourceRecords: [],
-        seventhTargetClient: {},
+        knownSixInheritedBindings: [],
       }));
       const createWriteClients = vi.fn();
       const verifyLiveSource = vi.fn(async () => ({ verified: true }));
@@ -656,9 +655,8 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     const createReadOnlyDependencies = vi.fn(async () => ({
       sourceClient: {},
       policySnapshotProvider: vi.fn(async () => fixture.policy),
-      knownSixTargetClient: {},
       knownSixSourceRecords: [],
-      seventhTargetClient: {},
+      knownSixInheritedBindings: [],
     }));
     const writeFactoryReached = new Error("write-factory-reached");
     const createWriteClients = vi.fn(async () => {
@@ -680,13 +678,13 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(createWriteClients).toHaveBeenCalledOnce();
   });
 
-  it("rejects injected proof callbacks and non-concrete target clients before write construction", async () => {
+  it("rejects caller-supplied target clients before write construction", async () => {
     const fixture = createFixture();
     const createReadOnlyDependencies = vi.fn(async () => ({
       sourceClient: {},
       policySnapshotProvider: vi.fn(async () => fixture.policy),
-      knownSixTargetClient: {},
       knownSixSourceRecords: [],
+      knownSixInheritedBindings: [],
       seventhTargetClient: {},
     }));
     const createWriteClients = vi.fn();
@@ -699,7 +697,7 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       trustAnchor: fixture.trustAnchor,
       now: Date.parse("2026-08-22T01:30:00.000Z"),
       verifyLiveSource: vi.fn(async () => ({ verified: true })),
-    })).rejects.toMatchObject({ code: "FIXED_ALL_SEVEN_TARGET_COLLECTOR_REQUIRED" });
+    })).rejects.toMatchObject({ code: "COMBINED_READ_DEPENDENCY_SCHEMA" });
     expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
     expect(createWriteClients).not.toHaveBeenCalled();
   });

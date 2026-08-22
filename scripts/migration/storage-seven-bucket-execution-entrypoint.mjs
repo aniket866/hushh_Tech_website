@@ -88,12 +88,12 @@ const SEVENTH_PREFLIGHT_KEYS = [
 const READ_ONLY_DEPENDENCY_KEYS = [
   "sourceClient",
   "policySnapshotProvider",
-  "knownSixTargetClient",
   "knownSixSourceRecords",
-  "seventhTargetClient",
+  "knownSixInheritedBindings",
 ];
 
 const WRITE_CLIENT_KEYS = ["knownSixGcsClient", "seventhGcsClient"];
+const FIXED_PLATFORM_FETCH = globalThis.fetch.bind(globalThis);
 
 const TRUST_ANCHOR_KEYS = [
   "schemaVersion",
@@ -357,24 +357,30 @@ const collectConcreteAllSevenTargetPreflight = async ({
   nowProvider,
 }) => {
   if (
-    !(readDependencies.knownSixTargetClient instanceof InCloudStoragePreflightClient) ||
-    !(readDependencies.seventhTargetClient instanceof FixedSeventhTargetReadClient) ||
-    !Array.isArray(readDependencies.knownSixSourceRecords)
+    !Array.isArray(readDependencies.knownSixSourceRecords) ||
+    !Array.isArray(readDependencies.knownSixInheritedBindings)
   ) {
     fail(
       "FIXED_ALL_SEVEN_TARGET_COLLECTOR_REQUIRED",
       "Execution requires the checked-in fixed all-seven target collectors.",
     );
   }
-  await readDependencies.knownSixTargetClient.initialize();
+  const knownSixTargetClient = new InCloudStoragePreflightClient({
+    fetchImpl: FIXED_PLATFORM_FETCH,
+    inheritedBindings: readDependencies.knownSixInheritedBindings,
+  });
+  const seventhTargetClient = new FixedSeventhTargetReadClient({
+    fetchImpl: FIXED_PLATFORM_FETCH,
+  });
+  await knownSixTargetClient.initialize();
   const [knownSixPreflight, seventhPreflight] = await Promise.all([
     collectLiveTargetPreflight({
-      gcsClient: readDependencies.knownSixTargetClient,
+      gcsClient: knownSixTargetClient,
       sourceRecords: readDependencies.knownSixSourceRecords,
       collectedAt: new Date(nowProvider()).toISOString(),
     }),
     collectFixedSeventhTargetPreflight({
-      client: readDependencies.seventhTargetClient,
+      client: seventhTargetClient,
       seventhSource: request.planInputs.seventhSource,
       now: nowProvider,
     }),
