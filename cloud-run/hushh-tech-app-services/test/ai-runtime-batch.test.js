@@ -1007,6 +1007,7 @@ test("profile search rejects PII in decoded source URLs on first response and re
     "https://example.com/1415.555.1234",
     `https://example.com/${encodeURIComponent("用户@例子.公司")}`,
     "https://example.com/person%E2%80%8B%40example.com",
+    "https://١٤١٥٥٥٥١٢٣٤.example.com/public",
   ];
   let searches = 0;
   const firstHarness = enabledHandlers({

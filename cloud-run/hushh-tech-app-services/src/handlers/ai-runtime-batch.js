@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { domainToUnicode } from "node:url";
 
 const PRIVATE_JSON_HEADERS = Object.freeze({
   "cache-control": "private, no-store",
@@ -1239,13 +1240,18 @@ function decodedPublicUrlComponent(raw) {
 
 function safePublicUrl(raw) {
   if (typeof raw !== "string" || raw.length < 1 || raw.length > 2_048) return null;
+  const rawAuthority = /^https:\/\/([^/?#]+)/i.exec(raw)?.[1] ?? null;
+  if (rawAuthority === null || decodedPublicUrlComponent(rawAuthority) === null) return null;
   try {
     const url = new URL(raw);
+    const unicodeHostname = domainToUnicode(url.hostname);
     if (
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
       PRIVATE_HOST_PATTERN.test(url.hostname) ||
+      !unicodeHostname ||
+      decodedPublicUrlComponent(unicodeHostname) === null ||
       url.hostname.endsWith(".internal") ||
       url.hostname.endsWith(".local")
     ) {
