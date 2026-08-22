@@ -64,7 +64,10 @@ function backendError(error: unknown, status?: number): BackendError {
   return { name: "GcpBackendError", message: "GCP backend request failed.", status };
 }
 
-function toUser(value: FirebaseUser): User {
+function toUser(
+  value: FirebaseUser,
+  claims: Readonly<Record<string, unknown>> = {},
+): User {
   const createdAt = value.metadata.creationTime || new Date(0).toISOString();
   return {
     id: value.uid,
@@ -75,6 +78,7 @@ function toUser(value: FirebaseUser): User {
     app_metadata: {
       provider: value.providerData[0]?.providerId || "firebase",
       providers: value.providerData.map((entry) => entry.providerId),
+      fund_admin: claims.fund_admin === true,
     },
     user_metadata: {
       full_name: value.displayName || undefined,
@@ -108,7 +112,7 @@ async function toSession(value: FirebaseUser | null, forceRefresh = false): Prom
     token_type: "bearer",
     expires_in: Math.max(0, expiresAt - Math.floor(Date.now() / 1000)),
     expires_at: expiresAt,
-    user: toUser(value),
+    user: toUser(value, token.claims),
   };
 }
 
