@@ -5,12 +5,21 @@ import {
   generateKeyPairSync,
   sign as signDetached,
 } from "node:crypto";
-import test from "node:test";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import test, { after } from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { RuntimeError } from "../src/errors.js";
 import {
-  __testing,
-  GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR,
   createGithubDevopsNotifyCandidate,
   parseUniqueJson,
   verifyRawDetachedApproval,
@@ -28,17 +37,122 @@ const APPROVAL_PUBLIC_KEY_BYTES = APPROVAL_PUBLIC_KEY.export({
   type: "spki",
 });
 const TEST_APPROVAL_TRUST_ANCHOR = Object.freeze({
-  schemaVersion: 1,
-  provisioningState: "PROVISIONED",
+  schema_version: 1,
+  provisioning_state: "PROVISIONED",
   algorithm: "Ed25519",
-  keyId: "github-devops-notify-independent-reviewer-v1",
-  publicKeySpkiDerBase64url: APPROVAL_PUBLIC_KEY_BYTES.toString("base64url"),
-  publicKeySha256: createHash("sha256")
+  key_id: "github-devops-notify-independent-reviewer-v1",
+  public_key_spki_der_base64url:
+    APPROVAL_PUBLIC_KEY_BYTES.toString("base64url"),
+  public_key_sha256: createHash("sha256")
     .update(APPROVAL_PUBLIC_KEY_BYTES)
     .digest("hex"),
-  reviewerIdentity: "independent-edge-reviewer",
+  reviewer_identity: "independent-edge-reviewer",
 });
-const EXPECTED_APPROVAL_BINDING = await __testing.loadExpectedApprovalBinding();
+const PRODUCTION_TRUST_ANCHOR_URL = new URL(
+  "../registry/github-devops-notify-approval-trust-anchor.v1.json",
+  import.meta.url,
+);
+const PRODUCTION_TRUST_ANCHOR_BYTES = await readFile(
+  PRODUCTION_TRUST_ANCHOR_URL,
+);
+const PRODUCTION_APPROVAL_TRUST_ANCHOR = JSON.parse(
+  PRODUCTION_TRUST_ANCHOR_BYTES,
+);
+const PRODUCTION_TRUST_ANCHOR_DIGEST = createHash("sha256")
+  .update(PRODUCTION_TRUST_ANCHOR_BYTES)
+  .digest("hex");
+
+function stableJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+    .join(",")}}`;
+}
+
+const TEST_FIXTURE_ROOT = await mkdtemp(
+  path.join(tmpdir(), "github-devops-notify-approved-"),
+);
+const SERVICE_ROOT = new URL("../", import.meta.url);
+
+async function copyFixtureFile(relativePath) {
+  const destination = path.join(TEST_FIXTURE_ROOT, relativePath);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await copyFile(new URL(relativePath, SERVICE_ROOT), destination);
+}
+
+const testTrustAnchorBytes = Buffer.from(
+  `${JSON.stringify(TEST_APPROVAL_TRUST_ANCHOR, null, 2)}\n`,
+  "utf8",
+);
+const testTrustAnchorDigest = createHash("sha256")
+  .update(testTrustAnchorBytes)
+  .digest("hex");
+await Promise.all([
+  copyFixtureFile("src/errors.js"),
+  copyFixtureFile("registry/candidates.github-devops-notify.v1.json"),
+]);
+const testHandlerPath = path.join(
+  TEST_FIXTURE_ROOT,
+  "src/handlers/github-devops-notify.js",
+);
+await mkdir(path.dirname(testHandlerPath), { recursive: true });
+const productionHandlerSource = await readFile(
+  new URL("src/handlers/github-devops-notify.js", SERVICE_ROOT),
+  "utf8",
+);
+const testHandlerSource = productionHandlerSource.replace(
+  PRODUCTION_TRUST_ANCHOR_DIGEST,
+  testTrustAnchorDigest,
+);
+assert.notEqual(testHandlerSource, productionHandlerSource);
+await writeFile(testHandlerPath, testHandlerSource, "utf8");
+const testHandlerDigest = createHash("sha256")
+  .update(testHandlerSource)
+  .digest("hex");
+const testTrustAnchorPath = path.join(
+  TEST_FIXTURE_ROOT,
+  "registry/github-devops-notify-approval-trust-anchor.v1.json",
+);
+await writeFile(testTrustAnchorPath, testTrustAnchorBytes);
+const testManifestPath = path.join(
+  TEST_FIXTURE_ROOT,
+  "registry/candidates.github-devops-notify.v1.json",
+);
+const testManifest = JSON.parse(await readFile(testManifestPath, "utf8"));
+testManifest.detached_approval.trust_anchor_state = "PROVISIONED";
+testManifest.detached_approval.trust_anchor_file_sha256 =
+  testTrustAnchorDigest;
+testManifest.runtime_byte_lock[
+  "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json"
+] = testTrustAnchorDigest;
+testManifest.runtime_byte_lock[
+  "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js"
+] = testHandlerDigest;
+delete testManifest.detached_approval.manifest_self_digest;
+testManifest.detached_approval.manifest_self_digest = createHash("sha256")
+  .update(stableJson(testManifest))
+  .digest("hex");
+await writeFile(
+  testManifestPath,
+  `${JSON.stringify(testManifest, null, 2)}\n`,
+  "utf8",
+);
+const TEST_HANDLER_MODULE = await import(
+  pathToFileURL(
+    path.join(
+      TEST_FIXTURE_ROOT,
+      "src/handlers/github-devops-notify.js",
+    ),
+  ).href
+);
+const EXPECTED_APPROVAL_BINDING =
+  await TEST_HANDLER_MODULE.__testing.loadExpectedApprovalBinding();
+
+after(async () => {
+  await rm(TEST_FIXTURE_ROOT, { recursive: true, force: true });
+});
 
 function approvalClaims(overrides = {}) {
   return {
@@ -54,7 +168,9 @@ function approvalClaims(overrides = {}) {
     source_pins: structuredClone(EXPECTED_APPROVAL_BINDING.sourcePins),
     issued_at_ms: NOW.getTime() - 1_000,
     expires_at_ms: NOW.getTime() + 300_000,
-    reviewer_identity: TEST_APPROVAL_TRUST_ANCHOR.reviewerIdentity,
+    trust_anchor_file_sha256:
+      EXPECTED_APPROVAL_BINDING.trustAnchorFileSha256,
+    reviewer_identity: TEST_APPROVAL_TRUST_ANCHOR.reviewer_identity,
     independent_reviewer: true,
     ...overrides,
   };
@@ -71,7 +187,7 @@ function approvalReceipt({ claims = {}, envelope = {}, signature } = {}) {
     JSON.stringify({
       schema_version: 1,
       algorithm: "Ed25519",
-      key_id: TEST_APPROVAL_TRUST_ANCHOR.keyId,
+      key_id: TEST_APPROVAL_TRUST_ANCHOR.key_id,
       payload_base64url: payloadBytes.toString("base64url"),
       signature_base64url: signatureBytes.toString("base64url"),
       ...envelope,
@@ -254,15 +370,17 @@ function candidate(overrides = {}) {
   return {
     operationLedger,
     mailProvider,
-    handle: __testing.createGithubDevopsNotifyCandidateWithTrustAnchor(
-      TEST_APPROVAL_TRUST_ANCHOR,
-      options,
-    ),
+    handle: TEST_HANDLER_MODULE.createGithubDevopsNotifyCandidate(options),
   };
 }
 
 function runtimeCode(error, code, statusCode) {
-  assert.ok(error instanceof RuntimeError);
+  assert.ok(
+    error instanceof RuntimeError ||
+      (error?.constructor?.name === "RuntimeError" &&
+        typeof error?.code === "string" &&
+        Number.isInteger(error?.statusCode)),
+  );
   assert.equal(error.code, code);
   assert.equal(error.statusCode, statusCode);
   return true;
@@ -303,6 +421,7 @@ test("raw detached approval binds every reviewed artifact and rejects signed mut
   const attacks = [
     approvalReceipt({ claims: { scope: "widened-scope" } }),
     approvalReceipt({ claims: { handler_file_sha256: "0".repeat(64) } }),
+    approvalReceipt({ claims: { trust_anchor_file_sha256: "0".repeat(64) } }),
     approvalReceipt({ claims: { manifest_file_sha256: "0".repeat(64) } }),
     approvalReceipt({ claims: { manifest_self_digest: "0".repeat(64) } }),
     approvalReceipt({ claims: { reviewed_commit: "1".repeat(40) } }),
@@ -483,6 +602,15 @@ test("abort before durable dispatch becomes retryable; provider ambiguity remain
 });
 
 test("prevalidated claims and unprovisioned approval fail before dependency factories", async () => {
+  assert.equal(
+    "createGithubDevopsNotifyCandidateWithTrustAnchor" in TEST_HANDLER_MODULE,
+    false,
+  );
+  assert.equal(
+    "createGithubDevopsNotifyCandidateWithTrustAnchor" in
+      TEST_HANDLER_MODULE.__testing,
+    false,
+  );
   const operationLedger = ledger();
   const mailProvider = mailer();
   let ledgerFactoryCalls = 0;
@@ -531,7 +659,10 @@ test("prevalidated claims and unprovisioned approval fail before dependency fact
     signedButUnprovisioned({ request: request(), signal: SIGNAL }),
     (error) => runtimeCode(error, "DETACHED_CANDIDATE_NOT_APPROVED", 503),
   );
-  assert.equal(GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR.provisioningState, "UNPROVISIONED");
+  assert.equal(
+    PRODUCTION_APPROVAL_TRUST_ANCHOR.provisioning_state,
+    "UNPROVISIONED",
+  );
   assert.equal(ledgerFactoryCalls, 0);
   assert.equal(mailFactoryCalls, 0);
 });

@@ -99,22 +99,399 @@
     "algorithm": "Ed25519",
     "key_id": "github-devops-notify-independent-reviewer-v1",
     "trust_anchor_state": "UNPROVISIONED",
+    "trust_anchor_path": "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json",
+    "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "c027158bb77d5b4745fb916b17bc42511f51ece967bc522d229384896d1673cd",
+    "manifest_self_digest": "1583a61ea086c28495f9b5f6dcef0402873987e4414d201ee57ffad07e6826ba",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
   "runtime_byte_lock": {
+    "cloud-run/hushh-tech-app-services/Dockerfile": "b7e52b350e1e07d6b2c2b7bcc7d63b0e50710cf8871bffb63bac443e833c321b",
+    "cloud-run/hushh-tech-app-services/package-lock.json": "1c0ff0633b22047297a288ab73a059be5f7a49f7cb4db41dc32ea38366f10576",
     "cloud-run/hushh-tech-app-services/package.json": "73a5a477348433b0f9c4e43b98868415dcfc94f1fec3ddcb22a9776b61dc9fb5",
+    "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
     "cloud-run/hushh-tech-app-services/src/app.js": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086",
     "cloud-run/hushh-tech-app-services/src/server.js": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764",
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
-    "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "87a317d64a72a148af466e7839bcc693d1d950f1ffc32b3bf05e40f5c6843bc2",
+    "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "dd46d342221e323eba47ceb538d5fecb8168efa699cd787216a46287ee222fa3",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
     "server.js": "5b9ebf2f7d65d20434368a65f50839cd177b628e3e8ac79ca9cff695afaaaff3"
+  },
+  "service_executable_closure": {
+    "schema_version": 1,
+    "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
+    "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
+    "src_inventory_digest": "901e7a3cf682f854b08803877047c1c83b8019c018c58537be62f00ca0c7764e",
+    "src_inventory": [
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
+        "bytes": 38929,
+        "sha256": "fac3722644a99d580773c54156d7247507559329e707c367d1a959de8ed121e2"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/adapters/investor-read-only.js",
+        "bytes": 9612,
+        "sha256": "4f88fe517467ae09187ff64ace65ef2ba500ffabe37f6c054c7432aa141ae6d5"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/app.js",
+        "bytes": 26957,
+        "sha256": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
+        "bytes": 4509,
+        "sha256": "5767b8dd4ff872900ea7680e08123dda90a0c335d7956a6ef5188be809a0951c"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/auth/google.js",
+        "bytes": 2220,
+        "sha256": "c5e33e07c3b9e505f59afc958bf8ef405d65a802d2466b1c637cba9c6302ffc7"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/config.js",
+        "bytes": 9375,
+        "sha256": "3e18a201c1b4364472c243680da50151c210ca4da9f1d606b27b1ae0d92722fb"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/contracts.js",
+        "bytes": 13296,
+        "sha256": "c3e0647e993a42ac8e5a96c0781bb176a4566494f0f4b5a80c9b28b55096d114"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/database.js",
+        "bytes": 27821,
+        "sha256": "2567d6afa23afc9d959e33a75d70d7ac80e4347afb75006271566167cac7c1d2"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/errors.js",
+        "bytes": 775,
+        "sha256": "834d401110483306644bdb8ea7a005fb6fd4fbbf321747bad0a560525d16677e"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+        "bytes": 14226,
+        "sha256": "aefae02382283bc28c625af4b8dd8d711387fbf32c7f98c831393d51d9fd5591"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
+        "bytes": 3837,
+        "sha256": "515e38e63b5084cf8ad8530272ac11ca69d18a95582b1d8b09e319df068984ef"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/gcp-read-batch.js",
+        "bytes": 37162,
+        "sha256": "42b8e6aaeb9352cbbb0e204e222b7668b589fc702780b3f01f39b3a334ce3a17"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
+        "bytes": 30991,
+        "sha256": "dd46d342221e323eba47ceb538d5fecb8168efa699cd787216a46287ee222fa3"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/investor-read-only.js",
+        "bytes": 5592,
+        "sha256": "589776cb730cc83a2423f621cff0332765db1007c441360b1e8546c49cf9f7ae"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/notify-write-batch.js",
+        "bytes": 48049,
+        "sha256": "645a1e489dd56569a2665a8674d6440b64cb8991680894ffaaab25323db70843"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/plaid-payment-batch.js",
+        "bytes": 61602,
+        "sha256": "7191813eb0c7fca2fb295ed02b2ba051148c41f20447356d598a39a22bb6b0bb"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/rate-limit.js",
+        "bytes": 1375,
+        "sha256": "cbc9022015941c5a457918d14c32907e88c86a8055dff684dc5eefc3ce75f8d3"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/registry.js",
+        "bytes": 5375,
+        "sha256": "766b9699f7e51d97e8d5f8c6fd80229673cd2aa9e6af603d90a93bc2fd94c491"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "bytes": 2731,
+        "sha256": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/server.js",
+        "bytes": 2671,
+        "sha256": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/shared-rate-limit.js",
+        "bytes": 1597,
+        "sha256": "622c0243b03ad9c736558b22e5ebe98b934267ae77c51b0d187d8c86d73e9b5a"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/table-privileges.js",
+        "bytes": 6417,
+        "sha256": "d9a2a4af81f5b89c79ef1e0c7e0226169abae76cbdd77bb6f364d03660e50bad"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js",
+        "bytes": 10850,
+        "sha256": "428028e89f0061f0aa57998741b435b9e4c086a1a9c9fbb8dc109be8708f2168"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/webhooks.js",
+        "bytes": 2925,
+        "sha256": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7"
+      }
+    ],
+    "boot_graph_digest": "e539a8f916853d5e07eea5c00ee542b03c5549b3ac06fd62163354150edabdfd",
+    "boot_reachable": [
+      "cloud-run/hushh-tech-app-services/src/adapters/investor-read-only.js",
+      "cloud-run/hushh-tech-app-services/src/app.js",
+      "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
+      "cloud-run/hushh-tech-app-services/src/auth/google.js",
+      "cloud-run/hushh-tech-app-services/src/config.js",
+      "cloud-run/hushh-tech-app-services/src/contracts.js",
+      "cloud-run/hushh-tech-app-services/src/database.js",
+      "cloud-run/hushh-tech-app-services/src/errors.js",
+      "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+      "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
+      "cloud-run/hushh-tech-app-services/src/handlers/investor-read-only.js",
+      "cloud-run/hushh-tech-app-services/src/rate-limit.js",
+      "cloud-run/hushh-tech-app-services/src/registry.js",
+      "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+      "cloud-run/hushh-tech-app-services/src/server.js",
+      "cloud-run/hushh-tech-app-services/src/shared-rate-limit.js",
+      "cloud-run/hushh-tech-app-services/src/table-privileges.js",
+      "cloud-run/hushh-tech-app-services/src/webhook-ledger.js",
+      "cloud-run/hushh-tech-app-services/src/webhooks.js"
+    ],
+    "boot_edges": [
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./contracts.js",
+        "to": "cloud-run/hushh-tech-app-services/src/contracts.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./database.js",
+        "to": "cloud-run/hushh-tech-app-services/src/database.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./rate-limit.js",
+        "to": "cloud-run/hushh-tech-app-services/src/rate-limit.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./registry.js",
+        "to": "cloud-run/hushh-tech-app-services/src/registry.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./shared-rate-limit.js",
+        "to": "cloud-run/hushh-tech-app-services/src/shared-rate-limit.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "./webhook-ledger.js",
+        "to": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "express",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/app.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
+        "specifier": "firebase-admin/app",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
+        "specifier": "firebase-admin/auth",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/auth/google.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/auth/google.js",
+        "specifier": "google-auth-library",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/contracts.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/database.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/database.js",
+        "specifier": "./table-privileges.js",
+        "to": "cloud-run/hushh-tech-app-services/src/table-privileges.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/database.js",
+        "specifier": "@google-cloud/cloud-sql-connector",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/database.js",
+        "specifier": "pg",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+        "specifier": "firebase-admin/app",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+        "specifier": "firebase-admin/firestore",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+        "specifier": "google-auth-library",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/rate-limit.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/registry.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/registry.js",
+        "specifier": "node:fs",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "specifier": "./adapters/investor-read-only.js",
+        "to": "cloud-run/hushh-tech-app-services/src/adapters/investor-read-only.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "specifier": "./handlers/engagement-admin.js",
+        "to": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "specifier": "./handlers/investor-read-only.js",
+        "to": "cloud-run/hushh-tech-app-services/src/handlers/investor-read-only.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./app.js",
+        "to": "cloud-run/hushh-tech-app-services/src/app.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./auth/firebase.js",
+        "to": "cloud-run/hushh-tech-app-services/src/auth/firebase.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./auth/google.js",
+        "to": "cloud-run/hushh-tech-app-services/src/auth/google.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./config.js",
+        "to": "cloud-run/hushh-tech-app-services/src/config.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./database.js",
+        "to": "cloud-run/hushh-tech-app-services/src/database.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./firestore-rate-limit.js",
+        "to": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./runtime-handlers.js",
+        "to": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./webhook-ledger.js",
+        "to": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/server.js",
+        "specifier": "./webhooks.js",
+        "to": "cloud-run/hushh-tech-app-services/src/webhooks.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/shared-rate-limit.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/webhooks.js",
+        "specifier": "./errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      }
+    ]
   },
   "blockers": [
     {

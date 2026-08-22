@@ -2,14 +2,21 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json";
+const SERVICE_PATH = "cloud-run/hushh-tech-app-services";
+const SERVICE_SRC_PATH = `${SERVICE_PATH}/src`;
+const SERVICE_ENTRYPOINT = `${SERVICE_SRC_PATH}/server.js`;
+const CANDIDATE_HANDLER_PATH =
+  `${SERVICE_SRC_PATH}/handlers/github-devops-notify.js`;
+const TRUST_ANCHOR_PATH =
+  `${SERVICE_PATH}/registry/github-devops-notify-approval-trust-anchor.v1.json`;
 const EXPECTED_DOCUMENT_DIGEST =
-  "6f713f5415ad427e4a554dc2480c868dc9f9a421a7c0746f5bfe1a876aa4f570";
+  "514e4fbc8cd57ecb5fd9cfdff1197a34278efb68a96be981f1d94b1c864ef23b";
 const AUTHORITATIVE_BLOCKERS = Object.freeze([
   "SOURCE_BUNDLE_VERSION_UNBOUND",
   "SOURCE_METADATA_END_CHECK_MISSING",
@@ -160,6 +167,153 @@ async function readJson(root, relativePath) {
   return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
 }
 
+function repoPath(root, absolutePath) {
+  return path.relative(root, absolutePath).split(path.sep).join("/");
+}
+
+function lexicalCompare(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+async function collectRegularFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries.sort((left, right) => lexicalCompare(left.name, right.name))) {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectRegularFiles(absolutePath)));
+      continue;
+    }
+    assert.equal(
+      entry.isFile(),
+      true,
+      `${absolutePath}: service src inventory contains a non-regular file`,
+    );
+    files.push(absolutePath);
+  }
+  return files;
+}
+
+function staticImportSpecifiers(source, relativePath) {
+  assert.equal(
+    /\b(?:import\s*\(|require\s*\()/.test(source),
+    false,
+    `${relativePath}: dynamic or CommonJS imports are forbidden in the locked graph`,
+  );
+  const declarations = source.match(/(?:^|\n)\s*import(?=\s)/g) ?? [];
+  const exportsFrom =
+    source.match(/(?:^|\n)\s*export\s+(?:\*|\{[\s\S]*?\})\s+from\s+/g) ?? [];
+  const matches = [];
+  const patterns = [
+    /(?:^|\n)\s*import\s+(?:[\s\S]*?\s+from\s+)?["']([^"'\r\n]+)["']\s*;?/g,
+    /(?:^|\n)\s*export\s+(?:\*|\{[\s\S]*?\})\s+from\s+["']([^"'\r\n]+)["']\s*;?/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) matches.push(match[1]);
+  }
+  assert.equal(
+    matches.length,
+    declarations.length + exportsFrom.length,
+    `${relativePath}: unparsed static import in locked graph`,
+  );
+  return matches.sort();
+}
+
+export async function computeServiceExecutableClosure(root) {
+  const sourceRoot = path.join(root, SERVICE_SRC_PATH);
+  const absoluteFiles = await collectRegularFiles(sourceRoot);
+  const inventory = [];
+  const sourceByPath = new Map();
+  for (const absolutePath of absoluteFiles) {
+    const relativePath = repoPath(root, absolutePath);
+    const bytes = await readFile(absolutePath);
+    inventory.push({
+      path: relativePath,
+      bytes: bytes.length,
+      sha256: sha256(bytes),
+    });
+    if (path.extname(absolutePath) === ".js") {
+      sourceByPath.set(relativePath, bytes.toString("utf8"));
+    }
+  }
+  inventory.sort((left, right) => lexicalCompare(left.path, right.path));
+  assert.equal(
+    inventory.every(({ path: relativePath }) => relativePath.endsWith(".js")),
+    true,
+    "Cloud Run service src inventory contains a non-JavaScript file",
+  );
+  assert.equal(sourceByPath.has(SERVICE_ENTRYPOINT), true, "Cloud Run entrypoint missing");
+
+  const localEdges = new Map();
+  for (const [from, source] of sourceByPath) {
+    const edges = staticImportSpecifiers(source, from).map((specifier) => {
+      if (!specifier.startsWith(".")) {
+        return { from, specifier, to: null };
+      }
+      assert.equal(
+        specifier.endsWith(".js"),
+        true,
+        `${from}: local imports must use an exact .js path`,
+      );
+      const absoluteTarget = path.resolve(
+        root,
+        path.dirname(from),
+        specifier,
+      );
+      const target = repoPath(root, absoluteTarget);
+      assert.equal(
+        target === SERVICE_SRC_PATH || target.startsWith(`${SERVICE_SRC_PATH}/`),
+        true,
+        `${from}: local import escapes the locked src inventory`,
+      );
+      assert.equal(
+        sourceByPath.has(target),
+        true,
+        `${from}: local import target ${target} is absent from the locked inventory`,
+      );
+      return { from, specifier, to: target };
+    });
+    localEdges.set(from, edges);
+  }
+
+  const reachable = new Set([SERVICE_ENTRYPOINT]);
+  const pending = [SERVICE_ENTRYPOINT];
+  while (pending.length > 0) {
+    const from = pending.shift();
+    for (const edge of localEdges.get(from) ?? []) {
+      if (edge.to === null || reachable.has(edge.to)) continue;
+      reachable.add(edge.to);
+      pending.push(edge.to);
+    }
+  }
+  assert.equal(
+    reachable.has(CANDIDATE_HANDLER_PATH),
+    false,
+    "detached GitHub notify candidate became transitively runtime reachable",
+  );
+  const bootReachable = [...reachable].sort();
+  const bootEdges = bootReachable
+    .flatMap((relativePath) => localEdges.get(relativePath) ?? [])
+    .sort((left, right) => lexicalCompare(stableJson(left), stableJson(right)));
+  const bootGraph = {
+    entrypoint: SERVICE_ENTRYPOINT,
+    reachable: bootReachable,
+    edges: bootEdges,
+  };
+  return {
+    schema_version: 1,
+    entrypoint: SERVICE_ENTRYPOINT,
+    candidate_handler: CANDIDATE_HANDLER_PATH,
+    src_inventory_digest: sha256(stableJson(inventory)),
+    src_inventory: inventory,
+    boot_graph_digest: sha256(stableJson(bootGraph)),
+    boot_reachable: bootReachable,
+    boot_edges: bootEdges,
+  };
+}
+
 export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
   const root = path.resolve(repoRoot);
   const rawManifest = await readFile(path.join(root, MANIFEST_PATH), "utf8");
@@ -186,11 +340,14 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
     algorithm: "Ed25519",
     key_id: "github-devops-notify-independent-reviewer-v1",
     trust_anchor_state: "UNPROVISIONED",
+    trust_anchor_path: TRUST_ANCHOR_PATH,
+    trust_anchor_file_sha256:
+      "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     handler_path:
       "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     manifest_path: MANIFEST_PATH,
     manifest_self_digest:
-      "c027158bb77d5b4745fb916b17bc42511f51ece967bc522d229384896d1673cd",
+      "1583a61ea086c28495f9b5f6dcef0402873987e4414d201ee57ffad07e6826ba",
     reviewed_commit: "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     reviewed_tree: "10aaac108dd01bea0e240d96137c8860aa1d488b",
   });
@@ -294,6 +451,54 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
     "node src/server.js",
     "Cloud Run package start entrypoint drift",
   );
+  const servicePackageLock = await readJson(
+    root,
+    `${SERVICE_PATH}/package-lock.json`,
+  );
+  assert.deepEqual(
+    servicePackageLock.packages?.[""]?.dependencies,
+    servicePackage.dependencies,
+    "Cloud Run package-lock root dependency drift",
+  );
+  assert.equal(
+    servicePackageLock.packages?.[""]?.name,
+    servicePackage.name,
+    "Cloud Run package-lock root package drift",
+  );
+  assert.equal(
+    servicePackageLock.packages?.[""]?.version,
+    servicePackage.version,
+    "Cloud Run package-lock root version drift",
+  );
+  const dockerfile = await readFile(
+    path.join(root, `${SERVICE_PATH}/Dockerfile`),
+    "utf8",
+  );
+  assert.deepEqual(
+    dockerfile.match(/^[ \t]*CMD[ \t]+.*$/gm),
+    ['CMD ["node", "src/server.js"]'],
+    "Cloud Run Docker CMD entrypoint drift",
+  );
+  assert.equal(
+    /^[ \t]*ENTRYPOINT\b/m.test(dockerfile),
+    false,
+    "Cloud Run Docker ENTRYPOINT is forbidden",
+  );
+  assert.deepEqual(
+    manifest.service_executable_closure,
+    await computeServiceExecutableClosure(root),
+    "Cloud Run executable src inventory or boot graph drift",
+  );
+  const trustAnchor = await readJson(root, TRUST_ANCHOR_PATH);
+  assert.deepEqual(trustAnchor, {
+    schema_version: 1,
+    provisioning_state: "UNPROVISIONED",
+    algorithm: "Ed25519",
+    key_id: "github-devops-notify-independent-reviewer-v1",
+    public_key_spki_der_base64url: null,
+    public_key_sha256: null,
+    reviewer_identity: "UNPROVISIONED",
+  });
   const runtimeFiles = [
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
     "cloud-run/hushh-tech-app-services/src/app.js",

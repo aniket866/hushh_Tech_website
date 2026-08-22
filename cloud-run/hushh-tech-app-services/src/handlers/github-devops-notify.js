@@ -42,8 +42,16 @@ const HANDLER_REPO_PATH =
   "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js";
 const MANIFEST_REPO_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json";
+const TRUST_ANCHOR_REPO_PATH =
+  "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json";
+const TRUST_ANCHOR_FILE_SHA256 =
+  "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8";
 const MANIFEST_URL = new URL(
   "../../registry/candidates.github-devops-notify.v1.json",
+  import.meta.url,
+);
+const TRUST_ANCHOR_URL = new URL(
+  "../../registry/github-devops-notify-approval-trust-anchor.v1.json",
   import.meta.url,
 );
 const APPROVAL_ENVELOPE_KEYS = Object.freeze([
@@ -68,17 +76,8 @@ const APPROVAL_CLAIM_KEYS = Object.freeze([
   "source_pins",
   "target_project",
   "target_region",
+  "trust_anchor_file_sha256",
 ]);
-
-export const GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR = Object.freeze({
-  schemaVersion: 1,
-  provisioningState: "UNPROVISIONED",
-  algorithm: "Ed25519",
-  keyId: "github-devops-notify-independent-reviewer-v1",
-  publicKeySpkiDerBase64url: null,
-  publicKeySha256: null,
-  reviewerIdentity: "UNPROVISIONED",
-});
 
 export const GITHUB_DEVOPS_NOTIFY_SOURCE_PIN = Object.freeze({
   slug: "github-devops-notify",
@@ -447,30 +446,30 @@ function decodeBase64url(value, expectedBytes) {
 function provisionedTrustAnchor(trustAnchor) {
   const keys = [
     "algorithm",
-    "keyId",
-    "provisioningState",
-    "publicKeySha256",
-    "publicKeySpkiDerBase64url",
-    "reviewerIdentity",
-    "schemaVersion",
+    "key_id",
+    "provisioning_state",
+    "public_key_sha256",
+    "public_key_spki_der_base64url",
+    "reviewer_identity",
+    "schema_version",
   ];
   if (
     !hasExactKeys(trustAnchor, keys) ||
-    trustAnchor.schemaVersion !== 1 ||
-    trustAnchor.provisioningState !== "PROVISIONED" ||
+    trustAnchor.schema_version !== 1 ||
+    trustAnchor.provisioning_state !== "PROVISIONED" ||
     trustAnchor.algorithm !== "Ed25519" ||
-    typeof trustAnchor.keyId !== "string" ||
-    trustAnchor.keyId.length < 8 ||
-    trustAnchor.keyId.length > 128 ||
-    !SHA256_PATTERN.test(trustAnchor.publicKeySha256 ?? "") ||
-    !REVIEWER_IDENTITY_PATTERN.test(trustAnchor.reviewerIdentity ?? "")
+    typeof trustAnchor.key_id !== "string" ||
+    trustAnchor.key_id.length < 8 ||
+    trustAnchor.key_id.length > 128 ||
+    !SHA256_PATTERN.test(trustAnchor.public_key_sha256 ?? "") ||
+    !REVIEWER_IDENTITY_PATTERN.test(trustAnchor.reviewer_identity ?? "")
   ) {
     rejectDetachedApproval();
   }
   const publicKeyBytes = decodeBase64url(
-    trustAnchor.publicKeySpkiDerBase64url,
+    trustAnchor.public_key_spki_der_base64url,
   );
-  if (sha256(publicKeyBytes) !== trustAnchor.publicKeySha256) {
+  if (sha256(publicKeyBytes) !== trustAnchor.public_key_sha256) {
     rejectDetachedApproval();
   }
   try {
@@ -502,12 +501,48 @@ function manifestSelfDigest(manifest) {
   return sha256(stableJson(digestInput));
 }
 
-async function loadExpectedApprovalBinding() {
-  const [handlerBytes, manifestBytes] = await Promise.all([
+function validateTrustAnchorDocument(trustAnchor) {
+  const keys = [
+    "algorithm",
+    "key_id",
+    "provisioning_state",
+    "public_key_sha256",
+    "public_key_spki_der_base64url",
+    "reviewer_identity",
+    "schema_version",
+  ];
+  if (
+    !hasExactKeys(trustAnchor, keys) ||
+    trustAnchor.schema_version !== 1 ||
+    trustAnchor.algorithm !== "Ed25519" ||
+    trustAnchor.key_id !== "github-devops-notify-independent-reviewer-v1"
+  ) {
+    rejectDetachedApproval();
+  }
+  if (trustAnchor.provisioning_state === "UNPROVISIONED") {
+    if (
+      trustAnchor.public_key_sha256 !== null ||
+      trustAnchor.public_key_spki_der_base64url !== null ||
+      trustAnchor.reviewer_identity !== "UNPROVISIONED"
+    ) {
+      rejectDetachedApproval();
+    }
+  } else {
+    provisionedTrustAnchor(trustAnchor);
+  }
+  return Object.freeze(trustAnchor);
+}
+
+async function loadCandidateApprovalContext() {
+  const [handlerBytes, manifestBytes, trustAnchorBytes] = await Promise.all([
     readFile(new URL(import.meta.url)),
     readFile(MANIFEST_URL),
+    readFile(TRUST_ANCHOR_URL),
   ]);
   const manifest = parseApprovalJson(manifestBytes);
+  const trustAnchor = validateTrustAnchorDocument(
+    parseApprovalJson(trustAnchorBytes),
+  );
   const approval = manifest.detached_approval;
   const approvalKeys = [
     "algorithm",
@@ -518,6 +553,8 @@ async function loadExpectedApprovalBinding() {
     "reviewed_commit",
     "reviewed_tree",
     "scope",
+    "trust_anchor_file_sha256",
+    "trust_anchor_path",
     "trust_anchor_state",
   ];
   const sourcePins = {
@@ -530,24 +567,28 @@ async function loadExpectedApprovalBinding() {
   };
   const selfDigest = manifestSelfDigest(manifest);
   const handlerDigest = sha256(handlerBytes);
+  const trustAnchorDigest = sha256(trustAnchorBytes);
   if (
     !hasExactKeys(approval, approvalKeys) ||
     approval.scope !== APPROVAL_SCOPE ||
-    approval.algorithm !== GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR.algorithm ||
-    approval.key_id !== GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR.keyId ||
-    approval.trust_anchor_state !==
-      GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR.provisioningState ||
+    approval.algorithm !== trustAnchor.algorithm ||
+    approval.key_id !== trustAnchor.key_id ||
+    approval.trust_anchor_state !== trustAnchor.provisioning_state ||
     approval.handler_path !== HANDLER_REPO_PATH ||
     approval.manifest_path !== MANIFEST_REPO_PATH ||
+    approval.trust_anchor_path !== TRUST_ANCHOR_REPO_PATH ||
+    trustAnchorDigest !== TRUST_ANCHOR_FILE_SHA256 ||
+    approval.trust_anchor_file_sha256 !== trustAnchorDigest ||
     approval.manifest_self_digest !== selfDigest ||
     !GIT_OBJECT_PATTERN.test(approval.reviewed_commit ?? "") ||
     !GIT_OBJECT_PATTERN.test(approval.reviewed_tree ?? "") ||
     manifest.runtime_byte_lock?.[HANDLER_REPO_PATH] !== handlerDigest ||
+    manifest.runtime_byte_lock?.[TRUST_ANCHOR_REPO_PATH] !== trustAnchorDigest ||
     stableJson(sourcePins) !== stableJson(GITHUB_DEVOPS_NOTIFY_SOURCE_PIN)
   ) {
     rejectDetachedApproval();
   }
-  return Object.freeze({
+  const expectedBinding = Object.freeze({
     scope: APPROVAL_SCOPE,
     targetProject: TARGET_PROJECT,
     targetRegion: TARGET_REGION,
@@ -557,7 +598,13 @@ async function loadExpectedApprovalBinding() {
     reviewedCommit: approval.reviewed_commit,
     reviewedTree: approval.reviewed_tree,
     sourcePins: GITHUB_DEVOPS_NOTIFY_SOURCE_PIN,
+    trustAnchorFileSha256: trustAnchorDigest,
   });
+  return Object.freeze({ expectedBinding, trustAnchor });
+}
+
+async function loadExpectedApprovalBinding() {
+  return (await loadCandidateApprovalContext()).expectedBinding;
 }
 
 export function verifyRawDetachedApproval({
@@ -573,7 +620,7 @@ export function verifyRawDetachedApproval({
     !hasExactKeys(envelope, APPROVAL_ENVELOPE_KEYS) ||
     envelope.schema_version !== 1 ||
     envelope.algorithm !== trustAnchor.algorithm ||
-    envelope.key_id !== trustAnchor.keyId
+    envelope.key_id !== trustAnchor.key_id
   ) {
     rejectDetachedApproval();
   }
@@ -601,6 +648,8 @@ export function verifyRawDetachedApproval({
     claims.scope !== expectedBinding?.scope ||
     claims.target_project !== expectedBinding?.targetProject ||
     claims.target_region !== expectedBinding?.targetRegion ||
+    claims.trust_anchor_file_sha256 !==
+      expectedBinding?.trustAnchorFileSha256 ||
     claims.handler_file_sha256 !== expectedBinding?.handlerFileSha256 ||
     claims.manifest_file_sha256 !== expectedBinding?.manifestFileSha256 ||
     claims.manifest_self_digest !== expectedBinding?.manifestSelfDigest ||
@@ -616,7 +665,7 @@ export function verifyRawDetachedApproval({
     claims.expires_at_ms <= nowMs ||
     claims.expires_at_ms - claims.issued_at_ms > MAX_APPROVAL_TTL_MS ||
     nowMs - claims.issued_at_ms > MAX_APPROVAL_TTL_MS ||
-    claims.reviewer_identity !== trustAnchor.reviewerIdentity ||
+    claims.reviewer_identity !== trustAnchor.reviewer_identity ||
     !REVIEWER_IDENTITY_PATTERN.test(claims.reviewer_identity ?? "") ||
     claims.independent_reviewer !== true
   ) {
@@ -631,12 +680,12 @@ export function verifyRawDetachedApproval({
 
 async function assertDetachedApproval({
   approvalReceipt,
-  trustAnchor,
   now,
 }) {
   if (!Buffer.isBuffer(approvalReceipt)) rejectDetachedApproval();
   try {
-    const expectedBinding = await loadExpectedApprovalBinding();
+    const { expectedBinding, trustAnchor } =
+      await loadCandidateApprovalContext();
     return verifyRawDetachedApproval({
       rawReceipt: approvalReceipt,
       trustAnchor,
@@ -720,7 +769,7 @@ function claimDisposition(claim, deliveryId) {
   return null;
 }
 
-function createGithubDevopsNotifyCandidateWithTrustAnchor(trustAnchor, {
+export function createGithubDevopsNotifyCandidate({
   approvalReceipt,
   webhookSecret,
   createOperationLedger,
@@ -742,7 +791,7 @@ function createGithubDevopsNotifyCandidateWithTrustAnchor(trustAnchor, {
   }
 
   return async function githubDevopsNotify({ request, signal } = {}) {
-    await assertDetachedApproval({ approvalReceipt, trustAnchor, now });
+    await assertDetachedApproval({ approvalReceipt, now });
     let operationLedger;
     let mailer;
     try {
@@ -893,15 +942,7 @@ function createGithubDevopsNotifyCandidateWithTrustAnchor(trustAnchor, {
   };
 }
 
-export function createGithubDevopsNotifyCandidate(options = {}) {
-  return createGithubDevopsNotifyCandidateWithTrustAnchor(
-    GITHUB_DEVOPS_NOTIFY_APPROVAL_TRUST_ANCHOR,
-    options,
-  );
-}
-
 export const __testing = Object.freeze({
-  createGithubDevopsNotifyCandidateWithTrustAnchor,
   loadExpectedApprovalBinding,
   manifestSelfDigest,
   renderNotification,
