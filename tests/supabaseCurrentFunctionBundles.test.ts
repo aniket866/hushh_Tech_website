@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CURRENT_EVIDENCE_LOCK,
@@ -21,6 +21,23 @@ import {
   normalizeLiveFunctionMetadata,
 } from "../scripts/ci/capture-supabase-current-function-bundles.mjs";
 import {
+  BUNDLE_TRANSPORT,
+  EDGE_RUNTIME_IMAGE,
+  RAW_BODY_SURFACE,
+  TRANSPORT_RECEIPT_FILE,
+  __testing as localDockerCaptureTesting,
+  assertDockerImageInspectResponse,
+  assertDockerInfoResponse,
+  assertExactDockerContextInspectArgs,
+  assertExactDockerImageInspectArgs,
+  assertExactDockerInfoArgs,
+  assertLocalDockerContextResponse,
+  buildDockerImageInspectArgs,
+  buildDockerContextInspectArgs,
+  buildDockerInfoArgs,
+  captureLocalDockerCurrentFunctionBundles,
+} from "../migration/scripts/ci/capture-supabase-current-function-bundles-local-docker.mjs";
+import {
   DEFAULT_RECOVERY_LIMITS,
   assertSafeCanonicalString,
   digestAttemptEvidence,
@@ -29,8 +46,13 @@ import {
   digestCurrentSourceTree,
   encodeCanonicalRecord,
   inspectRecoverySnapshot,
+  sha256,
   snapshotRecoveryTree,
 } from "../scripts/ci/generate-supabase-current-function-bundle-evidence.mjs";
+import {
+  buildLocalDockerCurrentFunctionBundleEvidence,
+  inspectLocalDockerRecoverySnapshot,
+} from "../migration/scripts/ci/generate-supabase-local-docker-function-bundle-evidence.mjs";
 
 const root = process.cwd();
 const manifestPath = path.join(root, "migration", "manifests", "supabase-retirement.v1.json");
@@ -57,6 +79,13 @@ const historicalGeneratorBytes = fs.readFileSync(
 const manifest = JSON.parse(manifestBytes.toString("utf8"));
 const historicalEvidence = JSON.parse(historicalEvidenceBytes.toString("utf8"));
 const currentEvidence = JSON.parse(fs.readFileSync(currentEvidencePath, "utf8"));
+const TEST_EDGE_RUNTIME_IMAGE = `public.ecr.aws/supabase/edge-runtime@sha256:${"a".repeat(64)}`;
+const TEST_EDGE_RUNTIME_IMAGE_INSPECT = Object.freeze({
+  Id: `sha256:${"b".repeat(64)}`,
+  RepoDigests: [TEST_EDGE_RUNTIME_IMAGE],
+  Os: "linux",
+  Architecture: "amd64",
+});
 
 const clone = <T>(value: T): T => structuredClone(value);
 const validate = (
@@ -384,21 +413,651 @@ describe("current Supabase function bundle evidence", () => {
 });
 
 describe("read-only Supabase function capture transport", () => {
-  it("builds only exact-project list and API download commands", () => {
+  it("keeps the historical CLI read-only while the new path uses a pinned local image", () => {
     const listArgs = buildFunctionsListArgs();
-    const downloadArgs = buildFunctionDownloadArgs({ slug: "get-secrets" });
+    const historicalDownloadArgs = buildFunctionDownloadArgs({ slug: "get-secrets" });
+    const dockerArgs = buildDockerInfoArgs();
+    const dockerContextArgs = buildDockerContextInspectArgs();
+    const imageArgs = buildDockerImageInspectArgs(TEST_EDGE_RUNTIME_IMAGE);
 
     expect(assertReadOnlySupabaseCliArgs(listArgs)).toBe(listArgs);
-    expect(assertReadOnlySupabaseCliArgs(downloadArgs)).toBe(downloadArgs);
+    expect(assertReadOnlySupabaseCliArgs(historicalDownloadArgs)).toBe(historicalDownloadArgs);
+    expect(assertExactDockerInfoArgs(dockerArgs)).toBe(dockerArgs);
+    expect(assertExactDockerContextInspectArgs(dockerContextArgs)).toBe(dockerContextArgs);
+    expect(assertExactDockerImageInspectArgs(imageArgs, TEST_EDGE_RUNTIME_IMAGE)).toBe(imageArgs);
     expect(listArgs).toContain(EXPECTED_PROJECT_REF);
-    expect(downloadArgs).toContain("--use-api");
+    expect(historicalDownloadArgs).toContain("--use-api");
+    expect(historicalDownloadArgs).not.toContain("--use-docker");
     expect(listArgs.slice(listArgs.indexOf("functions"), listArgs.indexOf("functions") + 2)).toEqual([
       "functions",
       "list",
     ]);
     expect(
-      downloadArgs.slice(downloadArgs.indexOf("functions"), downloadArgs.indexOf("functions") + 2)
+      historicalDownloadArgs.slice(
+        historicalDownloadArgs.indexOf("functions"),
+        historicalDownloadArgs.indexOf("functions") + 2
+      )
     ).toEqual(["functions", "download"]);
+    expect(imageArgs.at(-1)).toBe(TEST_EDGE_RUNTIME_IMAGE);
+  });
+
+  it("requires an exact local Docker daemon and digest-pinned extractor image", () => {
+    expect(
+      assertLocalDockerContextResponse({
+        exitCode: 0,
+        stdout: '"unix:///var/run/docker.sock"\n',
+        stderr: "",
+      })
+    ).toBe("unix:///var/run/docker.sock");
+    for (const endpoint of [
+      "tcp://remote.example:2376",
+      "ssh://builder",
+      "npipe:////./pipe/docker",
+      "unix:///tmp/../remote.sock",
+      "unix:///tmp/%2e%2e/remote.sock",
+    ]) {
+      expect(() =>
+        assertLocalDockerContextResponse({
+          exitCode: 0,
+          stdout: `${JSON.stringify(endpoint)}\n`,
+          stderr: "",
+        })
+      ).toThrow("absolute local Unix socket");
+    }
+    expect(
+      assertDockerInfoResponse({ exitCode: 0, stdout: '"28.3.3"\n', stderr: "" })
+    ).toBe("28.3.3");
+    expect(() =>
+      assertDockerInfoResponse({ exitCode: 1, stdout: "", stderr: "daemon unavailable" })
+    ).toThrow("Local Docker is required before any remote function body request");
+    expect(() =>
+      assertDockerInfoResponse({ exitCode: 0, stdout: '"unknown"', stderr: "" })
+    ).toThrow("invalid server version");
+    expect(() =>
+      assertDockerInfoResponse({ exitCode: 0, stdout: '"28.3.3"', stderr: "warning" })
+    ).toThrow("unexpected warning");
+    expect(
+      assertDockerImageInspectResponse(
+        {
+          exitCode: 0,
+          stdout: `${JSON.stringify(TEST_EDGE_RUNTIME_IMAGE_INSPECT)}\n`,
+          stderr: "",
+        },
+        TEST_EDGE_RUNTIME_IMAGE
+      )
+    ).toEqual({
+      imageId: TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id,
+      imageOs: "linux",
+      imageArchitecture: "amd64",
+    });
+    expect(() =>
+      assertDockerImageInspectResponse(
+        {
+          exitCode: 0,
+          stdout: `${JSON.stringify({
+            ...TEST_EDGE_RUNTIME_IMAGE_INSPECT,
+            RepoDigests: [
+              `public.ecr.aws/supabase/edge-runtime@sha256:${"d".repeat(64)}`,
+            ],
+          })}\n`,
+          stderr: "",
+        },
+        TEST_EDGE_RUNTIME_IMAGE
+      )
+    ).toThrow("does not match");
+    expect(() =>
+      assertDockerImageInspectResponse(
+        { exitCode: 1, stdout: "[]\n", stderr: "not found" },
+        TEST_EDGE_RUNTIME_IMAGE
+      )
+    ).toThrow(
+      "must exist locally before provider access"
+    );
+  });
+
+  it("does not inherit unrelated secrets into local Docker child processes", () => {
+    const previous = process.env.UNRELATED_PRIVATE_SECRET;
+    process.env.UNRELATED_PRIVATE_SECRET = "must-not-reach-child";
+    try {
+      const childEnvironment = localDockerCaptureTesting.buildMinimalChildEnvironment();
+      expect(childEnvironment).not.toHaveProperty("UNRELATED_PRIVATE_SECRET");
+      expect(childEnvironment).not.toHaveProperty("SUPABASE_ACCESS_TOKEN");
+      expect(childEnvironment).not.toHaveProperty("DOCKER_HOST");
+      expect(childEnvironment).not.toHaveProperty("DOCKER_TLS_VERIFY");
+      expect(childEnvironment).toHaveProperty("PATH");
+    } finally {
+      if (previous === undefined) delete process.env.UNRELATED_PRIVATE_SECRET;
+      else process.env.UNRELATED_PRIVATE_SECRET = previous;
+    }
+  });
+
+  it("stops before the first remote body request when local Docker is unavailable", async () => {
+    const recoveryRoot = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "current-function-docker-gate.")
+    );
+    fs.chmodSync(recoveryRoot, 0o700);
+    const metadataCommands: string[][] = [];
+    let tokenReads = 0;
+    let rawBodyReads = 0;
+    let extractorCalls = 0;
+    try {
+      await expect(
+        localDockerCaptureTesting.captureLocalDockerCore({
+          manifest,
+          recoveryRoot,
+          edgeRuntimeImage: TEST_EDGE_RUNTIME_IMAGE,
+          beforeEveryAttempt: async () => {},
+          maxDownloadAttempts: 1,
+          accessTokenProvider: () => {
+            tokenReads += 1;
+            return `sbp_${"a".repeat(24)}`;
+          },
+          metadataCommandRunner: async ({ args }: { args: string[] }) => {
+            metadataCommands.push(args);
+            throw new Error("metadata must not run");
+          },
+          dockerCommandRunner: async ({ args }: { args: string[] }) =>
+            args[0] === "context"
+              ? {
+                  exitCode: 0,
+                  signal: null,
+                  stdout: '"unix:///var/run/docker.sock"\n',
+                  stderr: "",
+                }
+              : {
+                  exitCode: 1,
+                  signal: null,
+                  stdout: "",
+                  stderr: "daemon unavailable",
+                },
+          rawBodyRunner: async () => {
+            rawBodyReads += 1;
+            throw new Error("raw body must not run");
+          },
+          dockerExtractor: async () => {
+            extractorCalls += 1;
+            throw new Error("extractor must not run");
+          },
+        })
+      ).rejects.toThrow("Local Docker is required before any remote function body request");
+      expect(metadataCommands).toHaveLength(0);
+      expect(tokenReads).toBe(0);
+      expect(rawBodyReads).toBe(0);
+      expect(extractorCalls).toBe(0);
+    } finally {
+      fs.rmSync(recoveryRoot, { recursive: true, force: false });
+    }
+  });
+
+  it("keeps production disabled before credentials or provider access until an image is reviewed", () => {
+    expect(EDGE_RUNTIME_IMAGE).toBe("UNPROVISIONED");
+    expect(() => captureLocalDockerCurrentFunctionBundles({ manifest })).toThrow(
+      "Pinned edge-runtime image is unprovisioned"
+    );
+  });
+
+  it("rejects Docker image drift after metadata but before the first raw body read", async () => {
+    const recoveryRoot = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "current-function-image-drift.")
+    );
+    fs.chmodSync(recoveryRoot, 0o700);
+    const liveMetadata = currentEvidence.entries.map(
+      (entry: {
+        slug: string;
+        function_id: string;
+        status: string;
+        current_version: number;
+        verify_jwt: boolean;
+        provider_bundle_digest: string | null;
+      }) => ({
+        slug: entry.slug,
+        id: entry.function_id,
+        status: entry.status,
+        version: entry.current_version,
+        verify_jwt: entry.verify_jwt,
+        ezbr_sha256: entry.provider_bundle_digest,
+      })
+    );
+    let imageInspections = 0;
+    let metadataReads = 0;
+    let rawBodyReads = 0;
+    try {
+      await expect(
+        localDockerCaptureTesting.captureLocalDockerCore({
+          manifest,
+          recoveryRoot,
+          edgeRuntimeImage: TEST_EDGE_RUNTIME_IMAGE,
+          accessToken: `sbp_${"e".repeat(24)}`,
+          beforeEveryAttempt: async () => {},
+          maxDownloadAttempts: 1,
+          metadataCommandRunner: async ({ cwd }: { cwd: string }) => {
+            metadataReads += 1;
+            const bookkeepingRoot = path.join(cwd, "supabase", ".temp");
+            fs.mkdirSync(bookkeepingRoot, { recursive: true, mode: 0o700 });
+            fs.writeFileSync(
+              path.join(bookkeepingRoot, "linked-project.json"),
+              JSON.stringify({ ref: EXPECTED_PROJECT_REF }),
+              { mode: 0o600, flag: "wx" }
+            );
+            fs.writeFileSync(path.join(bookkeepingRoot, "cli-latest"), "v2.115.0", {
+              mode: 0o600,
+              flag: "wx",
+            });
+            return {
+              exitCode: 0,
+              signal: null,
+              stdout: JSON.stringify(liveMetadata),
+              stderr: "",
+            };
+          },
+          dockerCommandRunner: async ({ args }: { args: string[] }) => {
+            if (args[0] === "context") {
+              return {
+                exitCode: 0,
+                signal: null,
+                stdout: '"unix:///var/run/docker.sock"\n',
+                stderr: "",
+              };
+            }
+            if (args[0] === "info") {
+              return { exitCode: 0, signal: null, stdout: '"29.7.2"\n', stderr: "" };
+            }
+            imageInspections += 1;
+            return {
+              exitCode: 0,
+              signal: null,
+              stdout: `${JSON.stringify({
+                ...TEST_EDGE_RUNTIME_IMAGE_INSPECT,
+                Id:
+                  imageInspections === 1
+                    ? TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id
+                    : `sha256:${"f".repeat(64)}`,
+              })}\n`,
+              stderr: "",
+            };
+          },
+          rawBodyRunner: async () => {
+            rawBodyReads += 1;
+            throw new Error("raw body must not run");
+          },
+          dockerExtractor: async () => {
+            throw new Error("extractor must not run");
+          },
+        })
+      ).rejects.toThrow("Docker transport changed before a raw provider read");
+      expect(metadataReads).toBe(1);
+      expect(rawBodyReads).toBe(0);
+      expect(imageInspections).toBe(2);
+    } finally {
+      fs.rmSync(recoveryRoot, { recursive: true, force: false });
+    }
+  });
+
+  it("uses direct raw reads and the pinned local extractor for all 112 functions", async () => {
+    const recoveryRoot = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "current-function-direct-body.")
+    );
+    fs.chmodSync(recoveryRoot, 0o700);
+    const liveMetadata = currentEvidence.entries.map(
+      (entry: {
+        slug: string;
+        function_id: string;
+        status: string;
+        current_version: number;
+        verify_jwt: boolean;
+        provider_bundle_digest: string | null;
+      }) => ({
+        slug: entry.slug,
+        id: entry.function_id,
+        status: entry.status,
+        version: entry.current_version,
+        verify_jwt: entry.verify_jwt,
+        ezbr_sha256: entry.provider_bundle_digest,
+      })
+    );
+    let metadataReads = 0;
+    let rawBodyReads = 0;
+    let extractorCalls = 0;
+    try {
+      const result = await localDockerCaptureTesting.captureLocalDockerCore({
+        manifest,
+        recoveryRoot,
+        edgeRuntimeImage: TEST_EDGE_RUNTIME_IMAGE,
+        accessToken: `sbp_${"b".repeat(24)}`,
+        beforeEveryAttempt: async () => {},
+        maxDownloadAttempts: 1,
+        metadataCommandRunner: async ({ args, cwd }: { args: string[]; cwd: string }) => {
+          expect(args).toEqual(buildFunctionsListArgs());
+          expect(cwd).toBe(recoveryRoot);
+          metadataReads += 1;
+          const bookkeepingRoot = path.join(cwd, "supabase", ".temp");
+          fs.mkdirSync(bookkeepingRoot, { recursive: true, mode: 0o700 });
+          if (!fs.existsSync(path.join(bookkeepingRoot, "linked-project.json"))) {
+            fs.writeFileSync(
+              path.join(bookkeepingRoot, "linked-project.json"),
+              JSON.stringify({ ref: EXPECTED_PROJECT_REF }),
+              { mode: 0o600 }
+            );
+            fs.writeFileSync(path.join(bookkeepingRoot, "cli-latest"), "v2.115.0", {
+              mode: 0o600,
+            });
+          }
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: JSON.stringify(liveMetadata),
+            stderr: "",
+          };
+        },
+        dockerCommandRunner: async ({ args }: { args: string[] }) => {
+          if (args[0] === "context") {
+            return {
+              exitCode: 0,
+              signal: null,
+              stdout: '"unix:///var/run/docker.sock"\n',
+              stderr: "",
+            };
+          }
+          if (args[0] === "info") {
+            return { exitCode: 0, signal: null, stdout: '"29.7.2"\n', stderr: "" };
+          }
+          expect(args).toEqual(buildDockerImageInspectArgs(TEST_EDGE_RUNTIME_IMAGE));
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: `${JSON.stringify(TEST_EDGE_RUNTIME_IMAGE_INSPECT)}\n`,
+            stderr: "",
+          };
+        },
+        rawBodyRunner: async ({ slug, cwd }: { slug: string; cwd: string }) => {
+          rawBodyReads += 1;
+          const bytes = Buffer.from(`raw-eszip:${slug}`);
+          const eszipPath = path.join(cwd, "supabase", ".temp", `output_${slug}.eszip`);
+          fs.writeFileSync(eszipPath, bytes, { mode: 0o600, flag: "wx" });
+          return { status: 200, eszipPath, bytes: bytes.length, sha256: sha256(bytes) };
+        },
+        dockerExtractor: async ({ slug, cwd }: { slug: string; cwd: string }) => {
+          extractorCalls += 1;
+          const sourceRoot = path.join(cwd, "supabase", "functions", slug);
+          fs.mkdirSync(sourceRoot, { recursive: true, mode: 0o700 });
+          fs.writeFileSync(path.join(sourceRoot, "index.ts"), `export const slug = "${slug}";\n`, {
+            mode: 0o600,
+            flag: "wx",
+          });
+        },
+      });
+
+      expect(metadataReads).toBe(2);
+      expect(rawBodyReads).toBe(112);
+      expect(extractorCalls).toBe(112);
+      expect(result.outcomes).toHaveLength(112);
+      expect(result.outcomes.every(({ status }: { status: string }) => status === "EXTRACTED")).toBe(
+        true
+      );
+      expect(result.transportReceipt).toMatchObject({
+        tool: "supabase_cli_metadata_plus_direct_management_api_body",
+        bundle_transport: BUNDLE_TRANSPORT,
+        raw_body_surface: RAW_BODY_SURFACE,
+        docker_image: TEST_EDGE_RUNTIME_IMAGE,
+        docker_image_id: TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id,
+        docker_image_os: "linux",
+        docker_image_architecture: "amd64",
+        download_attempts: 112,
+      });
+      expect(result.transportReceipt.raw_body_attempts).toHaveLength(112);
+      expect(
+        result.transportReceipt.raw_body_attempts.every(
+          ({ status, sha256: digest }: { status: number; sha256: string }) =>
+            status === 200 && /^[a-f0-9]{64}$/.test(digest)
+        )
+      ).toBe(true);
+      expect(
+        fs
+          .readdirSync(recoveryRoot, { recursive: true })
+          .some((entry) => String(entry).endsWith(".eszip"))
+      ).toBe(false);
+    } finally {
+      fs.rmSync(recoveryRoot, { recursive: true, force: false });
+    }
+  });
+
+  it("streams a raw ESZIP create-only and binds its exact byte digest", async () => {
+    const recoveryRoot = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "current-function-raw-stream.")
+    );
+    fs.chmodSync(recoveryRoot, 0o700);
+    fs.mkdirSync(path.join(recoveryRoot, "supabase", ".temp"), {
+      recursive: true,
+      mode: 0o700,
+    });
+    const rawBytes = Buffer.from("exact-eszip-bytes");
+    const url = `https://api.supabase.com/v1/projects/${EXPECTED_PROJECT_REF}/functions/get-secrets/body`;
+    const fetchMock = vi.fn(async () => ({
+      url,
+      redirected: false,
+      status: 200,
+      headers: new Headers({
+        "content-type": "application/octet-stream",
+        "content-length": String(rawBytes.length),
+      }),
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(rawBytes.subarray(0, 5));
+          controller.enqueue(rawBytes.subarray(5));
+          controller.close();
+        },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const result = await localDockerCaptureTesting.runRawBodyFetch({
+        slug: "get-secrets",
+        projectRef: EXPECTED_PROJECT_REF,
+        cwd: recoveryRoot,
+        accessToken: `sbp_${"c".repeat(24)}`,
+      });
+      expect(result).toMatchObject({
+        status: 200,
+        bytes: rawBytes.length,
+        sha256: sha256(rawBytes),
+      });
+      expect(fs.readFileSync(result.eszipPath)).toEqual(rawBytes);
+      expect(fetchMock).toHaveBeenCalledWith(
+        url,
+        expect.objectContaining({
+          method: "GET",
+          redirect: "error",
+          headers: expect.objectContaining({
+            Accept: "application/octet-stream",
+            "Accept-Encoding": "identity",
+          }),
+        })
+      );
+      fs.unlinkSync(result.eszipPath);
+    } finally {
+      vi.unstubAllGlobals();
+      fs.rmSync(recoveryRoot, { recursive: true, force: false });
+    }
+  });
+
+  it("binds future capture receipts to raw ESZIP plus local Docker transport", () => {
+    expect(BUNDLE_TRANSPORT).toBe(
+      "DIRECT_MANAGEMENT_API_RAW_ESZIP_GET_LOCAL_DOCKER_UNBUNDLE_NO_CLI_FALLBACK"
+    );
+    expect(RAW_BODY_SURFACE).toContain("ACCEPT_APPLICATION_OCTET_STREAM");
+  });
+
+  it("accounts for and binds exact end metadata in local-Docker evidence", () => {
+    const snapshot = makeSyntheticRecoverySnapshot();
+    const startMetadata = JSON.parse(snapshot.files.get("functions-list.json")!.toString("utf8"));
+    snapshot.files.set(
+      "functions-list.json",
+      Buffer.from(JSON.stringify(startMetadata, null, 2) + "\n")
+    );
+    snapshot.files.set(
+      "functions-list-end.json",
+      Buffer.from(JSON.stringify(startMetadata, null, 2) + "\n")
+    );
+    const receipt = JSON.parse(snapshot.files.get("capture-receipt.json")!.toString("utf8"));
+    receipt.metadata_end_check = "MATCHED_EXACTLY";
+    const captureReceiptBytes = Buffer.from(JSON.stringify(receipt, null, 2) + "\n");
+    snapshot.files.set(
+      "capture-receipt.json",
+      captureReceiptBytes
+    );
+    snapshot.files.set(
+      TRANSPORT_RECEIPT_FILE,
+      Buffer.from(
+        JSON.stringify(
+          {
+            schema_version: 1,
+            project_ref: EXPECTED_PROJECT_REF,
+            tool: "supabase_cli_metadata_plus_direct_management_api_body",
+            tool_version: "2.115.0",
+            bundle_transport: BUNDLE_TRANSPORT,
+            raw_body_surface: RAW_BODY_SURFACE,
+            docker_image: TEST_EDGE_RUNTIME_IMAGE,
+            docker_image_id: TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id,
+            docker_image_os: "linux",
+            docker_image_architecture: "amd64",
+            docker_context_class: "ABSOLUTE_LOCAL_UNIX_SOCKET",
+            docker_context_endpoint_sha256: "a".repeat(64),
+            docker_server_version: "29.7.2",
+            download_attempts: receipt.outcomes.reduce(
+              (sum: number, outcome: { attempts: number }) => sum + outcome.attempts,
+              0
+            ),
+            raw_body_attempts: receipt.outcomes.flatMap(
+              (outcome: { slug: string; status: string; attempts: number }) =>
+                Array.from({ length: outcome.attempts }, (_, index) => {
+                  const isLast = index === outcome.attempts - 1;
+                  const status =
+                    outcome.status === "EXTRACTED" && isLast
+                      ? 200
+                      : outcome.status === "STORE_NOT_FOUND"
+                        ? 404
+                        : 500;
+                  return {
+                    slug: outcome.slug,
+                    status,
+                    bytes: status === 200 ? 123 : 0,
+                    sha256: status === 200 ? "c".repeat(64) : null,
+                  };
+                })
+            ),
+            capture_receipt_sha256: sha256(captureReceiptBytes),
+            start_metadata_sha256: sha256(snapshot.files.get("functions-list.json")!),
+            end_metadata_sha256: sha256(snapshot.files.get("functions-list-end.json")!),
+          },
+          null,
+          2
+        ) + "\n"
+      )
+    );
+    snapshot.counts.files = snapshot.files.size;
+    snapshot.counts.total_bytes = [...snapshot.files.values()].reduce(
+      (sum, bytes) => sum + bytes.length,
+      0
+    );
+
+    const inventory = inspectLocalDockerRecoverySnapshot({
+      snapshot,
+      manifest: clone(manifest),
+    });
+    const evidence = buildLocalDockerCurrentFunctionBundleEvidence({
+      manifest: clone(manifest),
+      historicalEvidence: clone(historicalEvidence),
+      inventory,
+      sourceSecretScan: {
+        tool: "gitleaks",
+        tool_version: "8.24.2",
+        status: "PASS",
+        finding_count: 0,
+      },
+      manifestBytes,
+      historicalEvidenceBytes,
+    });
+
+    expect(inventory.normalizedEndMetadata).toEqual(inventory.normalizedMetadata);
+    expect(evidence.capture.bundle_surface).toContain(
+      "raw_eszip via direct_management_api_then_digest_pinned_local_edge_runtime_unbundle"
+    );
+    expect(evidence.capture).toMatchObject({
+      tool: "supabase_cli_metadata_plus_direct_management_api_body",
+      local_unbundle_image: TEST_EDGE_RUNTIME_IMAGE,
+      local_unbundle_image_id: TEST_EDGE_RUNTIME_IMAGE_INSPECT.Id,
+      local_unbundle_image_os: "linux",
+      local_unbundle_image_architecture: "amd64",
+    });
+    expect(evidence.capture_integrity).toMatchObject({
+      transport_receipt_digest_algorithm: "sha256",
+      raw_body_attempts: 144,
+    });
+    expect(evidence.capture_integrity.transport_receipt_digest).toMatch(/^[a-f0-9]{64}$/);
+    expect(evidence.cutover_assessment).toMatchObject({
+      metadata_end_check_status: "MATCHED_EXACTLY",
+      bundle_to_metadata_version_binding_status: "BOUND_TO_STABLE_START_END_METADATA",
+    });
+
+    for (const mutation of [
+      (value: Record<string, unknown>) => {
+        value.raw_body_surface = "SERVER_MULTIPART_UNBUNDLE";
+      },
+      (value: Record<string, unknown>) => {
+        value.docker_image = "UNPROVISIONED";
+      },
+      (value: Record<string, unknown>) => {
+        const attempts = value.raw_body_attempts as Array<Record<string, unknown>>;
+        attempts[0].slug = "forged-slug";
+      },
+      (value: Record<string, unknown>) => {
+        delete value.docker_image_id;
+      },
+    ]) {
+      const mutated = clone(snapshot);
+      const transport = JSON.parse(
+        Buffer.from(mutated.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
+      ) as Record<string, unknown>;
+      mutation(transport);
+      mutated.files.set(
+        TRANSPORT_RECEIPT_FILE,
+        Buffer.from(JSON.stringify(transport, null, 2) + "\n")
+      );
+      mutated.counts.total_bytes = [...mutated.files.values()].reduce(
+        (sum, bytes) => sum + Buffer.from(bytes).length,
+        0
+      );
+      expect(() =>
+        inspectLocalDockerRecoverySnapshot({ snapshot: mutated, manifest: clone(manifest) })
+      ).toThrow();
+    }
+
+    const drifted = clone(snapshot);
+    const endMetadata = JSON.parse(
+      Buffer.from(drifted.files.get("functions-list-end.json")!).toString("utf8")
+    );
+    endMetadata[0].version += 1;
+    drifted.files.set(
+      "functions-list-end.json",
+      Buffer.from(JSON.stringify(endMetadata, null, 2) + "\n")
+    );
+    const driftedTransportReceipt = JSON.parse(
+      Buffer.from(drifted.files.get(TRANSPORT_RECEIPT_FILE)!).toString("utf8")
+    );
+    driftedTransportReceipt.end_metadata_sha256 = sha256(
+      drifted.files.get("functions-list-end.json")!
+    );
+    drifted.files.set(
+      TRANSPORT_RECEIPT_FILE,
+      Buffer.from(JSON.stringify(driftedTransportReceipt, null, 2) + "\n")
+    );
+    drifted.counts.total_bytes = [...drifted.files.values()].reduce(
+      (sum, bytes) => sum + Buffer.from(bytes).length,
+      0
+    );
+    expect(() =>
+      inspectLocalDockerRecoverySnapshot({ snapshot: drifted, manifest: clone(manifest) })
+    ).toThrow("metadata changed during bundle capture");
   });
 
   it("rejects any other project or write-shaped command", () => {
