@@ -27,9 +27,9 @@
     "idleInTransactionTimeoutMs": 15000,
     "workMemMb": 4,
     "statementCount": 9,
-    "querySetSha256": "2d500b3a3bfa1553c8df2a93a15e58e896ab3ea1c5453934d1b9d6256014799b",
+    "querySetSha256": "f721682cab239ba192e5ea54fd2f7d43cfdb6887bcc766a0c1cd72f2d525cc17",
     "boundsQuerySha256": "93db0e2e9986315c8011352c070c9fda6d89ca851b28cecc744e4d0d2feb57dc",
-    "catalogQuerySha256": "1417136c2f72c817aa8e463eb3b0f06c6c4b769c4f62f252d3527e33d65b7d72",
+    "catalogQuerySha256": "57c292ef92b4398396cad948a5a0ac8cb66490252ad28d9b3330627c822c10d4",
     "canonicalDigest": "SHA256_JSON_ARRAY_OF_ROW_SHA256"
   },
   "limits": {
@@ -49,7 +49,7 @@
     "imageDigestClaimRequired": true,
     "externalActualImageVerificationRequired": true
   },
-  "sourceSha256": "d973ccb1a866663c81cf0fe91509041390eb23a6fe7d8f6c12a29d71146eec4a",
+  "sourceSha256": "d6f0bc2f8229b6f3973310d2a9d80e50ad9b642b48f6bf789561e369f19ae694",
   "baseImageDigest": "sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51acf084a50ef483f3",
-  "contractSha256": "19f640733f2d8e4af6b2517e65adc2626e39cfe714cd21a005eb801956880033"
+  "contractSha256": "22df694deb0caa15527799be287d1d55e19a31a8242ee113904e84448203b949"
 }

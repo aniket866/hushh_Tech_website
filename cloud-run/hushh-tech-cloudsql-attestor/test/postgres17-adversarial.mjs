@@ -124,12 +124,12 @@ try {
   if (!ready) throw new Error("isolated PostgreSQL 17 did not become ready");
 
   psql("postgres", [
-    "CREATE ROLE hushh_tech_schema_owner NOLOGIN; CREATE ROLE hushh_tech_migration NOLOGIN; CREATE ROLE hushh_tech_runtime NOLOGIN; CREATE ROLE hushh_tech_audit NOLOGIN; CREATE ROLE hushh_tech_rollback NOLOGIN; CREATE ROLE \"hushh-tech-audit-uat@hushh-tech-uat.iam\" LOGIN;",
+    "CREATE ROLE hushh_tech_schema_owner NOLOGIN; CREATE ROLE hushh_tech_migration NOLOGIN; CREATE ROLE hushh_tech_runtime NOLOGIN; CREATE ROLE hushh_tech_audit NOLOGIN; CREATE ROLE hushh_tech_rollback NOLOGIN; CREATE ROLE cloudsqliamserviceaccount NOLOGIN; CREATE ROLE \"hushh-tech-audit-uat@hushh-tech-uat.iam\" LOGIN;",
     "CREATE DATABASE hushh_tech_app;",
   ]);
   psql("hushh_tech_app", [
     "REVOKE CREATE, TEMPORARY ON DATABASE hushh_tech_app FROM PUBLIC; REVOKE CREATE ON SCHEMA public FROM PUBLIC;",
-    `GRANT pg_read_all_data, hushh_tech_audit TO "${AUDIT_USER}";`,
+    `GRANT pg_read_all_data, hushh_tech_audit, cloudsqliamserviceaccount TO "${AUDIT_USER}";`,
   ]);
 
   const version = psql("hushh_tech_app", ["SHOW server_version_num;"]);
@@ -173,6 +173,15 @@ try {
     throw new Error(`baseline safe checks failed: ${failedBaselineChecks.join(",")}`);
   }
 
+  psql("hushh_tech_app", [
+    "GRANT CREATE ON SCHEMA public TO cloudsqliamserviceaccount;",
+  ]);
+  const providerMarkerWritePrivilege = captureChecks();
+  assertCheck(providerMarkerWritePrivilege, "auditWritableMembershipDenied", false);
+  psql("hushh_tech_app", [
+    "REVOKE CREATE ON SCHEMA public FROM cloudsqliamserviceaccount;",
+  ]);
+
   psql("hushh_tech_app", [`GRANT pg_execute_server_program TO "${AUDIT_USER}";`]);
   const privilegedMembership = captureChecks();
   assertCheck(privilegedMembership, "auditWritableMembershipDenied", false);
@@ -192,6 +201,7 @@ try {
       implicitFunctionDefaultAclRejected: true,
       migrationImplicitFunctionDefaultAclRejected: true,
       schemaOwnerFunctionDefaultAclRejected: true,
+      providerMarkerWritePrivilegeRejected: true,
       pgExecuteServerProgramRejected: true,
       writeDefaultAclRejected: true,
       liveCloudSql: false,

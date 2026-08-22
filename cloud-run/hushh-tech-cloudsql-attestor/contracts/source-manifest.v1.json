@@ -27,7 +27,7 @@
     },
     {
       "path": "sql/catalog-attestation.v1.sql",
-      "sha256": "1417136c2f72c817aa8e463eb3b0f06c6c4b769c4f62f252d3527e33d65b7d72"
+      "sha256": "57c292ef92b4398396cad948a5a0ac8cb66490252ad28d9b3330627c822c10d4"
     },
     {
       "path": "src/canonical.js",
@@ -74,5 +74,5 @@
       "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
     }
   ],
-  "sourceSha256": "d973ccb1a866663c81cf0fe91509041390eb23a6fe7d8f6c12a29d71146eec4a"
+  "sourceSha256": "d6f0bc2f8229b6f3973310d2a9d80e50ad9b642b48f6bf789561e369f19ae694"
 }

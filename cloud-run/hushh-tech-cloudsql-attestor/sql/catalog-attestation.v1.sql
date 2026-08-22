@@ -322,7 +322,11 @@ safe_checks AS (
           'MEMBER'
         )
         AND (
-          candidate.rolname NOT IN ('hushh_tech_audit', 'pg_read_all_data')
+          candidate.rolname NOT IN (
+            'hushh_tech_audit',
+            'pg_read_all_data',
+            'cloudsqliamserviceaccount'
+          )
           OR candidate.rolsuper
           OR candidate.rolcreaterole
           OR candidate.rolcreatedb
