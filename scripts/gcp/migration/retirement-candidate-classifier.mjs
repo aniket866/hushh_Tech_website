@@ -134,7 +134,7 @@ const APPROVALS = Object.freeze({
   owner: "REQUIRED_NOT_GRANTED",
   legal: "REQUIRED_NOT_GRANTED",
 });
-const SECURITY_RETIREMENT_410_CONTRACT = Object.freeze({
+export const SECURITY_RETIREMENT_410_CONTRACT = Object.freeze({
   slug: "get-secrets",
   owner_group: "security-retirement",
   final_disposition: "RETIRE_WITH_410",
@@ -146,6 +146,11 @@ const SECURITY_RETIREMENT_410_CONTRACT = Object.freeze({
   response_code: "FEATURE_RETIRED",
   secret_payload_allowed: false,
 });
+const OPTIONAL_SECURITY_RETIREMENT_RESPONSE_KEYS = new Set([
+  "response_status",
+  "response_code",
+  "secret_payload_allowed",
+]);
 const SOURCE_EXTENSIONS = new Set([
   ".cjs",
   ".css",
@@ -764,32 +769,43 @@ function pushIf(target, condition, code) {
   if (condition) target.push(code);
 }
 
+function securityRetirementRegistryValue(registryEntry, key) {
+  return key === "slug" ? registryEntry?.source?.slug : registryEntry?.[key];
+}
+
+function matchesSecurityRetirementMarker(observed, expected) {
+  if (observed === expected) return true;
+  if (typeof observed !== "string") return false;
+  const normalized = observed.trim();
+  if (typeof expected === "string") {
+    return normalized.toLowerCase() === expected.toLowerCase();
+  }
+  if (typeof expected === "number") return normalized === String(expected);
+  if (typeof expected === "boolean") {
+    return normalized.toLowerCase() === String(expected);
+  }
+  return false;
+}
+
 function securityRetirementContractFor(registryEntry) {
-  const markers =
-    registryEntry?.source?.slug === SECURITY_RETIREMENT_410_CONTRACT.slug ||
-    registryEntry?.owner_group ===
-      SECURITY_RETIREMENT_410_CONTRACT.owner_group ||
-    registryEntry?.final_disposition ===
-      SECURITY_RETIREMENT_410_CONTRACT.final_disposition ||
-    registryEntry?.gcp_owner === SECURITY_RETIREMENT_410_CONTRACT.gcp_owner ||
-    registryEntry?.auth_mode === SECURITY_RETIREMENT_410_CONTRACT.auth_mode ||
-    registryEntry?.migration_method ===
-      SECURITY_RETIREMENT_410_CONTRACT.migration_method ||
-    registryEntry?.parity_check ===
-      SECURITY_RETIREMENT_410_CONTRACT.parity_check;
+  const declaredMarkers = Object.entries(SECURITY_RETIREMENT_410_CONTRACT);
+  const markers = declaredMarkers.some(([key, expected]) =>
+    matchesSecurityRetirementMarker(
+      securityRetirementRegistryValue(registryEntry, key),
+      expected,
+    ),
+  );
   if (!markers) return null;
-  const exact =
-    registryEntry.source.slug === SECURITY_RETIREMENT_410_CONTRACT.slug &&
-    registryEntry.owner_group ===
-      SECURITY_RETIREMENT_410_CONTRACT.owner_group &&
-    registryEntry.final_disposition ===
-      SECURITY_RETIREMENT_410_CONTRACT.final_disposition &&
-    registryEntry.gcp_owner === SECURITY_RETIREMENT_410_CONTRACT.gcp_owner &&
-    registryEntry.auth_mode === SECURITY_RETIREMENT_410_CONTRACT.auth_mode &&
-    registryEntry.migration_method ===
-      SECURITY_RETIREMENT_410_CONTRACT.migration_method &&
-    registryEntry.parity_check ===
-      SECURITY_RETIREMENT_410_CONTRACT.parity_check;
+  const exact = declaredMarkers.every(([key, expected]) => {
+    const observed = securityRetirementRegistryValue(registryEntry, key);
+    if (
+      OPTIONAL_SECURITY_RETIREMENT_RESPONSE_KEYS.has(key) &&
+      observed === undefined
+    ) {
+      return true;
+    }
+    return observed === expected;
+  });
   return {
     exact,
     blocker: exact

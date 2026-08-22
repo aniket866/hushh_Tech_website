@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONTRACT,
+  SECURITY_RETIREMENT_410_CONTRACT,
   buildPinnedCallerGraph,
   classifyCandidateEntry,
   deriveGlobalEvidenceBlockers,
@@ -341,22 +342,49 @@ describe("retirement candidate decision contract", () => {
     });
   });
 
+  it.each(Object.entries(SECURITY_RETIREMENT_410_CONTRACT))(
+    "blocks an isolated %s 410 marker",
+    (key, value) => {
+      const fixture = candidateFixture();
+      if (key === "slug") {
+        fixture.registryEntry.source.slug = String(value);
+        fixture.currentEntry.slug = String(value);
+        fixture.trafficEntry.slug = String(value);
+        fixture.callerEntry.slug = String(value);
+      } else {
+        Object.assign(fixture.registryEntry, { [key]: value });
+      }
+
+      expect(classifyCandidateEntry(fixture)).toMatchObject({
+        classification: "BLOCKED",
+        reason_codes: ["SECURITY_RETIREMENT_410_CONTRACT_MISMATCH"],
+        retirement_authorized: false,
+      });
+    },
+  );
+
   it.each([
-    ["owner group", { owner_group: "security-retirement" }],
-    ["final disposition", { final_disposition: "RETIRE_WITH_410" }],
-    ["GCP owner", { gcp_owner: "cloud-run:hushh-tech-identity-api" }],
-    ["retired auth mode", { auth_mode: "none_feature_retired" }],
-    [
-      "migration method",
-      { migration_method: "do_not_port_return_410_feature_retired" },
-    ],
-    [
-      "parity contract",
-      { parity_check: "always_410_feature_retired_with_no_secret_payload" },
-    ],
-  ])("blocks an isolated %s 410 marker", (_label, marker) => {
+    ["response_status", "410"],
+    ["response_code", "feature_retired"],
+    ["secret_payload_allowed", "false"],
+  ])("blocks a type-variant %s 410 marker", (key, value) => {
     const fixture = candidateFixture();
-    Object.assign(fixture.registryEntry, marker);
+    Object.assign(fixture.registryEntry, { [key]: value });
+
+    expect(classifyCandidateEntry(fixture)).toMatchObject({
+      classification: "BLOCKED",
+      reason_codes: ["SECURITY_RETIREMENT_410_CONTRACT_MISMATCH"],
+      retirement_authorized: false,
+    });
+  });
+
+  it("blocks combined type-variant response-level 410 markers", () => {
+    const fixture = candidateFixture();
+    Object.assign(fixture.registryEntry, {
+      response_status: "410",
+      response_code: "feature_retired",
+      secret_payload_allowed: "false",
+    });
 
     expect(classifyCandidateEntry(fixture)).toMatchObject({
       classification: "BLOCKED",
