@@ -47,6 +47,19 @@ function dataAdapter(overrides = {}) {
     }),
     publicInvestorProfile: async () => null,
     overview: async () => emptyOverview(),
+    overviewList: async () => ({
+      investors: [],
+      total: 0,
+      counts: {
+        needs_attention: 0,
+        completed_onboarding: 0,
+        bank_linked: 0,
+        payment_review: 0,
+        manually_approved: 0,
+        all: 0,
+      },
+      sourceWarnings: [],
+    }),
     analytics: async () => emptyOverview(),
     ...overrides,
   };
@@ -99,7 +112,7 @@ test("location handler enforces the query contract and emits immutable data", as
   assert.deepEqual(countries.body.data, [{ isoCode: "US", name: "United States" }]);
   const invalid = await handler(context({ search: "?type=cities&country=US" }));
   assert.equal(invalid.status, 400);
-  assert.equal(invalid.headers["cache-control"], undefined);
+  assert.equal(invalid.headers["cache-control"], "private, no-store");
 });
 
 test("GCS catalog rejects unpinned data before parsing", async () => {
@@ -117,6 +130,60 @@ test("GCS catalog rejects unpinned data before parsing", async () => {
     },
   });
   await assert.rejects(adapter.countries(SIGNAL), /integrity/);
+});
+
+test("GCS catalog cancels an oversized stream before buffering beyond 25 MiB", async () => {
+  let cancelled = 0;
+  let reads = 0;
+  const maxBytes = 25 * 1024 * 1024;
+  const reader = {
+    async read() {
+      reads += 1;
+      if (reads === 1) return { done: false, value: new Uint8Array(maxBytes) };
+      return { done: false, value: new Uint8Array(1) };
+    },
+    async cancel() { cancelled += 1; },
+    releaseLock() {},
+  };
+  const adapter = createGcsLocationCatalogAdapter({
+    bucket: "hushh-tech-uat-catalogs",
+    object: "locations/v1.json",
+    generation: "123",
+    sha256: "a".repeat(64),
+    getAccessToken: async () => "identity-token",
+    fetchImpl: async () => ({
+      ok: true,
+      headers: new Headers(),
+      body: { getReader: () => reader },
+    }),
+  });
+  await assert.rejects(adapter.countries(SIGNAL), /integrity/);
+  assert.equal(reads, 2);
+  assert.equal(cancelled, 1);
+});
+
+test("GCS catalog cancels a declared oversized body before its first read", async () => {
+  let cancelled = 0;
+  let reads = 0;
+  const adapter = createGcsLocationCatalogAdapter({
+    bucket: "hushh-tech-uat-catalogs",
+    object: "locations/v1.json",
+    generation: "123",
+    sha256: "a".repeat(64),
+    getAccessToken: async () => "identity-token",
+    fetchImpl: async () => ({
+      ok: true,
+      headers: new Headers({ "content-length": String(25 * 1024 * 1024 + 1) }),
+      body: { getReader: () => ({
+        async read() { reads += 1; return { done: true }; },
+        async cancel() { cancelled += 1; },
+        releaseLock() {},
+      }) },
+    }),
+  });
+  await assert.rejects(adapter.countries(SIGNAL), /integrity/);
+  assert.equal(reads, 0);
+  assert.equal(cancelled, 1);
 });
 
 test("chat access validates identifiers and preserves free, paid, and limit decisions", async () => {
@@ -214,6 +281,7 @@ test("metrics Cloud SQL loading never reads the user email table", async () => {
 
 test("admin overview/list/metrics/analytics return bounded deterministic shapes", async () => {
   const overviewCalls = [];
+  const listCalls = [];
   const populated = emptyOverview({
     ndaRows: [{ user_id: "u1", signer_name: "Ada", signed_at: "2026-08-20T00:00:00Z" }],
     onboardingRows: [{ user_id: "u1", is_completed: true, financial_link_status: "completed" }],
@@ -223,14 +291,130 @@ test("admin overview/list/metrics/analytics return bounded deterministic shapes"
   const handlers = createGcpReadBatchHandlers({
     dataAdapter: dataAdapter({
       overview: async (options) => { overviewCalls.push(options); return populated; },
+      overviewList: async (options) => {
+        listCalls.push(options);
+        return {
+          investors: [{ userId: "u1" }],
+          total: 1,
+          counts: { needs_attention: 0, completed_onboarding: 1, bank_linked: 0,
+            payment_review: 1, manually_approved: 1, all: 1 },
+          sourceWarnings: [],
+        };
+      },
       analytics: async () => populated,
     }),
   });
   assert.equal((await handlers["fund-payment-admin-overview"](context({ body: {} }))).body.investors.length, 1);
   assert.equal((await handlers["fund-payment-admin-overview-metrics"](context({ body: {} }))).body.funnel.verified, 1);
   assert.equal(overviewCalls.at(-1).includeUsers, false);
-  assert.equal((await handlers["fund-payment-admin-overview-list"](context({ body: { pageSize: 500, tab: "all" } }))).body.pageSize, 100);
+  const list = await handlers["fund-payment-admin-overview-list"](
+    context({ body: { page: 2, pageSize: 500, tab: "all", search: "ada" } }),
+  );
+  assert.equal(list.body.pageSize, 100);
+  assert.equal(list.body.investors.length, 1);
+  assert.deepEqual(
+    { page: listCalls[0].page, pageSize: listCalls[0].pageSize, tab: listCalls[0].tab, search: listCalls[0].search },
+    { page: 2, pageSize: 100, tab: "all", search: "ada" },
+  );
   assert.equal((await handlers["fund-payment-admin-analytics"](context({ body: {} }))).body.success, true);
+});
+
+test("admin list adapter applies projection, filtering, LIMIT and OFFSET in Cloud SQL", async () => {
+  const statements = [];
+  const database = { transaction: async (work) => work({
+    async query(text, values = []) {
+      statements.push({ text, values });
+      if (/WITH candidate_users/.test(text)) {
+        return { rows: [{
+          user_id: "u1",
+          recipient_name: "Ada",
+          stage: "manual_approved",
+          payment_status: "verified_investor",
+          commitment_amount: "10",
+          onboarding_complete: true,
+          bank_linked: false,
+          meet_ceo_done: false,
+          financial_data_status: "missing",
+          plaid_product_count: 0,
+          plaid_account_count: 0,
+          kyc_status: "not_found",
+          missing_pieces: [],
+          data_sources: ["fund_stripe_payment_requests"],
+          count_all: 9,
+          count_needs_attention: 4,
+          count_completed_onboarding: 5,
+          count_bank_linked: 3,
+          count_payment_review: 6,
+          count_manually_approved: 2,
+        }] };
+      }
+      return { rows: [] };
+    },
+  }) };
+  const result = await createCloudSqlReadBatchAdapter().overviewList({
+    database,
+    actor: ADMIN,
+    page: 3,
+    pageSize: 25,
+    tab: "all",
+    search: "ada",
+    signal: SIGNAL,
+  });
+  const statement = statements.find(({ text }) => /WITH candidate_users/.test(text));
+  assert.ok(statement);
+  assert.match(statement.text, /LIMIT \$3 OFFSET \$4/);
+  assert.match(statement.text, /LEFT JOIN public\.users users ON users\.id = candidates\.user_id/);
+  assert.doesNotMatch(statement.text, /SELECT\s+(?:\w+\.)?\*/i);
+  const derived = statement.text.split("), derived AS (")[1].split("), projected AS (")[0];
+  assert.doesNotMatch(derived, /\bkyc\./i);
+  assert.deepEqual(statement.values, ["ada", "all", 25, 50]);
+  assert.equal(result.investors.length, 1);
+  assert.equal(result.total, 9);
+  assert.equal(result.counts.manually_approved, 2);
+});
+
+test("admin list falls back only when the optional KYC relation is absent", async () => {
+  const statements = [];
+  let listAttempts = 0;
+  const database = { transaction: async (work) => work({
+    async query(text, values = []) {
+      statements.push({ text, values });
+      if (!/WITH candidate_users/.test(text)) return { rows: [] };
+      listAttempts += 1;
+      if (listAttempts === 1) {
+        const error = new Error('relation "public.kyc_attestations" does not exist');
+        error.code = "42P01";
+        throw error;
+      }
+      assert.doesNotMatch(text, /kyc_attestations/i);
+      return { rows: [{
+        user_id: null,
+        count_all: 0,
+        count_needs_attention: 0,
+        count_completed_onboarding: 0,
+        count_bank_linked: 0,
+        count_payment_review: 0,
+        count_manually_approved: 0,
+      }] };
+    },
+  }) };
+  const result = await createCloudSqlReadBatchAdapter().overviewList({
+    database,
+    actor: ADMIN,
+    page: 1,
+    pageSize: 25,
+    tab: "all",
+    search: "",
+    signal: SIGNAL,
+  });
+  assert.equal(listAttempts, 2);
+  assert.deepEqual(result.investors, []);
+  assert.deepEqual(result.sourceWarnings, [{
+    source: "kyc_attestations",
+    code: "SOURCE_UNAVAILABLE",
+    message: "Optional source is unavailable",
+  }]);
+  assert.ok(statements.some(({ text }) => text === "ROLLBACK TO SAVEPOINT optional_kyc_admin_list"));
 });
 
 test("profile generation accepts only the strict twelve-field Vertex schema", async () => {

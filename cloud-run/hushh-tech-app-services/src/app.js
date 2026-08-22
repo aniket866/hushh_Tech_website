@@ -353,7 +353,9 @@ function normalizeHandlerResponse(output, contract = null) {
       !value ||
       value.length > 2_048 ||
       name in headers ||
-      (name === "cache-control" && value !== contract?.cacheControl)
+      (name === "cache-control" &&
+        value !== contract?.cacheControl &&
+        !(status >= 400 && value === "private, no-store"))
     ) {
       throw new RuntimeError(
         "HANDLER_CONTRACT_INVALID",
@@ -415,6 +417,11 @@ function sendHandlerResponse(response, output, contract) {
     .status(normalized.status)
     .type("application/json")
     .send(JSON.stringify(normalized.body));
+}
+
+function sendRuntimeError(response, error, requestId) {
+  response.setHeader("Cache-Control", "private, no-store");
+  return response.status(error.statusCode).json(errorPayload(error, requestId));
 }
 
 export function createApp({
@@ -654,7 +661,7 @@ export function createApp({
         requestId: id,
         serviceOwner: config.serviceOwner,
       });
-      return response.status(typed.statusCode).json(errorPayload(typed, id));
+      return sendRuntimeError(response, typed, id);
     } finally {
       deadline.cleanup();
     }
@@ -857,7 +864,7 @@ export function createApp({
         requestId: id,
         serviceOwner: config.serviceOwner,
       });
-      return response.status(typed.statusCode).json(errorPayload(typed, id));
+      return sendRuntimeError(response, typed, id);
     } finally {
       deadline.cleanup();
     }
@@ -872,10 +879,11 @@ export function createApp({
         : error?.type === "encoding.unsupported"
           ? new RuntimeError("INVALID_REQUEST", "Invalid request.", 415)
           : asRuntimeError(error);
-    return response.status(typed.statusCode).json(errorPayload(typed, id));
+    return sendRuntimeError(response, typed, id);
   });
 
   app.use((_request, response) => {
+    response.setHeader("Cache-Control", "private, no-store");
     response.status(404).json({
       detail: { code: "INVALID_ROUTE", message: "Not found." },
     });

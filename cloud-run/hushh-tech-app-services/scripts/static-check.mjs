@@ -10,6 +10,7 @@ import {
 } from "../src/registry.js";
 import { FUNCTION_CONTRACTS } from "../src/contracts.js";
 import { GCP_READ_BATCH_SLUGS } from "../src/handlers/gcp-read-batch.js";
+import { validateGcpReadBatchCandidateMatrix } from "../../../scripts/gcp/migration/validate-gcp-read-batch-candidates.mjs";
 import {
   SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
   SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
@@ -17,6 +18,7 @@ import {
 } from "../src/table-privileges.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repositoryRoot = resolve(root, "../..");
 const registryOnly = process.argv.includes("--registry-only");
 
 async function filesUnder(directory) {
@@ -72,6 +74,22 @@ assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
 const candidateMatrix = JSON.parse(
   await readFile(resolve(root, "registry/candidates.gcp-read-batch.v1.json"), "utf8"),
 );
+const currentBundleEvidence = JSON.parse(
+  await readFile(resolve(repositoryRoot, candidateMatrix.source_evidence.path), "utf8"),
+);
+const candidateSourceFiles = Object.fromEntries(
+  await Promise.all(
+    candidateMatrix.functions.map(async ({ slug, source_path }) => [
+      slug,
+      await readFile(resolve(repositoryRoot, source_path), "utf8"),
+    ]),
+  ),
+);
+validateGcpReadBatchCandidateMatrix({
+  matrix: candidateMatrix,
+  currentEvidence: currentBundleEvidence,
+  sourceFiles: candidateSourceFiles,
+});
 assert.equal(candidateMatrix.deployment_state, "DEFAULT_OFF");
 assert.equal(candidateMatrix.required_registry_state, "INVENTORY_FROZEN");
 assert.deepEqual(

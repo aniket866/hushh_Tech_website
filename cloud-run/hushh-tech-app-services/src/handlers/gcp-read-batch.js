@@ -12,6 +12,14 @@ const OG_IMAGE_HEADERS = Object.freeze({
   "cache-control": "public, max-age=3600, s-maxage=86400",
   "content-type": "image/svg+xml",
 });
+const PUBLIC_ERROR_JSON_HEADERS = Object.freeze({
+  "cache-control": "private, no-store",
+  "content-type": "application/json",
+});
+const PUBLIC_ERROR_TEXT_HEADERS = Object.freeze({
+  "cache-control": "private, no-store",
+  "content-type": "text/plain",
+});
 const ADMIN_TABS = new Set([
   "needs_attention",
   "completed_onboarding",
@@ -109,7 +117,7 @@ function json(status, body, headers = PRIVATE_JSON_HEADERS) {
 }
 
 function publicJsonError(status, body) {
-  return { status, headers: { "content-type": "application/json" }, body };
+  return { status, headers: PUBLIC_ERROR_JSON_HEADERS, body };
 }
 
 function text(status, body, headers) {
@@ -476,58 +484,6 @@ function computeOverview(data) {
   };
 }
 
-function matchesSearch(investor, query) {
-  if (!query) return true;
-  return [
-    investor.recipientName,
-    investor.userEmail,
-    investor.requestReference,
-    investor.institutionName,
-    investor.financialDataStatus,
-    investor.kycStatus,
-    ...investor.dataSources,
-    ...investor.missingPieces,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
-}
-
-function matchesTab(investor, tab) {
-  if (tab === "needs_attention") return investor.missingPieces.length > 0;
-  if (tab === "completed_onboarding") return investor.onboardingComplete;
-  if (tab === "bank_linked") return investor.bankLinked;
-  if (tab === "payment_review") {
-    return Boolean(
-      investor.paymentRequestStatus ||
-        investor.firstPaymentPaid ||
-        investor.manualReviewStatus,
-    );
-  }
-  if (tab === "manually_approved") {
-    return investor.manualInvestorStatus === "verified_investor";
-  }
-  return true;
-}
-
-function tabCounts(rows) {
-  const counts = {
-    needs_attention: 0,
-    completed_onboarding: 0,
-    bank_linked: 0,
-    payment_review: 0,
-    manually_approved: 0,
-    all: rows.length,
-  };
-  for (const investor of rows) {
-    for (const tab of Object.keys(counts)) {
-      if (tab !== "all" && matchesTab(investor, tab)) counts[tab] += 1;
-    }
-  }
-  return counts;
-}
-
 function median(values) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -850,7 +806,13 @@ export function createGcpReadBatchHandlers({
   vertexProfile = null,
   now = () => new Date(),
 } = {}) {
-  for (const method of ["chatAccess", "publicInvestorProfile", "overview", "analytics"]) {
+  for (const method of [
+    "chatAccess",
+    "publicInvestorProfile",
+    "overview",
+    "overviewList",
+    "analytics",
+  ]) {
     if (typeof dataAdapter?.[method] !== "function") {
       throw new Error(`GCP read batch data adapter is missing ${method}.`);
     }
@@ -978,9 +940,7 @@ export function createGcpReadBatchHandlers({
     async "investor-og-image"({ request, database, signal }) {
       const slug = clean(parameters(request).get("slug")).toLowerCase();
       if (!PROFILE_SLUG_PATTERN.test(slug)) {
-        return text(400, "Missing slug parameter", {
-          "content-type": "text/plain",
-        });
+        return text(400, "Missing slug parameter", PUBLIC_ERROR_TEXT_HEADERS);
       }
       try {
         const profile = await dataAdapter.publicInvestorProfile({
@@ -989,15 +949,11 @@ export function createGcpReadBatchHandlers({
           signal,
         });
         if (!profile) {
-          return text(404, "Profile not found", {
-            "content-type": "text/plain",
-          });
+          return text(404, "Profile not found", PUBLIC_ERROR_TEXT_HEADERS);
         }
         return text(200, ogImage(profile), OG_IMAGE_HEADERS);
       } catch {
-        return text(500, "Internal server error", {
-          "content-type": "text/plain",
-        });
+        return text(500, "Internal server error", PUBLIC_ERROR_TEXT_HEADERS);
       }
     },
 
@@ -1057,25 +1013,22 @@ export function createGcpReadBatchHandlers({
         if (search.length > 200) {
           return json(400, { error: "Invalid search" });
         }
-        const data = await dataAdapter.overview({
+        const data = await dataAdapter.overviewList({
           database: context.database,
           actor,
-          targetReference: `list:${tab}`,
-          signal: context.signal,
-        });
-        const searched = computeOverview(data).investors.filter((row) =>
-          matchesSearch(row, search),
-        );
-        const counts = tabCounts(searched);
-        const tabRows = searched.filter((row) => matchesTab(row, tab));
-        const offset = (page - 1) * pageSize;
-        return json(200, {
-          success: true,
-          investors: tabRows.slice(offset, offset + pageSize),
           page,
           pageSize,
-          total: tabRows.length,
-          counts,
+          tab,
+          search,
+          signal: context.signal,
+        });
+        return json(200, {
+          success: true,
+          investors: data.investors,
+          page,
+          pageSize,
+          total: data.total,
+          counts: data.counts,
           sourceWarnings: data.sourceWarnings,
         });
       } catch (error) {

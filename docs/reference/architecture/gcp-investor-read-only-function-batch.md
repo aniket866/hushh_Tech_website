@@ -18,19 +18,33 @@ code-readiness evidence only, not deployment or parity evidence.
 
 ## Source evidence
 
-The checked-in source and sanitized live-bundle evidence were compared. The
-eight-candidate source and live-bundle digests, plus exact request, table,
-column, cache, side-effect, dependency, and blocker contracts, are recorded in
+The eight-candidate matrix recomputes each checked-in `index.ts` SHA-256 and
+binds it to the matching entry in the sanitized current-v2 capture. It also
+pins exact source and target authentication, tables, columns, side effects,
+dependencies, and blockers. The machine contract is
 `cloud-run/hushh-tech-app-services/registry/candidates.gcp-read-batch.v1.json`.
 
-| Slug | Version | Checked-in source SHA-256 | Live source SHA-256 | Live bundle digest |
-| --- | ---: | --- | --- | --- |
-| `hushh-location-geocode` | 6092 | `499a6dd0f528045f5285ebe794a2d0c798c83ee31dccb4533682530f8d4f1573` | `6aaf6aaa0141e4949d911e3a3e53c12e0454dd427e9d6bf5599ef2b72a2f6e90` | `7f408b67193781383b2ca67c01e99501b9ab9da041ac8afb843382a45bd4ac8f` |
-| `stock-quotes` | 6285 | `2bcc1476769fbf46bb330556761e60a4a0a90a1a9f4a97c3ec0eba4a7a9ef68b` | `86abf4fe66472a7a1d87e34c156768591944c0a00d3c064939ee4d055b2bafc4` | `d54c9bcc4c8b642c9a16650e72878a9a70724dad7ce7d8f998e94e0241932683` |
+| Slug | Current / manifest | Checked-in source SHA-256 | Current-v2 bundle digest |
+| --- | ---: | --- | --- |
+| `chat-check-access` | 6209 / 6166 | `b83383a35a7d25ffcd2f479764b26cd3c1e338e4ad5840353295b2f641e6e9e0` | `cac0281a475a173038dfbbcecb8f220e53ec68b556ccef22d17ef2a7c1bdb794` |
+| `fund-payment-admin-analytics` | 3835 / 3792 | `1b26955866a1e9ee7b28b545420591c84e8e6c2b37948e3a0320db729804a7d5` | `0aaf2005bf05fd8089769538a602cd3dcafd537fd06e5f313af91a9342fa54fd` |
+| `fund-payment-admin-overview` | 3899 / 3856 | `ff858f2ce1b167cccd4d819237df6e6eb6cca4ca5c41712cedb4eaabcda438d7` | `656b666ae145055ee23a8f97a98513d6e3ff1848a206538e2ae16daca303894c` |
+| `fund-payment-admin-overview-list` | 3845 / 3802 | `4ebcc8e6f2e90b774630a2420b209f2749ed4294617726e567760197445b2dbd` | `3917c8b54ac8e66e797c07dcc5a99678cc03ea9d14f9231791242bbffd71fd52` |
+| `fund-payment-admin-overview-metrics` | 3845 / 3802 | `ed5a548672257eb84e7753ea8e969fcee82c01b97c580d4b31521d4ce204c6f1` | `736067da58586f5663103794d710de3c4a2233da393919d5aa040ace093fcd84` |
+| `generate-investor-profile` | 6221 / 6178 | `2f9ff1321c2074431853c3d0aa0c60699ad32c080ee32931140bd5cb058eb2a8` | `a953b24ba5b0de891580774285a7ac631142470f87f8741adbbb43966e689fd1` |
+| `get-locations` | 5623 / 5580 | `b9dfec2cda54b048b5522cddb8b803a3567a494017134a57a2578632a3e4e2f5` | `4a7d46510f6860a5db410e48389af184199ee6a2d7dffbc9b462f69246c0da0c` |
+| `investor-og-image` | 6215 / 6172 | `862250312646c32b7d036bdc3714dbe802c65aca239b8bddf43eede2f6574339` | `ee32d94f5bedd01860d11b82fe3e9471dedcefd5971e819c0aa64b56ac8af684` |
 
-The live bundle inventory is
-`migration/evidence/supabase-live-function-bundles.v1.json`. No recovered
-temporary path or recovered source is committed.
+The source capture is
+`migration/evidence/supabase-current-live-function-bundles.v2.json`. All eight
+entries report `verify_jwt=true`, `capture_status=EXTRACTED`, and a current
+version exactly 43 above the frozen manifest version. The v2 capture did not
+perform an ending metadata check and exposes no deploy or Git revision.
+Therefore its bundle digest is not proof that the bytes were bound to the
+reported current version. Every row retains all four blocking codes:
+`SOURCE_BUNDLE_VERSION_UNBOUND`, `SOURCE_METADATA_END_CHECK_MISSING`,
+`SOURCE_REVISION_UNPROVEN`, and `SOURCE_VERSION_DRIFT`. No source parity or
+revision equivalence is asserted.
 
 ## Shared route and authentication
 
@@ -119,10 +133,12 @@ auth parity is unresolved.
 
 The analytics, overview, list, and metrics candidates require a verified
 Firebase claim whose `fund_admin` value is the literal boolean `true`. They use
-static Cloud SQL statements, bounded pagination, best-effort audit writes, and
-degrade only the optional KYC source. They stay frozen until exact grants,
-forced row-level security, real claim issuance, and private live UAT parity are
-proven. `kyc_attestations` is absent from the target manifest.
+static Cloud SQL statements, best-effort audit writes, and degrade only the
+optional KYC source. The list query performs search, tab filtering, counts,
+explicit projection, `LIMIT`, and `OFFSET` inside Cloud SQL before sensitive
+rows reach the Node process. They stay frozen until exact grants, forced
+row-level security, real claim issuance, and private live UAT parity are proven.
+`kyc_attestations` is absent from the target manifest.
 
 ### `generate-investor-profile`
 
@@ -161,8 +177,9 @@ The focused Node suite proves:
   exact success and error shapes;
 - no candidate handler executes while the real registry remains frozen;
 - each of the eight gateway paths returns 503 before Firebase auth or upstream
-  access, and strict admin, PII, catalog-integrity, SVG-injection, Cloud SQL,
-  pagination, and Vertex-schema adversarial cases pass.
+  access, and strict admin, PII, source-evidence tampering, zero-digest,
+  fake-table, missing-blocker, catalog-stream limit/cancellation, SVG-injection,
+  bounded Cloud SQL list pagination, and Vertex-schema adversarial cases pass.
 
 Run:
 
@@ -175,7 +192,7 @@ The gateway contract test is in `tests/gcpFunctionGateway.test.ts`.
 
 ## Enablement blockers
 
-1. UAT has no deployed revision containing the two handlers.
+1. UAT has no deployed revision containing these staged handlers.
 2. The default server intentionally has no handler or adapter wiring.
 3. The distributed rate-limit adapter is unavailable.
 4. Google Maps and Finnhub secrets are not bound.
@@ -187,7 +204,7 @@ The gateway contract test is in `tests/gcpFunctionGateway.test.ts`.
 
 ## Live verification checklist
 
-- Keep all five registry entries frozen during review and testing.
+- Keep all 112 registry entries frozen during review and testing.
 - Deploy an exact reviewed SHA to an unserved UAT revision with zero traffic.
 - Install the distributed limiter before readiness can pass.
 - Bind only the reviewed service identities and provider secrets.
