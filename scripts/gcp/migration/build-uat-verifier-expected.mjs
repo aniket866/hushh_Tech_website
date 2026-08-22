@@ -13,6 +13,10 @@ import {
   validateSourceCaptureManifest,
   validateUatIdentityArtifact,
 } from "./uat-schema-data-executor.mjs";
+import {
+  loadRetainedUatSourceKeyManifest,
+  validateUatSourceKeyManifest,
+} from "./uat-source-key-manifest.mjs";
 
 export const PRE_APPLY_CATALOG_EVIDENCE_SHA256 =
   "ba52ac25a77276fe47046ea8eca69344b75e4b10e1a08d6f235561fa4224431c";
@@ -22,6 +26,8 @@ export const REPLAY_KEY_SHA256 =
 export function buildUatVerifierExpected({ sourceManifest, identityArtifact }) {
   const source = validateSourceCaptureManifest(sourceManifest, RETAINED_UAT_SOURCE_MANIFEST_SHA256);
   validateUatIdentityArtifact(identityArtifact, RETAINED_UAT_IDENTITY_EVIDENCE);
+  const sourceKeys = loadRetainedUatSourceKeyManifest();
+  validateUatSourceKeyManifest(sourceKeys, sourceManifest);
   const replayKey = canonicalHash({
     catalogEvidenceSha256: PRE_APPLY_CATALOG_EVIDENCE_SHA256,
     sourceManifestSha256: source.manifestSha256,
@@ -36,6 +42,7 @@ export function buildUatVerifierExpected({ sourceManifest, identityArtifact }) {
     preApplyCatalogEvidenceSha256: PRE_APPLY_CATALOG_EVIDENCE_SHA256,
     replayKey,
     sourceManifest,
+    sourceKeys,
     identity: deriveUatIdentityEvidence(identityArtifact),
     expectedCatalog: {
       publicTables: 70,
@@ -69,6 +76,7 @@ export function buildUatVerifierExpected({ sourceManifest, identityArtifact }) {
         tableWideSelect: false,
         publicDml: false,
         elevatedPrivileges: false,
+        expectedTotalPublicPolicies: 281,
       },
     },
   };
@@ -89,8 +97,9 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  const sourceInput = JSON.parse(readFileSync(resolve(args["source-manifest"]), "utf8"));
   const expected = buildUatVerifierExpected({
-    sourceManifest: JSON.parse(readFileSync(resolve(args["source-manifest"]), "utf8")),
+    sourceManifest: sourceInput.sourceManifest ?? sourceInput,
     identityArtifact: JSON.parse(readFileSync(resolve(args["identity-artifact"]), "utf8")),
   });
   const output = resolve(args.output);

@@ -12,6 +12,11 @@ import {
   validateUatIdentityArtifact,
 } from "./uat-schema-data-executor.mjs";
 import {
+  RETAINED_UAT_SOURCE_KEY_MANIFEST_SHA256,
+  loadRetainedUatSourceKeyManifest,
+  validateUatSourceKeyManifest,
+} from "./uat-source-key-manifest.mjs";
+import {
   TARGET_SCHEMA_PHASES,
   validatePrivateTargetSchemaPlan,
 } from "./target-schema-compiler.mjs";
@@ -182,7 +187,15 @@ FROM hushh_migration.migration_runs WHERE replay_key=${bytea(replayKey)}
 ON CONFLICT (migration_run_id,stream,sequence) DO NOTHING;`;
 }
 
-export function loadValidatedSourceMembers({ sourceManifest, rowDirectory }) {
+export function loadValidatedSourceMembers({
+  sourceManifest,
+  rowDirectory,
+  sourceKeyManifest = loadRetainedUatSourceKeyManifest(),
+  expectedSourceKeyManifestSha256 = RETAINED_UAT_SOURCE_KEY_MANIFEST_SHA256,
+  expectedSourceRowCount = 45_042,
+}) {
+  validateUatSourceKeyManifest(sourceKeyManifest, sourceManifest, expectedSourceKeyManifestSha256, expectedSourceRowCount);
+  const expectedKeys = new Map(sourceKeyManifest.tables.map((table) => [table.name, table]));
   const rowsByTable = new Map();
   for (const table of sourceManifest.tables) {
     let rows;
@@ -191,7 +204,7 @@ export function loadValidatedSourceMembers({ sourceManifest, rowDirectory }) {
     } catch {
       throw new Error("SOURCE_MEMBER_JSON_INVALID");
     }
-    validateRowsForTable(table, rows);
+    validateRowsForTable(table, rows, expectedKeys.get(table.name));
     rowsByTable.set(table.name, rows);
   }
   return rowsByTable;
@@ -204,6 +217,7 @@ export function buildCloudSqlImportBundle({
   phaseDirectory,
   rowDirectory,
   outputDirectory,
+  sourceKeyManifest = loadRetainedUatSourceKeyManifest(),
 }) {
   validateSourceCaptureManifest(sourceManifest, RETAINED_UAT_SOURCE_MANIFEST_SHA256);
   validateUatIdentityArtifact(identityArtifact);
@@ -220,10 +234,11 @@ export function buildCloudSqlImportBundle({
   );
   // Validate every governed table member before creating even one SQL artifact.
   // This makes a same-count/member/hash substitution fail without a partial bundle.
-  const rowsByTable = loadValidatedSourceMembers({ sourceManifest, rowDirectory });
+  const rowsByTable = loadValidatedSourceMembers({ sourceManifest, rowDirectory, sourceKeyManifest });
   const replayKey = canonicalHash({
     catalogEvidenceSha256,
     sourceManifestSha256: sourceManifest.manifestSha256,
+    sourceKeyManifestSha256: sourceKeyManifest.manifestSha256,
     identityArtifactSha256: identityArtifact.artifactSha256,
     target: UAT_TARGET,
   });
@@ -267,6 +282,7 @@ FROM hushh_migration.migration_runs WHERE replay_key=${bytea(replayKey)};`, "COM
     replayKey,
     catalogEvidenceSha256,
     sourceManifestSha256: sourceManifest.manifestSha256,
+    sourceKeyManifestSha256: sourceKeyManifest.manifestSha256,
     identityArtifactSha256: identityArtifact.artifactSha256,
     tableCount: 70,
     rowCount: 45_042,

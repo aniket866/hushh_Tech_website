@@ -87,6 +87,19 @@ describe('reproducible UAT schema/data verifier input', () => {
     expect(() => validateExpected(expected)).toThrow('EXPECTED_MANIFEST_INVALID');
   });
 
+  it('rejects same-count per-table key hash substitution after envelope rehash', () => {
+    const expected = expectedInput();
+    [expected.sourceKeys.tables[0].keySha256, expected.sourceKeys.tables[1].keySha256] =
+      [expected.sourceKeys.tables[1].keySha256, expected.sourceKeys.tables[0].keySha256];
+    const keyPayload = structuredClone(expected.sourceKeys);
+    delete keyPayload.manifestSha256;
+    expected.sourceKeys.manifestSha256 = canonicalHash(keyPayload);
+    const payload = structuredClone(expected);
+    delete payload.expectedSha256;
+    expected.expectedSha256 = canonicalHash(payload);
+    expect(() => validateExpected(expected)).toThrow('EXPECTED_MANIFEST_INVALID');
+  });
+
   it('builds the image from a declared checked-in manifest', () => {
     const dockerfile = readFileSync(new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/Dockerfile', import.meta.url), 'utf8');
     expect(dockerfile).toContain('COPY --chown=node:node index.mjs expected-manifest.v1.json ./');
@@ -109,6 +122,14 @@ describe('reproducible UAT schema/data verifier input', () => {
       publicDml: false,
       elevatedPrivileges: false,
       rlsPolicyExact: true,
+      rlsPolicy: {
+        name: 'nda_signatures_engagement_api_select',
+        command: 'SELECT',
+        permissive: true,
+        roles: ['hushh-tech-engagement-api-uat@hushh-tech-uat.iam'],
+        qual: "current_setting('app.firebase_fund_admin',true)='true'",
+        withCheck: null,
+      },
       missing: [],
     });
   });

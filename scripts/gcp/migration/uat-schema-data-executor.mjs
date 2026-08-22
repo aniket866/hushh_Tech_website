@@ -22,6 +22,11 @@ import {
   validateTerminalDispositions,
 } from "./identity-mapping.mjs";
 import { splitPostgresStatements } from "./target-schema-compiler.mjs";
+import {
+  hashPrimaryKeys,
+  loadRetainedUatSourceKeyManifest,
+  validateUatSourceKeyManifest,
+} from "./uat-source-key-manifest.mjs";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const GENERATION = /^(?:[1-9][0-9]{0,19})$/;
@@ -310,7 +315,7 @@ export function hashRowObjects(rows) {
   return hash.digest("hex");
 }
 
-export function validateRowsForTable(table, rows) {
+export function validateRowsForTable(table, rows, expectedKey = null) {
   validateTableManifest(table);
   if (!Array.isArray(rows) || rows.length !== table.rowCount) fail("SOURCE_ROW_COUNT_MISMATCH");
   for (const row of rows) {
@@ -328,6 +333,13 @@ export function validateRowsForTable(table, rows) {
     if (primaryKeys.has(key)) fail("SOURCE_ROW_KEY_DUPLICATE");
     primaryKeys.add(key);
   }
+  const keySha256 = hashPrimaryKeys(table, rows);
+  if (expectedKey !== null && (
+    expectedKey?.name !== table.name ||
+    !sameCanonical(expectedKey?.primaryKey, table.primaryKey) ||
+    expectedKey?.keyCount !== rows.length ||
+    expectedKey?.keySha256 !== keySha256
+  )) fail("SOURCE_KEY_PARITY_MISMATCH");
   if (canonicalHash(rows) !== table.artifact.memberSha256) fail("SOURCE_MEMBER_HASH_MISMATCH");
   if (hashRowObjects(rows) !== table.rowSha256) fail("SOURCE_ROW_HASH_MISMATCH");
   return true;
@@ -774,6 +786,7 @@ export async function executeUatSchemaDataMigration({
   phaseTexts,
   readRows,
   identityArtifact,
+  sourceKeyManifest = loadRetainedUatSourceKeyManifest(),
   driver,
 }) {
   const catalog = validateGreenCatalogAttestation(catalogEvidence, expectedCatalogEvidenceSha256);
@@ -782,6 +795,8 @@ export async function executeUatSchemaDataMigration({
     fail("IDENTITY_ARTIFACT_REQUIRED");
   }
   validateUatIdentityArtifact(identityArtifact);
+  validateUatSourceKeyManifest(sourceKeyManifest, sourceManifest);
+  const expectedKeys = new Map(sourceKeyManifest.tables.map((table) => [table.name, table]));
   if (!driver || typeof readRows !== "function") fail("EXECUTION_ADAPTER_REQUIRED");
   const boundary = await driver.assertBoundary(UAT_TARGET);
   if (!sameCanonical(boundary, UAT_TARGET)) fail("TARGET_BOUNDARY_MISMATCH");
@@ -835,7 +850,7 @@ export async function executeUatSchemaDataMigration({
   const tableResults = [];
   for (const table of sourceManifest.tables) {
     const rows = await readRows(table);
-    validateRowsForTable(table, rows);
+    validateRowsForTable(table, rows, expectedKeys.get(table.name));
     const result = await inBoundedTransaction(driver, `table:${table.name}`, async () => {
       const checkpoint = await driver.readTableCheckpoint(replayKey, table.name);
       if (!checkpoint) {
@@ -882,6 +897,7 @@ export async function executeUatSchemaDataMigration({
     replayKey,
     catalog,
     source,
+    sourceKeyManifestSha256: sourceKeyManifest.manifestSha256,
     identityArtifactSha256: identityArtifact.artifactSha256,
     phases: appliedPhases,
     tables: tableResults,
@@ -903,7 +919,7 @@ export async function executeUatSchemaDataMigration({
   });
 }
 
-export function buildExecutionEvidence({ replayKey, catalog, source, identityArtifactSha256, phases, tables }) {
+export function buildExecutionEvidence({ replayKey, catalog, source, sourceKeyManifestSha256, identityArtifactSha256, phases, tables }) {
   assertSha256(replayKey, "REPLAY_KEY_INVALID");
   const payload = {
     version: 1,
@@ -915,6 +931,7 @@ export function buildExecutionEvidence({ replayKey, catalog, source, identityArt
     preApplyCatalogEvidenceSha256: catalog.evidenceSha256,
     preApplyCatalogCaptureSha256: catalog.captureSha256,
     sourceManifestSha256: source.manifestSha256,
+    sourceKeyManifestSha256: assertSha256(sourceKeyManifestSha256, "SOURCE_KEY_MANIFEST_INVALID"),
     identityArtifactSha256: assertSha256(identityArtifactSha256, "IDENTITY_ARTIFACT_DIGEST_MISMATCH"),
     phases,
     tables: tables.map(({ name, rowCount, rowSha256 }) => ({ name, rowCount, rowSha256 })),

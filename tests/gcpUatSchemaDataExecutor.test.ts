@@ -16,6 +16,11 @@ import { canonicalHash, canonicalJson } from '../scripts/gcp/migration/canonical
 import { PUBLIC_TABLES } from '../scripts/gcp/migration/contract.mjs';
 import { loadValidatedSourceMembers } from '../scripts/gcp/migration/uat-cloudsql-import-bundle.mjs';
 import {
+  buildUatSourceKeyManifest,
+  hashPrimaryKeys,
+  validateUatSourceKeyManifest,
+} from '../scripts/gcp/migration/uat-source-key-manifest.mjs';
+import {
   SOURCE_BOUNDARY,
   UAT_TARGET,
   UatMigrationError,
@@ -308,19 +313,80 @@ describe('reviewed phase activation and row parity', () => {
       const expectedRows = [{ id: 'expected' }];
       manifest.tables[0].rowSha256 = hashRowObjects(expectedRows);
       manifest.tables[0].artifact.memberSha256 = canonicalHash(expectedRows);
+      const rowsByTable = new Map<string, Array<Record<string, unknown>>>();
       for (const [index, table] of manifest.tables.entries()) {
         const rows = index === 0 ? expectedRows : [];
+        rowsByTable.set(table.name, rows);
         writeFileSync(join(directory, table.artifact.member), `${canonicalJson(rows)}\n`, { mode: 0o600 });
       }
-      expect(loadValidatedSourceMembers({ sourceManifest: manifest, rowDirectory: directory }).size).toBe(70);
+      const sourceKeyManifest = buildUatSourceKeyManifest({ sourceManifest: manifest, rowsByTable });
+      expect(loadValidatedSourceMembers({
+        sourceManifest: manifest,
+        rowDirectory: directory,
+        sourceKeyManifest,
+        expectedSourceKeyManifestSha256: sourceKeyManifest.manifestSha256,
+        expectedSourceRowCount: 1,
+      }).size).toBe(70);
       writeFileSync(join(directory, manifest.tables[0].artifact.member), `${canonicalJson([{ id: 'changed' }])}\n`);
       expectCode(
-        () => loadValidatedSourceMembers({ sourceManifest: manifest, rowDirectory: directory }),
-        'SOURCE_MEMBER_HASH_MISMATCH',
+        () => loadValidatedSourceMembers({
+          sourceManifest: manifest,
+          rowDirectory: directory,
+          sourceKeyManifest,
+          expectedSourceKeyManifestSha256: sourceKeyManifest.manifestSha256,
+          expectedSourceRowCount: 1,
+        }),
+        'SOURCE_KEY_PARITY_MISMATCH',
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it('rejects a same-count primary-key substitution after row/member hashes are recomputed', () => {
+    const originalRows = [{ id: 'expected' }];
+    const changedRows = [{ id: 'changed' }];
+    const table = {
+      ...sourceManifest().tables[0],
+      rowCount: 1,
+      rowSha256: hashRowObjects(changedRows),
+      artifact: { ...sourceManifest().tables[0].artifact, memberSha256: canonicalHash(changedRows) },
+    };
+    const expectedKey = {
+      name: table.name,
+      primaryKey: table.primaryKey,
+      keyCount: 1,
+      keySha256: hashPrimaryKeys(table, originalRows),
+    };
+    expectCode(() => validateRowsForTable(table, changedRows, expectedKey), 'SOURCE_KEY_PARITY_MISMATCH');
+  });
+
+  it('rejects a same-count key drop replaced by a duplicate', () => {
+    const table = sourceManifest().tables[0];
+    expect(() => hashPrimaryKeys(table, [{ id: 'kept' }, { id: 'kept' }])).toThrow('SOURCE_ROW_KEY_DUPLICATE');
+  });
+});
+
+describe('retained 70-table key manifest', () => {
+  const expected = JSON.parse(readFileSync(
+    new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json', import.meta.url),
+    'utf8',
+  ));
+
+  it('binds an explicit key digest and count for every governed table', () => {
+    expect(validateUatSourceKeyManifest(expected.sourceKeys, expected.sourceManifest)).toBe(expected.sourceKeys);
+    expect(expected.sourceKeys.tables).toHaveLength(70);
+    expect(expected.sourceKeys.tables.every((table: any) => /^[a-f0-9]{64}$/.test(table.keySha256))).toBe(true);
+  });
+
+  it('rejects a same-count key-digest swap after the envelope is rehashed', () => {
+    const changed = structuredClone(expected.sourceKeys);
+    [changed.tables[0].keySha256, changed.tables[1].keySha256] =
+      [changed.tables[1].keySha256, changed.tables[0].keySha256];
+    const payload = structuredClone(changed);
+    delete payload.manifestSha256;
+    changed.manifestSha256 = canonicalHash(payload);
+    expect(() => validateUatSourceKeyManifest(changed, expected.sourceManifest)).toThrow('SOURCE_KEY_MANIFEST_INVALID');
   });
 });
 
@@ -443,6 +509,7 @@ describe('automatic identity readers, execution gate and rollback evidence', () 
       replayKey: digest('replay'),
       catalog,
       source,
+      sourceKeyManifestSha256: digest('source-keys'),
       identityArtifactSha256: digest('identity'),
       phases: [{ name: '20_raw_parity_schema.sql.plan', sha256: digest('phase') }],
       tables: [{ name: PUBLIC_TABLES[0], rowCount: 0, rowSha256: hashRowObjects([]) }],

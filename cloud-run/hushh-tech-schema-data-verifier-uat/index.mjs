@@ -14,8 +14,9 @@ const TARGET = Object.freeze({
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[a-z][a-z0-9_]{0,62}$/;
 const PAGE_SIZE = 1_000;
-export const PINNED_EXPECTED_SHA256 = "2f39b5bdf4971f3736b143d1e593747c89d1d858dd9821e5b863187316a0b2aa";
+export const PINNED_EXPECTED_SHA256 = "a924487b2660d2f7aa9226111a53de6539c590b52db4b2f2971bebc1ef774618";
 const PINNED_SOURCE_MANIFEST_SHA256 = "02f520f613addcd7e9b1bc692c39b628241a3c656c463e6f15ab1276b6a6aad1";
+const PINNED_SOURCE_KEY_MANIFEST_SHA256 = "050e24baa2b939ce539c7472502dd7d13bbdde0f8832712c4a6cd4229ae0cf70";
 const PINNED_IDENTITY_ARTIFACT_SHA256 = "a85f406c2852964a951740964efb02b8c9eb75d86f0db2a6568c171f4dada689";
 const PINNED_IDENTITY_MAPPING_SHA256 = "92a0162c5e96ff2ed4ddb425f93336b0ea43ac63f9338c61bec665d1c3523969";
 const TRIGGER_FUNCTIONS = Object.freeze([
@@ -77,6 +78,15 @@ function hashRows(rows) {
   return hash.digest("hex");
 }
 
+function hashPrimaryKeys(table, rows) {
+  const keys = rows.map((row) => canonicalJson(Object.fromEntries(
+    table.primaryKey.map((column) => [column, row[column]]),
+  ))).sort();
+  const hash = createHash("sha256");
+  for (const key of keys) hash.update(key, "utf8").update("\n", "utf8");
+  return hash.digest("hex");
+}
+
 function quoteIdentifier(value) {
   if (!IDENTIFIER.test(value ?? "")) fail("IDENTIFIER_INVALID");
   return `"${value}"`;
@@ -94,7 +104,7 @@ export function validateExpected(expected) {
     !Array.isArray(expected?.sourceManifest?.tables) ||
     expected.sourceManifest.tables.length !== 70
   ) fail("EXPECTED_MANIFEST_INVALID");
-  exactKeys(expected, ["version", "kind", "target", "preApplyCatalogEvidenceSha256", "replayKey", "sourceManifest", "identity", "expectedCatalog", "expectedIdentity", "expectedAccess", "expectedSha256"], "EXPECTED_MANIFEST_INVALID");
+  exactKeys(expected, ["version", "kind", "target", "preApplyCatalogEvidenceSha256", "replayKey", "sourceManifest", "sourceKeys", "identity", "expectedCatalog", "expectedIdentity", "expectedAccess", "expectedSha256"], "EXPECTED_MANIFEST_INVALID");
   const { expectedSha256, ...expectedPayload } = expected;
   if (canonicalHash(expectedPayload) !== expectedSha256) fail("EXPECTED_INPUT_DIGEST_MISMATCH");
   const { manifestSha256, ...sourcePayload } = expected.sourceManifest;
@@ -126,6 +136,31 @@ export function validateExpected(expected) {
     fail("EXPECTED_ROW_TOTAL_INVALID");
   }
   if (
+    expected.sourceKeys?.version !== 1 ||
+    expected.sourceKeys?.kind !== "HUSHH_TECH_UAT_SOURCE_PRIMARY_KEY_PARITY" ||
+    expected.sourceKeys?.manifestSha256 !== PINNED_SOURCE_KEY_MANIFEST_SHA256 ||
+    expected.sourceKeys?.sourceManifestSha256 !== PINNED_SOURCE_MANIFEST_SHA256 ||
+    expected.sourceKeys?.bundleObjectSha256 !== expected.sourceManifest.bundle.objectSha256 ||
+    String(expected.sourceKeys?.bundleGeneration) !== String(expected.sourceManifest.bundle.generation) ||
+    expected.sourceKeys?.tableCount !== 70 ||
+    expected.sourceKeys?.rowCount !== 45_042 ||
+    !Array.isArray(expected.sourceKeys?.tables) ||
+    expected.sourceKeys.tables.length !== 70
+  ) fail("EXPECTED_KEY_MANIFEST_INVALID");
+  exactKeys(expected.sourceKeys, ["version", "kind", "sourceManifestSha256", "bundleObjectSha256", "bundleGeneration", "tableCount", "rowCount", "tables", "manifestSha256"], "EXPECTED_KEY_MANIFEST_INVALID");
+  const { manifestSha256: keyManifestSha256, ...keyManifestPayload } = expected.sourceKeys;
+  if (canonicalHash(keyManifestPayload) !== keyManifestSha256) fail("EXPECTED_KEY_MANIFEST_DIGEST_MISMATCH");
+  for (const [index, keyTable] of expected.sourceKeys.tables.entries()) {
+    const sourceTable = expected.sourceManifest.tables[index];
+    exactKeys(keyTable, ["name", "primaryKey", "keyCount", "keySha256"], "EXPECTED_KEY_TABLE_INVALID");
+    if (
+      keyTable.name !== sourceTable.name ||
+      canonicalHash(keyTable.primaryKey) !== canonicalHash(sourceTable.primaryKey) ||
+      keyTable.keyCount !== sourceTable.rowCount ||
+      !SHA256.test(keyTable.keySha256 ?? "")
+    ) fail("EXPECTED_KEY_TABLE_INVALID");
+  }
+  if (
     expected.target?.project !== TARGET.project ||
     expected.target?.instance !== TARGET.instance ||
     expected.target?.database !== TARGET.database ||
@@ -137,7 +172,7 @@ export function validateExpected(expected) {
   ) fail("EXPECTED_IDENTITY_INVALID");
   const engagementAccess = expected.expectedAccess?.engagementNdaAdminFetch;
   exactKeys(expected.expectedAccess, ["engagementNdaAdminFetch"], "EXPECTED_ACCESS_INVALID");
-  exactKeys(engagementAccess, ["role", "table", "selectColumns", "rlsPolicy", "rlsClaimSetting", "rlsClaimValue", "tableWideSelect", "publicDml", "elevatedPrivileges"], "EXPECTED_ACCESS_INVALID");
+  exactKeys(engagementAccess, ["role", "table", "selectColumns", "rlsPolicy", "rlsClaimSetting", "rlsClaimValue", "tableWideSelect", "publicDml", "elevatedPrivileges", "expectedTotalPublicPolicies"], "EXPECTED_ACCESS_INVALID");
   if (
     engagementAccess?.role !== "hushh-tech-engagement-api-uat@hushh-tech-uat.iam" ||
     engagementAccess?.table !== "public.nda_signatures" ||
@@ -147,7 +182,8 @@ export function validateExpected(expected) {
     engagementAccess?.rlsClaimValue !== "true" ||
     engagementAccess?.tableWideSelect !== false ||
     engagementAccess?.publicDml !== false ||
-    engagementAccess?.elevatedPrivileges !== false
+    engagementAccess?.elevatedPrivileges !== false ||
+    engagementAccess?.expectedTotalPublicPolicies !== 281
   ) fail("EXPECTED_ACCESS_INVALID");
   return expected;
 }
@@ -216,11 +252,19 @@ export function assessEngagementNdaBoundary(observed, expected) {
     publicDml: observed.publicDml,
     elevatedPrivileges,
     rlsPolicyExact: exactPolicy,
+    rlsPolicy: observed.policy.length === 1 ? {
+      name: observed.policy[0].name,
+      command: observed.policy[0].command === "r" ? "SELECT" : observed.policy[0].command,
+      permissive: observed.policy[0].permissive,
+      roles: observed.policy[0].roles,
+      qual: normalizePolicyExpression(observed.policy[0].qual),
+      withCheck: normalizePolicyExpression(observed.policy[0].withCheck),
+    } : null,
     missing,
   });
 }
 
-async function fetchTable(client, table) {
+async function fetchTable(client, table, expectedKey) {
   const rows = [];
   const relation = `public.${quoteIdentifier(table.name)}`;
   for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -238,11 +282,14 @@ async function fetchTable(client, table) {
     if (result.rowCount < PAGE_SIZE) break;
   }
   const rowSha256 = hashRows(rows);
+  const keySha256 = hashPrimaryKeys(table, rows);
   return {
     name: table.name,
     rowCount: rows.length,
     rowSha256,
-    parity: rows.length === table.rowCount && rowSha256 === table.rowSha256,
+    keySha256,
+    parity: rows.length === table.rowCount && rowSha256 === table.rowSha256 &&
+      rows.length === expectedKey.keyCount && keySha256 === expectedKey.keySha256,
   };
 }
 
@@ -360,8 +407,8 @@ async function inspectEngagementNdaBoundary(client, expected) {
   }
   const policyResult = await client.query({
     text: `SELECT policy.polname,policy.polcmd,policy.polpermissive,
-                  ARRAY(SELECT role.rolname FROM unnest(policy.polroles) role_oid
-                        JOIN pg_catalog.pg_roles role ON role.oid=role_oid ORDER BY role.rolname),
+                  ARRAY(SELECT role.rolname::text FROM unnest(policy.polroles) role_oid
+                        JOIN pg_catalog.pg_roles role ON role.oid=role_oid ORDER BY role.rolname)::text[],
                   pg_get_expr(policy.polqual,policy.polrelid),
                   pg_get_expr(policy.polwithcheck,policy.polrelid)
              FROM pg_catalog.pg_policy policy
@@ -429,7 +476,9 @@ async function verify() {
     ) fail("TARGET_BOUNDARY_INVALID");
 
     const targetTables = [];
-    for (const table of expected.sourceManifest.tables) targetTables.push(await fetchTable(client, table));
+    for (const [index, table] of expected.sourceManifest.tables.entries()) {
+      targetTables.push(await fetchTable(client, table, expected.sourceKeys.tables[index]));
+    }
     const rowCount = targetTables.reduce((sum, table) => sum + table.rowCount, 0);
     if (rowCount !== 45_042 || targetTables.some((table) => !table.parity)) fail("ROW_HASH_PARITY_FAILED");
 
@@ -531,6 +580,9 @@ async function verify() {
       expected.expectedAccess.engagementNdaAdminFetch,
     );
     const totalPublicPolicies = Number(await scalar(client, "SELECT count(*)::integer FROM pg_catalog.pg_policies WHERE schemaname='public'"));
+    if (!engagementNdaAdminFetch.ready || totalPublicPolicies !== expected.expectedAccess.engagementNdaAdminFetch.expectedTotalPublicPolicies) {
+      fail("ENGAGEMENT_BOUNDARY_NOT_READY");
+    }
 
     const roles = await client.query({
       text: `SELECT owner.rolname, member.rolname, membership.admin_option, membership.inherit_option, membership.set_option
@@ -583,7 +635,10 @@ async function verify() {
       tableCount: targetTables.length,
       rowCount,
       rowHashParity: true,
-      tableParitySha256: canonicalHash(targetTables.map(({ name, rowCount: count, rowSha256 }) => ({ name, rowCount: count, rowSha256 }))),
+      keyHashParity: true,
+      sourceKeyManifestSha256: expected.sourceKeys.manifestSha256,
+      tableParity: targetTables.map(({ name, rowCount: count, rowSha256, keySha256 }) => ({ name, rowCount: count, rowSha256, keySha256 })),
+      tableParitySha256: canonicalHash(targetTables.map(({ name, rowCount: count, rowSha256, keySha256 }) => ({ name, rowCount: count, rowSha256, keySha256 }))),
       identity: { total: 369, active: 369, unclaimed: 0, foreignKeys: 37, referencedRows, mappingSha256: identityMappingSha256, importEvidenceSha256: expected.identity.importEvidenceSha256, authority: {
         projectIdSha256: expected.identity.firebaseProjectIdSha256,
         issuerSha256: expected.identity.firebaseIssuerSha256,
