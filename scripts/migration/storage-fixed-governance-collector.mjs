@@ -50,6 +50,12 @@ const OPERATOR_EFFECTIVE_MEMBERS = new Set([
   "allUsers",
 ]);
 
+const unsafeTokenCapabilityMember = (member) =>
+  OPERATOR_EFFECTIVE_MEMBERS.has(member) ||
+  member.startsWith("group:") ||
+  member.startsWith("domain:") ||
+  member.startsWith("principalSet://");
+
 export const FIXED_GOVERNANCE_REQUIRED_PERMISSIONS = Object.freeze([
   "iam.roles.get",
   "iam.serviceAccounts.getIamPolicy",
@@ -77,6 +83,7 @@ const SNAPSHOT_KEYS = [
   "tokenCreationPermissions",
   "tokenCapabilityBindingCount",
   "tokenCapabilityBindingsDigestSha256",
+  "tokenPrincipalMembershipDigestSha256",
   "policyEvidence",
   "snapshotDigestSha256",
 ];
@@ -569,11 +576,13 @@ export const validateFixedGovernanceSnapshot = ({ snapshot, now = Date.now() }) 
     "FIXED_GOVERNANCE_SNAPSHOT_INVALID",
     "token capability bindings digest",
   );
+  requireSha256(
+    snapshot.tokenPrincipalMembershipDigestSha256,
+    "FIXED_GOVERNANCE_SNAPSHOT_INVALID",
+    "token principal membership digest",
+  );
   validateZeroGrantPolicyEvidence(snapshot.policyEvidence);
-  if (
-    snapshot.tokenCapabilityBindingCount !== 0 ||
-    snapshot.tokenCapabilityBindingsDigestSha256 !== sha256(canonicalJson([]))
-  ) {
+  if (snapshot.tokenCapabilityBindingCount !== 0) {
     fail(
       "TEMPORARY_GRANT_PRESENT",
       "Token minting, signing, or delegation access is still present.",
@@ -637,9 +646,7 @@ export const collectFixedStorageGovernanceSnapshot = async ({
   const resolvedRolePermissions = roleEntries
     .map(([role, includedPermissions]) => ({ role, includedPermissions }))
     .sort((left, right) => left.role.localeCompare(right.role));
-  const tokenCapabilityBindings = allPolicyBindings
-    .filter((binding) =>
-      binding.members.some((member) => OPERATOR_EFFECTIVE_MEMBERS.has(member)))
+  const resolvedTokenCapabilityBindings = allPolicyBindings
     .map((binding) => {
       const includedPermissions = permissionsByRole.get(binding.role);
       const tokenPermissions = SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS
@@ -655,12 +662,23 @@ export const collectFixedStorageGovernanceSnapshot = async ({
     .filter((binding) =>
       binding.exactTokenCreatorRole || binding.tokenPermissions.length !== 0)
     .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
-  if (tokenCapabilityBindings.length !== 0) {
+  const unsafeTokenCapabilityBindings = resolvedTokenCapabilityBindings
+    .filter((binding) =>
+      binding.members.some((member) => unsafeTokenCapabilityMember(member)));
+  if (unsafeTokenCapabilityBindings.length !== 0) {
     fail(
       "TEMPORARY_GRANT_PRESENT",
-      "The operator still has token minting, signing, or delegation access.",
+      "A direct, group, domain, or principal-set grant can still mint or sign tokens.",
     );
   }
+  const tokenPrincipalMembership = resolvedTokenCapabilityBindings
+    .flatMap((binding) => binding.members.map((member) => ({
+      scope: binding.scope,
+      role: binding.role,
+      conditionDigestSha256: binding.conditionDigestSha256,
+      member,
+    })))
+    .sort((left, right) => canonicalJson(left).localeCompare(canonicalJson(right)));
   const inheritedBindings = hierarchyBindings
     .filter(({ role }) =>
       permissionsByRole.get(role).some((permission) => permission.startsWith("storage.")))
@@ -682,7 +700,7 @@ export const collectFixedStorageGovernanceSnapshot = async ({
   const operatorStorageAdminBindingCount = inheritedBindings
     .filter((binding) =>
       binding.members.some((member) => OPERATOR_EFFECTIVE_MEMBERS.has(member))).length;
-  const migrationTokenCreatorBindingCount = tokenCapabilityBindings.length;
+  const migrationTokenCreatorBindingCount = unsafeTokenCapabilityBindings.length;
   const completedMs = clock();
   const durationMs = completedMs - startedMs;
   if (
@@ -729,8 +747,11 @@ export const collectFixedStorageGovernanceSnapshot = async ({
     resolvedRoleCount: resolvedRolePermissions.length,
     resolvedRolePermissionsDigestSha256: sha256(canonicalJson(resolvedRolePermissions)),
     tokenCreationPermissions: [...SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS],
-    tokenCapabilityBindingCount: tokenCapabilityBindings.length,
-    tokenCapabilityBindingsDigestSha256: sha256(canonicalJson(tokenCapabilityBindings)),
+    tokenCapabilityBindingCount: unsafeTokenCapabilityBindings.length,
+    tokenCapabilityBindingsDigestSha256:
+      sha256(canonicalJson(resolvedTokenCapabilityBindings)),
+    tokenPrincipalMembershipDigestSha256:
+      sha256(canonicalJson(tokenPrincipalMembership)),
     policyEvidence,
     snapshotDigestSha256: null,
   };
@@ -766,6 +787,8 @@ export const assertFixedGovernanceUnchanged = (before, after) => {
       after.resolvedRolePermissionsDigestSha256 ||
     before.tokenCapabilityBindingsDigestSha256 !==
       after.tokenCapabilityBindingsDigestSha256 ||
+    before.tokenPrincipalMembershipDigestSha256 !==
+      after.tokenPrincipalMembershipDigestSha256 ||
     before.policyEvidence.projectPolicyCanonicalDigestSha256 !==
       after.policyEvidence.projectPolicyCanonicalDigestSha256 ||
     before.policyEvidence.migrationServiceAccountPolicyCanonicalDigestSha256 !==

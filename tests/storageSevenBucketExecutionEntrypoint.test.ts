@@ -97,6 +97,7 @@ const createGovernanceSnapshot = (
     tokenCreationPermissions: [...SERVICE_ACCOUNT_TOKEN_CREATION_PERMISSIONS],
     tokenCapabilityBindingCount: 0,
     tokenCapabilityBindingsDigestSha256: sha256(canonicalJson([])),
+    tokenPrincipalMembershipDigestSha256: sha256(canonicalJson([])),
     policyEvidence,
     snapshotDigestSha256: null as string | null,
   };
@@ -107,7 +108,7 @@ const createGovernanceSnapshot = (
   return snapshot as typeof snapshot & { snapshotDigestSha256: string };
 };
 
-const createUnsafeTokenGovernanceSnapshot = (
+const createUnsafeGroupTokenGovernanceSnapshot = (
   policy: ReturnType<typeof createPolicyEvidence>,
 ) => {
   const snapshot = createGovernanceSnapshot(policy);
@@ -120,7 +121,47 @@ const createUnsafeTokenGovernanceSnapshot = (
   snapshot.tokenCapabilityBindingsDigestSha256 = sha256(canonicalJson([{
     scope: "serviceAccounts/hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
     role: "roles/iam.serviceAccountTokenCreator",
-    operator: true,
+    members: ["group:gcp-admins@hushh.ai"],
+  }]));
+  snapshot.tokenPrincipalMembershipDigestSha256 = sha256(canonicalJson([{
+    scope: "serviceAccounts/hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    role: "roles/iam.serviceAccountTokenCreator",
+    member: "group:gcp-admins@hushh.ai",
+  }]));
+  snapshot.snapshotDigestSha256 = calculateSelfBoundDigest(
+    snapshot,
+    "snapshotDigestSha256",
+  );
+  return snapshot;
+};
+
+const createSafeTokenMembershipSnapshot = (
+  policy: ReturnType<typeof createPolicyEvidence>,
+  member: string,
+) => {
+  const snapshot = createGovernanceSnapshot(policy);
+  const role = "organizations/369781862791/roles/nonOperatorTokenSigner";
+  const permissions = ["iam.serviceAccounts.signJwt"];
+  const binding = {
+    scope: "organizations/369781862791",
+    role,
+    members: [member],
+    conditionDigestSha256: null,
+    exactTokenCreatorRole: false,
+    tokenPermissions: permissions,
+    rolePermissionDigestSha256: sha256(canonicalJson(permissions)),
+  };
+  snapshot.resolvedRoleCount = 1;
+  snapshot.resolvedRolePermissionsDigestSha256 = sha256(canonicalJson([{
+    role,
+    includedPermissions: permissions,
+  }]));
+  snapshot.tokenCapabilityBindingsDigestSha256 = sha256(canonicalJson([binding]));
+  snapshot.tokenPrincipalMembershipDigestSha256 = sha256(canonicalJson([{
+    scope: binding.scope,
+    role,
+    conditionDigestSha256: null,
+    member,
   }]));
   snapshot.snapshotDigestSha256 = calculateSelfBoundDigest(
     snapshot,
@@ -815,6 +856,43 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(createWriteClients).not.toHaveBeenCalled();
   });
 
+  it("blocks token-principal membership digest drift before constructing writers", async () => {
+    const fixture = createFixture();
+    const governanceSnapshots = [
+      createSafeTokenMembershipSnapshot(
+        fixture.policy,
+        "serviceAccount:approved-signer@hushh-tech-uat.iam.gserviceaccount.com",
+      ),
+      createSafeTokenMembershipSnapshot(
+        fixture.policy,
+        "serviceAccount:changed-signer@hushh-tech-uat.iam.gserviceaccount.com",
+      ),
+    ];
+    const collectLiveGovernanceSnapshot = vi.fn(async () => governanceSnapshots.shift()!);
+    const collectLiveAllSevenTargetPreflight = vi.fn(async () => Buffer.from(JSON.stringify(
+      refreshTargetProof(fixture, "2026-08-22T01:30:00.000Z"),
+    )));
+    const createWriteClients = vi.fn();
+    await expect(__testing.executeSevenBucketWithTrustAnchor({
+      request: {
+        ...fixture.request,
+        createReadOnlyDependencies: vi.fn(async () => ({
+          sourceClient: {},
+          knownSixSourceRecords: [],
+        })),
+        createWriteClients,
+      },
+      trustAnchor: fixture.trustAnchor,
+      now: Date.parse("2026-08-22T01:30:00.000Z"),
+      verifyLiveSource: vi.fn(async () => ({ verified: true })),
+      collectLiveAllSevenTargetPreflight,
+      collectLiveGovernanceSnapshot,
+    })).rejects.toMatchObject({ code: "GOVERNANCE_CHANGED_DURING_COPY" });
+    expect(collectLiveGovernanceSnapshot).toHaveBeenCalledTimes(2);
+    expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
+    expect(createWriteClients).not.toHaveBeenCalled();
+  });
+
   it("rejects live inherited writer access even when the caller omits all IAM evidence", async () => {
     const fixture = createFixture();
     const migrationWriter =
@@ -850,11 +928,11 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(createWriteClients).not.toHaveBeenCalled();
   });
 
-  it("keeps writer factories at zero for initial, recollected, or omitted token evidence", async () => {
+  it("keeps writers at zero for initial/recollected group grants or omitted token evidence", async () => {
     for (const phase of ["initial", "recollected", "omitted"] as const) {
       const fixture = createFixture();
       const safe = createGovernanceSnapshot(fixture.policy);
-      const unsafe = createUnsafeTokenGovernanceSnapshot(fixture.policy);
+      const unsafe = createUnsafeGroupTokenGovernanceSnapshot(fixture.policy);
       const omitted = createGovernanceSnapshot(fixture.policy) as Record<string, unknown>;
       delete omitted.tokenCreationPermissions;
       omitted.snapshotDigestSha256 = calculateSelfBoundDigest(

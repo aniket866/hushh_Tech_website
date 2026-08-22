@@ -39,6 +39,7 @@ const fixedFetch = ({
   tokenGrantScope = null as TokenGrantScope | null,
   tokenRole = "roles/iam.serviceAccountTokenCreator",
   tokenPermission = "iam.serviceAccounts.getAccessToken",
+  tokenMember = operator,
   conditionalTokenGrant = false,
   omitTokenRoleDefinition = false,
   tokenCreatorRoleDrift = false,
@@ -48,7 +49,7 @@ const fixedFetch = ({
 } = {}) => vi.fn(async (input: string | URL, init?: RequestInit) => {
   const tokenBinding = {
     role: tokenRole,
-    members: [operator],
+    members: [tokenMember],
     ...(conditionalTokenGrant ? {
       condition: {
         title: "Temporary conditional impersonation",
@@ -212,6 +213,9 @@ describe("fixed storage governance collector", () => {
     expect(snapshot.tokenCapabilityBindingsDigestSha256).toBe(
       sha256(canonicalJson([])),
     );
+    expect(snapshot.tokenPrincipalMembershipDigestSha256).toBe(
+      sha256(canonicalJson([])),
+    );
     expect(snapshot.resolvedRoleCount).toBe(1);
     expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(4);
     expect(fetchImpl.mock.calls.every(([, init]) =>
@@ -283,6 +287,51 @@ describe("fixed storage governance collector", () => {
         now: 1_777_000_000_000,
       })).rejects.toMatchObject({ code: "TEMPORARY_GRANT_PRESENT" });
     }
+  });
+
+  it("rejects every group, domain, or principal-set token-capability binding", async () => {
+    for (const options of [
+      {
+        tokenGrantScope: "organization" as const,
+        tokenMember: "group:gcp-admins@hushh.ai",
+      },
+      {
+        tokenGrantScope: "folder" as const,
+        tokenRole: "organizations/369781862791/roles/customTokenCapability",
+        tokenPermission: "iam.serviceAccounts.getAccessToken",
+        tokenMember: "domain:hushh.ai",
+      },
+      {
+        tokenGrantScope: "service-account" as const,
+        tokenRole: "projects/hushh-tech-uat/roles/customTokenCapability",
+        tokenPermission: "iam.serviceAccounts.signJwt",
+        tokenMember:
+          "principalSet://iam.googleapis.com/locations/global/workforcePools/hushh-admins/*",
+      },
+    ]) {
+      await expect(collectFixedStorageGovernanceSnapshot({
+        client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch(options) }),
+        now: 1_777_000_000_000,
+      })).rejects.toMatchObject({ code: "TEMPORARY_GRANT_PRESENT" });
+    }
+  });
+
+  it("self-binds non-operator token-role membership for pre-write drift comparison", async () => {
+    const snapshot = await collectFixedStorageGovernanceSnapshot({
+      client: new FixedStorageGovernanceReadClient({ fetchImpl: fixedFetch({
+        tokenGrantScope: "organization",
+        tokenMember:
+          "serviceAccount:approved-signer@hushh-tech-uat.iam.gserviceaccount.com",
+      }) }),
+      now: 1_777_000_000_000,
+    });
+    expect(snapshot.tokenCapabilityBindingCount).toBe(0);
+    expect(snapshot.tokenCapabilityBindingsDigestSha256).not.toBe(
+      sha256(canonicalJson([])),
+    );
+    expect(snapshot.tokenPrincipalMembershipDigestSha256).not.toBe(
+      sha256(canonicalJson([])),
+    );
   });
 
   it("fails closed when a bound custom role is omitted or token-creator closure drifts", async () => {
