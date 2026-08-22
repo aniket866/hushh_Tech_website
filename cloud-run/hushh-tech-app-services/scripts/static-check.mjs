@@ -9,7 +9,12 @@ import {
   validateRegistry,
 } from "../src/registry.js";
 import { FUNCTION_CONTRACTS } from "../src/contracts.js";
+import {
+  AI_RUNTIME_BATCH_CANDIDATE_SLUGS,
+  AI_RUNTIME_BATCH_CANDIDATE_STATE,
+} from "../src/handlers/ai-runtime-batch.js";
 import { GCP_READ_BATCH_SLUGS } from "../src/handlers/gcp-read-batch.js";
+import { validateAiRuntimeBatchCandidateManifest } from "../../../scripts/gcp/migration/validate-ai-runtime-batch-candidates.mjs";
 import { validateGcpReadBatchCandidateMatrix } from "../../../scripts/gcp/migration/validate-gcp-read-batch-candidates.mjs";
 import {
   SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
@@ -108,6 +113,18 @@ assert.equal(
 );
 const registryBySlug = new Map(LEGACY_FUNCTIONS.map((entry) => [entry.slug, entry]));
 for (const slug of GCP_READ_BATCH_SLUGS) {
+  assert.equal(registryBySlug.get(slug)?.migration_state, "INVENTORY_FROZEN");
+}
+const aiRuntimeCandidateMatrix = await validateAiRuntimeBatchCandidateManifest({
+  repoRoot: repositoryRoot,
+  verifyGitRecovery: false,
+});
+assert.equal(AI_RUNTIME_BATCH_CANDIDATE_STATE, "INVENTORY_FROZEN_DEFAULT_OFF");
+assert.deepEqual(
+  aiRuntimeCandidateMatrix.functions.map(({ slug }) => slug),
+  [...AI_RUNTIME_BATCH_CANDIDATE_SLUGS],
+);
+for (const slug of AI_RUNTIME_BATCH_CANDIDATE_SLUGS) {
   assert.equal(registryBySlug.get(slug)?.migration_state, "INVENTORY_FROZEN");
 }
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
