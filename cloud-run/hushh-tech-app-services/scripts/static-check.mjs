@@ -67,8 +67,8 @@ assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
   "generate-investor-profile",
   "get-locations",
   "hushh-location-geocode",
-  "nda-admin-fetch",
   "investor-og-image",
+  "nda-admin-fetch",
   "stock-quotes",
 ]);
 const candidateMatrix = JSON.parse(

@@ -38,7 +38,7 @@
     },
     "retirementRuntime": {
       "path": "cloud-run/hushh-tech-app-services/src/app.js",
-      "sha256": "fb95231cf2e7a65538a98326591450d3f13919d070c6f27833c9ceccee7d3bf8"
+      "sha256": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086"
     },
     "retirementTest": {
       "path": "cloud-run/hushh-tech-app-services/test/app.test.js",
@@ -6133,5 +6133,5 @@
       ]
     }
   ],
-  "evidence_digest": "e0cb9bb340113878a59088c16d787cf3a487b1558361ea65b3d93d9337f735f9"
+  "evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8"
 }

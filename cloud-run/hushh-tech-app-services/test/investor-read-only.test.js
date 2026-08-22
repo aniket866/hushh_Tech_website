@@ -174,8 +174,8 @@ test("reviewed contracts stay default-off except verified geocode", async () => 
     "generate-investor-profile",
     "get-locations",
     "hushh-location-geocode",
-    "nda-admin-fetch",
     "investor-og-image",
+    "nda-admin-fetch",
     "stock-quotes",
   ]);
   assert.equal(FUNCTION_CONTRACTS["hushh-dob-inference"], undefined);
