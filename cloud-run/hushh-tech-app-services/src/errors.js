@@ -4,6 +4,11 @@ export class RuntimeError extends Error {
     this.name = "RuntimeError";
     this.code = code;
     this.statusCode = statusCode;
+    this.diagnosticCode = /^[A-Z][A-Z0-9_]{0,63}$/.test(
+      options.diagnosticCode ?? "",
+    )
+      ? options.diagnosticCode
+      : null;
   }
 }
 

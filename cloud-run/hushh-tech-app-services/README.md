@@ -12,17 +12,17 @@ One fail-closed Node.js image serves seven locked Cloud Run owners through
 - `worker`
 
 The image embeds the frozen 112-function retirement registry. No legacy
-function is enabled by this foundation: all 112 entries remain
-`INVENTORY_FROZEN`; 111 are replacement candidates, and the retired
-secret-disclosure function has no handler.
+Only `hushh-location-geocode` is enabled by this foundation. The other 110
+runtime entries remain `INVENTORY_FROZEN`; 111 are replacement candidates,
+and the retired secret-disclosure function has no handler.
 Unknown, wrong-owner, retired, unverified, and unimplemented routes fail
 closed.
 
-`hushh-location-geocode` remains compiled but deliberately unwired.
+`hushh-location-geocode` is wired only on the private investor service.
 `stock-quotes` is the first wired GCP candidate, but it does not enable the
 legacy compatibility route. Its separate private path,
 `/api/v1/public/stock-quotes`, is default-off, belongs only to `investor-api`,
-accepts only the pinned web-gateway identity, and requires both process-local
+accepts only the pinned website runtime identity, and requires both process-local
 and Firestore transaction-backed per-client and provider-wide limits before
 the provider handler can run. The provider-wide default permits two 27-symbol
 fan-outs per minute across all service instances.
@@ -51,7 +51,7 @@ legacy registry entries, including `stock-quotes`, remain
 - Every compatibility or private candidate request requires a Google-signed
   caller token.
 - User-facing and webhook services accept only the checked-in
-  `hushh-tech-web-gateway-{stage}` caller. The worker accepts only the
+  `hushh-tech-web-{stage}` caller. The worker accepts only the
   checked-in `hushh-tech-task-runner-{stage}` caller.
 - User routes then reverify the forwarded, product-bound Firebase token with
   revocation checking.

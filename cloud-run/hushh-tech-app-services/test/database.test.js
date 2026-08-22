@@ -34,6 +34,9 @@ function transactionClient({ leakedAfterCommit = false } = {}) {
       if (normalized.includes("set_config('app.firebase_uid'")) {
         return { rows: [{ firebase_uid: parameters[0] }] };
       }
+      if (normalized.includes("set_config('app.firebase_fund_admin'")) {
+        return { rows: [{ firebase_fund_admin: parameters[0] }] };
+      }
       if (normalized.includes("current_setting('app.firebase_uid'")) {
         contextReads += 1;
         return {
@@ -41,6 +44,7 @@ function transactionClient({ leakedAfterCommit = false } = {}) {
             {
               firebase_uid:
                 leakedAfterCommit && contextReads === 1 ? "leaked-user" : null,
+              firebase_fund_admin: null,
             },
           ],
         };
@@ -73,23 +77,48 @@ test("database transactions install a transaction-local Firebase UID and clear i
   assert.equal(result, 42);
   assert.equal(client.releasedWith, null);
   assert.deepEqual(
-    calls.slice(0, 5).map(({ sql }) => sql),
+    calls.slice(0, 7).map(({ sql }) => sql),
     [
       "RESET app.firebase_uid",
+      "RESET app.firebase_fund_admin",
       "BEGIN",
       "SELECT set_config('statement_timeout', $1, true)",
       "SELECT set_config('app.firebase_uid', $1, true) AS firebase_uid",
+      "SELECT set_config('app.firebase_fund_admin', $1, true) AS firebase_fund_admin",
       "SELECT 42 AS answer",
     ],
   );
-  assert.deepEqual(calls[2].parameters, ["1500ms"]);
-  assert.deepEqual(calls[3].parameters, ["firebase-user-1"]);
+  assert.deepEqual(calls[3].parameters, ["1500ms"]);
+  assert.deepEqual(calls[4].parameters, ["firebase-user-1"]);
+  assert.deepEqual(calls[5].parameters, ["false"]);
   assert.equal(
     calls.some(({ sql }) => sql === "COMMIT"),
     true,
   );
   assert.equal(
     calls.filter(({ sql }) => sql === "RESET app.firebase_uid").length,
+    2,
+  );
+  assert.equal(
+    calls.filter(({ sql }) => sql === "RESET app.firebase_fund_admin").length,
+    2,
+  );
+});
+
+test("database transactions install fund admin only as a transaction-local boolean", async () => {
+  const { client, calls } = transactionClient();
+  await withFirebaseTransaction(
+    { connect: async () => client },
+    "firebase-fund-admin",
+    async () => true,
+    { fundAdmin: true },
+  );
+  const setting = calls.find(({ sql }) =>
+    sql.includes("set_config('app.firebase_fund_admin'"),
+  );
+  assert.deepEqual(setting.parameters, ["true"]);
+  assert.equal(
+    calls.filter(({ sql }) => sql === "RESET app.firebase_fund_admin").length,
     2,
   );
 });
@@ -174,7 +203,9 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
     application_schema_create_count: "0",
     inherited_privileged_role_count: "0",
     non_dml_table_privilege_count: "0",
-    executable_application_routine_count: "0",
+    executable_application_routine_count: "164",
+    executable_security_definer_routine_count: "0",
+    executable_procedure_count: "0",
     effective_table_dml_privileges: [],
     effective_column_privileges: [],
     effective_sequence_privileges: [],
@@ -246,7 +277,9 @@ test("runtime role verification allows DML-only and destroys unsafe clients", as
         expectedUser,
         serviceOwner,
       ),
-    (error) => runtimeCode(error, "DATABASE_ROLE_UNSAFE"),
+    (error) =>
+      runtimeCode(error, "DATABASE_ROLE_UNSAFE") &&
+      error.diagnosticCode === "NON_DML_TABLE_PRIVILEGE_DRIFT",
   );
 
   let roleQuery = "";
@@ -333,7 +366,9 @@ test("runtime readiness rejects broad DML, weak RLS, and application ownership",
     application_schema_create_count: "0",
     inherited_privileged_role_count: "0",
     non_dml_table_privilege_count: "0",
-    executable_application_routine_count: "0",
+    executable_application_routine_count: "164",
+    executable_security_definer_routine_count: "0",
+    executable_procedure_count: "0",
     effective_table_dml_privileges: [],
     effective_column_privileges: [],
     effective_sequence_privileges: [],
@@ -408,6 +443,14 @@ test("runtime readiness rejects broad DML, weak RLS, and application ownership",
       name: "routine ownership",
       change: { owned_application_routine_count: "1" },
     },
+    {
+      name: "security-definer routine execution",
+      change: { executable_security_definer_routine_count: "1" },
+    },
+    {
+      name: "procedure execution",
+      change: { executable_procedure_count: "1" },
+    },
   ];
   for (const { name, change } of unsafeCases) {
     assert.throws(
@@ -461,7 +504,7 @@ test("effective DML observations preserve and reject every grant option", () => 
   }
 });
 
-test("every disabled service starts with an exact empty table allowlist", () => {
+test("only engagement has the exact five-column NDA read allowlist", () => {
   assert.deepEqual(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(), [
     "content-api",
     "engagement-api-worker",
@@ -483,14 +526,27 @@ test("every disabled service starts with an exact empty table allowlist", () => 
     Object.keys(SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS).sort(),
     Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).sort(),
   );
-  for (const allowlists of [
+  assert.deepEqual(
+    SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS["engagement-api-worker"],
+    [
+      "public.nda_signatures.id:SELECT",
+      "public.nda_signatures.nda_version:SELECT",
+      "public.nda_signatures.pdf_url:SELECT",
+      "public.nda_signatures.signed_at:SELECT",
+      "public.nda_signatures.user_id:SELECT",
+    ],
+  );
+  for (const [owner, privileges] of Object.entries(
     SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
+  )) {
+    if (owner !== "engagement-api-worker") assert.deepEqual(privileges, []);
+    assert.equal(Object.isFrozen(privileges), true);
+  }
+  for (const privileges of Object.values(
     SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
-  ]) {
-    for (const privileges of Object.values(allowlists)) {
-      assert.deepEqual(privileges, []);
-      assert.equal(Object.isFrozen(privileges), true);
-    }
+  )) {
+    assert.deepEqual(privileges, []);
+    assert.equal(Object.isFrozen(privileges), true);
   }
 });
 

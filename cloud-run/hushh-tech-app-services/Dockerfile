@@ -12,6 +12,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY registry ./registry
 COPY src ./src
+COPY smoke ./smoke
 
 USER node
 EXPOSE 8080

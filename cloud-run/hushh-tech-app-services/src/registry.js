@@ -5,7 +5,7 @@ const REGISTRY_URL = new URL("../registry/functions.v1.json", import.meta.url);
 const REGISTRY_VERSION = 1;
 const REGISTRY_COUNT = 112;
 const REGISTRY_DIGEST =
-  "76737491439f7898cb488125c3630ae605a666018848181fe88fc2916d22bbb3";
+  "00b022ae3eab4a559fb5e70a90f55283e738a5fa81ed34a2e1aafb20e8479d55";
 const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
 const OWNER_GROUP_COUNTS = Object.freeze({
@@ -108,10 +108,12 @@ function assertEntry(entry, index, slugs, counts) {
 
   if (
     entry.final_disposition !== "PORT_TO_GCP" ||
-    entry.migration_state !== "INVENTORY_FROZEN"
+    !["INVENTORY_FROZEN", "PORTED_AND_VERIFIED"].includes(
+      entry.migration_state,
+    )
   ) {
     throw new Error(
-      `Registry entry ${entry.slug} is not frozen for unverified migration.`,
+      `Registry entry ${entry.slug} has an invalid migration state.`,
     );
   }
 }

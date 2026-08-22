@@ -32,11 +32,13 @@ const app = createApp({
   sharedRateLimiter: createFirestoreSharedRateLimiter({ config }),
   webhookLedger: createUnavailableWebhookLedger(),
   verifyReadiness: () =>
-    verifyDmlOnlyRuntime(
-      database.pool,
-      config.databaseUser,
-      config.serviceOwner,
-    ),
+    runtimeHandlers.databaseRequired
+      ? verifyDmlOnlyRuntime(
+          database.pool,
+          config.databaseUser,
+          config.serviceOwner,
+        )
+      : true,
   handlers: runtimeHandlers.handlers,
   verifyPublicHandlerReadiness:
     runtimeHandlers.verifyPublicHandlerReadiness,

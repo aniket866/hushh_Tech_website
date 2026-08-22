@@ -325,7 +325,7 @@
     "slug": "hushh-location-geocode",
     "owner_group": "investor-api",
     "auth_mode": "firebase_bearer",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {

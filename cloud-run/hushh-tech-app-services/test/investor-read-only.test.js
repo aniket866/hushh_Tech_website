@@ -20,7 +20,7 @@ import { errorCode, request } from "./helpers.js";
 
 const INTERNAL_CALLER = Object.freeze({
   kind: "google-service",
-  email: "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  email: "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
   subject: "gateway-subject",
 });
 const FIREBASE_ACTOR = Object.freeze({
@@ -164,9 +164,10 @@ function jsonBodyOfSize(size) {
   return body;
 }
 
-test("only two reviewed contracts exist and all real entries remain frozen", async () => {
+test("only three reviewed contracts exist and only geocode is enabled", async () => {
   assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
     "hushh-location-geocode",
+    "nda-admin-fetch",
     "stock-quotes",
   ]);
   for (const slug of [
@@ -178,10 +179,10 @@ test("only two reviewed contracts exist and all real entries remain frozen", asy
   }
   assert.equal(LEGACY_FUNCTIONS.length, 112);
   assert.equal(
-    LEGACY_FUNCTIONS.every(
+    LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "INVENTORY_FROZEN",
-    ),
-    true,
+    ).length,
+    111,
   );
   assert.match(
     readFileSync(new URL("../src/server.js", import.meta.url), "utf8"),
@@ -191,7 +192,13 @@ test("only two reviewed contracts exist and all real entries remain frozen", asy
   let calls = 0;
   const app = createApp(
     appDependencies({
-      registry: LEGACY_FUNCTION_REGISTRY,
+      registry: {
+        ...LEGACY_FUNCTION_REGISTRY,
+        "hushh-location-geocode": Object.freeze({
+          ...LEGACY_FUNCTION_REGISTRY["hushh-location-geocode"],
+          migration_state: "INVENTORY_FROZEN",
+        }),
+      },
       handlers: {
         "hushh-location-geocode": async () => {
           calls += 1;

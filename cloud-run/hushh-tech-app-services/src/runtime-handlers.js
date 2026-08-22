@@ -1,7 +1,16 @@
-import { createFinnhubQuoteAdapter } from "./adapters/investor-read-only.js";
-import { createStockQuotesHandler } from "./handlers/investor-read-only.js";
+import {
+  createFinnhubQuoteAdapter,
+  createGeocodingAdapter,
+} from "./adapters/investor-read-only.js";
+import {
+  createGeocodeHandler,
+  createStockQuotesHandler,
+} from "./handlers/investor-read-only.js";
+import { createNdaAdminFetchHandler } from "./handlers/engagement-admin.js";
 
+const GEOCODE_SLUG = "hushh-location-geocode";
 const STOCK_QUOTES_SLUG = "stock-quotes";
+const NDA_ADMIN_FETCH_SLUG = "nda-admin-fetch";
 
 export function createRuntimeHandlers({
   config,
@@ -13,14 +22,46 @@ export function createRuntimeHandlers({
     throw new Error("Runtime handler configuration is required.");
   }
 
-  if (!config.publicStockQuotesEnabled) {
+  if (config.serviceOwner === "engagement-api-worker") {
+    if (config.publicStockQuotesEnabled) {
+      throw new Error("Public stock quotes belong only to investor-api.");
+    }
     return Object.freeze({
-      handlers: Object.freeze({}),
+      handlers: Object.freeze({
+        [NDA_ADMIN_FETCH_SLUG]: createNdaAdminFetchHandler(),
+      }),
+      databaseRequired: true,
       verifyPublicHandlerReadiness: async () => false,
     });
   }
+
   if (config.serviceOwner !== "investor-api") {
-    throw new Error("Public stock quotes belong only to investor-api.");
+    if (config.publicStockQuotesEnabled) {
+      throw new Error("Public stock quotes belong only to investor-api.");
+    }
+    return Object.freeze({
+      handlers: Object.freeze({}),
+      databaseRequired: false,
+      verifyPublicHandlerReadiness: async () => false,
+    });
+  }
+
+  const handlers = {
+    [GEOCODE_SLUG]: createGeocodeHandler({
+      geocoder: createGeocodingAdapter({
+        fetchImpl,
+        googleMapsApiKey: config.googleMapsApiKey,
+        nominatimUserAgent: config.nominatimUserAgent,
+      }),
+    }),
+  };
+
+  if (!config.publicStockQuotesEnabled) {
+    return Object.freeze({
+      handlers: Object.freeze(handlers),
+      databaseRequired: false,
+      verifyPublicHandlerReadiness: async () => false,
+    });
   }
 
   const adapter = createFinnhubQuoteAdapter({
@@ -35,7 +76,8 @@ export function createRuntimeHandlers({
   });
 
   return Object.freeze({
-    handlers: Object.freeze({ [STOCK_QUOTES_SLUG]: handler }),
+    handlers: Object.freeze({ ...handlers, [STOCK_QUOTES_SLUG]: handler }),
+    databaseRequired: false,
     async verifyPublicHandlerReadiness(slug) {
       if (slug !== STOCK_QUOTES_SLUG || adapter.configured !== true) {
         throw new Error("The stock-quotes provider is unavailable.");
@@ -47,4 +89,9 @@ export function createRuntimeHandlers({
 
 export const PUBLIC_RUNTIME_HANDLER_SLUGS = Object.freeze([
   STOCK_QUOTES_SLUG,
+]);
+
+export const PRIVATE_RUNTIME_HANDLER_SLUGS = Object.freeze([
+  GEOCODE_SLUG,
+  NDA_ADMIN_FETCH_SLUG,
 ]);

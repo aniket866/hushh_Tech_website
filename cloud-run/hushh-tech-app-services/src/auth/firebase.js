@@ -75,6 +75,7 @@ function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
     uid,
     authTime,
     launchAuthorizationId,
+    fundAdmin: decoded?.fund_admin === true,
   });
 }
 

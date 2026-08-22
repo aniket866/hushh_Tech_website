@@ -22,14 +22,32 @@ const DEFINITIONS = Object.freeze(
       "engagement-api-worker",
       "signed-webhook-service",
       "worker",
-    ].map((owner) => [
-      owner,
-      Object.freeze({
-        tables: Object.freeze([]),
-        columns: Object.freeze([]),
-        sequences: Object.freeze([]),
-      }),
-    ]),
+    ].map((owner) => {
+      const engagementColumns = [
+        "id",
+        "nda_version",
+        "pdf_url",
+        "signed_at",
+        "user_id",
+      ].map((column) =>
+        Object.freeze({
+          schema: "public",
+          table: "nda_signatures",
+          column,
+          privileges: Object.freeze(["SELECT"]),
+        }),
+      );
+      return [
+        owner,
+        Object.freeze({
+          tables: Object.freeze([]),
+          columns: Object.freeze(
+            owner === "engagement-api-worker" ? engagementColumns : [],
+          ),
+          sequences: Object.freeze([]),
+        }),
+      ];
+    }),
   ),
 );
 

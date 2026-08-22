@@ -47,29 +47,46 @@ assert.deepEqual(
   retired.map(({ slug }) => slug),
   ["get-secrets"],
 );
-assert.equal(frozen.length, 112);
+assert.equal(frozen.length, 111);
 assert.equal(replacementCandidates.length, 111);
-assert.equal(
-  LEGACY_FUNCTIONS.some(
+assert.deepEqual(
+  LEGACY_FUNCTIONS.filter(
     ({ migration_state }) => migration_state === "PORTED_AND_VERIFIED",
-  ),
-  false,
+  ).map(({ slug }) => slug),
+  ["hushh-location-geocode"],
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
   "hushh-location-geocode",
+  "nda-admin-fetch",
   "stock-quotes",
 ]);
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
-for (const allowlists of [
-  SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,
+assert.equal(
+  Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).every(
+    (privileges) => privileges.length === 0,
+  ),
+  true,
+);
+assert.equal(
+  Object.values(SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS).every(
+    (privileges) => privileges.length === 0,
+  ),
+  true,
+);
+assert.deepEqual(
+  SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS["engagement-api-worker"],
+  [
+    "public.nda_signatures.id:SELECT",
+    "public.nda_signatures.nda_version:SELECT",
+    "public.nda_signatures.pdf_url:SELECT",
+    "public.nda_signatures.signed_at:SELECT",
+    "public.nda_signatures.user_id:SELECT",
+  ],
+);
+for (const [owner, privileges] of Object.entries(
   SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
-  SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
-]) {
-  assert.equal(Object.keys(allowlists).length, 7);
-  assert.equal(
-    Object.values(allowlists).every((privileges) => privileges.length === 0),
-    true,
-  );
+)) {
+  if (owner !== "engagement-api-worker") assert.deepEqual(privileges, []);
 }
 
 if (!registryOnly) {
@@ -94,6 +111,7 @@ if (!registryOnly) {
 
   const scanTargets = [
     ...(await filesUnder(resolve(root, "src"))),
+    ...(await filesUnder(resolve(root, "smoke"))),
     resolve(root, "registry/functions.v1.json"),
     resolve(root, "package.json"),
     resolve(root, "Dockerfile"),
@@ -121,6 +139,7 @@ console.log(
     registry_digest: REGISTRY_METADATA.digest,
     retired_count: retired.length,
     frozen_unverified_count: frozen.length,
+    ported_and_verified_count: 1,
     replacement_candidate_count: replacementCandidates.length,
     mode: registryOnly ? "registry" : "full",
   }),

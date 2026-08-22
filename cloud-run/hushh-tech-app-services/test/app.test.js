@@ -11,7 +11,7 @@ import { errorCode, request } from "./helpers.js";
 
 const INTERNAL_CALLER = Object.freeze({
   kind: "google-service",
-  email: "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  email: "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
   subject: "gateway-subject",
 });
 const FIREBASE_ACTOR = Object.freeze({
@@ -135,14 +135,26 @@ test("health and readiness expose only bounded scaffold metadata", async () => {
   assert.equal(ready.body.status, "ready");
   assert.equal(internalAuthCalls, 0);
 
+  const readinessLogs = [];
   const unavailable = createApp(
     dependencies({
       verifyReadiness: async () => Promise.reject(new Error("down")),
+      log: (record) => readinessLogs.push(record),
     }),
   );
   const notReady = await request(unavailable, "/readyz");
   assert.equal(notReady.response.status, 503);
   assert.equal(notReady.body.status, "not_ready");
+  assert.deepEqual(readinessLogs, [
+    {
+      level: "error",
+      code: "READINESS_UNAVAILABLE",
+      service_owner: "identity-api",
+      dependency: "database",
+      dependency_code: "DEPENDENCY_UNAVAILABLE",
+      dependency_diagnostic: null,
+    },
+  ]);
 });
 
 test("unknown, wrong-owner, retired, and unported functions fail closed", async () => {

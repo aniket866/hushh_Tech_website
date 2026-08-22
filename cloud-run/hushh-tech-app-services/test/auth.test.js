@@ -10,7 +10,7 @@ const NOW_MS = 2_000_000_000_000;
 const NOW_SECONDS = Math.floor(NOW_MS / 1_000);
 
 const CONFIG = Object.freeze({
-  firebaseProjectId: "hushh-pda",
+  firebaseProjectId: "hushh-tech-uat",
   productClient: "hushh-tech",
   productClientAppId: "app_hushh-technologies_cd1895ef",
   productAudience: "hushh-tech-uat",
@@ -26,8 +26,8 @@ function firebaseClaims(overrides = {}) {
   return {
     uid: "firebase-user-1",
     sub: "firebase-user-1",
-    aud: "hushh-pda",
-    iss: "https://securetoken.google.com/hushh-pda",
+    aud: "hushh-tech-uat",
+    iss: "https://securetoken.google.com/hushh-tech-uat",
     iat: NOW_SECONDS - 10,
     exp: NOW_SECONDS + 300,
     auth_time: NOW_SECONDS - 20,
@@ -78,7 +78,31 @@ test("Firebase user route reverifies revocation and exact product claims", async
     uid: "firebase-user-1",
     authTime: NOW_SECONDS - 20,
     launchAuthorizationId: "launch-authorization-1",
+    fundAdmin: false,
   });
+});
+
+test("Firebase fund admin context accepts only the literal boolean custom claim", async () => {
+  for (const [claim, expected] of [
+    [true, true],
+    [false, false],
+    ["true", false],
+    [1, false],
+    [undefined, false],
+  ]) {
+    const decoded = firebaseClaims(
+      claim === undefined ? {} : { fund_admin: claim },
+    );
+    const verify = createFirebaseProductVerifier({
+      config: CONFIG,
+      auth: { verifyIdToken: async () => decoded },
+      now: () => NOW_MS,
+    });
+    const actor = await verify(firebaseRequest(), {
+      auth_mode: "firebase_bearer",
+    });
+    assert.equal(actor.fundAdmin, expected);
+  }
 });
 
 test("Firebase user route rejects altered, stale, or mismatched evidence", async () => {

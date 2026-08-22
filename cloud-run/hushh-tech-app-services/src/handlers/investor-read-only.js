@@ -212,3 +212,8 @@ export function createStockQuotesHandler({
   return (context) =>
     stock({ ...context, stockQuotes: adapter, now, delay });
 }
+
+export function createGeocodeHandler({ geocoder } = {}) {
+  const adapter = requireAdapter("geocoder", geocoder);
+  return (context) => geocode({ ...context, geocoder: adapter });
+}

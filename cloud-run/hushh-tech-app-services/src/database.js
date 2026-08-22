@@ -86,6 +86,10 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   const executableApplicationRoutineCount = Number(
     row?.executable_application_routine_count,
   );
+  const executableSecurityDefinerRoutineCount = Number(
+    row?.executable_security_definer_routine_count,
+  );
+  const executableProcedureCount = Number(row?.executable_procedure_count);
   const applicationSchemaCreateCount = Number(
     row?.application_schema_create_count,
   );
@@ -156,7 +160,11 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     !Number.isSafeInteger(nonDmlTablePrivilegeCount) ||
     nonDmlTablePrivilegeCount !== 0 ||
     !Number.isSafeInteger(executableApplicationRoutineCount) ||
-    executableApplicationRoutineCount !== 0 ||
+    executableApplicationRoutineCount < 0 ||
+    !Number.isSafeInteger(executableSecurityDefinerRoutineCount) ||
+    executableSecurityDefinerRoutineCount !== 0 ||
+    !Number.isSafeInteger(executableProcedureCount) ||
+    executableProcedureCount !== 0 ||
     !Number.isSafeInteger(accessibleTableRlsDisabledCount) ||
     accessibleTableRlsDisabledCount !== 0 ||
     !Number.isSafeInteger(accessibleTableRlsNotForcedCount) ||
@@ -173,10 +181,85 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     !exactColumnPrivileges ||
     !exactSequencePrivileges
   ) {
+    let diagnosticCode = "ROLE_INVARIANT_DRIFT";
+    if (!row || row.current_user !== expectedUser) {
+      diagnosticCode = "ROLE_IDENTITY_DRIFT";
+    } else if (
+      row.rolsuper !== false ||
+      row.rolcreaterole !== false ||
+      row.rolcreatedb !== false ||
+      row.rolreplication !== false ||
+      row.rolbypassrls !== false
+    ) {
+      diagnosticCode = "ROLE_FLAG_DRIFT";
+    } else if (row.can_create_database !== false) {
+      diagnosticCode = "DATABASE_CREATE_PRIVILEGE_DRIFT";
+    } else if (canCreateTemporaryTables !== false) {
+      diagnosticCode = "DATABASE_TEMP_PRIVILEGE_DRIFT";
+    } else if (
+      row.can_create_public_schema !== false ||
+      !Number.isSafeInteger(applicationSchemaCreateCount) ||
+      applicationSchemaCreateCount !== 0
+    ) {
+      diagnosticCode = "SCHEMA_CREATE_PRIVILEGE_DRIFT";
+    } else if (
+      !Number.isSafeInteger(inheritedPrivilegedRoleCount) ||
+      inheritedPrivilegedRoleCount !== 0
+    ) {
+      diagnosticCode = "INHERITED_PRIVILEGE_DRIFT";
+    } else if (
+      !Number.isSafeInteger(nonDmlTablePrivilegeCount) ||
+      nonDmlTablePrivilegeCount !== 0
+    ) {
+      diagnosticCode = "NON_DML_TABLE_PRIVILEGE_DRIFT";
+    } else if (
+      !Number.isSafeInteger(executableApplicationRoutineCount) ||
+      executableApplicationRoutineCount < 0
+    ) {
+      diagnosticCode = "ROUTINE_OBSERVATION_INVALID";
+    } else if (
+      !Number.isSafeInteger(executableSecurityDefinerRoutineCount) ||
+      executableSecurityDefinerRoutineCount !== 0
+    ) {
+      diagnosticCode = "SECURITY_DEFINER_EXECUTE_PRIVILEGE_DRIFT";
+    } else if (
+      !Number.isSafeInteger(executableProcedureCount) ||
+      executableProcedureCount !== 0
+    ) {
+      diagnosticCode = "PROCEDURE_EXECUTE_PRIVILEGE_DRIFT";
+    } else if (
+      !Number.isSafeInteger(accessibleTableRlsDisabledCount) ||
+      accessibleTableRlsDisabledCount !== 0
+    ) {
+      diagnosticCode = "ROW_SECURITY_DISABLED_DRIFT";
+    } else if (
+      !Number.isSafeInteger(accessibleTableRlsNotForcedCount) ||
+      accessibleTableRlsNotForcedCount !== 0
+    ) {
+      diagnosticCode = "ROW_SECURITY_NOT_FORCED_DRIFT";
+    } else if (
+      !Number.isSafeInteger(ownedApplicationSchemaCount) ||
+      ownedApplicationSchemaCount !== 0 ||
+      !Number.isSafeInteger(ownedApplicationTableCount) ||
+      ownedApplicationTableCount !== 0 ||
+      !Number.isSafeInteger(ownedApplicationSequenceCount) ||
+      ownedApplicationSequenceCount !== 0 ||
+      !Number.isSafeInteger(ownedApplicationRoutineCount) ||
+      ownedApplicationRoutineCount !== 0
+    ) {
+      diagnosticCode = "APPLICATION_OWNERSHIP_DRIFT";
+    } else if (!exactTablePrivileges) {
+      diagnosticCode = "TABLE_PRIVILEGE_ALLOWLIST_DRIFT";
+    } else if (!exactColumnPrivileges) {
+      diagnosticCode = "COLUMN_PRIVILEGE_ALLOWLIST_DRIFT";
+    } else if (!exactSequencePrivileges) {
+      diagnosticCode = "SEQUENCE_PRIVILEGE_ALLOWLIST_DRIFT";
+    }
     throw new RuntimeError(
       "DATABASE_ROLE_UNSAFE",
       "Database role is not runtime-safe.",
       503,
+      { diagnosticCode },
     );
   }
   return true;
@@ -532,7 +615,41 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
                 'EXECUTE'
               )
             )
-        ) AS executable_application_routine_count
+        ) AS executable_application_routine_count,
+        (
+          SELECT count(*)
+          FROM pg_proc AS routines
+          INNER JOIN pg_namespace AS schemas
+            ON schemas.oid = routines.pronamespace
+          WHERE schemas.nspname NOT IN ('pg_catalog', 'information_schema')
+            AND routines.prosecdef IS TRUE
+            AND EXISTS (
+              SELECT 1
+              FROM effective_roles AS inherited
+              WHERE has_function_privilege(
+                inherited.rolname,
+                routines.oid,
+                'EXECUTE'
+              )
+            )
+        ) AS executable_security_definer_routine_count,
+        (
+          SELECT count(*)
+          FROM pg_proc AS routines
+          INNER JOIN pg_namespace AS schemas
+            ON schemas.oid = routines.pronamespace
+          WHERE schemas.nspname NOT IN ('pg_catalog', 'information_schema')
+            AND routines.prokind = 'p'
+            AND EXISTS (
+              SELECT 1
+              FROM effective_roles AS inherited
+              WHERE has_function_privilege(
+                inherited.rolname,
+                routines.oid,
+                'EXECUTE'
+              )
+            )
+        ) AS executable_procedure_count
       FROM pg_roles AS roles
       WHERE roles.rolname = current_user
     `);
@@ -556,20 +673,26 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
 
 async function readFirebaseContext(client) {
   const result = await client.query(
-    "SELECT current_setting('app.firebase_uid', true) AS firebase_uid",
+    `SELECT
+      current_setting('app.firebase_uid', true) AS firebase_uid,
+      current_setting('app.firebase_fund_admin', true) AS firebase_fund_admin`,
   );
-  return result.rows[0]?.firebase_uid ?? null;
+  return Object.freeze({
+    firebaseUid: result.rows[0]?.firebase_uid ?? null,
+    firebaseFundAdmin: result.rows[0]?.firebase_fund_admin ?? null,
+  });
 }
 
 export async function withFirebaseTransaction(
   pool,
   firebaseUid,
   work,
-  { statementTimeoutMs = 15_000, signal } = {},
+  { statementTimeoutMs = 15_000, signal, fundAdmin = false } = {},
 ) {
   if (
     !validFirebaseUid(firebaseUid) ||
     typeof work !== "function" ||
+    typeof fundAdmin !== "boolean" ||
     !Number.isSafeInteger(statementTimeoutMs) ||
     statementTimeoutMs < 1
   ) {
@@ -586,6 +709,7 @@ export async function withFirebaseTransaction(
   try {
     throwIfAborted(signal);
     await client.query("RESET app.firebase_uid");
+    await client.query("RESET app.firebase_fund_admin");
     await client.query("BEGIN");
     transactionOpen = true;
     await client.query("SELECT set_config('statement_timeout', $1, true)", [
@@ -602,13 +726,31 @@ export async function withFirebaseTransaction(
         503,
       );
     }
+    const adminContext = await client.query(
+      "SELECT set_config('app.firebase_fund_admin', $1, true) AS firebase_fund_admin",
+      [fundAdmin ? "true" : "false"],
+    );
+    if (
+      adminContext.rows[0]?.firebase_fund_admin !==
+      (fundAdmin ? "true" : "false")
+    ) {
+      throw new RuntimeError(
+        "DATABASE_CONTEXT_REJECTED",
+        "Database unavailable.",
+        503,
+      );
+    }
 
     result = await work(client, signal);
     throwIfAborted(signal);
     await client.query("COMMIT");
     transactionOpen = false;
     const leaked = await readFirebaseContext(client);
-    if (leaked !== null && leaked !== "") {
+    if (
+      (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
+      (leaked.firebaseFundAdmin !== null &&
+        leaked.firebaseFundAdmin !== "")
+    ) {
       destroy = true;
       throw new RuntimeError(
         "DATABASE_CONTEXT_LEAK",
@@ -636,8 +778,13 @@ export async function withFirebaseTransaction(
 
   try {
     await client.query("RESET app.firebase_uid");
+    await client.query("RESET app.firebase_fund_admin");
     const leaked = await readFirebaseContext(client);
-    if (leaked !== null && leaked !== "") {
+    if (
+      (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
+      (leaked.firebaseFundAdmin !== null &&
+        leaked.firebaseFundAdmin !== "")
+    ) {
       destroy = true;
       failure ??= new RuntimeError(
         "DATABASE_CONTEXT_LEAK",

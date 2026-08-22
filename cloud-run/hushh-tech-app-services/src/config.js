@@ -1,4 +1,3 @@
-const SHARED_FIREBASE_PROJECT = "hushh-pda";
 const PRODUCT_CLIENT_ID = "hushh-tech";
 const PRODUCT_CLIENT_APP_ID = "app_hushh-technologies_cd1895ef";
 const DATABASE_NAME = "hushh_tech_app";
@@ -39,6 +38,7 @@ const PROJECT_CONTRACTS = Object.freeze({
     number: "175298245599",
     region: "us-central1",
     productAudience: "hushh-tech-uat",
+    firebaseProjectId: "hushh-tech-uat",
     instanceConnectionName: "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
   }),
   "hushh-tech-prod": Object.freeze({
@@ -46,6 +46,7 @@ const PROJECT_CONTRACTS = Object.freeze({
     number: "646258530541",
     region: "us-central1",
     productAudience: "hushh-tech-prod",
+    firebaseProjectId: "hushh-tech-prod",
     instanceConnectionName:
       "hushh-tech-prod:us-central1:hushh-tech-app-pg-prod",
   }),
@@ -116,7 +117,7 @@ function expectedGoogleCaller(serviceOwner, projectId, stage) {
   const account =
     serviceOwner === "worker"
       ? `hushh-tech-task-runner-${stage}`
-      : `hushh-tech-web-gateway-${stage}`;
+      : `hushh-tech-web-${stage}`;
   return `${account}@${projectId}.iam.gserviceaccount.com`;
 }
 
@@ -165,7 +166,7 @@ export function readRuntimeConfig(env = process.env) {
   const productAudience = required(env, "PRODUCT_AUDIENCE");
   const productClientAppId = required(env, "PRODUCT_CLIENT_APP_ID");
   if (
-    firebaseProjectId !== SHARED_FIREBASE_PROJECT ||
+    firebaseProjectId !== project.firebaseProjectId ||
     productAudience !== project.productAudience ||
     productClientAppId !== PRODUCT_CLIENT_APP_ID
   ) {
@@ -191,9 +192,16 @@ export function readRuntimeConfig(env = process.env) {
     "HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED",
   );
   const finnhubApiKey = clean(env.FINNHUB_API_KEY);
+  const googleMapsApiKey = clean(env.GOOGLE_MAPS_API_KEY);
+  const nominatimUserAgent =
+    clean(env.NOMINATIM_USER_AGENT) ||
+    "hushh-location-geocode/1.0 (https://hushh.ai)";
+  if (/[\r\n]/.test(nominatimUserAgent)) {
+    throw new ConfigurationError("NOMINATIM_USER_AGENT is invalid.");
+  }
   if (
     serviceOwner !== "investor-api" &&
-    (publicStockQuotesEnabled || finnhubApiKey)
+    (publicStockQuotesEnabled || finnhubApiKey || googleMapsApiKey)
   ) {
     throw new ConfigurationError(
       "The public stock-quotes provider belongs only to investor-api.",
@@ -290,11 +298,20 @@ export function readRuntimeConfig(env = process.env) {
       15_000,
     ),
     finnhubApiKey,
+    googleMapsApiKey,
+    nominatimUserAgent,
   });
 }
 
 export const RUNTIME_CONSTANTS = Object.freeze({
-  firebaseProjectId: SHARED_FIREBASE_PROJECT,
+  firebaseProjectIds: Object.freeze(
+    Object.fromEntries(
+      Object.entries(PROJECT_CONTRACTS).map(([projectId, contract]) => [
+        projectId,
+        contract.firebaseProjectId,
+      ]),
+    ),
+  ),
   productClient: PRODUCT_CLIENT_ID,
   productClientAppId: PRODUCT_CLIENT_APP_ID,
   databaseName: DATABASE_NAME,

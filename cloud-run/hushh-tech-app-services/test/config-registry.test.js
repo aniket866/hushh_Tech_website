@@ -53,7 +53,7 @@ function expectedCaller(serviceOwner, stage, projectId) {
   const account =
     serviceOwner === "worker"
       ? `hushh-tech-task-runner-${stage}`
-      : `hushh-tech-web-gateway-${stage}`;
+      : `hushh-tech-web-${stage}`;
   return `${account}@${projectId}.iam.gserviceaccount.com`;
 }
 
@@ -64,6 +64,7 @@ function ownerRuntimeEnv(serviceOwner, stage, overrides = {}) {
     GOOGLE_CLOUD_PROJECT: project.id,
     SERVICE_AUDIENCE: `https://${SERVICE_NAMES[serviceOwner]}-${project.number}.us-central1.run.app`,
     ALLOWED_GOOGLE_CALLERS: expectedCaller(serviceOwner, stage, project.id),
+    FIREBASE_PROJECT_ID: project.id,
     PRODUCT_AUDIENCE: project.audience,
     INSTANCE_CONNECTION_NAME: project.instance,
     PGUSER: `${ACCOUNT_STEMS[serviceOwner]}-${stage}@${project.id}.iam`,
@@ -82,6 +83,7 @@ test("all seven owners bind to their exact UAT and production identities", () =>
         config.databaseUser,
         `${ACCOUNT_STEMS[serviceOwner]}-${stage}@${project.id}.iam`,
       );
+      assert.equal(config.firebaseProjectId, project.id);
       assert.deepEqual(config.allowedGoogleCallers, [
         expectedCaller(serviceOwner, stage, project.id),
       ]);
@@ -200,26 +202,26 @@ test("public stock quotes require exact investor ownership and provider coupling
   }
 });
 
-test("frozen registry is exact and enables no function", () => {
+test("registry enables only geocode and keeps NDA fail closed", () => {
   assert.equal(validateRegistry(LEGACY_FUNCTIONS), true);
   assert.equal(LEGACY_FUNCTIONS.length, 112);
   assert.equal(REGISTRY_METADATA.count, 112);
   assert.equal(
     REGISTRY_METADATA.digest,
-    "76737491439f7898cb488125c3630ae605a666018848181fe88fc2916d22bbb3",
+    "00b022ae3eab4a559fb5e70a90f55283e738a5fa81ed34a2e1aafb20e8479d55",
   );
   assert.equal(new Set(LEGACY_FUNCTIONS.map(({ slug }) => slug)).size, 112);
-  assert.equal(
+  assert.deepEqual(
     LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "PORTED_AND_VERIFIED",
-    ).length,
-    0,
+    ).map(({ slug }) => slug),
+    ["hushh-location-geocode"],
   );
   assert.equal(
     LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "INVENTORY_FROZEN",
     ).length,
-    112,
+    111,
   );
   assert.equal(
     LEGACY_FUNCTIONS.filter(
@@ -232,6 +234,14 @@ test("frozen registry is exact and enables no function", () => {
       ({ final_disposition }) => final_disposition === "RETIRE_WITH_410",
     ).map(({ slug }) => slug),
     ["get-secrets"],
+  );
+  assert.equal(
+    LEGACY_FUNCTION_REGISTRY["hushh-location-geocode"].migration_state,
+    "PORTED_AND_VERIFIED",
+  );
+  assert.equal(
+    LEGACY_FUNCTION_REGISTRY["nda-admin-fetch"].migration_state,
+    "INVENTORY_FROZEN",
   );
 });
 

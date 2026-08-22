@@ -274,7 +274,22 @@ export const INVESTOR_READ_ONLY_FUNCTION_CONTRACTS = createFunctionContracts({
   },
 });
 
+export const ENGAGEMENT_ADMIN_FUNCTION_CONTRACTS = createFunctionContracts({
+  "nda-admin-fetch": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+});
+
 // Contract presence is not enablement. The frozen registry is checked before
 // these definitions, and all 112 entries remain unreachable until independent
 // UAT parity changes a specific entry to PORTED_AND_VERIFIED.
-export const FUNCTION_CONTRACTS = INVESTOR_READ_ONLY_FUNCTION_CONTRACTS;
+export const FUNCTION_CONTRACTS = Object.freeze({
+  ...INVESTOR_READ_ONLY_FUNCTION_CONTRACTS,
+  ...ENGAGEMENT_ADMIN_FUNCTION_CONTRACTS,
+});

@@ -120,7 +120,13 @@ function workerFirebaseUid(request) {
   return value;
 }
 
-function databaseFacade(database, firebaseUid, statementTimeoutMs, signal) {
+function databaseFacade(
+  database,
+  firebaseUid,
+  statementTimeoutMs,
+  signal,
+  actor,
+) {
   return Object.freeze({
     async transaction(work) {
       if (!database?.pool) {
@@ -140,6 +146,7 @@ function databaseFacade(database, firebaseUid, statementTimeoutMs, signal) {
       return withFirebaseTransaction(database.pool, firebaseUid, work, {
         statementTimeoutMs,
         signal,
+        fundAdmin: actor?.fundAdmin === true,
       });
     },
   });
@@ -481,12 +488,15 @@ export function createApp({
   });
 
   app.get("/readyz", async (_request, response) => {
+    let dependency = "database";
     try {
       await verifyReadiness();
       if (portedEntries.length > 0) {
+        dependency = "shared_rate_limiter";
         await verifySharedRateLimiter(sharedRateLimiter);
       }
       if (publicStockQuotesEnabled) {
+        dependency = "public_handler";
         if (
           !publicStockQuotesOwned ||
           typeof handlers["stock-quotes"] !== "function" ||
@@ -494,15 +504,29 @@ export function createApp({
         ) {
           throw new Error("The public stock-quotes candidate is unavailable.");
         }
+        dependency = "shared_rate_limiter";
         await verifySharedRateLimiter(sharedRateLimiter);
       }
       if (requiresWebhookLedger) {
+        dependency = "webhook_ledger";
         await verifyWebhookLedger(webhookLedger);
       }
       response
         .status(200)
         .json({ status: "ready", service_owner: config.serviceOwner });
-    } catch {
+    } catch (error) {
+      log({
+        level: "error",
+        code: "READINESS_UNAVAILABLE",
+        service_owner: config.serviceOwner,
+        dependency,
+        dependency_code:
+          error instanceof RuntimeError
+            ? error.code
+            : "DEPENDENCY_UNAVAILABLE",
+        dependency_diagnostic:
+          error instanceof RuntimeError ? error.diagnosticCode : null,
+      });
       response
         .status(503)
         .json({ status: "not_ready", service_owner: config.serviceOwner });
@@ -771,6 +795,7 @@ export function createApp({
                     firebaseUid,
                     config.databaseStatementTimeoutMs,
                     deadline.signal,
+                    actor,
                   ),
             entry,
             signal: deadline.signal,

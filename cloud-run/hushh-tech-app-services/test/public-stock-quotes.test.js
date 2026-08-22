@@ -9,7 +9,7 @@ import { errorCode, request } from "./helpers.js";
 const RATE_KEY = "a".repeat(64);
 const GOOGLE_CALLER = Object.freeze({
   kind: "google-service",
-  email: "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  email: "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
   subject: "gateway-subject",
 });
 
@@ -290,7 +290,7 @@ test("readiness requires the provider seam and shared limiter when enabled", asy
   }
 });
 
-test("runtime wiring installs only the investor handler and performs no startup fetch", async () => {
+test("runtime wiring installs private geocode plus optional stock without startup fetch", async () => {
   let fetchCalls = 0;
   const disabled = createRuntimeHandlers({
     config: config({ publicStockQuotesEnabled: false }),
@@ -299,7 +299,8 @@ test("runtime wiring installs only the investor handler and performs no startup 
       throw new Error("must not run");
     },
   });
-  assert.deepEqual(disabled.handlers, {});
+  assert.deepEqual(Object.keys(disabled.handlers), ["hushh-location-geocode"]);
+  assert.equal(disabled.databaseRequired, false);
 
   assert.throws(
     () =>
@@ -322,8 +323,12 @@ test("runtime wiring installs only the investor handler and performs no startup 
     },
     delay: async () => {},
   });
-  assert.deepEqual(Object.keys(investor.handlers), ["stock-quotes"]);
+  assert.deepEqual(Object.keys(investor.handlers), [
+    "hushh-location-geocode",
+    "stock-quotes",
+  ]);
   assert.equal(await investor.verifyPublicHandlerReadiness("stock-quotes"), true);
+  assert.equal(investor.databaseRequired, false);
   assert.equal(fetchCalls, 0);
 });
 
