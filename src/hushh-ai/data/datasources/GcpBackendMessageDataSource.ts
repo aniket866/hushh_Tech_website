@@ -1,18 +1,18 @@
 /**
- * Supabase Message Data Source
- * Handles all Supabase operations for messages
+ * GcpBackend Message Data Source
+ * Handles all GcpBackend operations for messages
  */
-import { SupabaseClient } from '@supabase/supabase-js';
+import { GcpBackendClient } from '@/services/gcpBackend/types';
 import { MessageDTO } from '../models/MessageDTO';
 import { NetworkError } from '../../core/errors';
 import { logger } from '../../core/utils';
 
-export class SupabaseMessageDataSource {
-  constructor(private supabase: SupabaseClient) {}
+export class GcpBackendMessageDataSource {
+  constructor(private gcpBackend: GcpBackendClient) {}
 
   async getAll(chatId: string, limit: number = 50): Promise<MessageDTO[]> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_messages')
         .select('*')
         .eq('chat_id', chatId)
@@ -34,7 +34,7 @@ export class SupabaseMessageDataSource {
 
   async getById(messageId: string): Promise<MessageDTO | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_messages')
         .select('*')
         .eq('id', messageId)
@@ -62,7 +62,7 @@ export class SupabaseMessageDataSource {
     metadata?: Record<string, unknown>
   ): Promise<MessageDTO> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_messages')
         .insert({
           chat_id: chatId,
@@ -89,7 +89,7 @@ export class SupabaseMessageDataSource {
 
   async delete(messageId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.gcpBackend
         .from('hushh_ai_messages')
         .delete()
         .eq('id', messageId);

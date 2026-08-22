@@ -62,11 +62,11 @@ export const useStep2Logic = (): Step2Logic => {
         setSelectedAccountType(null);
         return;
       }
-      if (!config.supabaseClient) return;
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) return;
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) { navigate('/login'); return; }
       setUserId(user.id);
-      const { data } = await config.supabaseClient
+      const { data } = await config.gcpBackendClient
         .from('onboarding_data')
         .select('account_type, account_structure')
         .eq('user_id', user.id)
@@ -106,7 +106,7 @@ export const useStep2Logic = (): Step2Logic => {
       navigate(withLocalOnboardingPreview(nextRoute));
       return;
     }
-    if (!userId || !config.supabaseClient) return;
+    if (!userId || !config.gcpBackendClient) return;
     setIsLoading(true);
     try {
       await upsertOnboardingData(userId, {
@@ -129,7 +129,7 @@ export const useStep2Logic = (): Step2Logic => {
       savePreview();
       return true;
     }
-    if (!userId || !config.supabaseClient) return false;
+    if (!userId || !config.gcpBackendClient) return false;
     const { error } = await upsertOnboardingData(userId, {
       account_type: selectedAccountType,
       account_structure: accountStructureFor(selectedAccountType),

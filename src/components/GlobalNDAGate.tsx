@@ -182,7 +182,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
 
       // Resolve the refreshed Research session before consulting the legacy
       // NDA backend. LINK_REQUIRED and invalidated Research sessions are also
-      // handled here so they cannot fall through to Supabase.
+      // handled here so they cannot fall through to GcpBackend.
       try {
         const compatibilityMode = await getHushhResearchCompatibilityMode();
         if (compatibilityMode === 'research') {

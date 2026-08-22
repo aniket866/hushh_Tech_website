@@ -82,11 +82,11 @@ export default function HushhAILoginPage() {
   };
 
   useEffect(() => {
-    if (!config.supabaseClient) {
+    if (!config.gcpBackendClient) {
       return;
     }
 
-    config.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    config.gcpBackendClient.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate("/hushh-ai");
       }
@@ -94,7 +94,7 @@ export default function HushhAILoginPage() {
 
     const {
       data: { subscription },
-    } = config.supabaseClient.auth.onAuthStateChange((_event, session) => {
+    } = config.gcpBackendClient.auth.onAuthStateChange((_event, session) => {
       if (session) {
         navigate("/hushh-ai");
       }

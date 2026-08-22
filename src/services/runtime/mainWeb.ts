@@ -17,19 +17,19 @@ function isUsableConfiguredUrl(value: string | undefined): value is string {
   return Boolean(trimmed) && !trimmed.includes("YOUR_PROJECT_REF");
 }
 
-export function getSupabaseBaseUrl(): string {
-  return trimTrailingSlash(config.SUPABASE_URL);
+export function getGcpBackendBaseUrl(): string {
+  return trimTrailingSlash(config.GCP_API_BASE_URL);
 }
 
-export function getSupabaseRpcUrl(rpcName: string): string {
-  return `${getSupabaseBaseUrl()}/rest/v1/rpc/${rpcName}`;
+export function getGcpBackendRpcUrl(rpcName: string): string {
+  return `${getGcpBackendBaseUrl()}/rest/v1/rpc/${rpcName}`;
 }
 
-export function getSupabaseStoragePublicUrl(
+export function getGcpBackendStoragePublicUrl(
   bucket: string,
   objectPath = ""
 ): string {
-  const baseUrl = `${getSupabaseBaseUrl()}/storage/v1/object/public/${trimLeadingSlash(
+  const baseUrl = `${getGcpBackendBaseUrl()}/storage/v1/object/public/${trimLeadingSlash(
     bucket
   )}`;
 

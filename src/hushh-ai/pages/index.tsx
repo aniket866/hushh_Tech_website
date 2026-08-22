@@ -359,15 +359,15 @@ export default function HushhAIPage() {
     abortControllerRef.current = controller;
 
     try {
-      const supabaseUrl = config.SUPABASE_URL;
-      const supabaseKey = config.SUPABASE_ANON_KEY;
+      const gcpApiBaseUrl = config.GCP_API_BASE_URL;
+      const firebaseApiKey = config.FIREBASE_API_KEY;
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/hushh-ai-chat`, {
+      const response = await fetch(`${gcpApiBaseUrl}/functions/v1/hushh-ai-chat`, {
         method: 'POST',
         signal: controller.signal, // Add abort signal
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
+          'Authorization': `Bearer ${firebaseApiKey}`,
         },
         body: JSON.stringify({
           message,

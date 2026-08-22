@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GcpBackendClient } from "@/services/gcpBackend/types";
 
 import {
   normalizeFinancialLinkStatus,
@@ -76,7 +76,7 @@ async function readResearchOnboardingProgress(
 }
 
 async function fetchLegacyOnboardingProgress(
-  client: SupabaseClient,
+  client: GcpBackendClient,
   userId: string,
 ): Promise<OnboardingProgressRecord | null> {
   const primaryQuery = await client
@@ -144,7 +144,7 @@ async function fetchLegacyOnboardingProgress(
 }
 
 export async function fetchOnboardingProgress(
-  client: SupabaseClient | undefined,
+  client: GcpBackendClient | undefined,
   userId: string,
   options: Pick<CompatibilityRequestOptions, "researchBoundary"> = {},
 ): Promise<OnboardingProgressRecord | null> {
@@ -153,13 +153,13 @@ export async function fetchOnboardingProgress(
     return researchProgress;
   }
   if (!client) {
-    throw new Error("Supabase client is unavailable outside Research mode.");
+    throw new Error("GcpBackend client is unavailable outside Research mode.");
   }
   return fetchLegacyOnboardingProgress(client, userId);
 }
 
 export async function fetchResolvedOnboardingProgress(
-  client: SupabaseClient | undefined,
+  client: GcpBackendClient | undefined,
   userId: string,
   options: Pick<CompatibilityRequestOptions, "researchBoundary"> = {},
 ): Promise<OnboardingProgressRecord | null> {
@@ -168,7 +168,7 @@ export async function fetchResolvedOnboardingProgress(
     return researchProgress;
   }
   if (!client) {
-    throw new Error("Supabase client is unavailable outside Research mode.");
+    throw new Error("GcpBackend client is unavailable outside Research mode.");
   }
 
   const onboardingProgress = await fetchLegacyOnboardingProgress(client, userId);

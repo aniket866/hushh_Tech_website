@@ -1,15 +1,15 @@
 /**
  * Chat Repository Implementation
- * Implements IChatRepository using Supabase data source
+ * Implements IChatRepository using GcpBackend data source
  */
 import { IChatRepository } from '../../domain/repositories';
 import { Chat } from '../../domain/entities';
-import { SupabaseChatDataSource } from '../datasources';
+import { GcpBackendChatDataSource } from '../datasources';
 import { chatMapper } from '../models/mappers';
 import { retryWithBackoff } from '../../core/utils';
 
 export class ChatRepositoryImpl implements IChatRepository {
-  constructor(private dataSource: SupabaseChatDataSource) {}
+  constructor(private dataSource: GcpBackendChatDataSource) {}
 
   async getAll(userId: string, limit?: number): Promise<Chat[]> {
     const dtos = await retryWithBackoff(() =>

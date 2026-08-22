@@ -1,4 +1,4 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User } from "@/services/gcpBackend/types";
 import {
   HUSHH_RESEARCH_CALLBACK_PATH,
   HUSHH_RESEARCH_CONFIG_PATH,

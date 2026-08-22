@@ -38,20 +38,20 @@ export function isCalendarIntent(message: string): boolean {
 }
 
 /**
- * Get the user's Google OAuth token from Supabase session
+ * Get the user's Google OAuth token from GcpBackend session
  */
 export async function getUserGoogleToken(): Promise<string | null> {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      logger.error('Supabase client not initialized');
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      logger.error('GcpBackend client not initialized');
       return null;
     }
 
     const {
       data: { session },
       error,
-    } = await supabase.auth.getSession();
+    } = await gcpBackend.auth.getSession();
 
     if (error) {
       logger.error('Failed to get session', error);

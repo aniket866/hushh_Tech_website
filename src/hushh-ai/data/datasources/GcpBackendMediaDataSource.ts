@@ -1,8 +1,8 @@
 /**
- * Supabase Media Data Source
+ * GcpBackend Media Data Source
  * Handles file uploads and media limits
  */
-import { SupabaseClient } from '@supabase/supabase-js';
+import { GcpBackendClient } from '@/services/gcpBackend/types';
 import { NetworkError, ValidationError } from '../../core/errors';
 import { logger } from '../../core/utils';
 import { LIMITS } from '../../core/constants';
@@ -13,8 +13,8 @@ export interface MediaLimitsDTO {
   last_reset: string;
 }
 
-export class SupabaseMediaDataSource {
-  constructor(private supabase: SupabaseClient) {}
+export class GcpBackendMediaDataSource {
+  constructor(private gcpBackend: GcpBackendClient) {}
 
   async upload(file: File, userId: string): Promise<string> {
     try {
@@ -22,7 +22,7 @@ export class SupabaseMediaDataSource {
       const ext = file.name.split('.').pop();
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-      const { error } = await this.supabase.storage
+      const { error } = await this.gcpBackend.storage
         .from('hushh-ai-media')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -35,7 +35,7 @@ export class SupabaseMediaDataSource {
       }
 
       // Get public URL
-      const { data: urlData } = this.supabase.storage
+      const { data: urlData } = this.gcpBackend.storage
         .from('hushh-ai-media')
         .getPublicUrl(fileName);
 
@@ -49,7 +49,7 @@ export class SupabaseMediaDataSource {
 
   async getLimits(userId: string): Promise<MediaLimitsDTO | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_media_limits')
         .select('*')
         .eq('user_id', userId)
@@ -58,7 +58,7 @@ export class SupabaseMediaDataSource {
       if (error) {
         if (error.code === 'PGRST116') {
           // Create if not exists
-          const { data: newLimits } = await this.supabase
+          const { data: newLimits } = await this.gcpBackend
             .from('hushh_ai_media_limits')
             .insert({ user_id: userId })
             .select()
@@ -80,7 +80,7 @@ export class SupabaseMediaDataSource {
 
   async incrementUploadCount(userId: string): Promise<boolean> {
     try {
-      const { data, error } = await this.supabase.rpc('increment_hushh_ai_uploads', {
+      const { data, error } = await this.gcpBackend.rpc('increment_hushh_ai_uploads', {
         p_user_id: userId,
       });
 

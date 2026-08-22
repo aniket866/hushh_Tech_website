@@ -44,7 +44,7 @@ const demoUsers = [
 // Environment Configuration for Test/Production
 // =====================================================
 const API_BASE = import.meta.env.VITE_KYC_API_BASE || 
-  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/kyc-agent-a2a`;
+  `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/kyc-agent-a2a`;
 
 const IS_DEMO_MODE = import.meta.env.VITE_KYC_DEMO_MODE === 'true';
 const KYC_ENV = import.meta.env.VITE_KYC_ENV || 'development';

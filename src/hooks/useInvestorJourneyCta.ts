@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import type { Session, GcpBackendClient } from "@/services/gcpBackend/types";
 import { useAuthSession } from "../auth/AuthSessionProvider";
 import config from "../resources/config/config";
 import {
@@ -191,7 +191,7 @@ function isMissingProfileStatusColumnError(error: unknown): boolean {
 }
 
 async function fetchInvestorProfileBuiltStatus(
-  client: SupabaseClient,
+  client: GcpBackendClient,
   userId: string,
 ): Promise<boolean> {
   const researchProfile = await readHushhResearchCompatibilityIfActive("profile");
@@ -408,7 +408,7 @@ export function useInvestorJourneyCta(
         }
         return;
       }
-      if (!config.supabaseClient) {
+      if (!config.gcpBackendClient) {
         if (!cancelled) {
           setState("unauthenticated");
           setProfileBuilt(false);
@@ -417,8 +417,8 @@ export function useInvestorJourneyCta(
       }
       try {
         const [onboarding, hasProfileBuilt] = await Promise.all([
-          fetchResolvedOnboardingProgress(config.supabaseClient, session.user.id),
-          fetchInvestorProfileBuiltStatus(config.supabaseClient, session.user.id),
+          fetchResolvedOnboardingProgress(config.gcpBackendClient, session.user.id),
+          fetchInvestorProfileBuiltStatus(config.gcpBackendClient, session.user.id),
         ]);
         if (cancelled) return;
         const derived = getInvestorAccessState(onboarding);

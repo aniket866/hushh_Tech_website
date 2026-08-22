@@ -103,11 +103,11 @@ async function verifyCanonicalizedAuthEntry(startUrl, expectedPathname, expected
 const results = {
   loginUrl,
   apple: await verifyProviderRedirect("Continue with Apple", [
-    "supabase.co",
+    "firebaseapp.com",
     "appleid.apple.com",
   ]),
   google: await verifyProviderRedirect("Continue with Google", [
-    "supabase.co",
+    "firebaseapp.com",
     "google.com",
     "accounts.google.com",
   ]),

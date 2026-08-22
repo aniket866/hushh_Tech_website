@@ -124,11 +124,11 @@ export const useStep1Logic = (): Step1Logic => {
         return;
       }
 
-      if (!config.supabaseClient) return;
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) return;
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) { navigate('/login'); return; }
       setUserId(user.id);
-      const { data } = await config.supabaseClient
+      const { data } = await config.gcpBackendClient
         .from('onboarding_data')
         .select('referral_source, referral_source_other')
         .eq('user_id', user.id)
@@ -187,7 +187,7 @@ export const useStep1Logic = (): Step1Logic => {
       navigate(withLocalOnboardingPreview('/onboarding/step-2'));
       return;
     }
-    if (!userId || !config.supabaseClient || !selectedSource) return;
+    if (!userId || !config.gcpBackendClient || !selectedSource) return;
     setIsLoading(true);
     try {
       await upsertOnboardingData(userId, {

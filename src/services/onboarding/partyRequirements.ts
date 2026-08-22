@@ -1,7 +1,7 @@
 /**
  * Per-role required fields an INVITED party must complete on their tokenized
  * onboarding page (§5/§6/§7). This is the client copy; an identical copy lives at
- * supabase/functions/_shared/onboardingParties.ts for server-side validation, and
+ * gcpBackend/functions/_shared/onboardingParties.ts for server-side validation, and
  * a contract test (tests/partyRequirementsSync.test.ts) asserts the two never drift.
  *
  * Joint owners complete FULL KYC parity with the primary investor (identity,

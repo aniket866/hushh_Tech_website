@@ -2,7 +2,7 @@
  * Hushh Studio - Veo 3.1 API Service
  * Handles video generation using Google's Veo 3.1 model via Vertex AI
  * 
- * Uses Supabase Edge Function proxy for GCP paid billing access
+ * Uses GcpBackend Edge Function proxy for GCP paid billing access
  */
 
 import {
@@ -12,9 +12,9 @@ import {
   MAX_POLLING_ATTEMPTS,
 } from '../types';
 
-// Supabase Edge Function URL
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const VEO_ENDPOINT = `${SUPABASE_URL}/functions/v1/veo-generate-video`;
+// GcpBackend Edge Function URL
+const GCP_API_BASE_URL = import.meta.env.VITE_GCP_API_BASE_URL || '';
+const VEO_ENDPOINT = `${GCP_API_BASE_URL}/functions/v1/veo-generate-video`;
 
 // Polling interval in milliseconds
 const POLLING_INTERVAL = 10000; // 10 seconds
@@ -34,9 +34,9 @@ export class VeoService {
   private isInitialized: boolean = false;
 
   constructor() {
-    this.isInitialized = !!SUPABASE_URL;
+    this.isInitialized = !!GCP_API_BASE_URL;
     if (!this.isInitialized) {
-      console.error('VITE_SUPABASE_URL not found in environment variables');
+      console.error('VITE_GCP_API_BASE_URL not found in environment variables');
     }
   }
 
@@ -76,7 +76,7 @@ export class VeoService {
     onProgress: (progress: GenerationProgress) => void
   ): Promise<GeneratedVideo> {
     if (!this.isInitialized) {
-      throw new Error('VeoService not initialized. Check Supabase URL.');
+      throw new Error('VeoService not initialized. Check GcpBackend URL.');
     }
 
     onProgress({
@@ -183,7 +183,7 @@ export class VeoService {
     onProgress: (progress: GenerationProgress) => void
   ): Promise<GeneratedVideo> {
     if (!this.isInitialized) {
-      throw new Error('VeoService not initialized. Check Supabase URL.');
+      throw new Error('VeoService not initialized. Check GcpBackend URL.');
     }
 
     onProgress({
@@ -287,7 +287,7 @@ export class VeoService {
     onProgress: (progress: GenerationProgress) => void
   ): Promise<GeneratedVideo> {
     if (!this.isInitialized) {
-      throw new Error('VeoService not initialized. Check Supabase URL.');
+      throw new Error('VeoService not initialized. Check GcpBackend URL.');
     }
 
     onProgress({

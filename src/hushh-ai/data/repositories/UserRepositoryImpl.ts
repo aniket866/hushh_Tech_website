@@ -1,15 +1,15 @@
 /**
  * User Repository Implementation
- * Implements IUserRepository using Supabase data source
+ * Implements IUserRepository using GcpBackend data source
  */
 import { IUserRepository } from '../../domain/repositories';
 import { User } from '../../domain/entities';
-import { SupabaseUserDataSource } from '../datasources';
+import { GcpBackendUserDataSource } from '../datasources';
 import { userMapper } from '../models/mappers';
 import { retryWithBackoff } from '../../core/utils';
 
 export class UserRepositoryImpl implements IUserRepository {
-  constructor(private dataSource: SupabaseUserDataSource) {}
+  constructor(private dataSource: GcpBackendUserDataSource) {}
 
   async getCurrent(): Promise<User | null> {
     const dto = await retryWithBackoff(() =>

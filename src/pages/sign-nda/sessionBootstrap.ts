@@ -1,4 +1,4 @@
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session } from '@/services/gcpBackend/types';
 
 interface AuthSubscription {
   unsubscribe: () => void;

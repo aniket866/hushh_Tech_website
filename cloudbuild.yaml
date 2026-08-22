@@ -26,11 +26,11 @@ steps:
       - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
       # Build args for Vite (compile-time env vars)
       - '--build-arg'
-      - 'VITE_SUPABASE_URL=${_VITE_SUPABASE_URL}'
+      - 'VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}'
       - '--build-arg'
-      - 'VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}'
+      - 'VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}'
       - '--build-arg'
-      - 'VITE_SUPABASE_REDIRECT_URL=${_VITE_SUPABASE_REDIRECT_URL}'
+      - 'VITE_GCP_AUTH_REDIRECT_URL=${_VITE_GCP_AUTH_REDIRECT_URL}'
       - '--build-arg'
       - 'VITE_KYC_ENV=${_VITE_KYC_ENV}'
       - '--build-arg'
@@ -83,7 +83,7 @@ steps:
       - '--set-env-vars'
       - 'NODE_ENV=production,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=${_COMMUNITY_CONTENT_COLLECTION},COMMUNITY_CONTENT_BUCKET=${_COMMUNITY_CONTENT_BUCKET},COMMUNITY_CONTENT_CACHE_SECONDS=${_COMMUNITY_CONTENT_CACHE_SECONDS}'
       - '--set-secrets'
-      - 'SUPABASE_SERVICE_ROLE_KEY=${_SUPABASE_SERVICE_ROLE_KEY_SECRET}:latest'
+      - 'GCP_SERVER_ACTOR_UID=${_GCP_SERVER_ACTOR_UID_SECRET}:latest'
 
 # Substitution defaults (override in Cloud Build trigger settings)
 substitutions:
@@ -94,7 +94,7 @@ substitutions:
   _COMMUNITY_CONTENT_COLLECTION: community_posts
   _COMMUNITY_CONTENT_BUCKET: hushh-tech-community-content
   _COMMUNITY_CONTENT_CACHE_SECONDS: '300'
-  _SUPABASE_SERVICE_ROLE_KEY_SECRET: hushh-tech-supabase-service-role-key
+  _GCP_SERVER_ACTOR_UID_SECRET: hushh-tech-server-actor-uid
 
 # Build timeout
 timeout: '1200s'

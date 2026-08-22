@@ -36,7 +36,7 @@ const DeleteAccountModal = ({
   // Backend logic
   // =====================================================
   const handleDeleteAccount = async () => {
-    if (!isDeleteEnabled || !config.supabaseClient) return;
+    if (!isDeleteEnabled || !config.gcpBackendClient) return;
 
     setIsDeleting(true);
 
@@ -44,7 +44,7 @@ const DeleteAccountModal = ({
       console.log("[DeleteAccount] Starting account deletion process...");
 
       const { data: refreshData, error: refreshError } =
-        await config.supabaseClient.auth.refreshSession();
+        await config.gcpBackendClient.auth.refreshSession();
 
       let accessToken: string | null = session?.access_token || null;
 

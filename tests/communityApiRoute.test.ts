@@ -1,4 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { verifyFirebaseBearerMock, executeDataRequestMock } = vi.hoisted(() => ({
+  verifyFirebaseBearerMock: vi.fn(),
+  executeDataRequestMock: vi.fn(),
+}));
+
+vi.mock("../api/shared/gcpDataRuntime.js", () => ({
+  verifyFirebaseBearer: verifyFirebaseBearerMock,
+  executeDataRequest: executeDataRequestMock,
+}));
+
 import postsHandler from "../api/community/posts.js";
 import postDetailHandler from "../api/community/post-detail.js";
 import { normalizePost } from "../api/community/content-service.js";
@@ -27,6 +38,7 @@ describe("community API routes", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it("returns public community posts from the Cloud Run API fallback", async () => {
@@ -110,14 +122,7 @@ describe("community API routes", () => {
   });
 
   it("rejects an invalid bearer token before listing NDA posts", async () => {
-    vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(
-        new Response(JSON.stringify({ message: "invalid token" }), { status: 401 }),
-      ),
-    );
+    verifyFirebaseBearerMock.mockRejectedValueOnce(new Error("invalid token"));
     const res = createRes();
 
     await postsHandler(
@@ -134,17 +139,8 @@ describe("community API routes", () => {
   });
 
   it("rejects authenticated users who have not signed the NDA", async () => {
-    vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ id: "unsigned-user" }), { status: 200 }),
-        )
-        .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 })),
-    );
+    verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "unsigned-user" });
+    executeDataRequestMock.mockResolvedValueOnce({ data: [] });
     const res = createRes();
 
     await postsHandler(
@@ -161,21 +157,10 @@ describe("community API routes", () => {
   });
 
   it("returns NDA summaries only after the bearer token has a signed NDA row", async () => {
-    vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ id: "signed-user" }), { status: 200 }),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify([{ signed_at: "2026-06-05T00:00:00.000Z" }]), {
-            status: 200,
-          }),
-        ),
-    );
+    verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "signed-user" });
+    executeDataRequestMock.mockResolvedValueOnce({
+      data: [{ signed_at: "2026-06-05T00:00:00.000Z" }],
+    });
     const res = createRes();
 
     await postsHandler(
@@ -195,21 +180,10 @@ describe("community API routes", () => {
   });
 
   it("returns NDA post details only after the bearer token has a signed NDA row", async () => {
-    vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ id: "signed-user" }), { status: 200 }),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify([{ signed_at: "2026-06-05T00:00:00.000Z" }]), {
-            status: 200,
-          }),
-        ),
-    );
+    verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "signed-user" });
+    executeDataRequestMock.mockResolvedValueOnce({
+      data: [{ signed_at: "2026-06-05T00:00:00.000Z" }],
+    });
     const res = createRes();
 
     await postDetailHandler(

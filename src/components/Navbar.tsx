@@ -148,7 +148,7 @@ export default function Navbar() {
 
   // Fetch Hushh Coins balance when authenticated
   useEffect(() => {
-    if (!user?.id || !config.supabaseClient) {
+    if (!user?.id || !config.gcpBackendClient) {
       queueMicrotask(() => setHushhCoins(null));
       return;
     }
@@ -159,7 +159,7 @@ export default function Navbar() {
     const fetchCoins = async () => {
       try {
         const result = await readHushhCoinsBalance(
-          config.supabaseClient!,
+          config.gcpBackendClient!,
           user,
         );
         setHushhCoins(result.mode === "legacy" ? result.balance : null);

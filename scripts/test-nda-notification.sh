@@ -1,6 +1,6 @@
 #!/bin/bash
 # NDA Notification Function Test Script
-# Tests the nda-signed-notification Supabase Edge Function
+# Tests the nda-signed-notification GCP Edge Function
 
 set -e
 
@@ -13,14 +13,14 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}🧪 Testing NDA Signed Notification Function${NC}"
 echo "================================================"
 
-# Supabase project settings
-SUPABASE_URL="${SUPABASE_URL:-${VITE_SUPABASE_URL:-}}"
-FUNCTION_URL="${SUPABASE_URL}/functions/v1/nda-signed-notification"
+# GCP project settings
+GCP_BASE_URL="${GCP_BASE_URL:-${VITE_GCP_API_BASE_URL:-}}"
+FUNCTION_URL="${GCP_BASE_URL}/functions/v1/nda-signed-notification"
 
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${VITE_SUPABASE_ANON_KEY:-}}"
+FIREBASE_ID_TOKEN="${FIREBASE_ID_TOKEN:-${FIREBASE_ID_TOKEN:-}}"
 
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-  echo -e "${RED}❌ Set SUPABASE_URL/SUPABASE_ANON_KEY or VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY before running this script.${NC}"
+if [ -z "$GCP_BASE_URL" ] || [ -z "$FIREBASE_ID_TOKEN" ]; then
+  echo -e "${RED}❌ Set GCP_BASE_URL/FIREBASE_ID_TOKEN or VITE_GCP_API_BASE_URL/FIREBASE_ID_TOKEN before running this script.${NC}"
   exit 1
 fi
 
@@ -45,7 +45,7 @@ echo -e "${YELLOW}Test 2: Missing Required Fields${NC}"
 echo "--------------------------------"
 MISSING_FIELDS_RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
   -d '{"ndaVersion": "v1.0"}' \
   -w "\n%{http_code}" 2>&1)
 
@@ -65,7 +65,7 @@ echo "---------------------------------------------------"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 VALID_RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
   -d "{
     \"signerName\": \"Test User - Automated Test\",
     \"signerEmail\": \"test@hushh.ai\",
@@ -94,7 +94,7 @@ echo "----------------------------------"
 TIMESTAMP2=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 PDF_URL_RESPONSE=$(curl -s -X POST "$FUNCTION_URL" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $FIREBASE_ID_TOKEN" \
   -d "{
     \"signerName\": \"PDF Test User\",
     \"signerEmail\": \"pdftest@hushh.ai\",

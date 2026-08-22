@@ -28,21 +28,21 @@ export function useVerifyCompleteLogic() {
   }, [result, pollingCount]);
 
   const checkVerificationStatus = async () => {
-    if (!config.supabaseClient) {
+    if (!config.gcpBackendClient) {
       return;
     }
 
     try {
       const {
         data: { user },
-      } = await config.supabaseClient.auth.getUser();
+      } = await config.gcpBackendClient.auth.getUser();
 
       if (!user) {
         navigate('/login');
         return;
       }
 
-      const { data: verification } = await config.supabaseClient
+      const { data: verification } = await config.gcpBackendClient
         .from('identity_verifications')
         .select('*')
         .eq('user_id', user.id)

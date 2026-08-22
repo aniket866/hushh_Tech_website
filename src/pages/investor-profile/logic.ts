@@ -47,16 +47,16 @@ export function useInvestorProfileLogic() {
   useEffect(() => {
     const checkExistingProfile = async () => {
       try {
-        const supabase = resources.config.supabaseClient;
-        if (!supabase) {
-          throw new Error("Supabase client not initialized");
+        const gcpBackend = resources.config.gcpBackendClient;
+        if (!gcpBackend) {
+          throw new Error("GcpBackend client not initialized");
         }
 
         // Check authentication
         const {
           data: { user },
           error: authError,
-        } = await supabase.auth.getUser();
+        } = await gcpBackend.auth.getUser();
 
         if (authError || !user) {
           navigate("/login");

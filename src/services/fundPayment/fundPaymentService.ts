@@ -93,23 +93,23 @@ export interface FundPaymentStatusResponse {
 }
 
 const getFunctionsUrl = (): string => {
-  if (!config.SUPABASE_URL) {
-    throw new Error("VITE_SUPABASE_URL is not configured");
+  if (!config.GCP_API_BASE_URL) {
+    throw new Error("VITE_GCP_API_BASE_URL is not configured");
   }
-  return `${config.SUPABASE_URL}/functions/v1`;
+  return `${config.GCP_API_BASE_URL}/functions/v1`;
 };
 
 const getAnonKey = (): string => {
   try {
-    return import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
+    return import.meta.env?.VITE_FIREBASE_API_KEY || "";
   } catch {
     return "";
   }
 };
 
 const getUserAccessToken = async (): Promise<string> => {
-  if (!config.supabaseClient) return getAnonKey();
-  const session = await getAuthenticatedSession(config.supabaseClient);
+  if (!config.gcpBackendClient) return getAnonKey();
+  const session = await getAuthenticatedSession(config.gcpBackendClient);
   return session.access_token || getAnonKey();
 };
 

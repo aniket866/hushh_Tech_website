@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// Supabase URL for edge function
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// GcpBackend URL for edge function
+const GCP_API_BASE_URL = import.meta.env.VITE_GCP_API_BASE_URL || '';
+const FIREBASE_API_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
 
 // Exact 27 stocks as specified by user
 const STOCK_SYMBOLS = [
@@ -173,7 +173,7 @@ function generateFallbackData(): StockQuote[] {
   }));
 }
 
-// Hook for fetching stock quotes via Supabase edge function
+// Hook for fetching stock quotes via GcpBackend edge function
 export function useStockQuotes(refreshInterval = 120000, enabled = true) {
   const [quotes, setQuotes] = useState<StockQuote[]>(generateFallbackData());
   const [loading, setLoading] = useState(enabled);
@@ -190,17 +190,17 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
     try {
       setError(null);
 
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        throw new Error('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is not configured');
+      if (!GCP_API_BASE_URL || !FIREBASE_API_KEY) {
+        throw new Error('VITE_GCP_API_BASE_URL or VITE_FIREBASE_API_KEY is not configured');
       }
       
-      // Call Supabase edge function
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/stock-quotes`, {
+      // Call GcpBackend edge function
+      const response = await fetch(`${GCP_API_BASE_URL}/functions/v1/stock-quotes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'apikey': SUPABASE_ANON_KEY || '',
+          'Authorization': `Bearer ${FIREBASE_API_KEY}`,
+          'apikey': FIREBASE_API_KEY || '',
         },
         body: JSON.stringify({ symbols: STOCK_SYMBOLS }),
       });

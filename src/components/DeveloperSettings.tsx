@@ -78,31 +78,31 @@ interface DeveloperSettingsProps {
 }
 
 const DeveloperSettings: React.FC<DeveloperSettingsProps> = ({ investorSlug }) => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '{VITE_SUPABASE_URL}';
+  const gcpApiBaseUrl = import.meta.env.VITE_GCP_API_BASE_URL || '{VITE_GCP_API_BASE_URL}';
   
   const endpoints = [
     {
       title: "MCP Discovery Endpoint",
       description: "Get available MCP tools and resources for agent-to-agent communication",
       endpoint: investorSlug
-        ? `${supabaseUrl}/functions/v1/investor-agent-mcp/mcp?slug=${investorSlug}`
-        : `${supabaseUrl}/functions/v1/investor-agent-mcp/mcp?slug={investor-slug}`,
+        ? `${gcpApiBaseUrl}/functions/v1/investor-agent-mcp/mcp?slug=${investorSlug}`
+        : `${gcpApiBaseUrl}/functions/v1/investor-agent-mcp/mcp?slug={investor-slug}`,
       method: "GET",
     },
     {
       title: "Chat Endpoint",
       description: "Public chat endpoint for conversing with investor profiles",
       endpoint: investorSlug
-        ? `${supabaseUrl}/functions/v1/investor-chat?slug=${investorSlug}`
-        : `${supabaseUrl}/functions/v1/investor-chat?slug={investor-slug}`,
+        ? `${gcpApiBaseUrl}/functions/v1/investor-chat?slug=${investorSlug}`
+        : `${gcpApiBaseUrl}/functions/v1/investor-chat?slug={investor-slug}`,
       method: "POST",
     },
     {
       title: "AgentCard Endpoint (A2A)",
       description: "Get structured agent card data for agent-to-agent discovery",
       endpoint: investorSlug
-        ? `${supabaseUrl}/functions/v1/investor-agent-mcp/a2a/agent-card.json?slug=${investorSlug}`
-        : `${supabaseUrl}/functions/v1/investor-agent-mcp/a2a/agent-card.json?slug={investor-slug}`,
+        ? `${gcpApiBaseUrl}/functions/v1/investor-agent-mcp/a2a/agent-card.json?slug=${investorSlug}`
+        : `${gcpApiBaseUrl}/functions/v1/investor-agent-mcp/a2a/agent-card.json?slug={investor-slug}`,
       method: "GET",
     },
   ];

@@ -198,7 +198,7 @@ async function buildContext() {
 
 async function getAccessToken() {
   try {
-    const response = await config.supabaseClient?.auth.getSession();
+    const response = await config.gcpBackendClient?.auth.getSession();
     return response?.data.session?.access_token || "";
   } catch {
     return "";
@@ -262,7 +262,7 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
     isHushhResearchAuthRoute(currentPath) ||
     isHushhResearchAuthRoute(requestedPath)
   ) {
-    // The legacy collector persists to Supabase. Research sessions and the
+    // The legacy collector persists to GcpBackend. Research sessions and the
     // launch callback must not silently write into that backend.
     return;
   }

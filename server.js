@@ -56,6 +56,8 @@ const API_LOADERS = Object.freeze({
   'gemini-ephemeral-token': () => import('./api/gemini-ephemeral-token.js'),
   'generate-investor-profile': () => import('./api/generate-investor-profile.js'),
   'generate-profile-intelligence': () => import('./api/generate-profile-intelligence.js'),
+  'gcp-data': () => import('./api/gcp-data.js'),
+  'gcp-storage': () => import('./api/gcp-storage.js'),
   'google-wallet-pass': () => import('./api/google-wallet-pass.js'),
   'hushh-research-client': () => import('./api/hushh-research-client.js'),
   'legacy-functions': () => import('./api/legacy-functions.js'),
@@ -92,7 +94,7 @@ app.use((_req, res, next) => {
       "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com data:",
       "img-src 'self' data: blob: https: http:",
       // Wallet upstream traffic must stay behind same-origin /api proxies to avoid CSP regressions.
-      "connect-src 'self' https://*.plaid.com https://*.supabase.co wss://*.supabase.co https://www.google.com https://www.gstatic.com https://www.google-analytics.com https://www.googletagmanager.com https://generativelanguage.googleapis.com https://*.googleapis.com https://www.walletlink.org wss://www.walletlink.org wss://mainnet.infura.io wss://*.infura.io https://*.seondnsresolve.com https://www.recaptcha.net https://hushhtech-nda-generation-53407187172.us-central1.run.app",
+      "connect-src 'self' https://*.plaid.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com https://www.gstatic.com https://www.google-analytics.com https://www.googletagmanager.com https://generativelanguage.googleapis.com https://*.googleapis.com https://www.walletlink.org wss://www.walletlink.org wss://mainnet.infura.io wss://*.infura.io https://*.seondnsresolve.com https://www.recaptcha.net https://hushhtech-nda-generation-53407187172.us-central1.run.app",
       "frame-src 'self' https://cdn.plaid.com https://*.plaid.com https://www.google.com https://www.gstatic.com https://calendly.com https://www.recaptcha.net https://lookerstudio.google.com https://datastudio.google.com https://gamma.app https://*.gamma.app https://*.gamma.site",
       "media-src 'self' blob: data:",
       "worker-src 'self' blob:",
@@ -118,6 +120,11 @@ app.use('/functions/v1', preserveLegacyFunctionRawBody);
 // general parser so the default-off gate cannot consume a request body and a
 // whitespace-heavy payload cannot shrink through JSON reserialization.
 app.all('/api/stock-quotes', async (req, res) => wrapHandler(await loadApi('stock-quotes'))(req, res));
+app.put(
+  '/api/gcp/storage/*',
+  express.raw({ limit: '25mb', type: '*/*' }),
+  async (req, res) => wrapHandler(await loadApi('gcp-storage'))(req, res),
+);
 
 // Parse non-compatibility JSON and form bodies.
 app.use(express.json({ limit: '10mb' }));
@@ -135,6 +142,9 @@ app.all('/api/gemini-ephemeral-token', async (req, res) => wrapHandler(await loa
 app.all('/api/generate-investor-profile', async (req, res) => wrapHandler(await loadApi('generate-investor-profile'))(req, res));
 app.all('/api/generate-profile-intelligence', async (req, res) => wrapHandler(await loadApi('generate-profile-intelligence'))(req, res));
 app.all('/api/delete-account', async (req, res) => wrapHandler(await loadApi('delete-account'))(req, res));
+app.post('/api/gcp/data', async (req, res) => wrapHandler(await loadApi('gcp-data'))(req, res));
+app.post('/api/gcp/storage', async (req, res) => wrapHandler(await loadApi('gcp-storage'))(req, res));
+app.delete('/api/gcp/storage', async (req, res) => wrapHandler(await loadApi('gcp-storage'))(req, res));
 app.all('/api/analytics/collect', async (req, res) => wrapHandler(await loadApi('analytics/collect'))(req, res));
 app.all('/api/analytics/realtime', async (req, res) => wrapHandler(await loadApi('analytics/realtime'))(req, res));
 app.all('/api/community/posts', async (req, res) => wrapHandler(await loadApi('community/posts'))(req, res));

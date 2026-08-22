@@ -7,7 +7,7 @@ import config from '../../resources/config/config';
 import type { HushhAIUser, HushhChat, HushhMessage, MediaLimits, MessageMetadata } from '../core/types';
 import { LIMITS } from '../core/constants';
 
-const supabase = config.supabaseClient;
+const gcpBackend = config.gcpBackendClient;
 
 // ============================================
 // User Operations
@@ -17,13 +17,13 @@ const supabase = config.supabaseClient;
  * Get or create Hushh AI user
  */
 export async function getOrCreateUser(): Promise<HushhAIUser | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { user: authUser } } = await gcpBackend.auth.getUser();
   if (!authUser) return null;
 
   // Check if exists
-  const { data: existing } = await supabase
+  const { data: existing } = await gcpBackend
     .from('hushh_ai_users')
     .select('*')
     .eq('supabase_user_id', authUser.id)
@@ -31,7 +31,7 @@ export async function getOrCreateUser(): Promise<HushhAIUser | null> {
 
   if (existing) {
     // Update last login
-    await supabase
+    await gcpBackend
       .from('hushh_ai_users')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', existing.id);
@@ -40,7 +40,7 @@ export async function getOrCreateUser(): Promise<HushhAIUser | null> {
   }
 
   // Create new
-  const { data: newUser, error } = await supabase
+  const { data: newUser, error } = await gcpBackend
     .from('hushh_ai_users')
     .insert({
       supabase_user_id: authUser.id,
@@ -57,7 +57,7 @@ export async function getOrCreateUser(): Promise<HushhAIUser | null> {
   }
 
   // Create media limits record
-  await supabase
+  await gcpBackend
     .from('hushh_ai_media_limits')
     .insert({ user_id: newUser.id });
 
@@ -68,12 +68,12 @@ export async function getOrCreateUser(): Promise<HushhAIUser | null> {
  * Get current user
  */
 export async function getCurrentUser(): Promise<HushhAIUser | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { user: authUser } } = await gcpBackend.auth.getUser();
   if (!authUser) return null;
 
-  const { data } = await supabase
+  const { data } = await gcpBackend
     .from('hushh_ai_users')
     .select('*')
     .eq('supabase_user_id', authUser.id)
@@ -91,12 +91,12 @@ export async function getCurrentUser(): Promise<HushhAIUser | null> {
  * Get all chats for current user
  */
 export async function getChats(): Promise<HushhChat[]> {
-  if (!supabase) return [];
+  if (!gcpBackend) return [];
 
   const user = await getCurrentUser();
   if (!user) return [];
 
-  const { data } = await supabase
+  const { data } = await gcpBackend
     .from('hushh_ai_chats')
     .select('*')
     .eq('user_id', user.id)
@@ -111,9 +111,9 @@ export async function getChats(): Promise<HushhChat[]> {
  * Get single chat by ID
  */
 export async function getChatById(chatId: string): Promise<HushhChat | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data } = await supabase
+  const { data } = await gcpBackend
     .from('hushh_ai_chats')
     .select('*')
     .eq('id', chatId)
@@ -127,12 +127,12 @@ export async function getChatById(chatId: string): Promise<HushhChat | null> {
  * Create new chat
  */
 export async function createChat(title?: string): Promise<HushhChat | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('hushh_ai_chats')
     .insert({
       user_id: user.id,
@@ -147,7 +147,7 @@ export async function createChat(title?: string): Promise<HushhChat | null> {
   }
 
   // Update user chat count
-  await supabase
+  await gcpBackend
     .from('hushh_ai_users')
     .update({ total_chats: user.totalChats + 1 })
     .eq('id', user.id);
@@ -159,9 +159,9 @@ export async function createChat(title?: string): Promise<HushhChat | null> {
  * Update chat title
  */
 export async function updateChatTitle(chatId: string, title: string): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from('hushh_ai_chats')
     .update({ title })
     .eq('id', chatId);
@@ -173,9 +173,9 @@ export async function updateChatTitle(chatId: string, title: string): Promise<bo
  * Delete chat
  */
 export async function deleteChat(chatId: string): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from('hushh_ai_chats')
     .delete()
     .eq('id', chatId);
@@ -191,9 +191,9 @@ export async function deleteChat(chatId: string): Promise<boolean> {
  * Get messages for a chat
  */
 export async function getMessages(chatId: string): Promise<HushhMessage[]> {
-  if (!supabase) return [];
+  if (!gcpBackend) return [];
 
-  const { data } = await supabase
+  const { data } = await gcpBackend
     .from('hushh_ai_messages')
     .select('*')
     .eq('chat_id', chatId)
@@ -214,7 +214,7 @@ export async function addMessage(
   mediaUrls: string[] = [],
   metadata?: MessageMetadata
 ): Promise<HushhMessage | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
   const insertData: {
     chat_id: string;
@@ -234,7 +234,7 @@ export async function addMessage(
     insertData.metadata = metadata as Record<string, unknown>;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('hushh_ai_messages')
     .insert(insertData)
     .select()
@@ -256,12 +256,12 @@ export async function addMessage(
  * Get media limits for current user
  */
 export async function getMediaLimits(): Promise<MediaLimits | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const { data } = await supabase
+  const { data } = await gcpBackend
     .from('hushh_ai_media_limits')
     .select('*')
     .eq('user_id', user.id)
@@ -269,7 +269,7 @@ export async function getMediaLimits(): Promise<MediaLimits | null> {
 
   if (!data) {
     // Create if not exists
-    const { data: newLimits } = await supabase
+    const { data: newLimits } = await gcpBackend
       .from('hushh_ai_media_limits')
       .insert({ user_id: user.id })
       .select()
@@ -295,12 +295,12 @@ export async function canUploadMedia(): Promise<boolean> {
  * Increment upload count
  */
 export async function incrementUploadCount(): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
   const user = await getCurrentUser();
   if (!user) return false;
 
-  const { data, error } = await supabase.rpc('increment_hushh_ai_uploads', {
+  const { data, error } = await gcpBackend.rpc('increment_hushh_ai_uploads', {
     p_user_id: user.id,
   });
 
@@ -315,9 +315,9 @@ export async function incrementUploadCount(): Promise<boolean> {
  * Upload media file
  */
 export async function uploadMedia(file: File): Promise<string | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await gcpBackend.auth.getUser();
   if (!user) return null;
 
   // Check limits first
@@ -332,7 +332,7 @@ export async function uploadMedia(file: File): Promise<string | null> {
   const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
   // Upload
-  const { error } = await supabase.storage
+  const { error } = await gcpBackend.storage
     .from('hushh-ai-media')
     .upload(fileName, file, {
       cacheControl: '3600',
@@ -348,7 +348,7 @@ export async function uploadMedia(file: File): Promise<string | null> {
   await incrementUploadCount();
 
   // Get public URL
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = gcpBackend.storage
     .from('hushh-ai-media')
     .getPublicUrl(fileName);
 
@@ -363,8 +363,8 @@ export async function uploadMedia(file: File): Promise<string | null> {
  * Check if user is authenticated
  */
 export async function isAuthenticated(): Promise<boolean> {
-  if (!supabase) return false;
-  const { data: { session } } = await supabase.auth.getSession();
+  if (!gcpBackend) return false;
+  const { data: { session } } = await gcpBackend.auth.getSession();
   return !!session;
 }
 
@@ -372,9 +372,9 @@ export async function isAuthenticated(): Promise<boolean> {
  * Subscribe to auth changes
  */
 export function onAuthChange(callback: (isLoggedIn: boolean) => void): () => void {
-  if (!supabase) return () => {};
+  if (!gcpBackend) return () => {};
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  const { data: { subscription } } = gcpBackend.auth.onAuthStateChange(
     (_event, session) => {
       callback(!!session);
     }
@@ -387,7 +387,7 @@ export function onAuthChange(callback: (isLoggedIn: boolean) => void): () => voi
  * Sign out current user
  */
 export async function signOut(): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
   // Clear profile cache
   try {
@@ -396,7 +396,7 @@ export async function signOut(): Promise<boolean> {
     console.warn('Failed to clear profile cache:', e);
   }
 
-  const { error } = await supabase.auth.signOut();
+  const { error } = await gcpBackend.auth.signOut();
   return !error;
 }
 
@@ -407,8 +407,8 @@ const PROFILE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
  * Get user email and avatar
  */
 export async function getUserProfile(): Promise<{ email: string; displayName: string | null; avatarUrl: string | null } | null> {
-  if (!supabase) {
-    console.error('getUserProfile: Supabase client not initialized');
+  if (!gcpBackend) {
+    console.error('getUserProfile: GcpBackend client not initialized');
     return null;
   }
 
@@ -428,10 +428,10 @@ export async function getUserProfile(): Promise<{ email: string; displayName: st
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const { data: { user }, error } = await gcpBackend.auth.getUser();
 
     if (error) {
-      console.error('getUserProfile: Failed to get user from Supabase Auth:', error);
+      console.error('getUserProfile: Failed to get user from GcpBackend Auth:', error);
       return null;
     }
 

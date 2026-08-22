@@ -42,7 +42,7 @@ function normalizePublicInvestorProfileRecord(
  * 1. Get authenticated user
  * 2. Check if profile already exists
  * 3. Call same-origin GCP API to generate AI-powered investor profile
- * 4. Save to Supabase investor_profiles table
+ * 4. Save to GcpBackend investor_profiles table
  * 5. Return complete profile record
  * 
  * SECURITY: AI generation happens in the Cloud Run API with server-side Gemini key storage.
@@ -50,21 +50,21 @@ function normalizePublicInvestorProfileRecord(
 export async function createInvestorProfile(
   input: InvestorProfileInput
 ): Promise<InvestorProfileRecord> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
   
   // 1. Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to create investor profile");
   }
   
   // 2. Check if profile already exists
-  const { data: existingProfile, error: existingProfileError } = await supabase
+  const { data: existingProfile, error: existingProfileError } = await gcpBackend
     .from("investor_profiles")
     .select("id")
     .eq("user_id", user.id)
@@ -91,7 +91,7 @@ export async function createInvestorProfile(
   const investorProfile = result.profile;
   
   // 5. Save to database
-  const { data: profileRecord, error: insertError } = await supabase
+  const { data: profileRecord, error: insertError } = await gcpBackend
     .from("investor_profiles")
     .insert({
       user_id: user.id,
@@ -132,21 +132,21 @@ export async function updateInvestorProfile(
     user_confirmed?: boolean;
   }
 ): Promise<InvestorProfileRecord> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
   
   // 1. Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to update investor profile");
   }
   
   // 2. Fetch existing profile
-  const { data: existingProfile, error: fetchError } = await supabase
+  const { data: existingProfile, error: fetchError } = await gcpBackend
     .from("investor_profiles")
     .select("*")
     .eq("user_id", user.id)
@@ -202,7 +202,7 @@ export async function updateInvestorProfile(
   }
   
   // 7. Save updates
-  const { data: updatedProfile, error: updateError } = await supabase
+  const { data: updatedProfile, error: updateError } = await gcpBackend
     .from("investor_profiles")
     .update(updateData)
     .eq("user_id", user.id)
@@ -220,21 +220,21 @@ export async function updateInvestorProfile(
  * Fetch the investor profile for the authenticated user
  */
 export async function fetchInvestorProfile(): Promise<InvestorProfileRecord | null> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
   
   // 1. Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to fetch investor profile");
   }
   
   // 2. Fetch profile
-  const { data: profile, error: fetchError } = await supabase
+  const { data: profile, error: fetchError } = await gcpBackend
     .from("investor_profiles")
     .select("*")
     .eq("user_id", user.id)
@@ -256,21 +256,21 @@ export async function fetchInvestorProfile(): Promise<InvestorProfileRecord | nu
  * Delete the investor profile for the authenticated user
  */
 export async function deleteInvestorProfile(): Promise<void> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
   
   // 1. Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to delete investor profile");
   }
   
   // 2. Delete profile
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await gcpBackend
     .from("investor_profiles")
     .delete()
     .eq("user_id", user.id);
@@ -321,13 +321,13 @@ export async function fetchPublicInvestorProfileBySlug(
     }
   }
 
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
 
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
 
-  const { data, error } = await supabase.rpc("get_public_investor_profile", {
+  const { data, error } = await gcpBackend.rpc("get_public_investor_profile", {
     p_slug: trimmedSlug,
   });
 
@@ -349,21 +349,21 @@ export async function fetchPublicInvestorProfileBySlug(
  * Useful if user wants to change their public URL for privacy
  */
 export async function regenerateProfileSlug(): Promise<string> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
 
   // Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to regenerate slug");
   }
 
   // Setting slug to empty will trigger auto-generation via database trigger
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('investor_profiles')
     .update({ slug: '' })
     .eq('user_id', user.id)
@@ -381,20 +381,20 @@ export async function regenerateProfileSlug(): Promise<string> {
  * Toggle the public visibility of the authenticated user's profile
  */
 export async function toggleProfileVisibility(isPublic: boolean): Promise<void> {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
-  if (!supabase) {
-    throw new Error("Supabase client not initialized");
+  if (!gcpBackend) {
+    throw new Error("GcpBackend client not initialized");
   }
 
   // Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await gcpBackend.auth.getUser();
   
   if (authError || !user) {
     throw new Error("User must be authenticated to toggle visibility");
   }
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from('investor_profiles')
     .update({ is_public: isPublic })
     .eq('user_id', user.id);

@@ -142,8 +142,8 @@ export default function InvestorGuide() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (!config.supabaseClient) return;
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) return;
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       setIsLoggedIn(!!user);
     };
     checkAuth();

@@ -16,13 +16,13 @@ export default async function fetchPreferences(
 export async function fetchPreferencesWithSeed(
   userId: string
 ): Promise<UserPreferencesRecord | null> {
-  const supabase = resources.config.supabaseClient;
-  if (!supabase) {
-    console.error("Supabase client is not initialized");
+  const gcpBackend = resources.config.gcpBackendClient;
+  if (!gcpBackend) {
+    console.error("GcpBackend client is not initialized");
     return null;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from("members")
     .select(
       "profile, name, email, age, phone_country_code, phone_number, organisation"

@@ -33,7 +33,7 @@ export function useMeetCeoLogic() {
   const sendCoinsEmail = useCallback(async (email: string, name: string, coins: number) => {
     try {
       if (!session?.access_token) return;
-      await fetch(`${config.SUPABASE_URL}/functions/v1/coins-credit-notification`, {
+      await fetch(`${config.GCP_API_BASE_URL}/functions/v1/coins-credit-notification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ recipientEmail: email, recipientName: name, coinsAwarded: coins }),
@@ -45,7 +45,7 @@ export function useMeetCeoLogic() {
   const sendCoinsDeductionEmail = useCallback(async (email: string, name: string, coins: number, meetingDate: string, meetingTime: string) => {
     try {
       if (!session?.access_token) return;
-      await fetch(`${config.SUPABASE_URL}/functions/v1/coins-deduction-notification`, {
+      await fetch(`${config.GCP_API_BASE_URL}/functions/v1/coins-deduction-notification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ recipientEmail: email, recipientName: name, coinsDeducted: coins, meetingDate, meetingTime }),
@@ -63,13 +63,13 @@ export function useMeetCeoLogic() {
    */
   const checkPaymentStatus = useCallback(async () => {
     if (status === 'booting') return;
-    if (!config.supabaseClient) { setPaymentState('not_paid'); return; }
+    if (!config.gcpBackendClient) { setPaymentState('not_paid'); return; }
     try {
       if (status !== 'authenticated' || !user) {
         navigate(buildLoginRedirectPath('/onboarding/meet-ceo'), { replace: true });
         return;
       }
-      const { data: payment } = await config.supabaseClient
+      const { data: payment } = await config.gcpBackendClient
         .from('ceo_meeting_payments').select('*').eq('user_id', user.id).maybeSingle();
       if (payment?.payment_status === 'completed') {
         setHushhCoins(payment.hushh_coins_awarded || 300000);
@@ -77,7 +77,7 @@ export function useMeetCeoLogic() {
         return;
       }
       // No perk row yet (webhook delayed / not run) — grant it now, free.
-      const { error: grantErr } = await config.supabaseClient
+      const { error: grantErr } = await config.gcpBackendClient
         .from('ceo_meeting_payments')
         .upsert({
           user_id: user.id,
@@ -99,7 +99,7 @@ export function useMeetCeoLogic() {
     setLoadingSlots(true);
     try {
       if (!session?.access_token) { setLoadingSlots(false); return; }
-      const res = await fetch(`${config.SUPABASE_URL}/functions/v1/ceo-calendar-booking?days=14`, {
+      const res = await fetch(`${config.GCP_API_BASE_URL}/functions/v1/ceo-calendar-booking?days=14`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();
@@ -114,7 +114,7 @@ export function useMeetCeoLogic() {
     setBookingInProgress(true); setError(null);
     try {
       if (!session?.access_token || !user) throw new Error('Not authenticated');
-      const res = await fetch(`${config.SUPABASE_URL}/functions/v1/ceo-calendar-booking`, {
+      const res = await fetch(`${config.GCP_API_BASE_URL}/functions/v1/ceo-calendar-booking`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ startTime: selectedSlot.startTime, endTime: selectedSlot.endTime, attendeeName: user?.user_metadata?.full_name || 'Hushh User' }),
       });

@@ -114,8 +114,8 @@ export const upsertOnboardingData = async (
   userId: string,
   payload: Record<string, unknown>
 ): Promise<{ error: { message: string } | null }> => {
-  if (!config.supabaseClient) {
-    return { error: { message: 'Supabase client not configured' } };
+  if (!config.gcpBackendClient) {
+    return { error: { message: 'GcpBackend client not configured' } };
   }
 
   try {
@@ -127,7 +127,7 @@ export const upsertOnboardingData = async (
 
       // Retry a few times, dropping one missing column per attempt when PostgREST complains.
       for (let attempt = 0; attempt < 5; attempt++) {
-        const { error } = await config.supabaseClient
+        const { error } = await config.gcpBackendClient
           .from('onboarding_data')
           .update({ ...currentPayload, updated_at: now })
           .eq('user_id', userId);
@@ -156,7 +156,7 @@ export const upsertOnboardingData = async (
       let currentPayload = { ...basePayload };
 
       for (let attempt = 0; attempt < 5; attempt++) {
-        const { error } = await config.supabaseClient
+        const { error } = await config.gcpBackendClient
           .from('onboarding_data')
           .insert({ user_id: userId, ...currentPayload });
 
@@ -179,7 +179,7 @@ export const upsertOnboardingData = async (
     };
 
     // 1. Check if row exists
-    const { data: existing, error: selectError } = await config.supabaseClient
+    const { data: existing, error: selectError } = await config.gcpBackendClient
       .from('onboarding_data')
       .select('id')
       .eq('user_id', userId)

@@ -5,7 +5,7 @@
  * Uses inline styles for email client compatibility.
  * 
  * Location: Main codebase (not in Edge Function)
- * Called by: Vercel API endpoint → Supabase Edge Function
+ * Called by: Vercel API endpoint → GcpBackend Edge Function
  */
 
 export interface PRData {

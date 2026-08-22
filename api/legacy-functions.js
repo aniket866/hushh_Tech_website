@@ -5,7 +5,7 @@ import {
 import { GCP_FUNCTION_CONTRACTS } from "./shared/gcpFunctionContracts.js";
 import { createMetadataIdentityTokenProvider } from "./shared/gcpServiceIdentity.js";
 import { verifyHushhResearchFirebaseToken } from "./shared/hushhResearchFirebase.js";
-import { SUPABASE_RETIREMENT_FUNCTIONS } from "./shared/supabaseRetirementFunctionRegistry.js";
+import { GCP_BACKEND_RETIREMENT_FUNCTIONS } from "./shared/supabaseRetirementFunctionRegistry.js";
 
 const FIREBASE_PROJECT_ID = "hushh-pda";
 const DEVELOPER_APP_ID = "app_hushh-technologies_cd1895ef";
@@ -61,7 +61,7 @@ export function createLegacyFunctionsHandler({
   verifyFirebaseToken,
   getServiceIdentityToken,
 } = {}) {
-  const registry = buildGcpFunctionRegistry(SUPABASE_RETIREMENT_FUNCTIONS);
+  const registry = buildGcpFunctionRegistry(GCP_BACKEND_RETIREMENT_FUNCTIONS);
   const firebaseConfig = readGcpFunctionFirebaseConfig(env);
   const verifier =
     verifyFirebaseToken ??

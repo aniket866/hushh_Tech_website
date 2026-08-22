@@ -17,7 +17,7 @@ export default function HushhResearchHardEntryGuard({
   replaceLocation = (target) => window.location.replace(target),
 }: HushhResearchHardEntryGuardProps) {
   const location = useLocation();
-  const legacyClient = config.supabaseClient;
+  const legacyClient = config.gcpBackendClient;
   const requiresCleanEntry =
     isHushhResearchAuthRoute(location.pathname) && Boolean(legacyClient);
 

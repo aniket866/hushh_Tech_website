@@ -6,7 +6,7 @@
  * routes the application to manual review. It is a flag, never a hard submit block,
  * consistent with the codebase's review-flag philosophy (see proofOfFunds.ts).
  *
- * The Deno copy lives at supabase/functions/_shared/fundingNameMatch.ts and MUST
+ * The Deno copy lives at gcpBackend/functions/_shared/fundingNameMatch.ts and MUST
  * stay in sync (tests/fundingNameMatchSync.test.ts asserts identical behaviour).
  */
 export type FundingNameMatchStatus = 'match' | 'mismatch' | 'unavailable';

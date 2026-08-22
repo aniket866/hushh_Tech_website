@@ -78,8 +78,8 @@ const KycFlowPage: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        if (config.supabaseClient) {
-          const { data: { user } } = await config.supabaseClient.auth.getUser();
+        if (config.gcpBackendClient) {
+          const { data: { user } } = await config.gcpBackendClient.auth.getUser();
           if (user) {
             setUserId(user.id);
             setUserEmail(user.email || undefined);

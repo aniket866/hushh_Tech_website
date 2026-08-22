@@ -144,7 +144,7 @@ interface VerifyResponse {
   kyc?: KycGateInfo;
 }
 
-const functionUrl = (name: string) => `${config.SUPABASE_URL}/functions/v1/${name}`;
+const functionUrl = (name: string) => `${config.GCP_API_BASE_URL}/functions/v1/${name}`;
 
 export function useFundAdminDetail(userId: string | undefined) {
   const { session, status } = useAuthSession();

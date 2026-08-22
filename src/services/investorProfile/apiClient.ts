@@ -21,15 +21,15 @@ export async function generateInvestorProfile(
   input: InvestorProfileInput
 ): Promise<GenerateProfileResponse> {
   try {
-    const supabase = resources.config.supabaseClient;
+    const gcpBackend = resources.config.gcpBackendClient;
     
-    if (!supabase) {
-      throw new Error("Supabase client not initialized");
+    if (!gcpBackend) {
+      throw new Error("GcpBackend client not initialized");
     }
 
     // 1. Get authenticated user session for Authorization header
     const session = await getAuthenticatedSession(
-      supabase,
+      gcpBackend,
       "User not logged in. Please sign in to generate investor profile."
     );
 
@@ -43,7 +43,7 @@ export async function generateInvestorProfile(
     }
 
     // 3. Call the same-origin GCP API route. The browser never receives the AI key.
-    const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+    const gcpApiBaseUrl = (import.meta as any).env.VITE_GCP_API_BASE_URL;
     const response = await fetch("/api/generate-investor-profile", {
       method: 'POST',
       headers: {
@@ -88,7 +88,7 @@ export async function generateInvestorProfile(
       };
 
       // Fire-and-forget — don't block profile creation
-      fetch(`${supabaseUrl}/functions/v1/nws-score-notification`, {
+      fetch(`${gcpApiBaseUrl}/functions/v1/nws-score-notification`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,7 +98,7 @@ export async function generateInvestorProfile(
       }).catch((err) => console.warn("NWS email notification failed (non-blocking):", err));
 
       // Also save NWS score to onboarding_data (fire-and-forget)
-      supabase
+      gcpBackend
         .from("onboarding_data")
         .update({ nws_score: plaidData.nws_score })
         .eq("user_id", session.user.id)

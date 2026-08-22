@@ -77,12 +77,12 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
   const checkAccess = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-check-access`,
+        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-check-access`,
         {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
           },
           body: JSON.stringify({ visitorId, slug }),
         }
@@ -105,12 +105,12 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
     if (paymentStatus === 'success' && sessionId) {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-verify-payment`,
+          `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-verify-payment`,
           {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+              'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
             },
             body: JSON.stringify({ sessionId, visitorId, slug }),
           }
@@ -144,12 +144,12 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
     setProcessing(true);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-create-checkout`,
+        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/chat-create-checkout`,
         {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
           },
           body: JSON.stringify({ visitorId, slug }),
         }
@@ -194,12 +194,12 @@ export function InvestorChatWidget({ slug, investorName }: { slug: string; inves
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/investor-chat`,
+        `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/investor-chat`,
         {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+            'apikey': import.meta.env.VITE_FIREBASE_API_KEY || ''
           },
           body: JSON.stringify({ slug, message: text, visitorId, history }),
         }

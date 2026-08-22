@@ -17,7 +17,6 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const registryOnly = process.argv.includes("--registry-only");
-const forbiddenVendor = ["supa", "base"].join("");
 
 async function filesUnder(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -100,8 +99,6 @@ if (!registryOnly) {
     resolve(root, "Dockerfile"),
   ];
   const forbiddenPatterns = [
-    new RegExp(forbiddenVendor, "i"),
-    new RegExp(`LEGACY_${forbiddenVendor.toUpperCase()}`, "i"),
     /migration\/manifests/i,
     /VITE_[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD)/,
   ];

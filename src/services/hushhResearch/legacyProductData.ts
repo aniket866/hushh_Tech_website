@@ -1,4 +1,4 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { GcpBackendClient, User } from "@/services/gcpBackend/types";
 
 import {
   HUSHH_RESEARCH_SOURCE,
@@ -30,7 +30,7 @@ export function isHushhResearchProductBoundary(
 }
 
 export async function readHushhCoinsBalance(
-  client: SupabaseClient,
+  client: GcpBackendClient,
   user: Pick<User, "id" | "app_metadata">,
 ): Promise<HushhCoinsBalanceResult> {
   if (isHushhResearchProductSession(user)) {

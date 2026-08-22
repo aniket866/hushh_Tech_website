@@ -6,24 +6,24 @@ import {
   type CompatibilityRequestOptions,
 } from './hushhResearch/compatibility';
 
-const REPORTS_SUPABASE_URL = import.meta.env.VITE_MARKET_SUPABASE_URL || "";
-const REPORTS_SUPABASE_KEY = import.meta.env.VITE_MARKET_SUPABASE_KEY || "";
+const REPORTS_GCP_API_BASE_URL = import.meta.env.VITE_MARKET_GCP_API_BASE_URL || "";
+const REPORTS_GCS_PUBLIC_KEY = import.meta.env.VITE_MARKET_GCS_PUBLIC_KEY || "";
 
-// Supabase storage buckets (public)
+// GcpBackend storage buckets (public)
 export const STORAGE_BUCKETS = {
-  IMAGES: REPORTS_SUPABASE_URL
-    ? `${REPORTS_SUPABASE_URL}/storage/v1/object/public/alohafundsreport-images`
+  IMAGES: REPORTS_GCP_API_BASE_URL
+    ? `${REPORTS_GCP_API_BASE_URL}/storage/v1/object/public/alohafundsreport-images`
     : '',
-  VIDEOS: REPORTS_SUPABASE_URL
-    ? `${REPORTS_SUPABASE_URL}/storage/v1/object/public/alohafundsreport-videos`
+  VIDEOS: REPORTS_GCP_API_BASE_URL
+    ? `${REPORTS_GCP_API_BASE_URL}/storage/v1/object/public/alohafundsreport-videos`
     : '',
 };
 
-// Supabase REST API base URL & anon key
-const API_BASE = REPORTS_SUPABASE_URL ? `${REPORTS_SUPABASE_URL}/rest/v1` : '';
-const API_KEY = REPORTS_SUPABASE_KEY;
+// GcpBackend REST API base URL & anon key
+const API_BASE = REPORTS_GCP_API_BASE_URL ? `${REPORTS_GCP_API_BASE_URL}/rest/v1` : '';
+const API_KEY = REPORTS_GCS_PUBLIC_KEY;
 
-// Raw shape returned by Supabase
+// Raw shape returned by GcpBackend
 interface RawReport {
   id: string;
   title: string;
@@ -126,7 +126,7 @@ export const getReportById = async (
   if (researchReport !== 'legacy') return researchReport;
 
   if (!API_BASE || !API_KEY) {
-    console.error('Missing VITE_MARKET_SUPABASE_URL or VITE_MARKET_SUPABASE_KEY');
+    console.error('Missing VITE_MARKET_GCP_API_BASE_URL or VITE_MARKET_GCS_PUBLIC_KEY');
     return null;
   }
 

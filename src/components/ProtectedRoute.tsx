@@ -124,7 +124,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           return;
         }
 
-        if (!config.supabaseClient) {
+        if (!config.gcpBackendClient) {
           redirectToLogin();
           return;
         }
@@ -135,7 +135,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         }
 
         const onboardingData = await fetchResolvedOnboardingProgress(
-          config.supabaseClient,
+          config.gcpBackendClient,
           userId
         );
 

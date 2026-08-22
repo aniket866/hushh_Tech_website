@@ -1,4 +1,4 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User } from "@/services/gcpBackend/types";
 
 import {
   getHushhResearchSessionState,
@@ -95,7 +95,7 @@ export interface CompatibilityRequestOptions {
   /**
    * Sticky caller proof that the current React session belongs to Research.
    * This never supplies a token; it only prevents a lost browser-mode key
-   * from reopening a legacy/Supabase fallback.
+   * from reopening a legacy/GcpBackend fallback.
    */
   researchBoundary?: boolean;
 }

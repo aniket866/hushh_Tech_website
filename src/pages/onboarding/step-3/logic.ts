@@ -47,7 +47,7 @@ import {
    CONSTANTS
    ═══════════════════════════════════════════════ */
 
-export const CURRENT_STEP = 4; // raw Supabase current_step value
+export const CURRENT_STEP = 4; // raw GcpBackend current_step value
 export const TOTAL_STEPS = TOTAL_VISIBLE_ONBOARDING_STEPS;
 export const PROGRESS_PCT = Math.round((3 / TOTAL_STEPS) * 100); // display step = 3
 
@@ -645,15 +645,15 @@ export function useCombinedLocationLogic() {
         }
         return;
       }
-      if (!config.supabaseClient) return;
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) return;
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) { navigate('/login'); return; }
       setUserId(user.id);
 
       // Fetch all relevant data in parallel. Enriched/GPS data is intentionally
       // not used as legal-residence fallback; only Plaid can populate that card.
       const [onboardingResult, financialResult, sharedCache] = await Promise.all([
-        config.supabaseClient
+        config.gcpBackendClient
           .from('onboarding_data')
           .select(`
             citizenship_country, residence_country, current_step,
@@ -663,7 +663,7 @@ export function useCombinedLocationLogic() {
           `)
           .eq('user_id', user.id)
           .maybeSingle(),
-        config.supabaseClient
+        config.gcpBackendClient
           .from('user_financial_data')
           .select('identity_data')
           .eq('user_id', user.id)
@@ -986,7 +986,7 @@ export function useCombinedLocationLogic() {
   /* ─── Navigation ─── */
   const handleContinue = async () => {
     trackCta('continue', 'step-3');
-    if (!userId || (!isPreview && !config.supabaseClient)) return;
+    if (!userId || (!isPreview && !config.gcpBackendClient)) return;
 
     if (!legalFirstName.trim() || !legalLastName.trim()) {
       setError('Please enter your legal first and last name');
@@ -1133,7 +1133,7 @@ export function useCombinedLocationLogic() {
     }
     setIsLoading(true);
     try {
-      if (userId && config.supabaseClient) {
+      if (userId && config.gcpBackendClient) {
         const { error: saveError } = await upsertOnboardingData(userId, { current_step: 9 });
         if (saveError) {
           throw new Error(saveError.message);

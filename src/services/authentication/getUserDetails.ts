@@ -2,13 +2,13 @@ import config from "../../resources/config/config";
 import { getValidatedSession } from "../../auth/session";
 
 /**
- * Get the current user's session details using the Supabase client.
- * Uses supabase.auth.getSession() instead of hardcoded localStorage keys
- * to ensure compatibility regardless of which Supabase project is configured.
+ * Get the current user's session details using the GcpBackend client.
+ * Uses gcpBackend.auth.getSession() instead of hardcoded localStorage keys
+ * to ensure compatibility regardless of which GcpBackend project is configured.
  */
 export default async function getUserDetails(setUserDetails: Function | null) {
   try {
-    const snapshot = await getValidatedSession(config.supabaseClient);
+    const snapshot = await getValidatedSession(config.gcpBackendClient);
     if (snapshot.status !== "authenticated" || !snapshot.session) {
       const emptyResult = { data: null };
       if (setUserDetails) setUserDetails(emptyResult);

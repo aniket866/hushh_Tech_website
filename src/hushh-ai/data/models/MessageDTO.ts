@@ -1,6 +1,6 @@
 /**
  * Message Data Transfer Object
- * Matches Supabase database schema
+ * Matches GcpBackend database schema
  */
 export interface MessageDTO {
   id: string;

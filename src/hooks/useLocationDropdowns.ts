@@ -2,7 +2,7 @@
  * useLocationDropdowns — Manages the Country → State → City cascade.
  *
  * Loads countries synchronously from a static list.
- * States and cities are fetched async from Supabase Edge Functions.
+ * States and cities are fetched async from GcpBackend Edge Functions.
  * Uses pending refs to solve the race condition when GPS data arrives
  * before dropdown options have loaded.
  */

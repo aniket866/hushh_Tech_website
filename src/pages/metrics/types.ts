@@ -1,6 +1,6 @@
 /**
  * Shared TypeScript interfaces for the Hushh KPI dashboard.
- * The primary funnel comes from Supabase; traffic context is server-side GA4.
+ * The primary funnel comes from GcpBackend; traffic context is server-side GA4.
  */
 
 /* ── Reporting window ── */

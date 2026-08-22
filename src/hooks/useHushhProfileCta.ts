@@ -16,7 +16,7 @@ import {
   type InvestorJourneyCta,
   type UseInvestorJourneyCtaOptions,
 } from "./useInvestorJourneyCta";
-import { Session } from "@supabase/supabase-js";
+import { Session } from "@/services/gcpBackend/types";
 
 export type HushhProfileCta = InvestorJourneyCta;
 

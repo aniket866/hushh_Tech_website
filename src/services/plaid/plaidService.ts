@@ -1,5 +1,5 @@
 /**
- * Plaid Service — Clean API calls to Supabase Edge Functions
+ * Plaid Service — Clean API calls to GcpBackend Edge Functions
  * 
  * Simple, no-frills service. All sensitive operations happen server-side.
  */
@@ -153,22 +153,22 @@ export interface PlaidUnlinkResponse {
 // Config
 // =====================================================
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
+const GCP_API_BASE_URL = import.meta.env.VITE_GCP_API_BASE_URL || '';
+const GCP_FUNCTIONS_URL = `${GCP_API_BASE_URL}/functions/v1`;
 
 const getAnonKey = (): string => {
   try {
     // @ts-ignore
-    return import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+    return import.meta.env?.VITE_FIREBASE_API_KEY || '';
   } catch { return ''; }
 };
 
 const getUserAccessToken = async (): Promise<string> => {
   try {
     const config = (await import('../../resources/config/config')).default;
-    const supabase = config.supabaseClient;
-    if (!supabase) return getAnonKey();
-    const session = await getAuthenticatedSession(supabase);
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) return getAnonKey();
+    const session = await getAuthenticatedSession(gcpBackend);
     return session.access_token || getAnonKey();
   } catch { return getAnonKey(); }
 };
@@ -179,10 +179,10 @@ const getHeaders = (token?: string) => ({
 });
 
 const getFunctionsUrl = (): string => {
-  if (!SUPABASE_URL) {
-    throw new Error('VITE_SUPABASE_URL is not configured');
+  if (!GCP_API_BASE_URL) {
+    throw new Error('VITE_GCP_API_BASE_URL is not configured');
   }
-  return SUPABASE_FUNCTIONS_URL;
+  return GCP_FUNCTIONS_URL;
 };
 
 // =====================================================
@@ -297,10 +297,10 @@ export const getPlaidSyncStatus = async (
 ): Promise<PlaidProductSyncStatus[]> => {
   try {
     const config = (await import('../../resources/config/config')).default;
-    const supabase = config.supabaseClient;
-    if (!supabase) return [];
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) return [];
 
-    const { data, error } = await supabase
+    const { data, error } = await gcpBackend
       .from('plaid_product_sync_statuses')
       .select('product, status, available, records_count, error_code, error_message, completed_at, updated_at')
       .eq('user_id', userId)
@@ -340,10 +340,10 @@ export const fetchLinkedTransferAccounts = async (
   userId: string,
 ): Promise<LinkedTransferAccount[]> => {
   const config = (await import('../../resources/config/config')).default;
-  const supabase = config.supabaseClient;
-  if (!supabase) return [];
+  const gcpBackend = config.gcpBackendClient;
+  if (!gcpBackend) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('plaid_transfer_accounts')
     .select(`
       id, plaid_account_id, plaid_item_id, institution_name, institution_id,
@@ -443,15 +443,15 @@ export const checkAssetReport = async (assetReportToken: string, userId: string)
   return res.json() as Promise<{ status: 'complete' | 'pending'; data?: any }>;
 };
 
-/** Save financial data to Supabase */
+/** Save financial data to GcpBackend */
 export const saveFinancialDataToSupabase = async (
   userId: string, data: FinancialDataResponse,
   institutionName?: string, institutionId?: string, itemId?: string, accessToken?: string,
 ) => {
   try {
     const config = (await import('../../resources/config/config')).default;
-    const supabase = config.supabaseClient;
-    if (!supabase) return;
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) return;
 
     const errors: Record<string, string> = {};
     if (data.balance.error) errors.balance = data.balance.error;
@@ -461,7 +461,7 @@ export const saveFinancialDataToSupabase = async (
     if (data.authNumbers?.error) errors.auth = data.authNumbers.error;
     if (data.identityMatch?.error) errors.identity_match = data.identityMatch.error;
 
-    await supabase.from('user_financial_data').upsert({
+    await gcpBackend.from('user_financial_data').upsert({
       user_id: userId,
       plaid_item_id: itemId || null,
       plaid_access_token: null,
@@ -487,7 +487,7 @@ export const saveFinancialDataToSupabase = async (
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });
 
-    console.log('[Plaid] ✅ Data saved to Supabase');
+    console.log('[Plaid] ✅ Data saved to GcpBackend');
   } catch (err) {
     console.warn('[Plaid] Save failed:', err);
   }

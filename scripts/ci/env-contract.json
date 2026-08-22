@@ -1,19 +1,23 @@
 {
   "clientRequired": [
-    "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY",
-    "VITE_SUPABASE_REDIRECT_URL",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_APP_ID",
+    "VITE_GCP_AUTH_REDIRECT_URL",
     "VITE_PLAID_REDIRECT_URI"
   ],
   "clientOptional": [
+    "VITE_GCP_API_BASE_URL",
+    "VITE_FIREBASE_STORAGE_BUCKET",
     "VITE_NDA_GENERATION_URL",
     "VITE_PLAID_ENV",
     "VITE_PLAID_LINK_MODE",
     "VITE_PLAID_DISABLE_LOCAL_SANDBOX_DIRECT",
     "VITE_ALLOW_LOCAL_PLAID_LINK",
     "VITE_GUEST_MODE_ACCESS_TOKEN",
-    "VITE_MARKET_SUPABASE_URL",
-    "VITE_MARKET_SUPABASE_KEY",
+    "VITE_MARKET_GCS_PUBLIC_BASE_URL",
+    "VITE_MARKET_GCS_SIGNED_URL_PATH",
     "VITE_GEMINI_API_KEY",
     "VITE_GEMINI_API_KEY_FALLBACK_1",
     "VITE_GEMINI_API_KEY_FALLBACK_2",
@@ -79,7 +83,14 @@
     "GOOGLE_SERVICE_ACCOUNT_EMAIL",
     "GOOGLE_PRIVATE_KEY",
     "GMAIL_SENDER_EMAIL",
-    "SUPABASE_SERVICE_ROLE_KEY",
+    "GCP_SERVER_ACTOR_UID",
+    "GCP_DATA_RUNTIME_ENABLED",
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME",
+    "CLOUD_SQL_DATABASE",
+    "CLOUD_SQL_IAM_USER",
+    "FIREBASE_PROJECT_ID",
+    "GCP_STORAGE_BUCKET_PREFIX",
+    "DELETE_ACCOUNT_AUDIT_SECRET",
     "GMAIL_USER",
     "GMAIL_APP_PASSWORD",
     "GOOGLE_WALLET_ISSUER_ID",
@@ -136,8 +147,13 @@
     "GEMINI_API_KEY",
     "PROFILE_INTELLIGENCE_API_BASE_URL",
     "PROFILE_INTELLIGENCE_TIMEOUT_MS",
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY"
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME",
+    "CLOUD_SQL_DATABASE",
+    "CLOUD_SQL_IAM_USER",
+    "FIREBASE_PROJECT_ID",
+    "GCP_STORAGE_BUCKET_PREFIX",
+    "GCP_DATA_RUNTIME_ENABLED",
+    "GCP_SERVER_ACTOR_UID"
   ],
   "forbiddenProductionBrowserSecrets": [
     "VITE_OPENAI_API_KEY",
@@ -180,24 +196,14 @@
     "HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST"
   ],
   "criticalServerRouteVars": {
-    "SUPABASE_URL": [
-      "api/generate-investor-profile.js",
-      "api/generate-profile-intelligence.js",
-      "api/public-investor-profile.js",
-      "api/delete-account-service.js",
-      "api/send-email-notification.js",
-      "api/metrics/service.js",
-      "api/analytics/collect.js"
-    ],
-    "SUPABASE_SERVICE_ROLE_KEY": [
-      "api/generate-investor-profile.js",
-      "api/generate-profile-intelligence.js",
-      "api/public-investor-profile.js",
-      "api/delete-account-service.js",
-      "api/send-email-notification.js",
-      "api/metrics/service.js",
-      "api/analytics/collect.js"
-    ],
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME": ["api/shared/gcpDataRuntime.js"],
+    "CLOUD_SQL_DATABASE": ["api/shared/gcpDataRuntime.js"],
+    "CLOUD_SQL_IAM_USER": ["api/shared/gcpDataRuntime.js"],
+    "FIREBASE_PROJECT_ID": ["api/shared/gcpDataRuntime.js"],
+    "GCP_STORAGE_BUCKET_PREFIX": ["api/shared/gcpDataRuntime.js"],
+    "GCP_DATA_RUNTIME_ENABLED": ["api/shared/gcpDataRuntime.js"],
+    "GCP_SERVER_ACTOR_UID": ["api/shared/gcpServerClient.js"],
+    "DELETE_ACCOUNT_AUDIT_SECRET": ["api/delete-account-service.js"],
     "ANALYTICS_HASH_SALT": [
       "api/analytics/collect.js"
     ],

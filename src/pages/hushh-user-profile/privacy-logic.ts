@@ -84,9 +84,9 @@ export function usePrivacyControlsLogic() {
           return;
         }
 
-        const supabase = resources.config.supabaseClient;
-        if (!supabase) {
-          throw new Error("Supabase client not available");
+        const gcpBackend = resources.config.gcpBackendClient;
+        if (!gcpBackend) {
+          throw new Error("GcpBackend client not available");
         }
 
         if (status !== "authenticated" || !user) {
@@ -100,7 +100,7 @@ export function usePrivacyControlsLogic() {
           return;
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await gcpBackend
           .from("investor_profiles")
           .select("privacy_settings")
           .eq("user_id", user.id)
@@ -140,12 +140,12 @@ export function usePrivacyControlsLogic() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const supabase = resources.config.supabaseClient;
-      if (!supabase || status !== "authenticated" || !user) {
+      const gcpBackend = resources.config.gcpBackendClient;
+      if (!gcpBackend || status !== "authenticated" || !user) {
         throw new Error("Not authenticated");
       }
 
-      const { error } = await supabase
+      const { error } = await gcpBackend
         .from("investor_profiles")
         .update({ privacy_settings: privacySettings })
         .eq("user_id", user.id);

@@ -1,14 +1,14 @@
-import { createSupabaseServerClient } from "./shared/supabaseServerClient.js";
+import { createGcpServerClient } from "./shared/gcpServerClient.js";
 
 const getServiceClient = () => {
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const gcpBackendUrl = process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME?.trim();
+  const serviceRoleKey = process.env.GCP_SERVER_ACTOR_UID?.trim();
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing");
+  if (!gcpBackendUrl || !serviceRoleKey) {
+    throw new Error("GcpBackend server environment variables are missing");
   }
 
-  return createSupabaseServerClient(supabaseUrl, serviceRoleKey);
+  return createGcpServerClient(gcpBackendUrl, serviceRoleKey);
 };
 
 export const isPublicProfileFieldVisible = (
@@ -161,8 +161,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabase = getServiceClient();
-    const { data: profileRow, error: profileError } = await supabase
+    const gcpBackend = getServiceClient();
+    const { data: profileRow, error: profileError } = await gcpBackend
       .from("investor_profiles")
       .select(
         "slug,user_id,name,email,age,organisation,is_public,user_confirmed,privacy_settings,investor_profile,shadow_profile"
@@ -179,7 +179,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Profile not found or is private" });
     }
 
-    const { data: onboardingRow, error: onboardingError } = await supabase
+    const { data: onboardingRow, error: onboardingError } = await gcpBackend
       .from("onboarding_data")
       .select(
         "account_type,selected_fund,citizenship_country,residence_country"

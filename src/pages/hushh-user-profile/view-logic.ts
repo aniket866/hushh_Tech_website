@@ -47,9 +47,9 @@ export function useViewPreferencesLogic() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const supabase = resources.config.supabaseClient;
-        if (!supabase) {
-          throw new Error("Supabase client not available");
+        const gcpBackend = resources.config.gcpBackendClient;
+        if (!gcpBackend) {
+          throw new Error("GcpBackend client not available");
         }
 
         if (status === "booting") {
@@ -67,8 +67,8 @@ export function useViewPreferencesLogic() {
           return;
         }
 
-        // Fetch investor profile from Supabase
-        const { data, error } = await supabase
+        // Fetch investor profile from GcpBackend
+        const { data, error } = await gcpBackend
           .from("investor_profiles")
           .select("*")
           .eq("user_id", userIdToFetch)

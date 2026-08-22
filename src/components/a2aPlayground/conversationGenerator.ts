@@ -20,16 +20,16 @@ import type {
   A2ARiskBand,
 } from '../../types/a2aPlayground';
 
-// Supabase config - MUST be set via environment variables
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// GcpBackend config - MUST be set via environment variables
+const GCP_API_BASE_URL = import.meta.env.VITE_GCP_API_BASE_URL;
+const FIREBASE_API_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
 
 // Validate required environment variables
-if (!SUPABASE_URL) {
-  console.error('[A2A Playground] VITE_SUPABASE_URL environment variable is required');
+if (!GCP_API_BASE_URL) {
+  console.error('[A2A Playground] VITE_GCP_API_BASE_URL environment variable is required');
 }
-if (!SUPABASE_ANON_KEY) {
-  console.error('[A2A Playground] VITE_SUPABASE_ANON_KEY environment variable is required');
+if (!FIREBASE_API_KEY) {
+  console.error('[A2A Playground] VITE_FIREBASE_API_KEY environment variable is required');
 }
 
 // A2A Protocol Message Type - Extended for Agentic Negotiation
@@ -249,11 +249,11 @@ async function callA2AProtocolApi(
   error?: string;
 }> {
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/kyc-agent-a2a-protocol/sendMessage`, {
+    const response = await fetch(`${GCP_API_BASE_URL}/functions/v1/kyc-agent-a2a-protocol/sendMessage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${FIREBASE_API_KEY}`,
       },
       body: JSON.stringify({
         subject: config.user.fullName,

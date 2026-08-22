@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { GcpBackendClient } from '@/services/gcpBackend/types';
 import config from '../../resources/config/config';
 import { useAuthSession } from '../../auth/AuthSessionProvider';
 import { checkAccessStatus } from '../../services/access/accessControlApi';
@@ -20,7 +20,7 @@ import { HUSHH_RESEARCH_SOURCE } from '../../services/hushhResearch/contracts';
 import { isHushhResearchAuthMode } from '../../services/hushhResearch/firebaseAuth';
 
 export async function fetchCompatibleProfileBuiltStatus(
-  client: SupabaseClient | undefined,
+  client: GcpBackendClient | undefined,
   userId: string,
   researchBoundary = false,
 ): Promise<boolean> {
@@ -32,7 +32,7 @@ export async function fetchCompatibleProfileBuiltStatus(
     return hasHushhResearchProfileMetadata(researchProfile.response.payload);
   }
   if (!client) {
-    throw new Error('Supabase client is unavailable outside Research mode.');
+    throw new Error('GcpBackend client is unavailable outside Research mode.');
   }
 
   const { data: profile, error } = await client
@@ -95,7 +95,7 @@ export function useProfileLogic() {
   useEffect(() => {
     if (
       !session?.user?.id ||
-      (!config.supabaseClient && !isResearchSession)
+      (!config.gcpBackendClient && !isResearchSession)
     ) {
       const timeoutId = window.setTimeout(() => {
         setOnboardingStatus((prev) => ({ ...prev, loading: false }));
@@ -107,12 +107,12 @@ export function useProfileLogic() {
       try {
         const [hasProfile, onboarding] = await Promise.all([
           fetchCompatibleProfileBuiltStatus(
-            config.supabaseClient,
+            config.gcpBackendClient,
             session.user.id,
             isResearchSession,
           ),
           fetchResolvedOnboardingProgress(
-            config.supabaseClient,
+            config.gcpBackendClient,
             session.user.id,
             { researchBoundary: isResearchSession },
           ),

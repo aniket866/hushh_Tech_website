@@ -1,4 +1,5 @@
 import { createHmac } from "crypto";
+import { createGcpServerClient } from "./shared/gcpServerClient.js";
 
 export const DELETE_ACCOUNT_DELETED_SCOPES = [
   "storage.hushh_ai_media",
@@ -142,8 +143,8 @@ const formatFilterValue = (value) => {
   return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 };
 
-const buildRestUrl = (supabaseUrl, path, query = {}) => {
-  const url = new URL(path, supabaseUrl);
+const buildRestUrl = (gcpBackendUrl, path, query = {}) => {
+  const url = new URL(path, gcpBackendUrl);
 
   for (const [key, value] of Object.entries(query)) {
     if (value === null || value === undefined || value === "") continue;
@@ -153,7 +154,7 @@ const buildRestUrl = (supabaseUrl, path, query = {}) => {
   return url.toString();
 };
 
-async function parseSupabaseResponse(response) {
+async function parseGcpBackendResponse(response) {
   const text = await response.text();
   let payload = null;
 
@@ -179,7 +180,7 @@ async function parseSupabaseResponse(response) {
           message:
             typeof payload === "string" && payload.length > 0
               ? payload
-              : response.statusText || "Supabase request failed",
+              : response.statusText || "GcpBackend request failed",
         };
 
   return {
@@ -194,15 +195,15 @@ async function parseSupabaseResponse(response) {
   };
 }
 
-function createRestAdminClient(supabaseUrl, serviceRoleKey) {
+function createRestAdminClient(gcpBackendUrl, serviceRoleKey) {
   async function requestJson(method, path, { query, body, headers } = {}) {
-    const response = await fetch(buildRestUrl(supabaseUrl, path, query), {
+    const response = await fetch(buildRestUrl(gcpBackendUrl, path, query), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-    return parseSupabaseResponse(response);
+    return parseGcpBackendResponse(response);
   }
 
   return {
@@ -741,17 +742,12 @@ async function purgeUserData(adminClient, userId, context) {
 }
 
 export function createDeleteAccountAdminClientFromEnv() {
-  const supabaseUrl =
-    process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing");
-  }
+  const auditSecret = process.env.DELETE_ACCOUNT_AUDIT_SECRET?.trim();
+  if (!auditSecret) throw new Error("Delete-account audit secret is missing");
 
   return {
-    adminClient: createRestAdminClient(supabaseUrl, serviceRoleKey),
-    auditSecret: serviceRoleKey,
+    adminClient: createGcpServerClient(),
+    auditSecret,
   };
 }
 

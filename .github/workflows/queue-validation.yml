@@ -17,11 +17,14 @@ env:
   NODE_VERSION: "20.19.0"
   SERVICE_NODE_VERSION: "22.23.2"
   ATTESTOR_NODE_VERSION: "22.22.0"
-  VITE_SUPABASE_URL: "https://example.supabase.co"
-  VITE_SUPABASE_ANON_KEY: "ci-anon-key"
-  VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
+  VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com"
+  VITE_FIREBASE_API_KEY: "ci-anon-key"
+  VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat"
+  VITE_FIREBASE_APP_ID: "ci-app-id"
+  VITE_GCP_AUTH_REDIRECT_URL: "https://hushhtech.com/auth/callback"
   VITE_PLAID_REDIRECT_URI: "https://hushhtech.com/onboarding/financial-link"
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   secret-scan:

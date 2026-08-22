@@ -243,8 +243,8 @@ export const useFinancialLinkLogic = () => {
     hasInitialized.current = true;
 
     const getUser = async () => {
-      if (!config.supabaseClient) { navigate('/login'); return; }
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) { navigate('/login'); return; }
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) {
         const redirectTarget = `${FINANCIAL_LINK_ROUTE}${isReviewMode ? '?mode=review' : ''}`;
         navigate(`/login?redirect=${encodeURIComponent(redirectTarget)}`, {
@@ -264,7 +264,7 @@ export const useFinancialLinkLogic = () => {
          Swallow errors so a pending migration (column not yet present) never
          blocks the page (a thrown select just leaves the box unchecked). */
       try {
-        const { data: consentRow } = await config.supabaseClient
+        const { data: consentRow } = await config.gcpBackendClient
           .from('onboarding_data')
           .select('plaid_consent_at, consent_version')
           .eq('user_id', user.id)
@@ -282,12 +282,12 @@ export const useFinancialLinkLogic = () => {
 
       try {
         const onboardingProgress = await fetchOnboardingProgress(
-          config.supabaseClient,
+          config.gcpBackendClient,
           user.id
         );
-        const { data: financialData, error: fetchError } = await config.supabaseClient
+        const { data: financialData, error: fetchError } = await config.gcpBackendClient
           .from('user_financial_data').select('status').eq('user_id', user.id).maybeSingle();
-        if (fetchError) console.warn('[FinancialLink] Supabase query error (ignoring):', fetchError.message);
+        if (fetchError) console.warn('[FinancialLink] GcpBackend query error (ignoring):', fetchError.message);
         const effectiveStatus = resolveFinancialLinkStatus(
           onboardingProgress?.financial_link_status,
           financialData?.status

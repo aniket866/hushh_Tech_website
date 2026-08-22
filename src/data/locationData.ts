@@ -3,7 +3,7 @@
  *
  * Architecture:
  * - Countries: static list (no server call needed, instant)
- * - States & Cities: fetched from Supabase Edge Function `get-locations`
+ * - States & Cities: fetched from GcpBackend Edge Function `get-locations`
  *   which runs `country-state-city` server-side (safe from iOS stack overflow)
  * - All fetches are async → non-blocking, never on main thread
  * - Fallback to countriesnow.space API if edge function fails
@@ -235,9 +235,9 @@ const COUNTRIES: CountryItem[] = [
 const COUNTRY_NAME_MAP: Record<string, string> = {};
 COUNTRIES.forEach(c => { COUNTRY_NAME_MAP[c.isoCode] = c.name; });
 
-/** Build the edge function URL from Supabase config. */
+/** Build the edge function URL from GcpBackend config. */
 const getEdgeFunctionUrl = (): string => {
-  const base = config.SUPABASE_URL;
+  const base = config.GCP_API_BASE_URL;
   return `${base}/functions/v1/get-locations`;
 };
 
@@ -251,7 +251,7 @@ export const getCountryName = (isoCode: string): string =>
   COUNTRY_NAME_MAP[isoCode] || isoCode;
 
 /**
- * Fetch states for a country from the Supabase Edge Function.
+ * Fetch states for a country from the GcpBackend Edge Function.
  * The edge function uses `country-state-city` server-side (safe from iOS issues).
  * Falls back to countriesnow.space API on failure.
  */
@@ -260,13 +260,13 @@ export const getStatesOfCountry = async (
 ): Promise<StateItem[]> => {
   if (!countryIsoCode) return [];
 
-  // Primary: Supabase Edge Function (uses country-state-city server-side)
+  // Primary: GcpBackend Edge Function (uses country-state-city server-side)
   try {
     const url = `${getEdgeFunctionUrl()}?type=states&country=${encodeURIComponent(countryIsoCode)}`;
     const res = await fetch(url, {
       headers: {
-        'apikey': config.SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+        'apikey': config.FIREBASE_API_KEY,
+        'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
       },
     });
 
@@ -285,7 +285,7 @@ export const getStatesOfCountry = async (
 };
 
 /**
- * Fetch cities for a state from the Supabase Edge Function.
+ * Fetch cities for a state from the GcpBackend Edge Function.
  * Falls back to countriesnow.space API on failure.
  */
 export const getCitiesOfState = async (
@@ -294,13 +294,13 @@ export const getCitiesOfState = async (
 ): Promise<CityItem[]> => {
   if (!countryIsoCode || !stateCode) return [];
 
-  // Primary: Supabase Edge Function
+  // Primary: GcpBackend Edge Function
   try {
     const url = `${getEdgeFunctionUrl()}?type=cities&country=${encodeURIComponent(countryIsoCode)}&state=${encodeURIComponent(stateCode)}`;
     const res = await fetch(url, {
       headers: {
-        'apikey': config.SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+        'apikey': config.FIREBASE_API_KEY,
+        'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
       },
     });
 

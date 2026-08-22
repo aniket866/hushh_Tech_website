@@ -1,18 +1,18 @@
 /**
- * Supabase Chat Data Source
- * Handles all Supabase operations for chats
+ * GcpBackend Chat Data Source
+ * Handles all GcpBackend operations for chats
  */
-import { SupabaseClient } from '@supabase/supabase-js';
+import { GcpBackendClient } from '@/services/gcpBackend/types';
 import { ChatDTO } from '../models/ChatDTO';
 import { NetworkError } from '../../core/errors';
 import { logger } from '../../core/utils';
 
-export class SupabaseChatDataSource {
-  constructor(private supabase: SupabaseClient) {}
+export class GcpBackendChatDataSource {
+  constructor(private gcpBackend: GcpBackendClient) {}
 
   async getAll(userId: string, limit: number = 100): Promise<ChatDTO[]> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_chats')
         .select('*')
         .eq('user_id', userId)
@@ -34,7 +34,7 @@ export class SupabaseChatDataSource {
 
   async getById(chatId: string): Promise<ChatDTO | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_chats')
         .select('*')
         .eq('id', chatId)
@@ -56,7 +56,7 @@ export class SupabaseChatDataSource {
 
   async create(userId: string, title: string = 'New Chat'): Promise<ChatDTO> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_chats')
         .insert({
           user_id: userId,
@@ -80,7 +80,7 @@ export class SupabaseChatDataSource {
 
   async updateTitle(chatId: string, title: string): Promise<ChatDTO | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_chats')
         .update({ title })
         .eq('id', chatId)
@@ -102,7 +102,7 @@ export class SupabaseChatDataSource {
 
   async delete(chatId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.gcpBackend
         .from('hushh_ai_chats')
         .delete()
         .eq('id', chatId);

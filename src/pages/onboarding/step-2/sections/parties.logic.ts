@@ -35,12 +35,12 @@ export function useStep3Parties(accountType: UIAccountType | null) {
   const [links, setLinks] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
-    if (!config.supabaseClient) return;
-    const { data: { user } } = await config.supabaseClient.auth.getUser();
+    if (!config.gcpBackendClient) return;
+    const { data: { user } } = await config.gcpBackendClient.auth.getUser();
     if (!user) return;
     const [{ data: parties }, { data: invites }] = await Promise.all([
-      config.supabaseClient.from('onboarding_parties').select(PARTY_SELECT).eq('primary_user_id', user.id),
-      config.supabaseClient.from('onboarding_invites').select(INVITE_SELECT).eq('primary_user_id', user.id),
+      config.gcpBackendClient.from('onboarding_parties').select(PARTY_SELECT).eq('primary_user_id', user.id),
+      config.gcpBackendClient.from('onboarding_invites').select(INVITE_SELECT).eq('primary_user_id', user.id),
     ]);
     const latestByParty = new Map<string, { id: string; status: string; expires_at: string | null }>();
     for (const inv of invites || []) {

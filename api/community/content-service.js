@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { google } from "googleapis";
 import { STATIC_COMMUNITY_POSTS } from "./staticPosts.generated.js";
+import { executeDataRequest, verifyFirebaseBearer } from "../shared/gcpDataRuntime.js";
 
 const PROJECT_ID =
   process.env.GOOGLE_CLOUD_PROJECT ||
@@ -40,13 +41,6 @@ export const isCommunityAccessError = (error) =>
   error instanceof CommunityAccessError ||
   (error?.name === "CommunityAccessError" && Number.isInteger(error?.statusCode));
 
-const trimEnv = (value) => (typeof value === "string" ? value.trim() : "");
-
-const supabaseBaseUrl = () =>
-  trimEnv(process.env.SUPABASE_URL) || trimEnv(process.env.VITE_SUPABASE_URL);
-
-const supabaseServiceKey = () => trimEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
-
 const bearerTokenFromRequest = (req) => {
   const header =
     req?.headers?.authorization ||
@@ -61,63 +55,37 @@ export const requestAccessLevel = (req) => {
   return value === "nda" || value === "sensitive" ? NDA_ACCESS : PUBLIC_ACCESS;
 };
 
-const fetchSupabaseJson = async (url, headers) => {
-  const response = await fetch(url, { headers });
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
-  return { response, payload };
-};
-
 export const assertNdaAccess = async (req) => {
   const token = bearerTokenFromRequest(req);
   if (!token) {
     throw new CommunityAccessError(401, "NDA access requires sign-in");
   }
 
-  const baseUrl = supabaseBaseUrl();
-  const serviceKey = supabaseServiceKey();
-  if (!baseUrl || !serviceKey) {
-    throw new CommunityAccessError(503, "NDA access is not configured");
-  }
-
-  const authHeaders = {
-    apikey: serviceKey,
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
-  const { response: authResponse, payload: user } = await fetchSupabaseJson(
-    `${baseUrl.replace(/\/+$/, "")}/auth/v1/user`,
-    authHeaders,
-  );
-
-  if (!authResponse.ok || !user?.id) {
+  let actor;
+  try {
+    actor = await verifyFirebaseBearer(`Bearer ${token}`);
+  } catch {
     throw new CommunityAccessError(401, "Invalid or expired session");
   }
-
-  const params = new URLSearchParams({
-    select: "signed_at",
-    user_id: `eq.${user.id}`,
-    signed_at: "not.is.null",
-    limit: "1",
-  });
-  const dataHeaders = {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
-    Accept: "application/json",
-  };
-  const { response: dataResponse, payload: rows } = await fetchSupabaseJson(
-    `${baseUrl.replace(/\/+$/, "")}/rest/v1/nda_signatures?${params.toString()}`,
-    dataHeaders,
-  );
-
-  if (!dataResponse.ok) {
+  let rows;
+  try {
+    ({ data: rows } = await executeDataRequest({
+      kind: "table",
+      table: "nda_signatures",
+      operation: "select",
+      columns: "signed_at",
+      filters: [{ operator: "eq", column: "user_id", value: actor.uid }],
+      limit: 1,
+      cardinality: "many",
+    }, actor.uid));
+  } catch {
     throw new CommunityAccessError(503, "NDA status could not be verified");
   }
   if (!Array.isArray(rows) || !rows.some((row) => Boolean(row?.signed_at))) {
     throw new CommunityAccessError(403, "Signed NDA required");
   }
 
-  return { userId: user.id };
+  return { userId: actor.uid };
 };
 
 const fieldValue = (field) => {

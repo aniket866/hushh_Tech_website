@@ -10,9 +10,9 @@
  * and the edge-function validators) reads from this config instead of scattering
  * `if (accountType === 'joint')` branches across the codebase.
  *
- * This module is intentionally data-only (no React, no Supabase) so it can be
+ * This module is intentionally data-only (no React, no GcpBackend) so it can be
  * imported by UI, services, and vitest contract tests alike. The Deno edge
- * functions keep a mirrored copy (see PR5: supabase/functions/_shared/
+ * functions keep a mirrored copy (see PR5: gcpBackend/functions/_shared/
  * onboardingParties.ts) with a contract test asserting the two stay in sync.
  */
 import type { UIAccountType, AccountStructure } from '../../types/onboarding';

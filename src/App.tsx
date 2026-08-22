@@ -474,7 +474,7 @@ const AppLayout = () => {
             {/* NDA Admin Page - Password protected view of all NDA agreements */}
             <Route path='/nda-admin' element={<NDAAdminPage />} />
             <Route path='/deployments' element={<DeploymentsPage />} />
-            {/* Hushh Fund investor verification — team-gated (Supabase auth + allowlist) */}
+            {/* Hushh Fund investor verification — team-gated (GcpBackend auth + allowlist) */}
             <Route path='/fund-admin' element={
               <FundAdminRoute>
                 <FundAdminPage />

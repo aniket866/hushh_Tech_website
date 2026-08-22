@@ -1,6 +1,6 @@
 /**
  * Vertex AI Data Source
- * Handles AI streaming via Supabase Edge Function
+ * Handles AI streaming via GcpBackend Edge Function
  */
 import { NetworkError, RateLimitError } from '../../core/errors';
 import { logger } from '../../core/utils';
@@ -14,8 +14,8 @@ export class VertexAIDataSource {
   private abortController: AbortController | null = null;
 
   constructor(
-    private supabaseUrl: string,
-    private supabaseKey: string
+    private gcpApiBaseUrl: string,
+    private firebaseApiKey: string
   ) {}
 
   async streamResponse(
@@ -31,11 +31,11 @@ export class VertexAIDataSource {
 
       this.abortController = new AbortController();
 
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/hushh-ai-chat`, {
+      const response = await fetch(`${this.gcpApiBaseUrl}/functions/v1/hushh-ai-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.supabaseKey}`,
+          'Authorization': `Bearer ${this.firebaseApiKey}`,
         },
         body: JSON.stringify({
           message,

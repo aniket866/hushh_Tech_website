@@ -1,14 +1,14 @@
 /**
  * Media Repository Implementation
- * Implements IMediaRepository using Supabase data source
+ * Implements IMediaRepository using GcpBackend data source
  */
 import { IMediaRepository, MediaLimits } from '../../domain/repositories';
-import { SupabaseMediaDataSource } from '../datasources';
+import { GcpBackendMediaDataSource } from '../datasources';
 import { retryWithBackoff } from '../../core/utils';
 import { LIMITS } from '../../core/constants';
 
 export class MediaRepositoryImpl implements IMediaRepository {
-  constructor(private dataSource: SupabaseMediaDataSource) {}
+  constructor(private dataSource: GcpBackendMediaDataSource) {}
 
   async upload(file: File, userId: string): Promise<string> {
     // Check if user can upload

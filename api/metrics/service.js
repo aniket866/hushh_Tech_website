@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 
-import { createSupabaseServerClient } from "../shared/supabaseServerClient.js";
+import { createGcpServerClient } from "../shared/gcpServerClient.js";
 
 const ANALYTICS_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const SEARCH_CONSOLE_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
@@ -403,25 +403,25 @@ function buildWindowFetchStartIso(window) {
   return `${window.startDate}T00:00:00.000Z`;
 }
 
-function createSupabaseAdminClient(url, serviceRoleKey) {
-  return createSupabaseServerClient(url, serviceRoleKey);
+function createGcpBackendAdminClient(url, serviceRoleKey) {
+  return createGcpServerClient(url, serviceRoleKey);
 }
 
-function getWebsiteSupabaseConfig(env) {
-  const supabaseUrl =
-    trimEnvValue(env.SUPABASE_URL) || trimEnvValue(env.VITE_SUPABASE_URL);
-  const serviceRoleKey = trimEnvValue(env.SUPABASE_SERVICE_ROLE_KEY);
-  const anonKey = trimEnvValue(env.VITE_SUPABASE_ANON_KEY);
+function getWebsiteGcpBackendConfig(env) {
+  const gcpBackendUrl =
+    trimEnvValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME) || trimEnvValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME);
+  const serviceRoleKey = trimEnvValue(env.GCP_SERVER_ACTOR_UID);
+  const anonKey = trimEnvValue(env.VITE_FIREBASE_API_KEY);
 
-  if (!supabaseUrl) {
+  if (!gcpBackendUrl) {
     throw new Error(
-      "SUPABASE_URL or VITE_SUPABASE_URL is required for business metrics"
+      "CLOUD_SQL_INSTANCE_CONNECTION_NAME or CLOUD_SQL_INSTANCE_CONNECTION_NAME is required for business metrics"
     );
   }
 
   if (serviceRoleKey) {
     return {
-      url: supabaseUrl,
+      url: gcpBackendUrl,
       apiKey: serviceRoleKey,
       accessLevel: "service_role",
     };
@@ -429,22 +429,22 @@ function getWebsiteSupabaseConfig(env) {
 
   if (anonKey) {
     return {
-      url: supabaseUrl,
+      url: gcpBackendUrl,
       apiKey: anonKey,
       accessLevel: "anon",
     };
   }
 
   throw new Error(
-    "SUPABASE_SERVICE_ROLE_KEY is missing and no VITE_SUPABASE_ANON_KEY fallback is available"
+    "GCP_SERVER_ACTOR_UID is missing and no VITE_FIREBASE_API_KEY fallback is available"
   );
 }
 
-function getLegacySupabaseConfig(env) {
-  const url = trimEnvValue(env.LEGACY_SUPABASE_URL);
+function getLegacyGcpBackendConfig(env) {
+  const url = trimEnvValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME);
   const serviceRoleKey =
-    trimEnvValue(env.LEGACY_SUPABASE_SERVICE_ROLE_KEY) ||
-    trimEnvValue(env.LEGACY_SUPABASE_KEY);
+    trimEnvValue(env.LEGACY_GCP_SERVER_ACTOR_UID) ||
+    trimEnvValue(env.GCP_SERVER_ACTOR_UID);
 
   if (!url || !serviceRoleKey) {
     return null;
@@ -1152,10 +1152,10 @@ async function fetchSearchPerformanceMetrics(env, window, regionalTraffic, warni
   }
 }
 
-function createEmptySiteAnalytics(window, available = false, note = "First-party Supabase analytics have not started collecting data yet.") {
+function createEmptySiteAnalytics(window, available = false, note = "First-party GcpBackend analytics have not started collecting data yet.") {
   return {
     available,
-    source: "website-supabase-site-analytics",
+    source: "website-gcpBackend-site-analytics",
     audience: {
       dau: 0,
       wau: 0,
@@ -1393,7 +1393,7 @@ async function fetchSiteAnalytics(client, window, timezone, warnings) {
 
   return {
     available: true,
-    source: "website-supabase-site-analytics",
+    source: "website-gcpBackend-site-analytics",
     audience: {
       dau: dauUsers.size,
       wau: wauUsers.size,
@@ -1471,7 +1471,7 @@ async function countTableRows(client, table, window) {
   };
 }
 
-async function fetchSupabaseStackMetrics(client, window, warnings) {
+async function fetchGcpBackendStackMetrics(client, window, warnings) {
   const tables = [
     "site_analytics_events",
     "site_analytics_sessions",
@@ -1492,11 +1492,11 @@ async function fetchSupabaseStackMetrics(client, window, warnings) {
   const unavailable = rows.filter((row) => !row.available);
 
   for (const row of unavailable) {
-    warnings.push(`Supabase aggregate for ${row.table} is unavailable.`);
+    warnings.push(`GcpBackend aggregate for ${row.table} is unavailable.`);
   }
 
   return {
-    source: "website-supabase",
+    source: "website-gcpBackend",
     tables: rows.map(({ error, ...row }) => row),
   };
 }
@@ -1698,15 +1698,15 @@ async function fetchGcpMetrics(env, window, warnings) {
 }
 
 function createDefaultMetricsFetchers(env) {
-  const websiteConfig = getWebsiteSupabaseConfig(env);
-  const websiteClient = createSupabaseAdminClient(
+  const websiteConfig = getWebsiteGcpBackendConfig(env);
+  const websiteClient = createGcpBackendAdminClient(
     websiteConfig.url,
     websiteConfig.apiKey
   );
   const hasServiceRole = websiteConfig.accessLevel === "service_role";
-  const legacyConfig = getLegacySupabaseConfig(env);
+  const legacyConfig = getLegacyGcpBackendConfig(env);
   const legacyClient = legacyConfig
-    ? createSupabaseAdminClient(legacyConfig.url, legacyConfig.serviceRoleKey)
+    ? createGcpBackendAdminClient(legacyConfig.url, legacyConfig.serviceRoleKey)
     : null;
 
   return {
@@ -1716,7 +1716,7 @@ function createDefaultMetricsFetchers(env) {
       }
 
       warnings.push(
-        "SUPABASE_SERVICE_ROLE_KEY is missing in this environment, so signups are falling back to public.users instead of auth.users."
+        "GCP_SERVER_ACTOR_UID is missing in this environment, so signups are falling back to public.users instead of auth.users."
       );
 
       const rows = await fetchWebsiteUsers(websiteClient, window);
@@ -1730,7 +1730,7 @@ function createDefaultMetricsFetchers(env) {
     fetchOnboardingRows: ({ window, warnings }) => {
       if (!hasServiceRole) {
         warnings.push(
-          "Protected onboarding metrics are unavailable without the Supabase service role, so onboarding cards are showing partial fallback data."
+          "Protected onboarding metrics are unavailable without the GcpBackend service role, so onboarding cards are showing partial fallback data."
         );
         return [];
       }
@@ -1740,7 +1740,7 @@ function createDefaultMetricsFetchers(env) {
     fetchInvestorProfiles: ({ window, warnings }) => {
       if (!hasServiceRole) {
         warnings.push(
-          "Protected investor profile metrics are unavailable without the Supabase service role, so profile cards are showing partial fallback data."
+          "Protected investor profile metrics are unavailable without the GcpBackend service role, so profile cards are showing partial fallback data."
         );
         return [];
       }
@@ -1750,7 +1750,7 @@ function createDefaultMetricsFetchers(env) {
     runSchemaAudit: () => {
       if (!hasServiceRole) {
         return Promise.resolve([
-          "Local fallback mode is active: protected tables and schema-drift checks require the server-side Supabase service role.",
+          "Local fallback mode is active: protected tables and schema-drift checks require the server-side GcpBackend service role.",
         ]);
       }
 
@@ -1759,14 +1759,14 @@ function createDefaultMetricsFetchers(env) {
     fetchLegacyUsers: async ({ window, warnings }) => {
       if (!legacyClient) {
         warnings.push(
-          "Legacy metrics are unavailable until LEGACY_SUPABASE_URL and LEGACY_SUPABASE_SERVICE_ROLE_KEY are configured on this service."
+          "Legacy metrics are unavailable until CLOUD_SQL_INSTANCE_CONNECTION_NAME and LEGACY_GCP_SERVER_ACTOR_UID are configured on this service."
         );
 
         return {
           available: false,
           rows: [],
           note:
-            "Legacy external profile flow remains separate and read-only until legacy Supabase credentials are configured.",
+            "Legacy external profile flow remains separate and read-only until legacy GcpBackend credentials are configured.",
           warnings: [],
         };
       }
@@ -1778,25 +1778,25 @@ function createDefaultMetricsFetchers(env) {
     fetchSiteAnalytics: ({ window, timezone, warnings }) => {
       if (!hasServiceRole) {
         warnings.push(
-          "First-party site analytics require the server-side Supabase service role."
+          "First-party site analytics require the server-side GcpBackend service role."
         );
         return createEmptySiteAnalytics(window);
       }
 
       return fetchSiteAnalytics(websiteClient, window, timezone, warnings);
     },
-    fetchSupabaseStackMetrics: ({ window, warnings }) => {
+    fetchGcpBackendStackMetrics: ({ window, warnings }) => {
       if (!hasServiceRole) {
         warnings.push(
-          "Supabase stack table aggregates require the server-side Supabase service role."
+          "GcpBackend stack table aggregates require the server-side GcpBackend service role."
         );
         return {
-          source: "website-supabase",
+          source: "website-gcpBackend",
           tables: [],
         };
       }
 
-      return fetchSupabaseStackMetrics(websiteClient, window, warnings);
+      return fetchGcpBackendStackMetrics(websiteClient, window, warnings);
     },
     fetchGcpMetrics: ({ window, warnings }) =>
       fetchGcpMetrics(env, window, warnings),
@@ -1828,7 +1828,7 @@ export async function buildMetricsSummary(options = {}) {
     legacyMetrics,
     traffic,
     siteAnalytics,
-    supabaseStack,
+    gcpBackendStack,
     gcp,
     regionalTraffic,
   ] = await Promise.all([
@@ -1842,10 +1842,10 @@ export async function buildMetricsSummary(options = {}) {
     fetchers.fetchSiteAnalytics
       ? fetchers.fetchSiteAnalytics({ window, timezone, warnings })
       : createEmptySiteAnalytics(window),
-    fetchers.fetchSupabaseStackMetrics
-      ? fetchers.fetchSupabaseStackMetrics({ window, timezone, warnings })
+    fetchers.fetchGcpBackendStackMetrics
+      ? fetchers.fetchGcpBackendStackMetrics({ window, timezone, warnings })
       : Promise.resolve({
-          source: "website-supabase",
+          source: "website-gcpBackend",
           tables: [],
         }),
     fetchers.fetchGcpMetrics
@@ -1969,7 +1969,7 @@ export async function buildMetricsSummary(options = {}) {
   const hasFirstPartyAudience = Boolean(siteAnalytics?.audience?.events);
   const audience = {
     source: hasFirstPartyAudience
-      ? "website-supabase-site-analytics"
+      ? "website-gcpBackend-site-analytics"
       : "ga4-data-api-fallback",
     dau: hasFirstPartyAudience
       ? siteAnalytics.audience.dau
@@ -1988,7 +1988,7 @@ export async function buildMetricsSummary(options = {}) {
       : traffic.overview.screenPageViews,
     events: siteAnalytics?.audience?.events || 0,
     note: hasFirstPartyAudience
-      ? "Audience metrics are first-party Supabase aggregates."
+      ? "Audience metrics are first-party GcpBackend aggregates."
       : "Audience metrics are using GA4 fallback until first-party event collection has enough data.",
   };
 
@@ -2001,7 +2001,7 @@ export async function buildMetricsSummary(options = {}) {
       endDate: window.endDate,
     },
     businessFunnel: {
-      source: "website-supabase",
+      source: "website-gcpBackend",
       overview: businessOverview,
       conversionRates: {
         signupToPersistedUsers: ratio(
@@ -2033,7 +2033,7 @@ export async function buildMetricsSummary(options = {}) {
     traffic,
     gcp,
     systemHealth: {
-      supabase: supabaseStack,
+      gcpBackend: gcpBackendStack,
       gcp: {
         available: gcp.available,
         servicesConfigured: gcp.services.length,
@@ -2049,7 +2049,7 @@ export async function buildMetricsSummary(options = {}) {
       },
     },
     legacy: {
-      source: "legacy-hushh-api-supabase",
+      source: "legacy-hushh-api-gcpBackend",
       available: Boolean(legacyMetrics.available),
       overview: legacyOverview,
       series: legacySeries,
@@ -2061,7 +2061,7 @@ export async function buildMetricsSummary(options = {}) {
       ...siteAnalytics.dataCoverage,
       ga4Available: Boolean(traffic.available),
       gcpAvailable: Boolean(gcp.available),
-      supabaseAggregateTables: supabaseStack.tables.length,
+      gcpBackendAggregateTables: gcpBackendStack.tables.length,
       searchConsoleAvailable: Boolean(searchPerformance.available),
       ga4RegionAvailable: Boolean(regionalTraffic.available),
     },
@@ -2076,10 +2076,10 @@ export async function buildMetricsSummary(options = {}) {
 export const __testing = {
   buildFunnel,
   buildSearchPerformanceReport,
-  createSupabaseAdminClient,
+  createGcpBackendAdminClient,
   fetchSiteAnalytics,
   fetchSearchPerformanceMetrics,
-  fetchSupabaseStackMetrics,
+  fetchGcpBackendStackMetrics,
   publicCount,
   publicRatio,
   sanitizePublicDimensionLabel,

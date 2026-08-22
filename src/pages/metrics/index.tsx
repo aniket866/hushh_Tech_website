@@ -436,7 +436,7 @@ export default function MetricsPage() {
           error:
             error instanceof Error
               ? error.message
-              : "Supabase metrics query failed.",
+              : "GcpBackend metrics query failed.",
           isLoading: false,
         }));
       }
@@ -511,7 +511,7 @@ export default function MetricsPage() {
         <title>Public KPI Dashboard | Hushh Technologies</title>
         <meta
           name="description"
-          content="Public Hushh KPI dashboard with audited 7-day business funnel metrics from Supabase and secondary Google Analytics traffic context."
+          content="Public Hushh KPI dashboard with audited 7-day business funnel metrics from GcpBackend and secondary Google Analytics traffic context."
         />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
@@ -544,13 +544,13 @@ export default function MetricsPage() {
 
                   <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f5a4d] md:text-lg">
                     Seven days of website signup, onboarding, investor profile,
-                    and traffic activity with Supabase driving the primary
+                    and traffic activity with GcpBackend driving the primary
                     numbers.
                   </p>
 
                   <div className="mt-6 flex flex-wrap gap-3 text-sm text-[#5f5a4d]">
                     {[
-                      "Website Supabase primary",
+                      "Website GcpBackend primary",
                       "Last 7 days in Pacific time",
                       "Legacy API split out",
                     ].map((item) => (
@@ -707,7 +707,7 @@ export default function MetricsPage() {
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <SummaryCell
                   label="Source"
-                  value="Website Supabase"
+                  value="Website GcpBackend"
                   theme="dark"
                 />
                 <SummaryCell
@@ -729,7 +729,7 @@ export default function MetricsPage() {
                   value={
                     summary.data?.traffic.available
                       ? "GA4 supporting"
-                      : "Supabase-only primary"
+                      : "GcpBackend-only primary"
                   }
                   theme="dark"
                 />

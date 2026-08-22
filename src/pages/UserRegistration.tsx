@@ -43,16 +43,16 @@ export default function UserRegistration() {
   const [investorType, setInvestorType] = useState("");
 
   useEffect(() => {
-    // Get user email from Supabase session
+    // Get user email from GcpBackend session
     const getUserData = async () => {
       try {
-        if (!resources.config.supabaseClient) {
-          console.error("Supabase client is not initialized");
+        if (!resources.config.gcpBackendClient) {
+          console.error("GcpBackend client is not initialized");
           navigate("/login");
           return;
         }
         
-        const { data: { user } } = await resources.config.supabaseClient.auth.getUser();
+        const { data: { user } } = await resources.config.gcpBackendClient.auth.getUser();
         if (user?.email) {
           setUserEmail(user.email);
           setUserId(user.id);

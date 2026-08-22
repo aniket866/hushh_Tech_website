@@ -116,11 +116,11 @@ const ProfilePage: React.FC = () => {
   });
 
   useEffect(() => {
-    config.supabaseClient?.auth.getSession().then(({ data: { session } }) => {
+    config.gcpBackendClient?.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
     const { data: { subscription } } =
-      config.supabaseClient?.auth.onAuthStateChange((_event, session) => {
+      config.gcpBackendClient?.auth.onAuthStateChange((_event, session) => {
         setSession(session);
       }) ?? { data: { subscription: null } };
     return () => {
@@ -133,21 +133,21 @@ const ProfilePage: React.FC = () => {
   // Check user's onboarding status
   useEffect(() => {
     async function checkUserStatus() {
-      if (!session?.user?.id || !config.supabaseClient) {
+      if (!session?.user?.id || !config.gcpBackendClient) {
         setOnboardingStatus(prev => ({ ...prev, loading: false }));
         return;
       }
       
       try {
         // Check if investor_profile exists
-        const { data: profile, error: profileError } = await config.supabaseClient
+        const { data: profile, error: profileError } = await config.gcpBackendClient
           .from('investor_profiles')
           .select('id, user_confirmed')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
         // Check onboarding_data status
-        const { data: onboarding, error: onboardingError } = await config.supabaseClient
+        const { data: onboarding, error: onboardingError } = await config.gcpBackendClient
           .from('onboarding_data')
           .select('is_completed, current_step')
           .eq('user_id', session.user.id)

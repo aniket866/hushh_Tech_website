@@ -1,6 +1,6 @@
 /**
  * User Data Transfer Object
- * Matches Supabase database schema
+ * Matches GcpBackend database schema
  */
 export interface UserDTO {
   id: string;

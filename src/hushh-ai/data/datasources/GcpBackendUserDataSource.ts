@@ -1,21 +1,21 @@
 /**
- * Supabase User Data Source
- * Handles all Supabase operations for users
+ * GcpBackend User Data Source
+ * Handles all GcpBackend operations for users
  */
-import { SupabaseClient } from '@supabase/supabase-js';
+import { GcpBackendClient } from '@/services/gcpBackend/types';
 import { UserDTO } from '../models/UserDTO';
 import { NetworkError } from '../../core/errors';
 import { logger } from '../../core/utils';
 
-export class SupabaseUserDataSource {
-  constructor(private supabase: SupabaseClient) {}
+export class GcpBackendUserDataSource {
+  constructor(private gcpBackend: GcpBackendClient) {}
 
   async getCurrent(): Promise<UserDTO | null> {
     try {
-      const { data: { user: authUser } } = await this.supabase.auth.getUser();
+      const { data: { user: authUser } } = await this.gcpBackend.auth.getUser();
       if (!authUser) return null;
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_users')
         .select('*')
         .eq('supabase_user_id', authUser.id)
@@ -37,11 +37,11 @@ export class SupabaseUserDataSource {
 
   async getOrCreate(): Promise<UserDTO | null> {
     try {
-      const { data: { user: authUser } } = await this.supabase.auth.getUser();
+      const { data: { user: authUser } } = await this.gcpBackend.auth.getUser();
       if (!authUser) return null;
 
       // Check if exists
-      const { data: existing } = await this.supabase
+      const { data: existing } = await this.gcpBackend
         .from('hushh_ai_users')
         .select('*')
         .eq('supabase_user_id', authUser.id)
@@ -49,7 +49,7 @@ export class SupabaseUserDataSource {
 
       if (existing) {
         // Update last login
-        await this.supabase
+        await this.gcpBackend
           .from('hushh_ai_users')
           .update({ last_login_at: new Date().toISOString() })
           .eq('id', existing.id);
@@ -58,7 +58,7 @@ export class SupabaseUserDataSource {
       }
 
       // Create new user
-      const { data: newUser, error } = await this.supabase
+      const { data: newUser, error } = await this.gcpBackend
         .from('hushh_ai_users')
         .insert({
           supabase_user_id: authUser.id,
@@ -75,7 +75,7 @@ export class SupabaseUserDataSource {
       }
 
       // Create media limits record
-      await this.supabase
+      await this.gcpBackend
         .from('hushh_ai_media_limits')
         .insert({ user_id: newUser.id });
 
@@ -97,7 +97,7 @@ export class SupabaseUserDataSource {
       if (displayName !== undefined) updates.display_name = displayName;
       if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.gcpBackend
         .from('hushh_ai_users')
         .update(updates)
         .eq('id', userId)
@@ -119,7 +119,7 @@ export class SupabaseUserDataSource {
 
   async updateLastLogin(userId: string): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.gcpBackend
         .from('hushh_ai_users')
         .update({ last_login_at: new Date().toISOString() })
         .eq('id', userId);
@@ -137,7 +137,7 @@ export class SupabaseUserDataSource {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const { data: { session } } = await this.supabase.auth.getSession();
+      const { data: { session } } = await this.gcpBackend.auth.getSession();
       return !!session;
     } catch (error) {
       logger.error('Error checking authentication', error as Error);

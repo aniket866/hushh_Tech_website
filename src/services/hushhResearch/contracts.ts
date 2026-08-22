@@ -1,4 +1,4 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User } from "@/services/gcpBackend/types";
 
 export const HUSHH_RESEARCH_PROJECT_ID = "hushh-pda" as const;
 export const HUSHH_RESEARCH_SOURCE = "hushh-research" as const;

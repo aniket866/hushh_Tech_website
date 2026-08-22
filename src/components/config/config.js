@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/services/gcpBackend/types";
 
 const env = typeof import.meta !== "undefined" ? import.meta.env : {};
 
@@ -12,23 +12,23 @@ function readClientEnv(value, name, fallback = "") {
 }
 
 const config = {
-  SUPABASE_URL: readClientEnv(env?.VITE_SUPABASE_URL, "VITE_SUPABASE_URL"),
-  SUPABASE_ANON_KEY: readClientEnv(env?.VITE_SUPABASE_ANON_KEY, "VITE_SUPABASE_ANON_KEY"),
+  GCP_API_BASE_URL: readClientEnv(env?.VITE_GCP_API_BASE_URL, "VITE_GCP_API_BASE_URL"),
+  FIREBASE_API_KEY: readClientEnv(env?.VITE_FIREBASE_API_KEY, "VITE_FIREBASE_API_KEY"),
   guestModeAccessToken: env?.VITE_GUEST_MODE_ACCESS_TOKEN || "",
   redirect_url:
-    env?.VITE_SUPABASE_REDIRECT_URL ||
+    env?.VITE_GCP_AUTH_REDIRECT_URL ||
     (typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "https://www.hushhtech.com/auth/callback"),
 };
 
-function createSupabaseClient() {
-  if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
+function createGcpBackendClient() {
+  if (!config.GCP_API_BASE_URL || !config.FIREBASE_API_KEY) {
     return undefined;
   }
 
-  const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  return supabase;
+  const gcpBackend = createClient(config.GCP_API_BASE_URL, config.FIREBASE_API_KEY);
+  return gcpBackend;
 }
 
-config.supabaseClient = createSupabaseClient();
+config.gcpBackendClient = createGcpBackendClient();
 
 export default config;

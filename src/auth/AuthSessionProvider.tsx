@@ -25,7 +25,7 @@ import {
   AUTH_EVENT_STORAGE_KEY,
   broadcastAuthEvent,
   clearLegacyAuthStorage,
-  clearSupabaseSession,
+  clearGcpBackendSession,
   getLocalSession,
   getValidatedSession,
   parseAuthBroadcastEvent,
@@ -57,7 +57,7 @@ const INITIAL_SNAPSHOT: AuthSessionSnapshot = {
 export const AuthSessionProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const supabase = config.supabaseClient;
+  const gcpBackend = config.gcpBackendClient;
   const [snapshot, setSnapshot] =
     useState<AuthSessionSnapshot>(INITIAL_SNAPSHOT);
   const pendingSignedOutStateRef = useRef<PendingSignedOutState | null>(null);
@@ -116,9 +116,9 @@ export const AuthSessionProvider: React.FC<{
         clearHushhResearchLocalSession({
           preserveMode: true,
         });
-        await clearSupabaseSession(supabase, { storageOnly: true });
+        await clearGcpBackendSession(gcpBackend, { storageOnly: true });
       } else {
-        await clearSupabaseSession(supabase, options);
+        await clearGcpBackendSession(gcpBackend, options);
       }
       if (generation === sessionGenerationRef.current) {
         applyClearedState(status, reason);
@@ -133,7 +133,7 @@ export const AuthSessionProvider: React.FC<{
         reason,
       } satisfies AuthSessionSnapshot;
     },
-    [applyClearedState, supabase]
+    [applyClearedState, gcpBackend]
   );
 
   const revalidateSession = useCallback(async () => {
@@ -156,7 +156,7 @@ export const AuthSessionProvider: React.FC<{
       }
 
       if (researchState.status === "authenticated") {
-        await clearSupabaseSession(supabase, { storageOnly: true });
+        await clearGcpBackendSession(gcpBackend, { storageOnly: true });
         if (generation !== sessionGenerationRef.current) {
           return staleSnapshot();
         }
@@ -183,7 +183,7 @@ export const AuthSessionProvider: React.FC<{
       return nextSnapshot;
     }
 
-    const nextSnapshot = await getValidatedSession(supabase);
+    const nextSnapshot = await getValidatedSession(gcpBackend);
     if (generation !== sessionGenerationRef.current) {
       return staleSnapshot();
     }
@@ -197,7 +197,7 @@ export const AuthSessionProvider: React.FC<{
 
     applySnapshot(nextSnapshot);
     return nextSnapshot;
-  }, [applySnapshot, clearLocalSession, supabase]);
+  }, [applySnapshot, clearLocalSession, gcpBackend]);
 
   // Boot: Instantly resolve from localStorage (no network call).
   // This eliminates the 'booting' state almost immediately.
@@ -214,11 +214,11 @@ export const AuthSessionProvider: React.FC<{
         return;
       }
 
-      const localSnapshot = await getLocalSession(supabase);
+      const localSnapshot = await getLocalSession(gcpBackend);
       applySnapshot(localSnapshot);
     };
     void bootFromLocalStorage();
-  }, [applySnapshot, revalidateSession, supabase]);
+  }, [applySnapshot, revalidateSession, gcpBackend]);
 
   useEffect(() => {
     if (researchModeRef.current) {
@@ -267,13 +267,13 @@ export const AuthSessionProvider: React.FC<{
       };
     }
 
-    if (!supabase) {
+    if (!gcpBackend) {
       return;
     }
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    } = gcpBackend.auth.onAuthStateChange(async (event, nextSession) => {
       if (researchModeRef.current) {
         return;
       }
@@ -291,8 +291,8 @@ export const AuthSessionProvider: React.FC<{
         return;
       }
 
-      // Trust the session provided by Supabase events directly.
-      // Supabase has already validated the token before firing the event.
+      // Trust the session provided by GcpBackend events directly.
+      // GcpBackend has already validated the token before firing the event.
       // This eliminates redundant getUser() network calls on every
       // INITIAL_SESSION, SIGNED_IN, and TOKEN_REFRESHED event.
       if (nextSession.user?.id && nextSession.access_token) {
@@ -312,7 +312,7 @@ export const AuthSessionProvider: React.FC<{
 
     // Soft revalidation for focus/visibility — only reads localStorage,
     // no server-side getUser() call. This prevents session drops when
-    // switching tabs. Supabase's autoRefreshToken handles token renewal.
+    // switching tabs. GcpBackend's autoRefreshToken handles token renewal.
     const handleSoftRevalidation = async () => {
       if (researchModeRef.current || isHushhResearchAuthMode()) {
         researchModeRef.current = true;
@@ -320,7 +320,7 @@ export const AuthSessionProvider: React.FC<{
         return;
       }
 
-      const localSnapshot = await getLocalSession(supabase);
+      const localSnapshot = await getLocalSession(gcpBackend);
 
       if (localSnapshot.status === "invalidated") {
         await clearLocalSession(
@@ -376,7 +376,7 @@ export const AuthSessionProvider: React.FC<{
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [applySnapshot, clearLocalSession, revalidateSession, supabase]);
+  }, [applySnapshot, clearLocalSession, revalidateSession, gcpBackend]);
 
   const startOAuth = useCallback(
     async (provider: OAuthProvider) => {
@@ -390,9 +390,9 @@ export const AuthSessionProvider: React.FC<{
         } satisfies OAuthStartResult;
       }
 
-      return startUnifiedOAuth(provider, supabase);
+      return startUnifiedOAuth(provider, gcpBackend);
     },
-    [supabase]
+    [gcpBackend]
   );
 
   const signOut = useCallback(async () => {
@@ -406,7 +406,7 @@ export const AuthSessionProvider: React.FC<{
         reason: "signed_out",
       };
       clearHushhResearchLocalSession({ preserveMode: true });
-      await clearSupabaseSession(supabase, { storageOnly: true });
+      await clearGcpBackendSession(gcpBackend, { storageOnly: true });
       if (generation === sessionGenerationRef.current) {
         applyClearedState("anonymous", "signed_out");
         broadcastAuthEvent("signed_out");
@@ -414,7 +414,7 @@ export const AuthSessionProvider: React.FC<{
       return;
     }
 
-    if (!supabase) {
+    if (!gcpBackend) {
       applyClearedState("anonymous", "signed_out");
       return;
     }
@@ -425,17 +425,17 @@ export const AuthSessionProvider: React.FC<{
     };
 
     try {
-      await supabase.auth.signOut();
+      await gcpBackend.auth.signOut();
     } catch (error) {
       console.error("[AuthSession] Sign-out failed, clearing locally:", error);
-      await clearSupabaseSession(supabase);
+      await clearGcpBackendSession(gcpBackend);
     }
 
     if (generation === sessionGenerationRef.current) {
       applyClearedState("anonymous", "signed_out");
       broadcastAuthEvent("signed_out");
     }
-  }, [applyClearedState, supabase]);
+  }, [applyClearedState, gcpBackend]);
 
   const handleAccountDeleted = useCallback(async () => {
     await clearLocalSession("invalidated", "deleted", true, {

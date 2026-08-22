@@ -147,10 +147,10 @@ const AIDetectedPreferences: React.FC<AIDetectedPreferencesProps> = ({ userId, o
   useEffect(() => {
     const fetchEnrichedProfile = async () => {
       try {
-        const supabase = config.supabaseClient;
-        if (!supabase || !userId) return;
+        const gcpBackend = config.gcpBackendClient;
+        if (!gcpBackend || !userId) return;
 
-        const { data, error: fetchError } = await supabase
+        const { data, error: fetchError } = await gcpBackend
           .from('user_enriched_profiles')
           .select('*')
           .eq('user_id', userId)
@@ -208,8 +208,8 @@ const AIDetectedPreferences: React.FC<AIDetectedPreferencesProps> = ({ userId, o
     
     setSaving(true);
     try {
-      const supabase = config.supabaseClient;
-      if (!supabase) return;
+      const gcpBackend = config.gcpBackendClient;
+      if (!gcpBackend) return;
 
       const updatedPreferences = {
         ...enrichedProfile.preferences,
@@ -222,7 +222,7 @@ const AIDetectedPreferences: React.FC<AIDetectedPreferencesProps> = ({ userId, o
         [`preferences.${fieldName}`]: 'user_edited',
       };
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await gcpBackend
         .from('user_enriched_profiles')
         .update({
           preferences: updatedPreferences,

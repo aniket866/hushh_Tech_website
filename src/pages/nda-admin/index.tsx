@@ -5,7 +5,7 @@
  * Password: 123456
  * Design: Simple black/white table with no colors.
  * 
- * Uses Supabase Edge Function to bypass RLS and fetch all NDA records.
+ * Uses GcpBackend Edge Function to bypass RLS and fetch all NDA records.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -24,7 +24,7 @@ interface NDARecord {
 }
 
 const ADMIN_PASSWORD = '123456';
-const NDA_ADMIN_FETCH_URL = `${config.SUPABASE_URL}/functions/v1/nda-admin-fetch`;
+const NDA_ADMIN_FETCH_URL = `${config.GCP_API_BASE_URL}/functions/v1/nda-admin-fetch`;
 
 const NDAAdminPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -73,8 +73,8 @@ const NDAAdminPage: React.FC = () => {
     setError(null);
 
     try {
-      if (!config.SUPABASE_ANON_KEY) {
-        throw new Error('VITE_SUPABASE_ANON_KEY is not configured');
+      if (!config.FIREBASE_API_KEY) {
+        throw new Error('VITE_FIREBASE_API_KEY is not configured');
       }
 
       // Call the edge function with password for authentication
@@ -82,7 +82,7 @@ const NDAAdminPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
         },
         body: JSON.stringify({
           password: ADMIN_PASSWORD,

@@ -61,7 +61,7 @@ const ProfilePage = () => {
         return;
       }
     } catch (prefError) {
-      console.error("Error loading preferences from Supabase:", prefError);
+      console.error("Error loading preferences from GcpBackend:", prefError);
     }
 
     const stored = localStorage.getItem("hushhUserPreferences");
@@ -76,13 +76,13 @@ const ProfilePage = () => {
   };
 
   useEffect(() => {
-    // Get user email from Supabase session and fetch profile
+    // Get user email from GcpBackend session and fetch profile
     const fetchUserProfile = async () => {
       try {
         console.log('🔍 Fetching user session...');
         
-        if (!resources.config.supabaseClient) {
-          console.error("Supabase client is not initialized");
+        if (!resources.config.gcpBackendClient) {
+          console.error("GcpBackend client is not initialized");
           setError("Authentication service not available");
           setIsLoading(false);
           return;

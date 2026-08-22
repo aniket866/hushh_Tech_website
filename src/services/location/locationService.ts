@@ -30,8 +30,8 @@ import {
 import { normalizeDetectedAddress } from './addressNormalization.js';
 
 // API Endpoints
-const LOCATIONS_API = `${config.SUPABASE_URL}/functions/v1/get-locations`;
-const GEOCODE_API = `${config.SUPABASE_URL}/functions/v1/hushh-location-geocode`;
+const LOCATIONS_API = `${config.GCP_API_BASE_URL}/functions/v1/get-locations`;
+const GEOCODE_API = `${config.GCP_API_BASE_URL}/functions/v1/hushh-location-geocode`;
 
 // IP Geolocation fallback (free, no API key needed)
 // NOTE: ipapi.co is frequently blocked (403) in many environments. Use ipwho.is instead.
@@ -410,20 +410,20 @@ export class LocationService {
 
   /**
    * Call geocode API to convert GPS coordinates to address.
-   * Uses Google Geocoding API via Supabase Edge Function.
+   * Uses Google Geocoding API via GcpBackend Edge Function.
    */
   async geocodeCoordinates(coords: Coordinates): Promise<LocationData> {
     const providers: Array<{ name: string; run: () => Promise<LocationData> }> = [
       {
-        name: 'supabase-geocode',
+        name: 'gcpBackend-geocode',
         run: async () => {
           this.abortController = new AbortController();
           const response = await fetch(GEOCODE_API, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': config.SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+              'apikey': config.FIREBASE_API_KEY,
+              'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
             },
             body: JSON.stringify(coords),
             signal: this.abortController.signal,
@@ -685,8 +685,8 @@ export class LocationService {
     const cacheRecord = this.createLocationCacheRecord(locationData, source, existingRecord);
     await this.writeSharedLocationCache(userId, cacheRecord);
 
-    if (!config.supabaseClient) {
-      console.warn('[LocationService] Supabase client not configured; location mirrored only to shared cache');
+    if (!config.gcpBackendClient) {
+      console.warn('[LocationService] GcpBackend client not configured; location mirrored only to shared cache');
       return cacheRecord;
     }
 
@@ -724,9 +724,9 @@ export class LocationService {
       return sharedCache.data;
     }
 
-    if (!config.supabaseClient) return null;
+    if (!config.gcpBackendClient) return null;
 
-    const { data, error } = await config.supabaseClient
+    const { data, error } = await config.gcpBackendClient
       .from('onboarding_data')
       .select('*')
       .eq('user_id', userId)

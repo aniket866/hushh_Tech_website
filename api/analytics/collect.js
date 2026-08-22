@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { createSupabaseServerClient } from "../shared/supabaseServerClient.js";
+import { createGcpServerClient } from "../shared/gcpServerClient.js";
 
 const MAX_CONTENT_LENGTH_BYTES = 64 * 1024;
 const MAX_EVENTS_PER_REQUEST = 50;
@@ -97,21 +97,21 @@ const SAFE_CONTEXT_KEYS = new Set([
   "utmContent",
 ]);
 
-const SPOOFED_USER_KEYS = new Set(["userId", "user_id", "uid", "supabaseUserId"]);
+const SPOOFED_USER_KEYS = new Set(["userId", "user_id", "uid", "gcpBackendUserId"]);
 
 function trimValue(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getSupabaseConfig(env = process.env) {
-  const supabaseUrl = trimValue(env.SUPABASE_URL) || trimValue(env.VITE_SUPABASE_URL);
-  const serviceRoleKey = trimValue(env.SUPABASE_SERVICE_ROLE_KEY);
+function getGcpBackendConfig(env = process.env) {
+  const gcpBackendUrl = trimValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME) || trimValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME);
+  const serviceRoleKey = trimValue(env.GCP_SERVER_ACTOR_UID);
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for analytics collection");
+  if (!gcpBackendUrl || !serviceRoleKey) {
+    throw new Error("CLOUD_SQL_INSTANCE_CONNECTION_NAME and GCP_SERVER_ACTOR_UID are required for analytics collection");
   }
 
-  return { supabaseUrl, serviceRoleKey };
+  return { gcpBackendUrl, serviceRoleKey };
 }
 
 function getAnalyticsHashSalt(env = process.env) {
@@ -126,9 +126,9 @@ function getAnalyticsHashSalt(env = process.env) {
 }
 
 function createAdminClient(env = process.env) {
-  const { supabaseUrl, serviceRoleKey } = getSupabaseConfig(env);
+  const { gcpBackendUrl, serviceRoleKey } = getGcpBackendConfig(env);
 
-  return createSupabaseServerClient(supabaseUrl, serviceRoleKey);
+  return createGcpServerClient(gcpBackendUrl, serviceRoleKey);
 }
 
 function isMissingAnalyticsTableError(error, tableName) {
@@ -307,7 +307,7 @@ async function deriveUserId(client, token) {
 
   const response = await client.auth.getUser(token);
   if (response.error || !response.data?.user?.id) {
-    const message = response.error?.message || "Invalid Supabase bearer token";
+    const message = response.error?.message || "Invalid GcpBackend bearer token";
     const error = new Error(message);
     error.statusCode = 401;
     throw error;
