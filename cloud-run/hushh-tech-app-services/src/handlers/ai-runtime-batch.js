@@ -42,6 +42,9 @@ const PAYMENT_CARD_VALUE_PATTERN = /(?<!\d)(?:\d[ -]?){13,19}(?!\d)/g;
 const LABELED_PRIVATE_VALUE_PATTERN =
   /\b(?:account|routing|passport|tax\s*id|national\s*id|address)\s*(?:number|no\.?|id)?\s*[:=]\s*[^\n,;]{3,120}/gi;
 const PHONE_VALUE_PATTERN = /(?<!\w)\+?[1-9][0-9 ()-]{8,17}[0-9](?!\w)/g;
+const URL_FORMAT_PATTERN = /\p{Cf}/u;
+const URL_PHONE_PATTERN =
+  /(?<![\p{L}\p{N}])\+?\p{Nd}(?:[\s()._-]*\p{Nd}){8,14}(?![\p{L}\p{N}])/u;
 const KYC_ATTRIBUTES = new Set([
   "identity_verified",
   "address_verified",
@@ -1224,6 +1227,9 @@ function decodedPublicUrlComponent(raw) {
   const normalized = decoded.normalize("NFKC");
   if (
     CONTROL_PATTERN.test(normalized) ||
+    URL_FORMAT_PATTERN.test(normalized) ||
+    normalized.includes("@") ||
+    URL_PHONE_PATTERN.test(normalized) ||
     redactText(normalized, normalized.length + 1) !== normalized
   ) {
     return null;
@@ -1253,7 +1259,7 @@ function safePublicUrl(raw) {
     ) {
       return null;
     }
-    return url.toString();
+    return `${url.origin}/`;
   } catch {
     return null;
   }

@@ -43,8 +43,8 @@
   },
   "candidate_implementation": {
     "path": "cloud-run/hushh-tech-app-services/src/handlers/ai-runtime-batch.js",
-    "bytes": 80654,
-    "sha256": "3753895d08c61bf0c107b665ce88d170c769b3204c733708d1d09c3cc5a3ff86",
+    "bytes": 80912,
+    "sha256": "a233d9163cc605473b60ccf5fbe78df7f8139bb1417336b0047c358acfc9f089",
     "runtime_imports": [],
     "enabled_by_default": false,
     "activation_artifact": "forbidden",

@@ -889,7 +889,7 @@ test("profile search requires scoped consent, fixed egress, and source-backed pu
     {
       field: "occupation",
       value: "Founder",
-      sourceUrl: "https://example.com/bio",
+      sourceUrl: "https://example.com/",
       confidence: 0.9,
       basis: "source_backed",
     },
@@ -1002,7 +1002,12 @@ test("profile search rejects prohibited inference even inside allowlisted fact f
 });
 
 test("profile search rejects PII in decoded source URLs on first response and replay", async () => {
-  const privateUrl = "https://example.com/person%2540example.com";
+  const privateUrls = [
+    "https://example.com/person%2540example.com",
+    "https://example.com/1415.555.1234",
+    `https://example.com/${encodeURIComponent("用户@例子.公司")}`,
+    "https://example.com/person%E2%80%8B%40example.com",
+  ];
   let searches = 0;
   const firstHarness = enabledHandlers({
     adapters: {
@@ -1010,6 +1015,7 @@ test("profile search rejects PII in decoded source URLs on first response and re
       profileSearch: {
         networkPolicy: "vertex_google_search_and_gravatar_only",
         async search() {
+          const privateUrl = privateUrls[searches];
           searches += 1;
           return {
             facts: [{
@@ -1024,67 +1030,68 @@ test("profile search rejects PII in decoded source URLs on first response and re
       },
     },
   });
-  const input = context({
-    path: "/functions/v1/hushh-profile-search",
-    idempotencyKey: "client-profile-private-url-0001",
-    body: {
-      name: "Public Person",
-      email: "person@example.com",
-      country: "India",
-      consentReceipt: profileConsent(),
-    },
-  });
-  const first = await firstHarness.handlers["hushh-profile-search"](input);
-  assert.equal(first.status, 502);
-  assert.equal(first.body.error, "UPSTREAM_UNAVAILABLE");
-  assert.equal(JSON.stringify(first).includes("person@example.com"), false);
-  assert.equal(JSON.stringify(first).includes("person%2540example.com"), false);
-  assert.equal(searches, 1);
+  for (let index = 0; index < privateUrls.length; index += 1) {
+    const input = context({
+      path: "/functions/v1/hushh-profile-search",
+      idempotencyKey: `client-profile-private-url-000${index}`,
+      body: {
+        name: "Public Person",
+        email: "person@example.com",
+        country: "India",
+        consentReceipt: profileConsent(),
+      },
+    });
+    const first = await firstHarness.handlers["hushh-profile-search"](input);
+    assert.equal(first.status, 502);
+    assert.equal(first.body.error, "UPSTREAM_UNAVAILABLE");
+    assert.equal(JSON.stringify(first).includes(privateUrls[index]), false);
 
-  const storedResponse = {
-    status: 200,
-    headers: {
-      "cache-control": "private, no-store",
-      "content-type": "application/json",
-      pragma: "no-cache",
-      vary: "Origin",
-    },
-    body: {
-      success: true,
-      data: {
-        facts: [{
-          field: "occupation",
-          value: "Founder",
-          sourceUrl: "https://14155551234.example.com/public",
-          confidence: 0.9,
-          basis: "source_backed",
-        }],
+    const storedResponse = {
+      status: 200,
+      headers: {
+        "cache-control": "private, no-store",
+        "content-type": "application/json",
+        pragma: "no-cache",
+        vary: "Origin",
       },
-      inferencePolicy: "source_backed_public_facts_only",
-    },
-  };
-  const replayHarness = enabledHandlers({
-    guardOptions: {
-      claimResult: {
-        status: "replay",
-        response: storedResponse,
-        responseDigest: responseDigest(storedResponse),
+      body: {
+        success: true,
+        data: {
+          facts: [{
+            field: "occupation",
+            value: "Founder",
+            sourceUrl: privateUrls[index],
+            confidence: 0.9,
+            basis: "source_backed",
+          }],
+        },
+        inferencePolicy: "source_backed_public_facts_only",
       },
-    },
-    adapters: {
-      consent: consentAdapter(),
-      profileSearch: {
-        networkPolicy: "vertex_google_search_and_gravatar_only",
-        async search() {
-          throw new Error("replay must not call the provider");
+    };
+    const replayHarness = enabledHandlers({
+      guardOptions: {
+        claimResult: {
+          status: "replay",
+          response: storedResponse,
+          responseDigest: responseDigest(storedResponse),
         },
       },
-    },
-  });
-  const replay = await replayHarness.handlers["hushh-profile-search"](input);
-  assert.equal(replay.status, 503);
-  assert.equal(replay.body.error, "CANDIDATE_UNAVAILABLE");
-  assert.equal(JSON.stringify(replay).includes("14155551234"), false);
+      adapters: {
+        consent: consentAdapter(),
+        profileSearch: {
+          networkPolicy: "vertex_google_search_and_gravatar_only",
+          async search() {
+            throw new Error("replay must not call the provider");
+          },
+        },
+      },
+    });
+    const replay = await replayHarness.handlers["hushh-profile-search"](input);
+    assert.equal(replay.status, 503);
+    assert.equal(replay.body.error, "CANDIDATE_UNAVAILABLE");
+    assert.equal(JSON.stringify(replay).includes(privateUrls[index]), false);
+  }
+  assert.equal(searches, privateUrls.length);
 });
 
 test("Hushh AI rejects caller URLs and unowned media, pins generations and models, and redacts output", async () => {
