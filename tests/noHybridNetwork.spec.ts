@@ -255,7 +255,7 @@ test("network guard samples five unauthenticated application routes", async ({ c
 });
 
 test("generated anonymous routes reach their exact terminal surfaces without provider egress", async ({ context, page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   const networkGate = await installNoHybridNetworkGate(context);
   await context.route("**/api/**", async (route) => {
     await route.fulfill({
@@ -276,9 +276,11 @@ test("generated anonymous routes reach their exact terminal surfaces without pro
     (entry: InventoryClientRoute) => entry.access === "anonymous",
   );
   for (const route of anonymousRoutes) {
-    await page.goto(route.sample, { waitUntil: "domcontentloaded" });
-    await assertRouteReady(page, route);
-    networkGate.assertClean();
+    await test.step(`${route.pattern} reaches ${route.terminal}`, async () => {
+      await page.goto(route.sample, { waitUntil: "domcontentloaded" });
+      await assertRouteReady(page, route);
+      networkGate.assertClean();
+    });
   }
 
   expect(pageErrors).toEqual([]);

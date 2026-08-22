@@ -55,6 +55,18 @@ const EXPECTED_LIVE_BUILDS = Object.freeze({
       "us-central1-docker.pkg.dev/hushh-tech-uat/cloud-run-source-deploy/hushh-tech-edge-gateway-smoke:gateway-b997f7c6",
   }),
 });
+const EXPECTED_REPOSITORY_BINDINGS = Object.freeze({
+  service: Object.freeze({
+    commit: "e3e579013473ad09e1ac5e07f36dd3e4f3f462b1",
+    tree: "ae5d4829022f800d10b4cb7514526e037a387848",
+    relation: "EXACT_BUILD_SCOPE_SUBTREE_AND_FILE_SET",
+  }),
+  gateway_smoke: Object.freeze({
+    commit: "b94b0a751f6062c98704f7017a5be3c118b124fe",
+    tree: "10f08d95fd13c64525c0f7f712ac905f561d3529",
+    relation: "EXACT_BUILD_FILE_SET",
+  }),
+});
 const EXPECTED_RUNTIME = Object.freeze({
   "get-secrets": Object.freeze({
     service: "hushh-tech-identity-api",
@@ -138,8 +150,31 @@ function git(root, args, encoding = "utf8") {
   });
 }
 
-function deriveSourceBinding(root, expected, kind) {
-  const commit = expected.source_commit;
+export function deriveSourceBinding(root, expected, repositoryBinding, kind) {
+  const commit = repositoryBinding?.commit;
+  let observedCommit;
+  let observedTree;
+  try {
+    observedCommit = git(root, ["rev-parse", `${commit}^{commit}`]).trim();
+    observedTree = git(root, ["rev-parse", `${commit}^{tree}`]).trim();
+  } catch {
+    throw new Error("IMAGE_SOURCE_REPOSITORY_BINDING_UNAVAILABLE");
+  }
+  if (
+    observedCommit !== commit ||
+    observedTree !== repositoryBinding.tree ||
+    ![
+      "EXACT_BUILD_SCOPE_SUBTREE_AND_FILE_SET",
+      "EXACT_BUILD_FILE_SET",
+    ].includes(repositoryBinding.relation)
+  ) {
+    throw new Error("IMAGE_SOURCE_REPOSITORY_BINDING_DRIFT");
+  }
+  try {
+    git(root, ["merge-base", "--is-ancestor", commit, "HEAD"]);
+  } catch {
+    throw new Error("IMAGE_SOURCE_REPOSITORY_BINDING_NOT_REACHABLE");
+  }
   const allPaths = git(root, ["ls-tree", "-r", "--name-only", commit])
     .trim()
     .split("\n")
@@ -166,8 +201,9 @@ function deriveSourceBinding(root, expected, kind) {
     return { path: file, bytes: bytes.length, sha256: sha256(bytes) };
   });
   return Object.freeze({
-    source_commit: commit,
-    source_tree: git(root, ["rev-parse", `${commit}^{tree}`]).trim(),
+    repository_commit: commit,
+    repository_tree: observedTree,
+    repository_relation: repositoryBinding.relation,
     source_subtree:
       kind === "service"
         ? git(root, ["rev-parse", `${commit}:${expected.source_scope}`]).trim()
@@ -491,11 +527,13 @@ function validateLiveEvidence(live, imageSourceBindings) {
   for (const [name, expected] of Object.entries(EXPECTED_LIVE_BUILDS)) {
     const build = live.builds?.[name];
     const derived = imageSourceBindings?.[name];
+    const repositoryBinding = EXPECTED_REPOSITORY_BINDINGS[name];
     buildsValid = Boolean(
       buildsValid &&
         stableJson(build) === stableJson(expected) &&
-        derived?.source_commit === expected.source_commit &&
-        derived?.source_tree === expected.source_tree &&
+        derived?.repository_commit === repositoryBinding.commit &&
+        derived?.repository_tree === repositoryBinding.tree &&
+        derived?.repository_relation === repositoryBinding.relation &&
         derived?.source_subtree === expected.source_subtree &&
         derived?.source_file_count === expected.source_file_count &&
         derived?.source_file_set_sha256 === expected.source_file_set_sha256 &&
@@ -826,7 +864,12 @@ export function readInputs(root = process.cwd()) {
   const imageSourceBindings = Object.fromEntries(
     Object.entries(EXPECTED_LIVE_BUILDS).map(([name, expected]) => [
       name,
-      deriveSourceBinding(root, expected, name === "service" ? "service" : "gateway"),
+      deriveSourceBinding(
+        root,
+        expected,
+        EXPECTED_REPOSITORY_BINDINGS[name],
+        name === "service" ? "service" : "gateway",
+      ),
     ]),
   );
   return {

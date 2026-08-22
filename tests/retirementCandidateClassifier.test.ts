@@ -467,6 +467,45 @@ describe("verified executable dependency bootstrap", () => {
     },
   );
 
+  it("rejects a pinned object that exists locally but is outside HEAD history", () => {
+    const clone = createClassifierClone();
+    try {
+      execFileSync(
+        "git",
+        ["checkout", "--quiet", "--orphan", "object-only"],
+        { cwd: clone },
+      );
+      execFileSync("git", ["add", "--all"], { cwd: clone });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=Retirement Classifier Test",
+          "-c",
+          "user.email=classifier-test@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "test: isolate reachable history",
+        ],
+        { cwd: clone },
+      );
+
+      expect(
+        execFileSync(
+          "git",
+          ["rev-parse", `${CONTRACT.base_commit}^{commit}`],
+          { cwd: clone, encoding: "utf8" },
+        ).trim(),
+      ).toBe(CONTRACT.base_commit);
+      expect(() => verifyExecutableClosure(clone)).toThrow(
+        /EXECUTABLE_BASE_NOT_REACHABLE_FROM_HEAD/,
+      );
+    } finally {
+      fs.rmSync(clone, { recursive: true, force: true });
+    }
+  });
+
   it("rejects missing, extra, symlinked, and root-path-drift closure states", () => {
     const missingClosure = { ...CONTRACT.executable_closure };
     delete missingClosure[

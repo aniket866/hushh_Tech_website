@@ -9,7 +9,7 @@ export const CONTRACT = Object.freeze({
   classifier_id: "hushh-tech-supabase-retirement-candidate-classifier",
   mode: "MACHINE_ONLY_DEFAULT_OFF",
   required_flag: "--machine-evaluate",
-  base_commit: "9ffd789b236165bcd2c0559411fe02c6a1d2b719",
+  base_commit: "7b41548d3af0532a59e7c6b008e795feece381fc",
   base_tree: "6a0310560dec5a4b7dcdc6401b1504c37acc93be",
   expected_functions: 112,
   evaluation_time_utc: "2026-08-21T18:03:38.344Z",
@@ -124,7 +124,7 @@ export const CONTRACT = Object.freeze({
   caller_corpus_sha256:
     "b6961373852d774b4b490785d751c22ec25fce48ae1e7d3fe7ca56b7dc768bf6",
   caller_graph_sha256:
-    "ab8087f28e134b73c1d9b5977ae92055c7c581be0dee409faec3a18bbd0d7a29",
+    "ec3ee89cd42607ad92925604b1e0fa0447cf99e423c9bc84b819896516d8d306",
 });
 
 const MUST_PORT = "MUST_PORT";
@@ -225,6 +225,16 @@ function assertPinnedBase(root) {
     observedTree !== CONTRACT.base_tree
   ) {
     throw new Error("EXECUTABLE_BASE_OBJECT_MISMATCH");
+  }
+  try {
+    git(root, [
+      "merge-base",
+      "--is-ancestor",
+      CONTRACT.base_commit,
+      "HEAD",
+    ]);
+  } catch {
+    throw new Error("EXECUTABLE_BASE_NOT_REACHABLE_FROM_HEAD");
   }
 }
 

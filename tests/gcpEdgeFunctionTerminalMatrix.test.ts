@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import fs, { readFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
   buildTerminalMatrix,
+  deriveSourceBinding,
   readInputs,
   sealEvidenceRecord,
   sha256,
@@ -48,6 +52,76 @@ function resealLive(value: ReturnType<typeof inputs>) {
 }
 
 describe("GCP edge-function terminal matrix", () => {
+  it("uses reachable signed equivalents for historical live build scopes", () => {
+    const value = inputs();
+    expect(value.imageSourceBindings).toEqual({
+      service: {
+        repository_commit: "e3e579013473ad09e1ac5e07f36dd3e4f3f462b1",
+        repository_tree: "ae5d4829022f800d10b4cb7514526e037a387848",
+        repository_relation: "EXACT_BUILD_SCOPE_SUBTREE_AND_FILE_SET",
+        source_subtree: "de2e6654bd4b054037221edcab7c229140e9a1ab",
+        source_file_count: 27,
+        source_file_set_sha256:
+          "0ffa9c59c2c1f5b21eacb805233f206ec6d500965aae6d07b1e23ea1916f6796",
+      },
+      gateway_smoke: {
+        repository_commit: "b94b0a751f6062c98704f7017a5be3c118b124fe",
+        repository_tree: "10f08d95fd13c64525c0f7f712ac905f561d3529",
+        repository_relation: "EXACT_BUILD_FILE_SET",
+        source_subtree: null,
+        source_file_count: 49,
+        source_file_set_sha256:
+          "fb98ca6c028f4549c121eac36b7d7ac1bf568163f7e4e6bd13a040abc57a161a",
+      },
+    });
+
+    const clone = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), "edge-binding-adversarial-")),
+    );
+    try {
+      execFileSync(
+        "git",
+        ["clone", "--quiet", "--no-hardlinks", process.cwd(), clone],
+        { stdio: "pipe" },
+      );
+      execFileSync(
+        "git",
+        ["checkout", "--quiet", "--orphan", "object-only"],
+        { cwd: clone },
+      );
+      execFileSync("git", ["add", "--all"], { cwd: clone });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=Edge Binding Test",
+          "-c",
+          "user.email=edge-binding-test@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "test: isolate reachable history",
+        ],
+        { cwd: clone },
+      );
+
+      expect(() =>
+        deriveSourceBinding(
+          clone,
+          value.live.builds.service,
+          {
+            commit: value.imageSourceBindings.service.repository_commit,
+            tree: value.imageSourceBindings.service.repository_tree,
+            relation: value.imageSourceBindings.service.repository_relation,
+          },
+          "service",
+        ),
+      ).toThrow(/IMAGE_SOURCE_REPOSITORY_BINDING_NOT_REACHABLE/);
+    } finally {
+      fs.rmSync(clone, { recursive: true, force: true });
+    }
+  });
+
   it("accounts for exactly 112 frozen slugs and fails closed on current drift", () => {
     const matrix = buildTerminalMatrix(inputs());
     expect(matrix.entries).toHaveLength(112);
