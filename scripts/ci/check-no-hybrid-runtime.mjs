@@ -850,6 +850,7 @@ export function validateGateWiring(root, policy) {
     addViolation(violations, "INVALID_PACKAGE_MANIFEST", "package.json", "cannot validate gate scripts");
   }
   const expectedScripts = {
+    "migration:no-hybrid:routes": "node scripts/ci/generate-no-hybrid-route-inventory.mjs",
     "migration:no-hybrid:source": "node scripts/ci/check-no-hybrid-runtime.mjs --source-only",
     "migration:no-hybrid:check": "node scripts/ci/check-no-hybrid-runtime.mjs --require-dist",
     "test:e2e:no-hybrid": "playwright test --config=playwright.no-hybrid.config.ts",
@@ -914,13 +915,14 @@ export function validateGateWiring(root, policy) {
   const noHybridCase = shellCaseBlock(orchestrator, "no-hybrid");
   const noHybridCommands = noHybridCase.split("\n").map((line) => line.trim()).filter(Boolean);
   const expectedNoHybridCommands = [
+    "npm run migration:no-hybrid:routes",
     "npm run migration:no-hybrid:source",
     "npm run build:web",
     "npm run migration:no-hybrid:check",
     "npm run test:e2e:no-hybrid",
   ];
   if (JSON.stringify(noHybridCommands) !== JSON.stringify(expectedNoHybridCommands)) {
-    addViolation(violations, "ORCHESTRATOR_GATE_MISSING", wiring.orchestrator, "no-hybrid case must contain the exact four gate commands");
+    addViolation(violations, "ORCHESTRATOR_GATE_MISSING", wiring.orchestrator, "no-hybrid case must contain the exact route, source, build, artifact, and browser gate commands");
   }
   const queueCase = shellCaseBlock(orchestrator, "queue");
   if (!indexesInOrder(queueCase, expectedNoHybridCommands)) {
@@ -955,6 +957,7 @@ export function validateGateWiring(root, policy) {
   const postMergeRaw = readRequired(root, wiring.post_merge_workflow, violations);
   const postMerge = yamlJobBlock(postMergeRaw, "smoke-gate", wiring.post_merge_workflow);
   const postMergeMarkers = [
+    "npm run migration:no-hybrid:routes",
     "npm run migration:no-hybrid:source",
     "npm run build:web",
     "npm run migration:no-hybrid:check",
@@ -972,6 +975,7 @@ export function validateGateWiring(root, policy) {
     const deployRaw = readRequired(root, deployPath, violations);
     const deploy = yamlJobBlock(deployRaw, "deploy", deployPath);
     const deployMarkers = [
+      "npm run migration:no-hybrid:routes",
       "npm run migration:no-hybrid:source",
       "google-github-actions/auth",
       "npm run build:web",

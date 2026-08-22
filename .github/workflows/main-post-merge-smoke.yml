@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify exhaustive route inventory
+        run: npm run migration:no-hybrid:routes
+
       - name: Validate no-hybrid source contract
         run: npm run migration:no-hybrid:source
 

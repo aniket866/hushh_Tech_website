@@ -11,6 +11,7 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     baseURL: "http://127.0.0.1:5173",
+    bypassCSP: true,
     serviceWorkers: "block",
     screenshot: "off",
     trace: "retain-on-failure",
@@ -21,11 +22,16 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+    },
   ],
   webServer: {
-    // Auth runtime permits this loopback origin, keeping the browser proof
-    // local instead of exercising the production-host redirect branch.
-    command: "npm run preview -- --host 127.0.0.1 --port 5173",
+    // The no-hybrid orchestrator builds first. Exercise the authoritative
+    // Cloud Run server and its same-origin API routes, not Vite's static-only
+    // preview server.
+    command: "PORT=5173 NODE_ENV=test node server.js",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: false,
     stdout: "pipe",

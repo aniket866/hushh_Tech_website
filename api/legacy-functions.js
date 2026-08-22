@@ -4,15 +4,13 @@ import {
 } from "./shared/gcpFunctionGateway.js";
 import { GCP_FUNCTION_CONTRACTS } from "./shared/gcpFunctionContracts.js";
 import { createMetadataIdentityTokenProvider } from "./shared/gcpServiceIdentity.js";
-import { verifyHushhResearchFirebaseToken } from "./shared/hushhResearchFirebase.js";
 import { GCP_BACKEND_RETIREMENT_FUNCTIONS } from "./shared/supabaseRetirementFunctionRegistry.js";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
-const FIREBASE_PROJECT_ID = "hushh-pda";
-const DEVELOPER_APP_ID = "app_hushh-technologies_cd1895ef";
-const EXPECTED_AUDIENCE = Object.freeze({
-  "hushh-tech-uat": "hushh-tech-uat",
-  "hushh-tech-prod": "hushh-tech-prod",
-});
+const FIREBASE_PROJECT_ID = "hushh-tech-uat";
+const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
+const FIREBASE_APP_NAME = "hushh-tech-legacy-functions-uat";
 
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -20,36 +18,52 @@ function clean(value) {
 
 export function readGcpFunctionFirebaseConfig(env = process.env) {
   const project = clean(env.GOOGLE_CLOUD_PROJECT);
-  const expectedAudience = EXPECTED_AUDIENCE[project];
-  const apiKey = clean(
-    env.HUSHH_TECH_FIREBASE_API_KEY ?? env.HUSHH_RESEARCH_FIREBASE_API_KEY,
-  );
-  const projectId = clean(
-    env.HUSHH_TECH_FIREBASE_PROJECT_ID ??
-      env.HUSHH_RESEARCH_FIREBASE_PROJECT_ID,
-  );
-  const audience = clean(
-    env.HUSHH_TECH_PRODUCT_AUDIENCE ?? env.HUSHH_RESEARCH_AUDIENCE,
-  );
-  const developerAppId = clean(
-    env.HUSHH_TECH_DEVELOPER_APP_ID ?? env.HUSHH_RESEARCH_DEVELOPER_APP_ID,
-  );
-
-  if (
-    !expectedAudience ||
-    !apiKey ||
-    projectId !== FIREBASE_PROJECT_ID ||
-    audience !== expectedAudience ||
-    developerAppId !== DEVELOPER_APP_ID
-  ) {
+  const projectId = clean(env.FIREBASE_PROJECT_ID);
+  if (project !== FIREBASE_PROJECT_ID || projectId !== FIREBASE_PROJECT_ID) {
     return null;
   }
 
   return Object.freeze({
-    firebase: Object.freeze({ apiKey, projectId }),
-    audience,
-    developerAppId,
+    firebase: Object.freeze({ projectId }),
+    audience: FIREBASE_PROJECT_ID,
+    issuer: FIREBASE_ISSUER,
   });
+}
+
+export async function verifyGcpFunctionFirebaseToken(idToken, config) {
+  if (
+    config?.firebase?.projectId !== FIREBASE_PROJECT_ID ||
+    config?.audience !== FIREBASE_PROJECT_ID ||
+    config?.issuer !== FIREBASE_ISSUER
+  ) {
+    const error = new Error("Firebase authority is unavailable.");
+    error.state = "UPSTREAM_UNAVAILABLE";
+    throw error;
+  }
+  const app =
+    getApps().find((candidate) => candidate.name === FIREBASE_APP_NAME) ||
+    initializeApp({ projectId: FIREBASE_PROJECT_ID }, FIREBASE_APP_NAME);
+  let decoded;
+  try {
+    decoded = await getAuth(app).verifyIdToken(idToken, true);
+  } catch (cause) {
+    if (cause?.code === "app/network-error" || cause?.code === "auth/internal-error") {
+      const error = new Error("Firebase authority is unavailable.");
+      error.state = "UPSTREAM_UNAVAILABLE";
+      throw error;
+    }
+    throw cause;
+  }
+  if (
+    !decoded.uid ||
+    decoded.sub !== decoded.uid ||
+    decoded.aud !== FIREBASE_PROJECT_ID ||
+    decoded.iss !== FIREBASE_ISSUER ||
+    !Number.isFinite(decoded.auth_time)
+  ) {
+    throw new Error("Firebase token authority is invalid.");
+  }
+  return { uid: decoded.uid, authTime: decoded.auth_time, idToken };
 }
 
 export function createLegacyFunctionsHandler({
@@ -71,10 +85,7 @@ export function createLegacyFunctionsHandler({
         error.state = "UPSTREAM_UNAVAILABLE";
         throw error;
       }
-      return verifyHushhResearchFirebaseToken(token, firebaseConfig, {
-        fetchImpl,
-        now,
-      });
+      return verifyGcpFunctionFirebaseToken(token, firebaseConfig);
     });
   const identityTokenProvider =
     getServiceIdentityToken ??

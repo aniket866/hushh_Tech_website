@@ -21,7 +21,7 @@ import {
   createLegacyFunctionsHandler,
   readGcpFunctionFirebaseConfig,
 } from "../api/legacy-functions.js";
-import { SUPABASE_RETIREMENT_FUNCTIONS } from "../api/shared/supabaseRetirementFunctionRegistry.js";
+import { GCP_BACKEND_RETIREMENT_FUNCTIONS } from "../api/shared/supabaseRetirementFunctionRegistry.js";
 
 const baseEntry = {
   source: { slug: "stock-quotes" },
@@ -89,7 +89,7 @@ describe("GCP function registry", () => {
       "stock-quotes",
     ]);
     expect(
-      SUPABASE_RETIREMENT_FUNCTIONS.filter(
+      GCP_BACKEND_RETIREMENT_FUNCTIONS.filter(
         (entry) => GCP_FUNCTION_CONTRACTS.has(entry.slug),
       ).every((entry) => entry.migration_state === "INVENTORY_FROZEN"),
     ).toBe(true);
@@ -730,34 +730,36 @@ describe("Cloud Run service identity", () => {
 
 describe("generated retirement registry integration", () => {
   it("loads exactly 112 explicit function dispositions", () => {
-    expect(SUPABASE_RETIREMENT_FUNCTIONS).toHaveLength(112);
+    expect(GCP_BACKEND_RETIREMENT_FUNCTIONS).toHaveLength(112);
     expect(
-      SUPABASE_RETIREMENT_FUNCTIONS.filter(
+      GCP_BACKEND_RETIREMENT_FUNCTIONS.filter(
         (entry) => entry.final_disposition === "RETIRE_WITH_410",
       ).map((entry) => entry.slug),
     ).toEqual(["get-secrets"]);
   });
 
-  it("pins the shared Firebase authority and environment-specific audience", () => {
+  it("pins the compatibility gateway to the isolated UAT Firebase authority", () => {
     expect(
       readGcpFunctionFirebaseConfig({
         GOOGLE_CLOUD_PROJECT: "hushh-tech-uat",
-        HUSHH_TECH_FIREBASE_API_KEY: "public-firebase-api-key",
-        HUSHH_TECH_FIREBASE_PROJECT_ID: "hushh-pda",
-        HUSHH_TECH_PRODUCT_AUDIENCE: "hushh-tech-uat",
-        HUSHH_TECH_DEVELOPER_APP_ID: "app_hushh-technologies_cd1895ef",
+        FIREBASE_PROJECT_ID: "hushh-tech-uat",
       }),
     ).toMatchObject({
-      firebase: { projectId: "hushh-pda" },
+      firebase: { projectId: "hushh-tech-uat" },
       audience: "hushh-tech-uat",
+      issuer: "https://securetoken.google.com/hushh-tech-uat",
     });
     expect(
       readGcpFunctionFirebaseConfig({
         GOOGLE_CLOUD_PROJECT: "hushh-tech-prod",
-        HUSHH_TECH_FIREBASE_API_KEY: "public-firebase-api-key",
-        HUSHH_TECH_FIREBASE_PROJECT_ID: "hushh-pda-uat",
-        HUSHH_TECH_PRODUCT_AUDIENCE: "hushh-tech-prod",
-        HUSHH_TECH_DEVELOPER_APP_ID: "app_hushh-technologies_cd1895ef",
+        FIREBASE_PROJECT_ID: "hushh-tech-prod",
+      }),
+    ).toBeNull();
+    expect(
+      readGcpFunctionFirebaseConfig({
+        GOOGLE_CLOUD_PROJECT: "hushh-tech-uat",
+        FIREBASE_PROJECT_ID: "hushh-pda",
+        HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda",
       }),
     ).toBeNull();
   });

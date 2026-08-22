@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import dataHandler from "../api/gcp-data.js";
+import { actorObjectPath, normalizeObjectPath } from "../api/gcp-storage.js";
 import {
   compileTableQuery,
   executeDataRequest,
@@ -21,7 +22,7 @@ const validEnv = () => ({
   GOOGLE_CLOUD_PROJECT: "hushh-tech-uat",
   CLOUD_SQL_INSTANCE_CONNECTION_NAME: "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
   CLOUD_SQL_DATABASE: "hushh_tech_app",
-  CLOUD_SQL_IAM_USER: "web@hushh-tech-uat.iam",
+  CLOUD_SQL_IAM_USER: "hushh-tech-web-uat@hushh-tech-uat.iam",
   FIREBASE_PROJECT_ID: "hushh-tech-uat",
   GCP_STORAGE_BUCKET_PREFIX: "hushh-tech-uat",
 });
@@ -40,6 +41,9 @@ describe("GCP backend runtime boundary", () => {
       firebaseProjectId: "hushh-tech-uat",
     }));
     expect(() => runtimeConfig({ ...validEnv(), FIREBASE_PROJECT_ID: "hushh-tech-prod" })).toThrow("authority");
+    expect(() => runtimeConfig({ ...validEnv(), GCP_PROJECT: "hushh-tech-prod" })).toThrow("UAT-only");
+    expect(() => runtimeConfig({ ...validEnv(), CLOUD_SQL_DATABASE: "postgres" })).toThrow("authority");
+    expect(() => runtimeConfig({ ...validEnv(), GCP_STORAGE_BUCKET_PREFIX: "other" })).toThrow("authority");
   });
 
   it("uses an explicit operation/table/RPC/bucket manifest", () => {
@@ -67,6 +71,49 @@ describe("GCP backend runtime boundary", () => {
     expect(query.values).toEqual(["x' OR TRUE --"]);
     expect(() => compileTableQuery({ table: "onboarding_data;DROP TABLE users", operation: "select" })).toThrow("not manifested");
     expect(() => compileTableQuery({ table: "onboarding_data", operation: "select", columns: "*,users(*)" })).toThrow("flat manifested columns");
+    expect(() => compileTableQuery({ table: "onboarding_data", operation: "delete", filters: [] })).toThrow("filters are required");
+    expect(() => compileTableQuery({ table: "onboarding_data", operation: "update", values: { account_type: "x" }, filters: [] })).toThrow("filters are required");
+    expect(() => compileTableQuery({ table: "onboarding_data", operation: "select", filters: [], limit: -1 })).toThrow("limit is invalid");
+    expect(() => compileTableQuery({ table: "onboarding_data", operation: "select", filters: "all" })).toThrow("filters are invalid");
+  });
+
+  it("normalizes storage paths under the authenticated user and rejects traversal", () => {
+    expect(actorObjectPath("user-a", "user-a/media/file.png")).toBe("user-a/media/file.png");
+    expect(actorObjectPath("user-a", "user-b/media/file.png")).toBe("user-a/user-b/media/file.png");
+    expect(actorObjectPath("user-a", "", { allowEmpty: true })).toBe("user-a/");
+    expect(() => actorObjectPath("user/a", "media/file.png")).toThrow("Invalid storage actor");
+    expect(() => actorObjectPath("..", "media/file.png")).toThrow("Invalid storage actor");
+    for (const value of ["../secret", "media/../secret", "media//file", "media\\file", "media\u0000file"]) {
+      expect(() => normalizeObjectPath(value)).toThrow("Invalid object path");
+    }
+  });
+
+  it("rolls back before reporting a mutation cardinality mismatch", async () => {
+    process.env = { ...process.env, ...validEnv() };
+    const statements: string[] = [];
+    const client = {
+      async query(query: string | { text: string }) {
+        const text = typeof query === "string" ? query : query.text;
+        statements.push(text);
+        if (text.startsWith("UPDATE")) return { rows: [{ id: 1 }, { id: 2 }], rowCount: 2 };
+        return { rows: [], rowCount: null };
+      },
+      release() { statements.push("RELEASE"); },
+    };
+    const fakePool = { async connect() { return client; } };
+
+    await expect(executeDataRequest({
+      kind: "table",
+      table: "onboarding_data",
+      operation: "update",
+      values: { account_type: "individual" },
+      filters: [{ operator: "eq", column: "user_id", value: "legacy-user" }],
+      cardinality: "single",
+    }, "firebase-user", { pool: fakePool })).rejects.toMatchObject({ code: "CARDINALITY_MISMATCH" });
+
+    expect(statements).toContain("ROLLBACK");
+    expect(statements).not.toContain("COMMIT");
+    expect(statements.indexOf("ROLLBACK")).toBeGreaterThan(statements.findIndex((entry) => entry.startsWith("UPDATE")));
   });
 
   it("requires a Firebase bearer before any data operation", async () => {

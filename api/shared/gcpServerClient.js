@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { executeDataRequest, storageRuntime, verifyFirebaseBearer } from "./gcpDataRuntime.js";
+import { executeDataRequest, runtimeConfig, storageRuntime, verifyFirebaseBearer } from "./gcpDataRuntime.js";
 
 const serviceActor = () => {
   const uid = process.env.GCP_SERVER_ACTOR_UID?.trim();
@@ -38,8 +38,9 @@ class ServerQueryBuilder {
 }
 
 function firebaseAdmin() {
-  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  const app = getApps()[0] || initializeApp({ projectId });
+  const projectId = runtimeConfig().firebaseProjectId;
+  const appName = `hushh-tech-server-${projectId}`;
+  const app = getApps().find((candidate) => candidate.name === appName) || initializeApp({ projectId }, appName);
   return getAuth(app);
 }
 

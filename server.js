@@ -125,6 +125,7 @@ app.put(
   express.raw({ limit: '25mb', type: '*/*' }),
   async (req, res) => wrapHandler(await loadApi('gcp-storage'))(req, res),
 );
+app.get('/api/gcp/storage/*', async (req, res) => wrapHandler(await loadApi('gcp-storage'))(req, res));
 
 // Parse non-compatibility JSON and form bodies.
 app.use(express.json({ limit: '10mb' }));

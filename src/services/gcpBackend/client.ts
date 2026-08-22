@@ -313,6 +313,26 @@ export function createGcpBackendClient(config: GcpClientConfig): GcpBackendClien
           getPublicUrl(path: string) {
             return { data: { publicUrl: `${STORAGE_PATH}/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}` } };
           },
+          async download(path: string) {
+            await auth.authStateReady();
+            const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+            if (!token) return { data: null, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
+            try {
+              const response = await fetch(`${STORAGE_PATH}/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                return { data: null, error: backendError(payload?.error || payload, response.status) };
+              }
+              return { data: await response.blob(), error: null };
+            } catch (error) {
+              return { data: null, error: backendError(error) };
+            }
+          },
           remove(paths: string[]) {
             return authenticatedFetch(auth, STORAGE_PATH, { method: "DELETE", body: JSON.stringify({ bucket, paths }) });
           },

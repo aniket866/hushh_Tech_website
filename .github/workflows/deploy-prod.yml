@@ -72,6 +72,9 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
 
+      - name: Verify exhaustive route inventory
+        run: npm run migration:no-hybrid:routes
+
       - name: Validate no-hybrid source contract
         run: npm run migration:no-hybrid:source
 

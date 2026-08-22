@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 
 import { installNoHybridNetworkGate } from "./noHybridNetworkGuard";
+
+const inventory = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), "tests/noHybridRouteInventory.generated.json"), "utf8"),
+);
 
 test("synthetic GCP-only browser fixture stays clean", async ({ context, page }) => {
   const networkGate = await installNoHybridNetworkGate(context);
@@ -113,7 +119,68 @@ test("network guard samples five unauthenticated application routes", async ({ c
   for (const route of ["/", "/login", "/signup", "/metrics", "/delete-account"]) {
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(page.locator("#root")).toBeAttached();
-    await page.waitForLoadState("networkidle");
     networkGate.assertClean();
   }
+});
+
+test("generated anonymous inventory reaches every React route without provider egress", async ({ context, page }) => {
+  test.setTimeout(120_000);
+  const networkGate = await installNoHybridNetworkGate(context);
+  await context.route("**/api/**", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      headers: {
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Allow-Methods": "DELETE, GET, OPTIONS, PATCH, POST, PUT",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({ error: { code: "DETERMINISTIC_FIXTURE", message: "Unavailable in anonymous route proof." } }),
+    });
+  });
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  for (const route of inventory.client) {
+    await page.goto(route.sample, { waitUntil: "domcontentloaded" });
+    await expect(page.locator("#root"), route.pattern).toBeAttached();
+    // WebKit reports fetches aborted by the next navigation as page errors.
+    // Let route-started same-origin work settle so the assertion observes the
+    // route itself instead of an artificial cancellation from this sweep.
+    await page.waitForTimeout(100);
+    networkGate.assertClean();
+  }
+
+  expect(pageErrors).toEqual([]);
+  expect(inventory.counts.client).toBe(93);
+});
+
+test("all 112 compatibility routes have an explicit terminal or blocking response", async ({ context, page }) => {
+  test.setTimeout(60_000);
+  const networkGate = await installNoHybridNetworkGate(context);
+  await page.goto("/robots.txt", { waitUntil: "domcontentloaded" });
+
+  const observed = await page.evaluate(async (routes) => {
+    const results = [];
+    for (const route of routes) {
+      const response = await fetch(route.route, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const payload = await response.json();
+      results.push({ slug: route.slug, status: response.status, code: payload?.detail?.code });
+    }
+    return results;
+  }, inventory.functions);
+
+  expect(observed).toHaveLength(112);
+  expect(observed.filter((entry) => entry.status === 410)).toEqual([
+    { slug: "get-secrets", status: 410, code: "FEATURE_RETIRED" },
+  ]);
+  expect(observed.filter((entry) => entry.status === 503)).toHaveLength(111);
+  expect(new Set(observed.filter((entry) => entry.status === 503).map((entry) => entry.code))).toEqual(
+    new Set(["FUNCTION_NOT_MIGRATED"]),
+  );
+  networkGate.assertClean();
 });

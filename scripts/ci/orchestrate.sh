@@ -18,6 +18,7 @@ case "$COMMAND" in
     npm run migration:retirement:check
     ;;
   no-hybrid)
+    npm run migration:no-hybrid:routes
     npm run migration:no-hybrid:source
     npm run build:web
     npm run migration:no-hybrid:check
@@ -44,6 +45,7 @@ case "$COMMAND" in
     ;;
   queue)
     npm run migration:retirement:check
+    npm run migration:no-hybrid:routes
     npm run migration:no-hybrid:source
     (
       cd cloud-run/hushh-tech-app-services
