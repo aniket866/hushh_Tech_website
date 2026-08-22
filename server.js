@@ -38,7 +38,40 @@ const wrapHandler = (handlerModule) => async (req, res) => {
   }
 };
 
-const loadApi = async (name) => import(`./api/${name}.js`);
+// Keep lazy loading, but make every deployable API module explicit. Besides
+// preventing path injection, this gives the no-hybrid gate a complete static
+// runtime graph instead of an unbounded template import.
+const API_LOADERS = Object.freeze({
+  'analytics/collect': () => import('./api/analytics/collect.js'),
+  'analytics/realtime': () => import('./api/analytics/realtime.js'),
+  'career-application': () => import('./api/career-application.js'),
+  'community/asset': () => import('./api/community/asset.js'),
+  'community/post-detail': () => import('./api/community/post-detail.js'),
+  'community/posts': () => import('./api/community/posts.js'),
+  'contact-notification': () => import('./api/contact-notification.js'),
+  'delete-account': () => import('./api/delete-account.js'),
+  deployments: () => import('./api/deployments.js'),
+  'enrich-preferences': () => import('./api/enrich-preferences.js'),
+  'gemini-chat': () => import('./api/gemini-chat.js'),
+  'gemini-ephemeral-token': () => import('./api/gemini-ephemeral-token.js'),
+  'generate-investor-profile': () => import('./api/generate-investor-profile.js'),
+  'generate-profile-intelligence': () => import('./api/generate-profile-intelligence.js'),
+  'google-wallet-pass': () => import('./api/google-wallet-pass.js'),
+  'hushh-research-client': () => import('./api/hushh-research-client.js'),
+  'legacy-functions': () => import('./api/legacy-functions.js'),
+  'metrics/send-report': () => import('./api/metrics/send-report.js'),
+  'metrics/summary': () => import('./api/metrics/summary.js'),
+  'public-investor-profile': () => import('./api/public-investor-profile.js'),
+  'send-email-notification': () => import('./api/send-email-notification.js'),
+  'stock-quotes': () => import('./api/stock-quotes.js'),
+  'wallet-pass': () => import('./api/wallet-pass.js'),
+});
+
+const loadApi = async (name) => {
+  const loader = API_LOADERS[name];
+  if (!loader) throw new Error(`Unknown API route: ${name}`);
+  return loader();
+};
 
 // ---------------------------------------------------------------------------
 // Middleware

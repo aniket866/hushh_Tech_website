@@ -405,6 +405,17 @@ describe("fail-closed no-hybrid runtime gate", () => {
     );
   });
 
+  it("keeps the production API loader graph statically bounded", () => {
+    const result = scanNoHybridRuntime({
+      root: process.cwd(),
+      policy: loadNoHybridPolicy(),
+      validateWiring: false,
+      enforceBrowserCoverage: false,
+    });
+
+    expect(codes(result)).not.toContain("UNRESOLVED_DYNAMIC_RUNTIME_IMPORT");
+  });
+
   it("keeps package, PR, queue, post-merge, deploy, image, and 112-route wiring fail closed", () => {
     expect(validateGateWiring(process.cwd(), loadNoHybridPolicy())).toEqual([]);
   });
