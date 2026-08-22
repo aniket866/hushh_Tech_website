@@ -79,6 +79,7 @@ test("Firebase user route reverifies revocation and exact product claims", async
     authTime: NOW_SECONDS - 20,
     launchAuthorizationId: "launch-authorization-1",
     fundAdmin: false,
+    email: null,
   });
 });
 
@@ -90,18 +91,17 @@ test("Firebase fund admin context accepts only the literal boolean custom claim"
     [1, false],
     [undefined, false],
   ]) {
-    const decoded = firebaseClaims(
-      claim === undefined ? {} : { fund_admin: claim },
-    );
     const verify = createFirebaseProductVerifier({
       config: CONFIG,
-      auth: { verifyIdToken: async () => decoded },
+      auth: {
+        verifyIdToken: async () =>
+          firebaseClaims({ fund_admin: claim, email: "Admin@Example.COM" }),
+      },
       now: () => NOW_MS,
     });
-    const actor = await verify(firebaseRequest(), {
-      auth_mode: "firebase_bearer",
-    });
+    const actor = await verify(firebaseRequest(), { auth_mode: "firebase_bearer" });
     assert.equal(actor.fundAdmin, expected);
+    assert.equal(actor.email, "admin@example.com");
   }
 });
 

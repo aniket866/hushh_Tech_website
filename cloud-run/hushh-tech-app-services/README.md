@@ -36,10 +36,14 @@ blocked until the website Cloud Run service is verified as
 the external load balancer produces the exact two-address forwarding header,
 and hosted tests prove spoofed chains and direct `run.app` requests fail.
 
-`get-locations`, `hushh-dob-inference`, and `investor-og-image` remain
-unimplemented and frozen behind licensing, privacy, and public-media contract
-blockers. The source map, exact wire behavior, blockers, and live-verification
-checklist are documented in
+Eight additional source-backed candidates now have GCP-only contracts,
+adapters, handlers, and adversarial tests, but remain unwired and frozen:
+`get-locations`, `chat-check-access`, `investor-og-image`, the four fund-admin
+read surfaces, and `generate-investor-profile`. Their exact table, column,
+request, cache, side-effect, dependency, and blocker matrix is
+`registry/candidates.gcp-read-batch.v1.json`. `hushh-dob-inference` remains
+unimplemented behind privacy and product review. The source map and
+live-verification checklist are documented in
 `docs/reference/architecture/gcp-investor-read-only-function-batch.md`. All 112
 legacy registry entries, including `stock-quotes`, remain
 `INVENTORY_FROZEN`.

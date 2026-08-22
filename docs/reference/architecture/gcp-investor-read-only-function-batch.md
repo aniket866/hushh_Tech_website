@@ -9,10 +9,9 @@ code-readiness evidence only, not deployment or parity evidence.
 - The default Cloud Run server supplies an empty handler map.
 - The same-origin gateway checks the frozen registry before its staged contract
   map, so every route returns `FUNCTION_NOT_MIGRATED` before a handler lookup.
-- Only `hushh-location-geocode` and `stock-quotes` have compiled contracts and
-  handlers. They remain unwired and unreachable.
-- `get-locations`, `hushh-dob-inference`, and `investor-og-image` have no GCP
-  contract, adapter, or handler in this batch.
+- Ten candidates have compiled contracts. Eight new GCP-only candidate
+  handlers and adapters remain deliberately absent from runtime wiring.
+- `hushh-dob-inference` remains unimplemented.
 - The new runtime modules contain no source-system package, URL, environment
   name, software development kit, database client, storage client, or fallback.
 - No Google Cloud Platform (GCP) or source-system resource was changed.
@@ -20,8 +19,9 @@ code-readiness evidence only, not deployment or parity evidence.
 ## Source evidence
 
 The checked-in source and sanitized live-bundle evidence were compared. The
-live differences for the two implemented candidates are formatting and erased
-TypeScript annotations; normal request and response behavior is unchanged.
+eight-candidate source and live-bundle digests, plus exact request, table,
+column, cache, side-effect, dependency, and blocker contracts, are recorded in
+`cloud-run/hushh-tech-app-services/registry/candidates.gcp-read-batch.v1.json`.
 
 | Slug | Version | Checked-in source SHA-256 | Live source SHA-256 | Live bundle digest |
 | --- | ---: | --- | --- | --- |
@@ -97,15 +97,47 @@ An unexplained difference still blocks the registry flip.
   the fixed 27-symbol watchlist is fetched. This remains unchanged until live
   parity and product review approve a correction.
 
-## Explicitly deferred candidates
+## Additional implemented but unreachable candidates
 
 ### `get-locations`
 
 The source implementation depends on a GPL-3.0 package. That package and its
-transitive data are absent from the service package and lockfile. This function
-has no GCP contract, adapter, or handler. It remains frozen until a complete,
-checked-in, permissively licensed dataset can reproduce the country, state, and
-city catalog and legal review approves its distribution.
+transitive data are absent from the service package and lockfile. The candidate
+uses only a generation- and SHA-256-pinned Cloud Storage JSON catalog. It stays
+frozen until that licensed artifact is staged and public caller auth parity is
+resolved.
+
+### `chat-check-access`
+
+The transactional Cloud SQL adapter serializes each visitor/profile pair,
+creates the free token once, and resets paid hourly counters without storing
+network address or user-agent data. It stays frozen because
+`chat_access_tokens` is absent from the target table manifest and public caller
+auth parity is unresolved.
+
+### Fund-admin reads
+
+The analytics, overview, list, and metrics candidates require a verified
+Firebase claim whose `fund_admin` value is the literal boolean `true`. They use
+static Cloud SQL statements, bounded pagination, best-effort audit writes, and
+degrade only the optional KYC source. They stay frozen until exact grants,
+forced row-level security, real claim issuance, and private live UAT parity are
+proven. `kyc_attestations` is absent from the target manifest.
+
+### `generate-investor-profile`
+
+The candidate uses Vertex AI in `us-central1`, validates every option in the
+12-field schema, and returns sanitized provider failures. It stays frozen until
+Vertex IAM, quota, and private live UAT parity are proven.
+
+### `investor-og-image`
+
+The GCP handler queries only confirmed public rows and XML-escapes every dynamic
+SVG value. Its source behavior is public media, while the current compatibility
+gateway requires a Firebase bearer token. It remains frozen until public
+routing, abuse controls, cache behavior, and live row-visibility proof exist.
+
+## Explicitly deferred candidate
 
 ### `hushh-dob-inference`
 
@@ -115,27 +147,22 @@ is a privacy-sensitive product decision. It remains frozen until privacy,
 legal, safety, and product owners define permissible evidence, retention,
 confidence, user notice, correction, and no-result behavior.
 
-### `investor-og-image`
-
-This function has no Firebase compatibility contract or GCP handler. Its source
-behavior is public media, while the current compatibility gateway requires a
-Firebase bearer token. It remains frozen until a separately reviewed public
-media contract defines routing, abuse controls, cache behavior, profile
-visibility, row-level security, generation behavior, and revocation.
-
 ## Automated proof
 
 The focused Node suite proves:
 
 - the real registry remains 112 of 112 frozen and the default server has no
   handlers;
-- only the two reviewed private contracts compile;
+- exactly ten reviewed contracts compile, including the eight-candidate batch;
 - exact method, path, query, media type, cache, Firebase authentication,
   16,384-byte and 8,192-byte service limits, and abort behavior;
 - coordinate boundaries fail before provider access;
 - Google-to-Nominatim behavior, Finnhub projection, fixed stock batches, and
   exact success and error shapes;
-- no handler executes while the real registry remains frozen.
+- no candidate handler executes while the real registry remains frozen;
+- each of the eight gateway paths returns 503 before Firebase auth or upstream
+  access, and strict admin, PII, catalog-integrity, SVG-injection, Cloud SQL,
+  pagination, and Vertex-schema adversarial cases pass.
 
 Run:
 
@@ -155,8 +182,8 @@ The gateway contract test is in `tests/gcpFunctionGateway.test.ts`.
 5. Provider quotas, error bodies, cache behavior, latency, Firebase failures,
    and normalized response hashes have not been verified against live UAT.
 6. The fixed stock watchlist differs from the caller-provided list.
-7. The three deferred functions require their explicit licensing, privacy, or
-   public-media decisions before implementation can begin.
+7. The machine matrix records the remaining table, claim, licensing, Vertex,
+   public-auth, and public-media blockers for each candidate.
 
 ## Live verification checklist
 

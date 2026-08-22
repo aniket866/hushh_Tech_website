@@ -148,9 +148,81 @@ export function buildGcpFunctionContracts(entries = []) {
 }
 
 // Contract presence is not enablement. The generated 112-function registry is
-// checked before this map. Geocode is the only browser-reachable port; stock
-// quotes remains a reviewed, default-off candidate.
+// checked before this map. Geocode is the only browser-reachable port; stock,
+// NDA, and the reviewed read-batch contracts remain default-off until each
+// exact slug has its own live UAT proof and registry transition.
 export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
+  {
+    slug: "chat-check-access",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 8_192,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "fund-payment-admin-analytics",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 4_096,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "fund-payment-admin-overview",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 4_096,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "fund-payment-admin-overview-list",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 8_192,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "fund-payment-admin-overview-metrics",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 4_096,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "generate-investor-profile",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 65_536,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "get-locations",
+    methods: ["GET"],
+    subpaths: [""],
+    queryKeys: ["type", "country", "state"],
+    contentTypes: [],
+    responseHeaders: [],
+    maxRequestBytes: 0,
+    timeoutMs: 25_000,
+    publicCache: true,
+  },
   {
     slug: "hushh-location-geocode",
     methods: ["POST"],
@@ -170,5 +242,16 @@ export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
     responseHeaders: [],
     maxRequestBytes: 8_192,
     timeoutMs: 25_000,
+  },
+  {
+    slug: "investor-og-image",
+    methods: ["GET"],
+    subpaths: [""],
+    queryKeys: ["slug"],
+    contentTypes: [],
+    responseHeaders: [],
+    maxRequestBytes: 0,
+    timeoutMs: 25_000,
+    publicCache: true,
   },
 ]);

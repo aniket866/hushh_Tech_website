@@ -7,7 +7,11 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const TEMPLATE_LITERAL_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 const TEMPLATE_PARAMETER_PATTERN = /^:[a-z][a-z0-9_]{0,31}$/;
 const MEDIA_TYPE_PATTERN = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/;
-const CACHE_CONTROL_VALUES = new Set(["private, no-store"]);
+const CACHE_CONTROL_VALUES = new Set([
+  "private, no-store",
+  "public, max-age=86400",
+  "public, max-age=3600, s-maxage=86400",
+]);
 const CREDENTIAL_KEY_PATTERN =
   /(?:authorization|credential|password|private[_-]?key|secret|service[_-]?role|token)/i;
 const MAX_QUERY_BYTES = 4_096;
@@ -254,6 +258,73 @@ export function assertFunctionRequestContract(contract, request) {
 }
 
 export const INVESTOR_READ_ONLY_FUNCTION_CONTRACTS = createFunctionContracts({
+  "chat-check-access": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "required",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 8_192,
+  },
+  "fund-payment-admin-analytics": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+  "fund-payment-admin-overview": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+  "fund-payment-admin-overview-list": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 8_192,
+  },
+  "fund-payment-admin-overview-metrics": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "optional",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 4_096,
+  },
+  "generate-investor-profile": {
+    methods: ["POST"],
+    subpaths: [""],
+    query: {},
+    body: "required",
+    mediaTypes: ["application/json"],
+    cacheControl: "private, no-store",
+    maxRequestBytes: 65_536,
+  },
+  "get-locations": {
+    methods: ["GET"],
+    subpaths: [""],
+    query: {
+      type: { required: true, multiple: false, maxLength: 16 },
+      country: { required: false, multiple: false, maxLength: 2 },
+      state: { required: false, multiple: false, maxLength: 3 },
+    },
+    body: "forbidden",
+    mediaTypes: [],
+    cacheControl: "public, max-age=86400",
+    maxRequestBytes: 0,
+  },
   "hushh-location-geocode": {
     methods: ["POST"],
     subpaths: [""],
@@ -271,6 +342,17 @@ export const INVESTOR_READ_ONLY_FUNCTION_CONTRACTS = createFunctionContracts({
     mediaTypes: ["application/json"],
     cacheControl: "private, no-store",
     maxRequestBytes: 8_192,
+  },
+  "investor-og-image": {
+    methods: ["GET"],
+    subpaths: [""],
+    query: {
+      slug: { required: true, multiple: false, maxLength: 128 },
+    },
+    body: "forbidden",
+    mediaTypes: [],
+    cacheControl: "public, max-age=3600, s-maxage=86400",
+    maxRequestBytes: 0,
   },
 });
 

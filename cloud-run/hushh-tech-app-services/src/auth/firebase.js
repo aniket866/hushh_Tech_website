@@ -70,12 +70,19 @@ function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
     );
   }
 
+  const email =
+    typeof decoded?.email === "string" ? decoded.email.trim().toLowerCase() : "";
+
   return Object.freeze({
     kind: "firebase",
     uid,
     authTime,
     launchAuthorizationId,
     fundAdmin: decoded?.fund_admin === true,
+    email:
+      email && email.length <= 320 && !/[\u0000-\u001f\u007f]/.test(email)
+        ? email
+        : null,
   });
 }
 

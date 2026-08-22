@@ -9,6 +9,7 @@ import {
   validateRegistry,
 } from "../src/registry.js";
 import { FUNCTION_CONTRACTS } from "../src/contracts.js";
+import { GCP_READ_BATCH_SLUGS } from "../src/handlers/gcp-read-batch.js";
 import {
   SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
   SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS,
@@ -56,10 +57,41 @@ assert.deepEqual(
   ["hushh-location-geocode"],
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
+  "chat-check-access",
+  "fund-payment-admin-analytics",
+  "fund-payment-admin-overview",
+  "fund-payment-admin-overview-list",
+  "fund-payment-admin-overview-metrics",
+  "generate-investor-profile",
+  "get-locations",
   "hushh-location-geocode",
   "nda-admin-fetch",
+  "investor-og-image",
   "stock-quotes",
 ]);
+const candidateMatrix = JSON.parse(
+  await readFile(resolve(root, "registry/candidates.gcp-read-batch.v1.json"), "utf8"),
+);
+assert.equal(candidateMatrix.deployment_state, "DEFAULT_OFF");
+assert.equal(candidateMatrix.required_registry_state, "INVENTORY_FROZEN");
+assert.deepEqual(
+  candidateMatrix.functions.map(({ slug }) => slug).sort(),
+  [...GCP_READ_BATCH_SLUGS],
+);
+assert.equal(
+  candidateMatrix.functions.every(
+    ({ source_sha256, live_bundle_sha256, blockers }) =>
+      /^[a-f0-9]{64}$/.test(source_sha256) &&
+      /^[a-f0-9]{64}$/.test(live_bundle_sha256) &&
+      Array.isArray(blockers) &&
+      blockers.length > 0,
+  ),
+  true,
+);
+const registryBySlug = new Map(LEGACY_FUNCTIONS.map((entry) => [entry.slug, entry]));
+for (const slug of GCP_READ_BATCH_SLUGS) {
+  assert.equal(registryBySlug.get(slug)?.migration_state, "INVENTORY_FROZEN");
+}
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
 assert.equal(
   Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).every(
@@ -113,6 +145,7 @@ if (!registryOnly) {
     ...(await filesUnder(resolve(root, "src"))),
     ...(await filesUnder(resolve(root, "smoke"))),
     resolve(root, "registry/functions.v1.json"),
+    resolve(root, "registry/candidates.gcp-read-batch.v1.json"),
     resolve(root, "package.json"),
     resolve(root, "Dockerfile"),
   ];

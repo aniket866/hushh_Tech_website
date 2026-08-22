@@ -82,12 +82,24 @@ const enabledEnv = {
     "https://hushh-tech-webhooks-175298245599.us-central1.run.app",
 };
 
+const GCP_READ_BATCH_SLUGS = [
+  "chat-check-access",
+  "fund-payment-admin-analytics",
+  "fund-payment-admin-overview",
+  "fund-payment-admin-overview-list",
+  "fund-payment-admin-overview-metrics",
+  "generate-investor-profile",
+  "get-locations",
+  "investor-og-image",
+] as const;
+
 describe("GCP function registry", () => {
-  it("enables geocode while stock and NDA remain frozen", () => {
+  it("enables geocode while other reviewed contracts remain frozen", () => {
     expect([...GCP_FUNCTION_CONTRACTS.keys()].sort()).toEqual([
+      ...GCP_READ_BATCH_SLUGS,
       "hushh-location-geocode",
       "stock-quotes",
-    ]);
+    ].sort());
     expect(
       GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
         (entry) => entry.slug === "hushh-location-geocode",
@@ -117,9 +129,19 @@ describe("GCP function registry", () => {
       timeoutMs: 25_000,
       publicCache: false,
     });
-    expect(GCP_FUNCTION_CONTRACTS.has("get-locations")).toBe(false);
+    expect(GCP_FUNCTION_CONTRACTS.get("get-locations")).toMatchObject({
+      methods: ["GET"],
+      queryKeys: ["type", "country", "state"],
+      maxRequestBytes: 0,
+      publicCache: true,
+    });
     expect(GCP_FUNCTION_CONTRACTS.has("hushh-dob-inference")).toBe(false);
-    expect(GCP_FUNCTION_CONTRACTS.has("investor-og-image")).toBe(false);
+    expect(GCP_FUNCTION_CONTRACTS.get("investor-og-image")).toMatchObject({
+      methods: ["GET"],
+      queryKeys: ["slug"],
+      maxRequestBytes: 0,
+      publicCache: true,
+    });
   });
 
   it("rejects duplicates and non-explicit owners", () => {
@@ -203,6 +225,35 @@ describe("GCP legacy function compatibility gateway", () => {
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+  it.each(GCP_READ_BATCH_SLUGS)(
+    "keeps candidate %s unreachable before auth and upstream",
+    async (slug) => {
+      const source = GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
+        (entry) => entry.slug === slug,
+      );
+      expect(source).toBeDefined();
+      const registry = buildGcpFunctionRegistry([source!]);
+      const fetchImpl = vi.fn();
+      const verifyFirebaseToken = vi.fn();
+      const res = responseRecorder();
+      await createGcpFunctionGateway({
+        registry,
+        contracts: GCP_FUNCTION_CONTRACTS,
+        fetchImpl,
+        verifyFirebaseToken,
+      })(
+        { method: "POST", url: `/functions/v1/${slug}`, headers: {} },
+        res,
+      );
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toMatchObject({
+        detail: { code: "FUNCTION_NOT_MIGRATED" },
+      });
+      expect(verifyFirebaseToken).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
 
   it("routes an allowlisted function with verified Firebase and service identity", async () => {
     const registry = buildGcpFunctionRegistry([baseEntry]);

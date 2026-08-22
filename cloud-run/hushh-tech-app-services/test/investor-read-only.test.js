@@ -164,19 +164,21 @@ function jsonBodyOfSize(size) {
   return body;
 }
 
-test("only three reviewed contracts exist and only geocode is enabled", async () => {
+test("reviewed contracts stay default-off except verified geocode", async () => {
   assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
+    "chat-check-access",
+    "fund-payment-admin-analytics",
+    "fund-payment-admin-overview",
+    "fund-payment-admin-overview-list",
+    "fund-payment-admin-overview-metrics",
+    "generate-investor-profile",
+    "get-locations",
     "hushh-location-geocode",
     "nda-admin-fetch",
+    "investor-og-image",
     "stock-quotes",
   ]);
-  for (const slug of [
-    "get-locations",
-    "hushh-dob-inference",
-    "investor-og-image",
-  ]) {
-    assert.equal(FUNCTION_CONTRACTS[slug], undefined);
-  }
+  assert.equal(FUNCTION_CONTRACTS["hushh-dob-inference"], undefined);
   assert.equal(LEGACY_FUNCTIONS.length, 112);
   assert.equal(
     LEGACY_FUNCTIONS.filter(

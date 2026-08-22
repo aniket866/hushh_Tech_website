@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "base_commit": "ce487c15773e5795e641e282cf394224fe294cd9",
+  "deployment_state": "DEFAULT_OFF",
+  "required_registry_state": "INVENTORY_FROZEN",
+  "target_project": "hushh-tech-uat",
+  "runtime_providers": ["Firebase Auth", "Cloud SQL", "Cloud Storage", "Vertex AI"],
+  "functions": [
+    {
+      "slug": "get-locations",
+      "source_sha256": "b9dfec2cda54b048b5522cddb8b803a3567a494017134a57a2578632a3e4e2f5",
+      "live_bundle_sha256": "4a7d46510f6860a5db410e48389af184199ee6a2d7dffbc9b462f69246c0da0c",
+      "request": {"method": "GET", "query": ["type", "country", "state"], "body": "forbidden"},
+      "auth": "source_public_target_gateway_firebase_plus_google_identity",
+      "response": "json_data_or_sanitized_error",
+      "cache": "public, max-age=86400",
+      "cors": "same_origin_gateway_only",
+      "tables": [],
+      "side_effects": [],
+      "dependencies": ["generation_and_sha256_pinned_gcs_json_catalog"],
+      "blockers": ["licensed_catalog_artifact_not_staged", "public_caller_auth_parity_unresolved", "private_live_uat_parity_missing"]
+    },
+    {
+      "slug": "chat-check-access",
+      "source_sha256": "b83383a35a7d25ffcd2f479764b26cd3c1e338e4ad5840353295b2f641e6e9e0",
+      "live_bundle_sha256": "cac0281a475a173038dfbbcecb8f220e53ec68b556ccef22d17ef2a7c1bdb794",
+      "request": {"method": "POST", "content_type": "application/json", "required": ["visitorId", "slug"]},
+      "auth": "source_public_target_gateway_firebase_plus_google_identity",
+      "response": "chat_access_decision",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "tables": ["chat_access_tokens"],
+      "side_effects": ["insert_free_token", "reset_paid_hourly_counter"],
+      "dependencies": ["cloud_sql_transaction", "advisory_lock", "unique_visitor_slug_constraint"],
+      "blockers": ["chat_access_tokens_table_not_in_target_manifest", "public_caller_auth_parity_unresolved", "private_live_uat_parity_missing"]
+    },
+    {
+      "slug": "investor-og-image",
+      "source_sha256": "862250312646c32b7d036bdc3714dbe802c65aca239b8bddf43eede2f6574339",
+      "live_bundle_sha256": "ee32d94f5bedd01860d11b82fe3e9471dedcefd5971e819c0aa64b56ac8af684",
+      "request": {"method": "GET", "query": ["slug"], "body": "forbidden"},
+      "auth": "source_public_target_gateway_firebase_plus_google_identity",
+      "response": "escaped_svg_or_text_error",
+      "cache": "public, max-age=3600, s-maxage=86400",
+      "cors": "same_origin_gateway_only",
+      "tables": ["investor_profiles"],
+      "side_effects": [],
+      "dependencies": ["cloud_sql"],
+      "blockers": ["public_caller_auth_parity_unresolved", "public_media_abuse_and_live_visibility_proof_missing"]
+    },
+    {
+      "slug": "fund-payment-admin-analytics",
+      "source_sha256": "1b26955866a1e9ee7b28b545420591c84e8e6c2b37948e3a0320db729804a7d5",
+      "live_bundle_sha256": "0aaf2005bf05fd8089769538a602cd3dcafd537fd06e5f313af91a9342fa54fd",
+      "request": {"method": "POST", "content_type": "application/json", "body": "optional_object"},
+      "auth": "firebase_fund_admin_literal_boolean",
+      "response": "fund_analytics_json",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "table_set": "fund_analytics",
+      "side_effects": [],
+      "dependencies": ["cloud_sql"],
+      "blockers": ["fund_admin_claim_and_rls_live_proof_missing", "optional_kyc_table_absent"]
+    },
+    {
+      "slug": "fund-payment-admin-overview",
+      "source_sha256": "ff858f2ce1b167cccd4d819237df6e6eb6cca4ca5c41712cedb4eaabcda438d7",
+      "live_bundle_sha256": "656b666ae145055ee23a8f97a98513d6e3ff1848a206538e2ae16daca303894c",
+      "request": {"method": "POST", "content_type": "application/json", "body": "optional_object"},
+      "auth": "firebase_fund_admin_literal_boolean",
+      "response": "funnel_and_investor_rows_json",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "table_set": "fund_overview",
+      "side_effects": ["best_effort_admin_access_log"],
+      "dependencies": ["cloud_sql"],
+      "blockers": ["fund_admin_claim_and_rls_live_proof_missing", "optional_kyc_table_absent"]
+    },
+    {
+      "slug": "fund-payment-admin-overview-list",
+      "source_sha256": "4ebcc8e6f2e90b774630a2420b209f2749ed4294617726e567760197445b2dbd",
+      "live_bundle_sha256": "3917c8b54ac8e66e797c07dcc5a99678cc03ea9d14f9231791242bbffd71fd52",
+      "request": {"method": "POST", "content_type": "application/json", "optional": ["page", "pageSize", "tab", "search"]},
+      "auth": "firebase_fund_admin_literal_boolean",
+      "response": "paginated_investor_rows_json",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "table_set": "fund_overview_with_users",
+      "side_effects": ["best_effort_admin_access_log"],
+      "dependencies": ["cloud_sql"],
+      "blockers": ["fund_admin_claim_and_rls_live_proof_missing", "optional_kyc_table_absent"]
+    },
+    {
+      "slug": "fund-payment-admin-overview-metrics",
+      "source_sha256": "ed5a548672257eb84e7753ea8e969fcee82c01b97c580d4b31521d4ce204c6f1",
+      "live_bundle_sha256": "736067da58586f5663103794d710de3c4a2233da393919d5aa040ace093fcd84",
+      "request": {"method": "POST", "content_type": "application/json", "body": "optional_object"},
+      "auth": "firebase_fund_admin_literal_boolean",
+      "response": "fund_overview_metrics_json",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "table_set": "fund_overview",
+      "side_effects": ["best_effort_admin_access_log"],
+      "dependencies": ["cloud_sql"],
+      "blockers": ["fund_admin_claim_and_rls_live_proof_missing", "optional_kyc_table_absent"]
+    },
+    {
+      "slug": "generate-investor-profile",
+      "source_sha256": "2f9ff1321c2074431853c3d0aa0c60699ad32c080ee32931140bd5cb058eb2a8",
+      "live_bundle_sha256": "a953b24ba5b0de891580774285a7ac631142470f87f8741adbbb43966e689fd1",
+      "request": {"method": "POST", "content_type": "application/json", "required": ["input", "context"]},
+      "auth": "firebase_user",
+      "response": "strict_twelve_field_investor_profile_json",
+      "cache": "private, no-store",
+      "cors": "same_origin_gateway_only",
+      "tables": [],
+      "side_effects": [],
+      "dependencies": ["vertex_ai_gemini_2_5_flash_us_central1"],
+      "blockers": ["vertex_iam_quota_and_private_live_uat_parity_missing"]
+    }
+  ],
+  "table_sets": {
+    "fund_analytics": {
+      "read": [
+        "fund_stripe_payment_requests(user_id,selected_fund,status,commitment_amount,first_payment_amount,class_a_units,class_b_units,class_c_units,recurring_selected,recurring_amount,paid_at,verified_at,rejected_at,created_at)",
+        "nda_signatures(user_id,signed_at)",
+        "onboarding_data(user_id,is_completed,completed_at,financial_link_status,selected_fund)",
+        "fund_stripe_payments(user_id,amount_cents,status,payment_kind,paid_at,created_at)",
+        "user_financial_data(user_id,status,plaid_sync_status,plaid_item_id)",
+        "ceo_meeting_payments(user_id,payment_status)",
+        "fund_stripe_subscriptions(user_id,status,recurring_amount,recurring_frequency)",
+        "kyc_attestations(user_id,status,risk_band) optional"
+      ]
+    },
+    "fund_overview": {
+      "read": [
+        "fund_stripe_payment_requests(id,user_id,request_reference,selected_fund,status,commitment_amount,first_payment_amount,class_a_units,class_b_units,class_c_units,risk_flags,paid_at,verified_at,rejected_at,reviewer_user_id,created_at)",
+        "nda_signatures(user_id,signer_name,signed_at)",
+        "ceo_meeting_payments(user_id,payment_status,calendly_booked,created_at)",
+        "onboarding_data(user_id,legal_first_name,legal_last_name,current_step,is_completed,completed_at,fund_payment_status,fund_investor_verification_status,financial_link_status,nda_signed_at,initial_investment_amount,selected_fund,class_a_units,class_b_units,class_c_units,updated_at)",
+        "fund_stripe_payments(user_id,amount,status)",
+        "user_financial_data(user_id,institution_name,status,plaid_sync_status,plaid_item_id,plaid_sync_completed_at,updated_at)",
+        "plaid_items(user_id,plaid_item_id,institution_name,status,updated_at)",
+        "plaid_accounts(plaid_item_id,plaid_account_id,name,official_name,type,subtype,mask,current_balance)",
+        "plaid_product_sync_statuses(user_id,plaid_item_id,product,status,available,records_count,updated_at,completed_at)",
+        "kyc_attestations(user_id,status,risk_band,risk_score,verified_at,provider_name) optional"
+      ],
+      "write": ["fund_admin_access_log(actor_user_id,actor_email,action,target_reference,metadata,ip_address,user_agent) best_effort"]
+    },
+    "fund_overview_with_users": {
+      "extends": "fund_overview",
+      "read": ["users(id,email)"]
+    }
+  },
+  "rls_contract": {
+    "public_profile": "is_public IS TRUE AND user_confirmed IS TRUE",
+    "fund_admin": "verified Firebase actor and fund_admin claim is exactly boolean true",
+    "caller_owned_context": "app.firebase_uid transaction-local context; exact grants and forced RLS required before enablement"
+  }
+}
