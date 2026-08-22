@@ -82,23 +82,32 @@ const providerJson = (
   payload: unknown,
   {
     status = 200,
-    url = '',
+    url,
     redirected = false,
-  }: { status?: number; url?: string; redirected?: boolean } = {},
+    includeUrl = true,
+    includeRedirected = true,
+  }: {
+    status?: number;
+    url?: unknown;
+    redirected?: unknown;
+    includeUrl?: boolean;
+    includeRedirected?: boolean;
+  } = {},
 ) => {
   const bytes = Buffer.from(JSON.stringify(payload));
-  return {
+  const response: Record<string, unknown> = {
     ok: status >= 200 && status < 300,
     status,
-    redirected,
-    url,
     headers: new Headers({ 'content-length': String(bytes.length) }),
     body: null,
     arrayBuffer: async () => bytes.buffer.slice(
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength,
     ),
-  } as Response;
+  };
+  if (includeUrl) response.url = url;
+  if (includeRedirected) response.redirected = redirected;
+  return response as unknown as Response;
 };
 
 const authorizedClient = (fetchImpl: typeof fetch) => {
@@ -151,10 +160,13 @@ describe('storage preflight regional tag binding client', () => {
       const url = new URL(String(input));
       requests.push({ url, init });
       if (url.hostname === targetTagHost) {
-        return providerJson({ tagBindings: tagsFor(targetBucket) });
+        return providerJson(
+          { tagBindings: tagsFor(targetBucket) },
+          { url: url.href },
+        );
       }
       if (url.hostname === 'iam.googleapis.com') {
-        return providerJson(exactDenyPolicy());
+        return providerJson(exactDenyPolicy(), { url: url.href });
       }
       throw new Error(`unexpected test endpoint: ${url.hostname}`);
     };
@@ -207,13 +219,16 @@ describe('storage preflight regional tag binding client', () => {
       code: 'TARGET_BUCKET_IDENTITY_DRIFT',
     },
   ])('rejects target bucket scope drift with $code', async ({ mutation, code }) => {
-    const client = authorizedClient((async () => providerJson({
-      id: targetBucket,
-      name: targetBucket,
-      projectNumber: ISOLATED_CUTOVER_CONTRACT.projectNumber,
-      location: ISOLATED_CUTOVER_CONTRACT.location,
-      ...mutation,
-    })) as typeof fetch);
+    const client = authorizedClient((async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      return providerJson({
+        id: targetBucket,
+        name: targetBucket,
+        projectNumber: ISOLATED_CUTOVER_CONTRACT.projectNumber,
+        location: ISOLATED_CUTOVER_CONTRACT.location,
+        ...mutation,
+      }, { url: url.href });
+    }) as typeof fetch);
     await expect(client.getBucket(targetBucket)).rejects.toMatchObject({ code });
   });
 
@@ -224,34 +239,90 @@ describe('storage preflight regional tag binding client', () => {
       projectNumber: ISOLATED_CUTOVER_CONTRACT.projectNumber,
       location: ISOLATED_CUTOVER_CONTRACT.location,
     };
-    const client = authorizedClient((async () => providerJson(exactBucket)) as typeof fetch);
+    const client = authorizedClient((async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      return providerJson(exactBucket, { url: url.href });
+    }) as typeof fetch);
     await expect(client.getBucket(targetBucket)).resolves.toEqual(exactBucket);
   });
 
   it('blocks an unknown bucket before credential or provider access', async () => {
-    let called = false;
-    const client = authorizedClient((async () => {
-      called = true;
-      return providerJson({});
-    }) as typeof fetch);
+    let metadataCredentialFetchCount = 0;
+    let providerFetchCount = 0;
+    const client = new InCloudStoragePreflightClient({
+      fetchImpl: (async (input: URL | RequestInfo) => {
+        const url = new URL(String(input));
+        if (url.hostname === 'metadata.google.internal') {
+          metadataCredentialFetchCount += 1;
+        } else {
+          providerFetchCount += 1;
+        }
+        throw new Error('unknown bucket must stop before any fetch');
+      }) as typeof fetch,
+      inheritedBindings: [],
+    });
     await expect(client.inspectIsolation('hushh-tech-cutover-v1-other-uat', [])).rejects.toMatchObject({
       code: 'PREFLIGHT_JOB_TARGET_BUCKET_BLOCKED',
     });
-    expect(called).toBe(false);
+    expect(metadataCredentialFetchCount).toBe(0);
+    expect(providerFetchCount).toBe(0);
   });
 
   it.each([
     {
+      label: 'redirect flag',
       redirected: true,
-      responseUrl: '',
+      responseUrl: 'EXACT_REQUEST_URL',
+      includeUrl: true,
+      includeRedirected: true,
     },
     {
+      label: 'rewritten URL',
       redirected: false,
       responseUrl: 'https://cloudresourcemanager.googleapis.com/v3/tagBindings',
+      includeUrl: true,
+      includeRedirected: true,
     },
-  ])('rejects redirected or rewritten regional TagBindings responses', async ({
+    {
+      label: 'empty URL',
+      redirected: false,
+      responseUrl: '',
+      includeUrl: true,
+      includeRedirected: true,
+    },
+    {
+      label: 'missing URL',
+      redirected: false,
+      responseUrl: undefined,
+      includeUrl: false,
+      includeRedirected: true,
+    },
+    {
+      label: 'non-string URL',
+      redirected: false,
+      responseUrl: 42,
+      includeUrl: true,
+      includeRedirected: true,
+    },
+    {
+      label: 'missing redirect state',
+      redirected: undefined,
+      responseUrl: 'EXACT_REQUEST_URL',
+      includeUrl: true,
+      includeRedirected: false,
+    },
+    {
+      label: 'non-boolean redirect state',
+      redirected: 'false',
+      responseUrl: 'EXACT_REQUEST_URL',
+      includeUrl: true,
+      includeRedirected: true,
+    },
+  ])('rejects TagBindings response endpoint drift: $label', async ({
     redirected,
     responseUrl,
+    includeUrl,
+    includeRedirected,
   }) => {
     const client = authorizedClient((async (input: URL | RequestInfo) => {
       const url = new URL(String(input));
@@ -260,7 +331,9 @@ describe('storage preflight regional tag binding client', () => {
           { tagBindings: tagsFor(targetBucket) },
           {
             redirected,
-            url: responseUrl,
+            url: responseUrl === 'EXACT_REQUEST_URL' ? url.href : responseUrl,
+            includeUrl,
+            includeRedirected,
           },
         );
       }
@@ -279,7 +352,9 @@ describe('storage preflight regional tag binding client', () => {
   ])('rejects paginated or schema-drifted regional responses', async (payload) => {
     const client = authorizedClient((async (input: URL | RequestInfo) => {
       const url = new URL(String(input));
-      if (url.hostname === targetTagHost) return providerJson(payload);
+      if (url.hostname === targetTagHost) {
+        return providerJson(payload, { url: url.href });
+      }
       throw new Error('pagination test must stop before another request');
     }) as typeof fetch);
     await expect(client.inspectIsolation(targetBucket, [])).rejects.toMatchObject({

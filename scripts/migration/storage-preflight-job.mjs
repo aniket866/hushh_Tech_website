@@ -225,10 +225,9 @@ export class InCloudStoragePreflightClient {
     }
     if (
       !response ||
-      response.redirected === true ||
-      (typeof response.url === "string" &&
-        response.url.length !== 0 &&
-        response.url !== parsed.href)
+      response.redirected !== false ||
+      typeof response.url !== "string" ||
+      response.url !== parsed.href
     ) {
       fail(code, "A read-only provider request redirected or changed endpoints.");
     }
