@@ -11,7 +11,10 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._~:+/-]{16,200}$/;
 const PROVIDER_MESSAGE_ID_PATTERN = /^[A-Za-z0-9._~:+/@=-]{1,256}$/;
-const OPERATION_LEDGER_DURABILITY = "cloud_sql_unique_operation_key_v1";
+const FENCING_TOKEN_PATTERN = /^[A-Za-z0-9._~:+/-]{16,200}$/;
+const OPERATION_LEDGER_DURABILITY = "cloud_sql_leased_fenced_operation_key_v2";
+const OPERATION_LEASE_DURATION_MS = 30_000;
+const DELIVERY_LEASE_DURATION_MS = 30_000;
 const SOURCE_EVIDENCE = Object.freeze({
   sourceEvidenceFileSha256: "54d9535f80d3954902da8f99cf84c46609cd7d971d6344c16704bad5e0963703",
   sourceEvidenceDigest: "abce166ff5f1af61b1ff7fa8f3839b21ff55d8a255efdf520fd724cfa8bba219",
@@ -63,6 +66,10 @@ export const NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS = Object.freeze(
 
 export const NOTIFY_WRITE_SOURCE_PINS = SOURCE_PINS;
 export const NOTIFY_WRITE_SLUGS = Object.freeze(Object.keys(SOURCE_PINS).sort());
+export const NOTIFY_WRITE_DURABLE_LEASES = Object.freeze({
+  operationLeaseDurationMs: OPERATION_LEASE_DURATION_MS,
+  deliveryLeaseDurationMs: DELIVERY_LEASE_DURATION_MS,
+});
 
 function json(status, body) {
   return Object.freeze({ status, headers: JSON_HEADERS, body });
@@ -74,9 +81,7 @@ function fail(code, message = "Service unavailable.", status = 503) {
 
 function throwIfAborted(signal) {
   if (signal?.aborted) {
-    throw signal.reason instanceof Error
-      ? signal.reason
-      : new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503);
+    throw new RuntimeError("HANDLER_ABORTED", "Service unavailable.", 503);
   }
 }
 
@@ -254,7 +259,14 @@ function requireDatabase(database) {
 }
 
 function requireOperationLedger(operationLedger) {
-  const methods = ["claim", "complete", "markRetryable", "reserveDelivery", "finishDelivery"];
+  const methods = [
+    "claim",
+    "complete",
+    "markRetryable",
+    "reserveDelivery",
+    "markDeliveryInvoked",
+    "finishDelivery",
+  ];
   if (
     operationLedger?.configured !== true ||
     operationLedger.durability !== OPERATION_LEDGER_DURABILITY ||
@@ -338,13 +350,16 @@ async function runDurableOperation({ operationLedger, descriptor, signal, execut
   const claim = await callLedger(() => ledger.claim({
     schemaVersion: 1,
     ...descriptor,
+    leaseDurationMs: OPERATION_LEASE_DURATION_MS,
     signal,
   }));
-  throwIfAborted(signal);
-  if (
-    claim?.operationKey !== descriptor.operationKey ||
-    claim?.payloadHash !== descriptor.payloadHash
-  ) {
+  if (claim?.operationKey !== descriptor.operationKey) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  if (claim.disposition === "PAYLOAD_CONFLICT" && claim.acquired === false) {
+    fail("IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key already used for another request.", 409);
+  }
+  if (claim?.payloadHash !== descriptor.payloadHash) {
     fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
   }
   if (claim.disposition === "COMPLETED" && claim.acquired === false) {
@@ -354,7 +369,11 @@ async function runDurableOperation({ operationLedger, descriptor, signal, execut
     claim.disposition !== "ACQUIRED" ||
     claim.acquired !== true ||
     !Number.isSafeInteger(claim.attempt) ||
-    claim.attempt < 1
+    claim.attempt < 1 ||
+    !FENCING_TOKEN_PATTERN.test(claim.fencingToken ?? "") ||
+    claim.leaseDurationMs !== OPERATION_LEASE_DURATION_MS ||
+    !Number.isSafeInteger(claim.leaseExpiresAtMs) ||
+    claim.leaseExpiresAtMs < 1
   ) {
     if (claim?.disposition === "PROCESSING") {
       fail("OPERATION_IN_PROGRESS", "Request is already processing.", 409);
@@ -363,9 +382,11 @@ async function runDurableOperation({ operationLedger, descriptor, signal, execut
   }
 
   try {
+    throwIfAborted(signal);
     const response = await execute(Object.freeze({
       operationKey: descriptor.operationKey,
       attempt: claim.attempt,
+      fencingToken: claim.fencingToken,
       ledger,
     }));
     const normalized = normalizeReplayResponse(response);
@@ -373,13 +394,17 @@ async function runDurableOperation({ operationLedger, descriptor, signal, execut
       schemaVersion: 1,
       operationKey: descriptor.operationKey,
       payloadHash: descriptor.payloadHash,
+      attempt: claim.attempt,
+      fencingToken: claim.fencingToken,
       response: normalized,
       signal,
     }));
     if (
       completion?.state !== "COMPLETED" ||
       completion.operationKey !== descriptor.operationKey ||
-      completion.payloadHash !== descriptor.payloadHash
+      completion.payloadHash !== descriptor.payloadHash ||
+      completion.attempt !== claim.attempt ||
+      completion.fencingToken !== claim.fencingToken
     ) {
       fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
     }
@@ -391,12 +416,16 @@ async function runDurableOperation({ operationLedger, descriptor, signal, execut
       schemaVersion: 1,
       operationKey: descriptor.operationKey,
       payloadHash: descriptor.payloadHash,
+      attempt: claim.attempt,
+      fencingToken: claim.fencingToken,
       failureCode: bounded.code,
     }));
     if (
       !["RETRYABLE", "COMPLETED"].includes(receipt?.state) ||
       receipt.operationKey !== descriptor.operationKey ||
-      receipt.payloadHash !== descriptor.payloadHash
+      receipt.payloadHash !== descriptor.payloadHash ||
+      receipt.attempt !== claim.attempt ||
+      receipt.fencingToken !== claim.fencingToken
     ) {
       fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
     }
@@ -434,6 +463,8 @@ function providerMessageId(value) {
 async function sendDurableMail({
   ledger,
   operationKey,
+  operationAttempt,
+  operationFencingToken,
   delivery,
   provider,
   recipients,
@@ -444,10 +475,13 @@ async function sendDurableMail({
   const reservation = await callLedger(() => ledger.reserveDelivery({
     schemaVersion: 1,
     operationKey,
+    operationAttempt,
+    operationFencingToken,
     deliveryKey,
     channel: "email",
     template: delivery,
     recipients,
+    leaseDurationMs: DELIVERY_LEASE_DURATION_MS,
     signal,
   }));
   if (reservation?.deliveryKey !== deliveryKey || reservation?.persisted !== true) {
@@ -463,11 +497,34 @@ async function sendDurableMail({
     reservation.state !== "PENDING" ||
     reservation.acquired !== true ||
     !Number.isSafeInteger(reservation.attempt) ||
-    reservation.attempt < 1
+    reservation.attempt < 1 ||
+    !FENCING_TOKEN_PATTERN.test(reservation.fencingToken ?? "") ||
+    reservation.leaseDurationMs !== DELIVERY_LEASE_DURATION_MS ||
+    !Number.isSafeInteger(reservation.leaseExpiresAtMs) ||
+    reservation.leaseExpiresAtMs < 1
   ) {
     if (reservation?.state === "PENDING") {
       fail("DELIVERY_IN_PROGRESS", "Request is already processing.", 409);
     }
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+
+  throwIfAborted(signal);
+  const invoked = await callLedger(() => ledger.markDeliveryInvoked({
+    schemaVersion: 1,
+    operationKey,
+    operationAttempt,
+    operationFencingToken,
+    deliveryKey,
+    attempt: reservation.attempt,
+    fencingToken: reservation.fencingToken,
+  }));
+  if (
+    invoked?.deliveryKey !== deliveryKey ||
+    invoked?.state !== "UNKNOWN" ||
+    invoked.attempt !== reservation.attempt ||
+    invoked.fencingToken !== reservation.fencingToken
+  ) {
     fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
   }
 
@@ -487,11 +544,20 @@ async function sendDurableMail({
     const receipt = await callLedger(() => ledger.finishDelivery({
       schemaVersion: 1,
       operationKey,
+      operationAttempt,
+      operationFencingToken,
       deliveryKey,
+      attempt: reservation.attempt,
+      fencingToken: reservation.fencingToken,
       status: "UNKNOWN",
       failureCode: error.code,
     }));
-    if (receipt?.deliveryKey !== deliveryKey || receipt?.state !== "UNKNOWN") {
+    if (
+      receipt?.deliveryKey !== deliveryKey ||
+      receipt?.state !== "UNKNOWN" ||
+      receipt.attempt !== reservation.attempt ||
+      receipt.fencingToken !== reservation.fencingToken
+    ) {
       fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
     }
     throw error;
@@ -504,12 +570,21 @@ async function sendDurableMail({
   const receipt = await callLedger(() => ledger.finishDelivery({
     schemaVersion: 1,
     operationKey,
+    operationAttempt,
+    operationFencingToken,
     deliveryKey,
+    attempt: reservation.attempt,
+    fencingToken: reservation.fencingToken,
     status,
     providerMessageId: messageId,
     failureCode,
   }));
-  if (receipt?.deliveryKey !== deliveryKey || receipt?.state !== status) {
+  if (
+    receipt?.deliveryKey !== deliveryKey ||
+    receipt?.state !== status ||
+    receipt.attempt !== reservation.attempt ||
+    receipt.fencingToken !== reservation.fencingToken
+  ) {
     fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
   }
   return Object.freeze({ success, replayed: false, messageId, failureCode });
@@ -768,7 +843,7 @@ export function createNotifyWriteBatchHandlers({
       operationLedger,
       descriptor,
       signal,
-      execute: async ({ operationKey, ledger }) => {
+      execute: async ({ operationKey, attempt, fencingToken, ledger }) => {
         const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
         if (identity) assertRecipient(actor, recipient, identity);
         const data = {
@@ -778,6 +853,8 @@ export function createNotifyWriteBatchHandlers({
         const result = await sendDurableMail({
           ledger,
           operationKey,
+          operationAttempt: attempt,
+          operationFencingToken: fencingToken,
           delivery,
           provider,
           recipients: [recipient],
@@ -874,7 +951,7 @@ export function createNotifyWriteBatchHandlers({
       operationLedger,
       descriptor,
       signal,
-      execute: async ({ operationKey, ledger }) => {
+      execute: async ({ operationKey, attempt, fencingToken, ledger }) => {
         await db.transaction(async (client) => client.query(
           "UPDATE public.nda_signatures SET signature_id = $2, signer_user_agent = $3, updated_at = $4 WHERE user_id = $1",
           [uid, text(body.signatureId, 256), text(body.userAgent, 1_024), now().toISOString()],
@@ -887,6 +964,8 @@ export function createNotifyWriteBatchHandlers({
         const admin = await sendDurableMail({
           ledger,
           operationKey,
+          operationAttempt: attempt,
+          operationFencingToken: fencingToken,
           delivery: "nda_admin",
           provider,
           recipients: adminRecipients,
@@ -897,6 +976,8 @@ export function createNotifyWriteBatchHandlers({
         const signer = await sendDurableMail({
           ledger,
           operationKey,
+          operationAttempt: attempt,
+          operationFencingToken: fencingToken,
           delivery: "nda_signer",
           provider,
           recipients: [identity.email],
@@ -941,12 +1022,14 @@ export function createNotifyWriteBatchHandlers({
       operationLedger,
       descriptor,
       signal,
-      execute: async ({ operationKey, ledger }) => {
+      execute: async ({ operationKey, attempt, fencingToken, ledger }) => {
         const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
         if (identity) assertRecipient(actor, recipient, identity);
         const result = await sendDurableMail({
           ledger,
           operationKey,
+          operationAttempt: attempt,
+          operationFencingToken: fencingToken,
           delivery: "nws_score",
           provider,
           recipients: [recipient],

@@ -13,6 +13,7 @@ import {
   calculateNotifyWriteEndMetadataBinding,
   createNotifyWriteBatchHandlers,
   NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS,
+  NOTIFY_WRITE_DURABLE_LEASES,
   NOTIFY_WRITE_SLUGS,
   NOTIFY_WRITE_SOURCE_EVIDENCE,
   NOTIFY_WRITE_SOURCE_PINS,
@@ -52,12 +53,12 @@ function evidence(overrides = {}) {
   }));
 }
 
-function context({ slug, actor = FIREBASE, body = {}, method = "POST", search = "", database = null, idempotencyKey = "idempotency-test-0001", requestId = "request-test-1" } = {}) {
+function context({ slug, actor = FIREBASE, body = {}, method = "POST", search = "", database = null, idempotencyKey = "idempotency-test-0001", requestId = "request-test-1", signal = SIGNAL } = {}) {
   return {
     actor,
     database,
     request: { method, headers: idempotencyKey === null ? {} : { "idempotency-key": idempotencyKey }, route: { slug, suffix: [], search }, requestId, body },
-    signal: SIGNAL,
+    signal,
   };
 }
 
@@ -78,65 +79,149 @@ function db(responder) {
   };
 }
 
-function durableLedger({ beforeClaim = null, beforeReserve = null, beforeFinish = null } = {}) {
+function durableLedger({
+  beforeClaim = null,
+  afterClaimPersist = null,
+  beforeReserve = null,
+  afterReservePersist = null,
+  beforeFinish = null,
+} = {}) {
   const operations = new Map();
   const deliveries = new Map();
   const calls = [];
+  let currentTimeMs = 10_000_000;
+  let fenceSequence = 0;
+  const nextFence = (kind) => `${kind}-fence-${String(++fenceSequence).padStart(8, "0")}`;
+  const unavailable = () => {
+    throw new RuntimeError("DURABLE_OPERATION_LEDGER_UNAVAILABLE", "Service unavailable.", 503);
+  };
+  const operationOwner = (input) => {
+    const row = operations.get(input.operationKey);
+    if (
+      !row ||
+      row.payloadHash !== input.payloadHash ||
+      row.attempt !== input.attempt ||
+      row.fencingToken !== input.fencingToken
+    ) {
+      unavailable();
+    }
+    return row;
+  };
+  const deliveryOwner = (input) => {
+    const row = deliveries.get(input.deliveryKey);
+    if (
+      !row ||
+      row.attempt !== input.attempt ||
+      row.fencingToken !== input.fencingToken
+    ) {
+      unavailable();
+    }
+    return row;
+  };
   return {
     configured: true,
-    durability: "cloud_sql_unique_operation_key_v1",
+    durability: "cloud_sql_leased_fenced_operation_key_v2",
     operations,
     deliveries,
     calls,
+    advance(ms) {
+      assert.ok(Number.isSafeInteger(ms) && ms >= 0);
+      currentTimeMs += ms;
+    },
     async claim(input) {
       calls.push({ name: "claim", input });
       await beforeClaim?.(input);
       const existing = operations.get(input.operationKey);
+      if (existing && existing.payloadHash !== input.payloadHash) {
+        return { disposition: "PAYLOAD_CONFLICT", acquired: false, operationKey: input.operationKey, payloadHash: input.payloadHash };
+      }
       if (existing?.state === "COMPLETED") {
-        assert.equal(existing.payloadHash, input.payloadHash);
         return { disposition: "COMPLETED", acquired: false, operationKey: input.operationKey, payloadHash: input.payloadHash, response: existing.response };
       }
-      if (existing?.state === "PROCESSING") {
+      if (existing?.state === "PROCESSING" && existing.leaseExpiresAtMs > currentTimeMs) {
         return { disposition: "PROCESSING", acquired: false, operationKey: input.operationKey, payloadHash: input.payloadHash };
       }
       const attempt = (existing?.attempt ?? 0) + 1;
-      operations.set(input.operationKey, { state: "PROCESSING", payloadHash: input.payloadHash, attempt });
-      return { disposition: "ACQUIRED", acquired: true, operationKey: input.operationKey, payloadHash: input.payloadHash, attempt };
+      const fencingToken = nextFence("operation");
+      const leaseExpiresAtMs = currentTimeMs + input.leaseDurationMs;
+      const row = { state: "PROCESSING", payloadHash: input.payloadHash, attempt, fencingToken, leaseExpiresAtMs };
+      operations.set(input.operationKey, row);
+      await afterClaimPersist?.(input, row);
+      return { disposition: "ACQUIRED", acquired: true, operationKey: input.operationKey, payloadHash: input.payloadHash, attempt, fencingToken, leaseDurationMs: input.leaseDurationMs, leaseExpiresAtMs };
     },
     async complete(input) {
       calls.push({ name: "complete", input });
-      operations.set(input.operationKey, { state: "COMPLETED", payloadHash: input.payloadHash, response: input.response });
-      return { state: "COMPLETED", operationKey: input.operationKey, payloadHash: input.payloadHash };
+      const existing = operationOwner(input);
+      if (existing.state !== "PROCESSING") unavailable();
+      operations.set(input.operationKey, { ...existing, state: "COMPLETED", response: input.response });
+      return { state: "COMPLETED", operationKey: input.operationKey, payloadHash: input.payloadHash, attempt: input.attempt, fencingToken: input.fencingToken };
     },
     async markRetryable(input) {
       calls.push({ name: "markRetryable", input });
-      const existing = operations.get(input.operationKey);
+      const existing = operationOwner(input);
+      if (existing.state === "COMPLETED") {
+        return { state: "COMPLETED", operationKey: input.operationKey, payloadHash: input.payloadHash, attempt: input.attempt, fencingToken: input.fencingToken };
+      }
+      if (existing.state !== "PROCESSING") unavailable();
       operations.set(input.operationKey, { ...existing, state: "RETRYABLE" });
-      return { state: "RETRYABLE", operationKey: input.operationKey, payloadHash: input.payloadHash };
+      return { state: "RETRYABLE", operationKey: input.operationKey, payloadHash: input.payloadHash, attempt: input.attempt, fencingToken: input.fencingToken };
     },
     async reserveDelivery(input) {
       calls.push({ name: "reserveDelivery", input });
       await beforeReserve?.(input);
+      const operation = operationOwner({
+        operationKey: input.operationKey,
+        payloadHash: operations.get(input.operationKey)?.payloadHash,
+        attempt: input.operationAttempt,
+        fencingToken: input.operationFencingToken,
+      });
+      if (operation.state !== "PROCESSING") unavailable();
       const existing = deliveries.get(input.deliveryKey);
       if (existing?.state === "SENT") {
-        return { state: "SENT", acquired: false, persisted: true, deliveryKey: input.deliveryKey, providerMessageId: existing.providerMessageId };
+        return { state: "SENT", acquired: false, persisted: true, deliveryKey: input.deliveryKey, attempt: existing.attempt, fencingToken: existing.fencingToken, providerMessageId: existing.providerMessageId };
       }
       if (existing?.state === "UNKNOWN") {
-        return { state: "UNKNOWN", acquired: false, persisted: true, deliveryKey: input.deliveryKey };
+        return { state: "UNKNOWN", acquired: false, persisted: true, deliveryKey: input.deliveryKey, attempt: existing.attempt, fencingToken: existing.fencingToken };
       }
-      if (existing?.state === "PENDING") {
-        return { state: "PENDING", acquired: false, persisted: true, deliveryKey: input.deliveryKey };
+      if (existing?.state === "PENDING" && existing.leaseExpiresAtMs > currentTimeMs) {
+        return { state: "PENDING", acquired: false, persisted: true, deliveryKey: input.deliveryKey, attempt: existing.attempt, fencingToken: existing.fencingToken };
       }
       const attempt = (existing?.attempt ?? 0) + 1;
-      deliveries.set(input.deliveryKey, { state: "PENDING", attempt });
-      return { state: "PENDING", acquired: true, persisted: true, deliveryKey: input.deliveryKey, attempt };
+      const fencingToken = nextFence("delivery");
+      const leaseExpiresAtMs = currentTimeMs + input.leaseDurationMs;
+      const row = { state: "PENDING", attempt, fencingToken, leaseExpiresAtMs };
+      deliveries.set(input.deliveryKey, row);
+      await afterReservePersist?.(input, row);
+      return { state: "PENDING", acquired: true, persisted: true, deliveryKey: input.deliveryKey, attempt, fencingToken, leaseDurationMs: input.leaseDurationMs, leaseExpiresAtMs };
+    },
+    async markDeliveryInvoked(input) {
+      calls.push({ name: "markDeliveryInvoked", input });
+      const operation = operationOwner({
+        operationKey: input.operationKey,
+        payloadHash: operations.get(input.operationKey)?.payloadHash,
+        attempt: input.operationAttempt,
+        fencingToken: input.operationFencingToken,
+      });
+      if (operation.state !== "PROCESSING") unavailable();
+      const existing = deliveryOwner(input);
+      if (existing.state !== "PENDING") unavailable();
+      deliveries.set(input.deliveryKey, { ...existing, state: "UNKNOWN", providerInvocationStarted: true });
+      return { state: "UNKNOWN", deliveryKey: input.deliveryKey, attempt: input.attempt, fencingToken: input.fencingToken };
     },
     async finishDelivery(input) {
       calls.push({ name: "finishDelivery", input });
       await beforeFinish?.(input);
-      const previous = deliveries.get(input.deliveryKey);
-      deliveries.set(input.deliveryKey, { state: input.status, attempt: previous?.attempt ?? 1, providerMessageId: input.providerMessageId ?? null, failureCode: input.failureCode ?? null });
-      return { state: input.status, deliveryKey: input.deliveryKey };
+      const operation = operationOwner({
+        operationKey: input.operationKey,
+        payloadHash: operations.get(input.operationKey)?.payloadHash,
+        attempt: input.operationAttempt,
+        fencingToken: input.operationFencingToken,
+      });
+      if (operation.state !== "PROCESSING") unavailable();
+      const previous = deliveryOwner(input);
+      if (previous.state !== "UNKNOWN") unavailable();
+      deliveries.set(input.deliveryKey, { ...previous, state: input.status, providerMessageId: input.providerMessageId ?? null, failureCode: input.failureCode ?? null });
+      return { state: input.status, deliveryKey: input.deliveryKey, attempt: input.attempt, fencingToken: input.fencingToken };
     },
   };
 }
@@ -155,6 +240,9 @@ test("candidate manifest pins all eight checked-in and live sources while regist
   assert.equal(matrix.source_approval.status, "BLOCKED");
   assert.equal(matrix.source_approval.metadata_end_check_passed, false);
   assert.equal(matrix.durable_operation_ledger.status, "NOT_LIVE_PROVEN");
+  assert.equal(matrix.durable_operation_ledger.required_durability, "cloud_sql_leased_fenced_operation_key_v2");
+  assert.equal(matrix.durable_operation_ledger.operation_lease_duration_ms, NOTIFY_WRITE_DURABLE_LEASES.operationLeaseDurationMs);
+  assert.equal(matrix.durable_operation_ledger.delivery_lease_duration_ms, NOTIFY_WRITE_DURABLE_LEASES.deliveryLeaseDurationMs);
   assert.deepEqual(matrix.functions.map(({ slug }) => slug).sort(), NOTIFY_WRITE_SLUGS);
   for (const row of matrix.functions) {
     assert.equal(row.source_sha256, NOTIFY_WRITE_SOURCE_PINS[row.slug].source);
@@ -246,7 +334,7 @@ test("coin notifications bind Firebase recipients, reject forged authority, and 
   assert.equal(credit.headers["access-control-allow-origin"], undefined);
   assert.match(sends[0].idempotencyKey, /^coins-credit-notification:[a-f0-9]{64}:coins_credit$/);
   assert.equal("requestId" in sends[0], false);
-  assert.deepEqual(ledger.calls.slice(0, 4).map(({ name }) => name), ["claim", "reserveDelivery", "finishDelivery", "complete"]);
+  assert.deepEqual(ledger.calls.slice(0, 5).map(({ name }) => name), ["claim", "reserveDelivery", "markDeliveryInvoked", "finishDelivery", "complete"]);
   await assert.rejects(handlers["coins-deduction-notification"](context({
     slug: "coins-deduction-notification", actor: { ...FIREBASE, fundAdmin: "true" }, body: { recipientEmail: "victim@example.com" },
   })), (error) => code(error, "RECIPIENT_MISMATCH", 403));
@@ -391,9 +479,10 @@ test("mutating providers reject missing, short, padded, or malformed Idempotency
 
 test("raw identity provider errors are bounded before any mail send", async () => {
   let sends = 0;
+  const ledger = durableLedger();
   const handlers = createNotifyWriteBatchHandlers({
     evidence: evidence(),
-    operationLedger: durableLedger(),
+    operationLedger: ledger,
     identityDirectory: {
       configured: true,
       getUser: async () => {
@@ -414,6 +503,7 @@ test("raw identity provider errors are bounded before any mail send", async () =
     },
   );
   assert.equal(sends, 0);
+  assert.equal([...ledger.operations.values()][0].state, "RETRYABLE");
 });
 
 test("NDA preserves a second-send failure, then retries only the failed unique delivery", async () => {
@@ -521,6 +611,244 @@ test("pre-provider Cloud SQL reservation failure sends nothing and exposes no ra
   );
   assert.equal(sends, 0);
   assert.equal(ledger.calls.some(({ name }) => name === "markRetryable"), true);
+});
+
+test("a committed claim releases on abort and recovers after a lost claim response without provider execution", async () => {
+  let abortSends = 0;
+  let abortOnce = true;
+  const controller = new AbortController();
+  const abortLedger = durableLedger({
+    afterClaimPersist: async () => {
+      if (abortOnce) {
+        abortOnce = false;
+        controller.abort(new Error("private abort reason"));
+      }
+    },
+  });
+  const abortHandlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: abortLedger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { abortSends += 1; return { success: true }; } },
+  });
+  const abortInput = {
+    slug: "coins-credit-notification",
+    idempotencyKey: "claim-abort-recovery-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  };
+  await assert.rejects(
+    abortHandlers["coins-credit-notification"](context({ ...abortInput, signal: controller.signal })),
+    (error) => {
+      assert.equal(code(error, "HANDLER_ABORTED"), true);
+      assert.equal(error.message.includes("private abort reason"), false);
+      return true;
+    },
+  );
+  assert.equal(abortSends, 0);
+  assert.equal([...abortLedger.operations.values()][0].state, "RETRYABLE");
+  await abortHandlers["coins-credit-notification"](context(abortInput));
+  assert.equal(abortSends, 1);
+
+  let lostSends = 0;
+  let loseResponse = true;
+  const lostLedger = durableLedger({
+    afterClaimPersist: async () => {
+      if (loseResponse) {
+        loseResponse = false;
+        throw new Error("private committed claim response loss");
+      }
+    },
+  });
+  const lostHandlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: lostLedger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { lostSends += 1; return { success: true }; } },
+  });
+  const lostInput = {
+    slug: "coins-credit-notification",
+    idempotencyKey: "claim-response-lost-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  };
+  await assert.rejects(
+    lostHandlers["coins-credit-notification"](context(lostInput)),
+    (error) => code(error, "DURABLE_OPERATION_LEDGER_UNAVAILABLE"),
+  );
+  assert.equal(lostSends, 0);
+  await assert.rejects(
+    lostHandlers["coins-credit-notification"](context(lostInput)),
+    (error) => code(error, "OPERATION_IN_PROGRESS", 409),
+  );
+  lostLedger.advance(NOTIFY_WRITE_DURABLE_LEASES.operationLeaseDurationMs + 1);
+  await lostHandlers["coins-credit-notification"](context(lostInput));
+  assert.equal(lostSends, 1);
+  assert.equal([...lostLedger.operations.values()][0].attempt, 2);
+});
+
+test("a persisted pre-provider delivery reservation is reclaimed after lease expiry and sends exactly once", async () => {
+  let sends = 0;
+  let loseReservationResponse = true;
+  const ledger = durableLedger({
+    afterReservePersist: async () => {
+      if (loseReservationResponse) {
+        loseReservationResponse = false;
+        throw new Error("private delivery reservation response loss");
+      }
+    },
+  });
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { sends += 1; return { success: true, messageId: "lease-recovered" }; } },
+  });
+  const input = {
+    slug: "coins-credit-notification",
+    idempotencyKey: "delivery-lease-recovery-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  };
+  await assert.rejects(
+    handlers["coins-credit-notification"](context(input)),
+    (error) => code(error, "DURABLE_OPERATION_LEDGER_UNAVAILABLE"),
+  );
+  assert.equal(sends, 0);
+  assert.equal([...ledger.deliveries.values()][0].state, "PENDING");
+  ledger.advance(NOTIFY_WRITE_DURABLE_LEASES.deliveryLeaseDurationMs + 1);
+  await handlers["coins-credit-notification"](context(input));
+  assert.equal(sends, 1);
+  assert.deepEqual(
+    [...ledger.deliveries.values()].map(({ state, attempt }) => ({ state, attempt })),
+    [{ state: "SENT", attempt: 2 }],
+  );
+});
+
+test("concurrent identical requests execute the provider exactly once", async () => {
+  let sends = 0;
+  let releaseProvider;
+  let announceProvider;
+  const providerStarted = new Promise((resolve) => { announceProvider = resolve; });
+  const providerGate = new Promise((resolve) => { releaseProvider = resolve; });
+  const ledger = durableLedger();
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: {
+      configured: true,
+      send: async () => {
+        sends += 1;
+        announceProvider();
+        await providerGate;
+        return { success: true, messageId: "concurrent-once" };
+      },
+    },
+  });
+  const input = context({
+    slug: "coins-credit-notification",
+    idempotencyKey: "concurrent-identical-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  });
+  const first = handlers["coins-credit-notification"](input);
+  await providerStarted;
+  await assert.rejects(
+    handlers["coins-credit-notification"](input),
+    (error) => code(error, "OPERATION_IN_PROGRESS", 409),
+  );
+  assert.equal(sends, 1);
+  releaseProvider();
+  await first;
+  assert.equal(sends, 1);
+});
+
+test("an altered payload conflicts after a retryable failure for the same Idempotency-Key", async () => {
+  let sends = 0;
+  const ledger = durableLedger();
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { sends += 1; return { success: false }; } },
+  });
+  const base = {
+    slug: "coins-credit-notification",
+    idempotencyKey: "payload-conflict-retryable-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  };
+  await assert.rejects(
+    handlers["coins-credit-notification"](context(base)),
+    (error) => code(error, "MAIL_SEND_REJECTED"),
+  );
+  assert.equal([...ledger.operations.values()][0].state, "RETRYABLE");
+  await assert.rejects(
+    handlers["coins-credit-notification"](context({ ...base, body: { ...base.body, coinsAwarded: 26 } })),
+    (error) => code(error, "IDEMPOTENCY_KEY_CONFLICT", 409),
+  );
+  assert.equal(sends, 1);
+  assert.equal([...ledger.operations.values()][0].state, "RETRYABLE");
+});
+
+test("stale operation and delivery fencing tokens cannot complete or overwrite newer attempts", async () => {
+  const ledger = durableLedger();
+  const operationInput = {
+    schemaVersion: 1,
+    slug: "coins-credit-notification",
+    operationKey: `coins-credit-notification:${"a".repeat(64)}`,
+    scopeHash: "b".repeat(64),
+    idempotencyKeyHash: "c".repeat(64),
+    payloadHash: "d".repeat(64),
+    leaseDurationMs: NOTIFY_WRITE_DURABLE_LEASES.operationLeaseDurationMs,
+    signal: SIGNAL,
+  };
+  const operationAttemptOne = await ledger.claim(operationInput);
+  ledger.advance(NOTIFY_WRITE_DURABLE_LEASES.operationLeaseDurationMs + 1);
+  const operationAttemptTwo = await ledger.claim(operationInput);
+  assert.equal(operationAttemptTwo.attempt, 2);
+  assert.notEqual(operationAttemptTwo.fencingToken, operationAttemptOne.fencingToken);
+
+  const deliveryInput = {
+    schemaVersion: 1,
+    operationKey: operationInput.operationKey,
+    operationAttempt: operationAttemptTwo.attempt,
+    operationFencingToken: operationAttemptTwo.fencingToken,
+    deliveryKey: `${operationInput.operationKey}:coins_credit`,
+    channel: "email",
+    template: "coins_credit",
+    recipients: ["user@example.com"],
+    leaseDurationMs: NOTIFY_WRITE_DURABLE_LEASES.deliveryLeaseDurationMs,
+    signal: SIGNAL,
+  };
+  const deliveryAttemptOne = await ledger.reserveDelivery(deliveryInput);
+  ledger.advance(NOTIFY_WRITE_DURABLE_LEASES.deliveryLeaseDurationMs + 1);
+  const deliveryAttemptTwo = await ledger.reserveDelivery(deliveryInput);
+  await ledger.markDeliveryInvoked({
+    ...deliveryInput,
+    attempt: deliveryAttemptTwo.attempt,
+    fencingToken: deliveryAttemptTwo.fencingToken,
+  });
+  await assert.rejects(
+    ledger.finishDelivery({
+      ...deliveryInput,
+      attempt: deliveryAttemptOne.attempt,
+      fencingToken: deliveryAttemptOne.fencingToken,
+      status: "SENT",
+    }),
+    (error) => code(error, "DURABLE_OPERATION_LEDGER_UNAVAILABLE"),
+  );
+  assert.equal(ledger.deliveries.get(deliveryInput.deliveryKey).state, "UNKNOWN");
+  assert.equal(ledger.deliveries.get(deliveryInput.deliveryKey).attempt, 2);
+
+  await assert.rejects(
+    ledger.complete({
+      operationKey: operationInput.operationKey,
+      payloadHash: operationInput.payloadHash,
+      attempt: operationAttemptOne.attempt,
+      fencingToken: operationAttemptOne.fencingToken,
+      response: { status: 200, headers: {}, body: {} },
+    }),
+    (error) => code(error, "DURABLE_OPERATION_LEDGER_UNAVAILABLE"),
+  );
+  assert.equal(ledger.operations.get(operationInput.operationKey).state, "PROCESSING");
+  assert.equal(ledger.operations.get(operationInput.operationKey).attempt, 2);
 });
 
 test("funding handlers preserve status parity without leaking holder names or balances", async () => {

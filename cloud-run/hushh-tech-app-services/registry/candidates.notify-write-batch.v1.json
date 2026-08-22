@@ -24,12 +24,19 @@
   },
   "durable_operation_ledger": {
     "status": "NOT_LIVE_PROVEN",
-    "required_durability": "cloud_sql_unique_operation_key_v1",
+    "required_durability": "cloud_sql_leased_fenced_operation_key_v2",
     "required_header": "Idempotency-Key",
+    "operation_lease_duration_ms": 30000,
+    "delivery_lease_duration_ms": 30000,
+    "claim_contract": "same_payload_only_all_states_with_expired_lease_reclaim",
+    "fencing_contract": "attempt_and_opaque_fencing_token_required_on_every_state_mutation",
     "provider_execution_before_persisted_claim": "forbidden",
+    "mail_provider_execution_before_durable_unknown_dispatch_start": "forbidden",
     "replay_contract": "return_prior_result",
-    "nda_delivery_contract": "unique_pending_row_before_each_send_then_same_row_update",
-    "timeout_contract": "ambiguous_delivery_stays_unknown_until_reconciled",
+    "nda_delivery_contract": "unique_leased_pending_row_then_durable_unknown_dispatch_start_then_fenced_same_row_update",
+    "pre_provider_failure_contract": "pending_reclaimable_only_after_lease_expiry",
+    "timeout_contract": "provider_invocation_started_delivery_stays_unknown_until_reconciled",
+    "payload_conflict_contract": "same_operation_key_different_payload_rejected_in_every_state",
     "blocker": "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING"
   },
   "functions": [

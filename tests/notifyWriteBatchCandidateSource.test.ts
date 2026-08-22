@@ -43,7 +43,11 @@ describe("default-off notification and write candidate source pins", () => {
     });
     expect(matrix.durable_operation_ledger).toMatchObject({
       status: "NOT_LIVE_PROVEN",
+      required_durability: "cloud_sql_leased_fenced_operation_key_v2",
       required_header: "Idempotency-Key",
+      operation_lease_duration_ms: 30_000,
+      delivery_lease_duration_ms: 30_000,
+      payload_conflict_contract: "same_operation_key_different_payload_rejected_in_every_state",
       blocker: "DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING",
     });
 
