@@ -444,6 +444,34 @@ describe("combined canonical seven-bucket migration", () => {
     expect(createDependencies).toHaveBeenCalledOnce();
   });
 
+  it("rejects a forged known-six callback instead of invoking caller-supplied copy logic", async () => {
+    const { plan, knownSource, seventhSource } = createCombinedPlan();
+    const forgedKnownSix = vi.fn();
+    const createDependencies = vi.fn(async () => ({
+      sourceClient: {},
+      knownSixGcsClient: {},
+      seventhGcsClient: {},
+      policySnapshotProvider: vi.fn(),
+      knownSixSourceFileDigestSha256: plan.knownSixSourceFileDigestSha256,
+      knownSixPreflight: {},
+      knownSixPreflightFileDigestSha256: plan.knownSixPreflightFileDigestSha256,
+      knownSixPlan: {},
+      knownSixPlanFileDigestSha256: plan.knownSixPlanFileDigestSha256,
+      executeReviewedKnownSix: forgedKnownSix,
+    }));
+    await expect(executeCombinedSixPlusOne({
+      activation: SEVEN_BUCKET_ACTIVATION,
+      approvalValidation: { valid: true },
+      plan,
+      approval: {},
+      knownSource,
+      seventhSource,
+      createDependencies,
+    })).rejects.toMatchObject({ code: "COMBINED_DEPENDENCY_SCHEMA" });
+    expect(createDependencies).toHaveBeenCalledOnce();
+    expect(forgedKnownSix).not.toHaveBeenCalled();
+  });
+
   it("retries a partial seventh copy as exact no-op plus create without overwrite", async () => {
     const payloads = [Buffer.from("already-present"), Buffer.from("new-object")];
     const objects = payloads.map((bytes, index) => ({

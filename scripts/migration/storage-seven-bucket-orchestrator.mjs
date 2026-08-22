@@ -1,6 +1,9 @@
 import { verify as verifySignature } from "node:crypto";
 
 import { STORAGE_CUTOVER_CONTRACT } from "./storage-cutover-contract.mjs";
+import {
+  executeActivatedKnownSixCreateOnly,
+} from "./storage-copy-executor.mjs";
 import { sourceObjectId, sourceObjectMetadataRecord } from "./storage-live-inventory.mjs";
 import {
   SEVEN_BUCKET_APPROVAL_SCHEMA,
@@ -63,6 +66,18 @@ const APPROVAL_KEYS = [
   "reviewerPublicKeySha256",
   "signatureBase64",
   "approvalDigestSha256",
+];
+
+const COMBINED_DEPENDENCY_KEYS = [
+  "sourceClient",
+  "knownSixGcsClient",
+  "seventhGcsClient",
+  "policySnapshotProvider",
+  "knownSixSourceFileDigestSha256",
+  "knownSixPreflight",
+  "knownSixPreflightFileDigestSha256",
+  "knownSixPlan",
+  "knownSixPlanFileDigestSha256",
 ];
 
 const normalizeLiveMetadata = (bucketId, entry, maximumObjectBytes) => {
@@ -582,10 +597,23 @@ export const executeCombinedSixPlusOne = async ({
   }
   const {
     sourceClient,
-    executeReviewedKnownSix,
-    gcsClient,
+    knownSixGcsClient,
+    seventhGcsClient,
     policySnapshotProvider,
-  } = await createDependencies();
+    knownSixSourceFileDigestSha256,
+    knownSixPreflight,
+    knownSixPreflightFileDigestSha256,
+    knownSixPlan,
+    knownSixPlanFileDigestSha256,
+  } = await createDependencies().then((dependencies) => {
+    requireExactKeys(
+      dependencies,
+      COMBINED_DEPENDENCY_KEYS,
+      "COMBINED_DEPENDENCY_SCHEMA",
+      "combined six-plus-one dependencies",
+    );
+    return dependencies;
+  });
   const policyBefore = validateZeroGrantPolicyEvidence(await policySnapshotProvider("before"));
   if (
     policyBefore.projectPolicyCanonicalDigestSha256 !==
@@ -596,8 +624,25 @@ export const executeCombinedSixPlusOne = async ({
     fail("COMBINED_POLICY_APPROVAL_MISMATCH", "The fresh zero-grant policy evidence changed after approval.");
   }
   const sourceBefore = await verifyAllSevenLiveSource({ knownSource, seventhSource, sourceClient });
-  const knownSixResult = await executeReviewedKnownSix();
-  const seventhResult = await performSeventhCreateOnlyCopy({ seventhSource, sourceClient, gcsClient });
+  const knownSixResult = await executeActivatedKnownSixCreateOnly({
+    activation,
+    approvalValidation,
+    combinedApproval: approval,
+    combinedPlan: plan,
+    source: knownSource,
+    sourceFileDigestSha256: knownSixSourceFileDigestSha256,
+    preflight: knownSixPreflight,
+    preflightFileDigestSha256: knownSixPreflightFileDigestSha256,
+    plan: knownSixPlan,
+    planFileDigestSha256: knownSixPlanFileDigestSha256,
+    sourceClient,
+    gcsClient: knownSixGcsClient,
+  });
+  const seventhResult = await performSeventhCreateOnlyCopy({
+    seventhSource,
+    sourceClient,
+    gcsClient: seventhGcsClient,
+  });
   const sourceAfter = await verifyAllSevenLiveSource({ knownSource, seventhSource, sourceClient });
   const policyAfter = validateZeroGrantPolicyEvidence(await policySnapshotProvider("after"));
   return buildCombinedPostCopyEvidence({

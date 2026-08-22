@@ -70,12 +70,17 @@ import {
   buildTombstoneRetentionAction,
   collectPostRunSourceConfirmation,
   downloadVerifiedSourceToTemp,
+  executeActivatedKnownSixCreateOnly,
   reconcileFinalTargets,
   reconcileFinalMigrationNamespace,
   reconcileRetainedHistoricalTargets,
   runStorageCopyExecutor,
   validateCopyApproval,
 } from '../scripts/migration/storage-copy-executor.mjs';
+import {
+  SEVEN_BUCKET_ACTIVATION,
+  sevenBucketActivationFileDigestSha256,
+} from '../scripts/migration/storage-seven-bucket-contract.mjs';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -1735,6 +1740,153 @@ describe('storage live inventory and create-only copy safety', () => {
     writePrivateArtifact(output, Buffer.from('{}'));
     expect((lstatSync(output).mode & 0o777)).toBe(0o600);
     expect(() => writePrivateArtifact(output, Buffer.from('{}'))).toThrowError();
+  });
+
+  it('runs the exact activated known-six adapter through 124 create-or-no-op operations', async () => {
+    const records = makeSourceRecords();
+    const source = validateSourceInventory(records);
+    const preflight = makePreflight(records, { presentCount: 124 });
+    const plan = buildCreateOnlyCopyPlan(source, preflight);
+    const sourceFileDigestSha256 = digest('combined-known-six-source-file');
+    const preflightFileDigestSha256 = digest('combined-known-six-preflight-file');
+    const planFileDigestSha256 = digest('combined-known-six-plan-file');
+    const combinedPlan: JsonRecord = {
+      contractState: SEVEN_BUCKET_ACTIVATION.contractState,
+      executionActivated: true,
+      activationFileDigestSha256: sevenBucketActivationFileDigestSha256(),
+      activationDigestSha256: SEVEN_BUCKET_ACTIVATION.activationDigestSha256,
+      knownSixSourceFileDigestSha256: sourceFileDigestSha256,
+      knownSixPreflightFileDigestSha256: preflightFileDigestSha256,
+      knownSixPreflightDigestSha256: plan.targetPreflightDigestSha256,
+      knownSixPlanFileDigestSha256: planFileDigestSha256,
+      knownSixPlanDigestSha256: plan.planDigestSha256,
+      knownSixActionCount: 124,
+      knownSixActions: plan.actions,
+      planDigestSha256: null,
+    };
+    combinedPlan.planDigestSha256 = calculateSelfBoundDigest(
+      combinedPlan,
+      'planDigestSha256',
+    );
+    const approvalDigestSha256 = digest('combined-lane-7-approval');
+    const combinedApproval = {
+      approvalDigestSha256,
+      contractState: SEVEN_BUCKET_ACTIVATION.contractState,
+      executionActivated: true,
+      activationFileDigestSha256: sevenBucketActivationFileDigestSha256(),
+      activationDigestSha256: SEVEN_BUCKET_ACTIVATION.activationDigestSha256,
+      planDigestSha256: combinedPlan.planDigestSha256,
+    };
+    const sourceClient = {
+      listBuckets: async () => STORAGE_CUTOVER_CONTRACT.buckets.map((bucket) => ({
+        id: bucket.sourceBucket,
+        public: bucket.sourcePublic,
+      })),
+      listObjects: async (bucketId: string) => source.objects
+        .filter((object) => object.bucketId === bucketId)
+        .map((object) => ({
+          id: sourceObjectId(object),
+          name: object.objectKey,
+          objectKey: object.objectKey,
+          updated_at: object.sourceUpdatedAt,
+          metadata: {
+            size: object.sizeBytes,
+            mimetype: object.mimeType,
+            cacheControl: object.cacheControl,
+          },
+        })),
+      hashObject: async (bucketId: string, objectKey: string) => {
+        const object = source.objects.find(
+          (candidate) => candidate.bucketId === bucketId && candidate.objectKey === objectKey,
+        )!;
+        return {
+          sizeBytes: object.sizeBytes,
+          sha256: object.sha256,
+          crc32cBase64: crc32c(object.sha256),
+          md5Base64: md5(object.sha256),
+        };
+      },
+    };
+    const sourceByTargetKey = new Map(source.objects.map((object, index) => [
+      buildMigrationTargetObjectKey(
+        object.bucketId,
+        object.objectKey,
+        object.fingerprint,
+      ),
+      {
+        object,
+        generation: String(index + 1),
+        crc32cBase64: crc32c(object.sha256),
+        md5Base64: md5(object.sha256),
+      },
+    ]));
+    let operationCount = 0;
+    const gcsClient = {
+      getObject: async (bucketName: string, targetKey: string) => {
+        operationCount += 1;
+        const match = sourceByTargetKey.get(targetKey)!;
+        const bucket = STORAGE_CUTOVER_CONTRACT.buckets.find(
+          (entry) => entry.sourceBucket === match.object.bucketId,
+        )!;
+        expect(bucketName).toBe(bucket.targetBucket);
+        return {
+          name: targetKey,
+          bucket: bucketName,
+          generation: match.generation,
+          size: String(match.object.sizeBytes),
+          crc32c: match.crc32cBase64,
+          md5Hash: match.md5Base64,
+          contentType: match.object.mimeType,
+          cacheControl: bucket.targetServingCacheControl,
+          metadata: buildExpectedTargetMetadata(match.object, source),
+        };
+      },
+      hashObject: async (_bucketName: string, targetObject: JsonRecord) => {
+        const match = sourceByTargetKey.get(String(targetObject.name))!;
+        return {
+          sizeBytes: match.object.sizeBytes,
+          sha256: match.object.sha256,
+          crc32cBase64: match.crc32cBase64,
+          md5Base64: match.md5Base64,
+        };
+      },
+      listMigrationObjects: async (bucketName: string) => [...sourceByTargetKey.entries()]
+        .filter(([, match]) => STORAGE_CUTOVER_CONTRACT.buckets.some((bucket) =>
+          bucket.sourceBucket === match.object.bucketId && bucket.targetBucket === bucketName))
+        .map(([name, match]) => ({
+          name,
+          bucket: bucketName,
+          generation: match.generation,
+          size: String(match.object.sizeBytes),
+        })),
+    };
+    const progress: JsonRecord[] = [];
+    const result = await executeActivatedKnownSixCreateOnly({
+      activation: SEVEN_BUCKET_ACTIVATION,
+      approvalValidation: { valid: true, approvalDigestSha256 },
+      combinedApproval,
+      combinedPlan,
+      source,
+      sourceFileDigestSha256,
+      preflight,
+      preflightFileDigestSha256,
+      plan,
+      planFileDigestSha256,
+      sourceClient,
+      gcsClient,
+      onProgress: (entry: JsonRecord) => progress.push(entry),
+    });
+    expect(result).toMatchObject({
+      createdCount: 0,
+      noopCount: 124,
+      deletedCount: 0,
+      overwrittenCount: 0,
+      sourcePostRun: { objectCount: 124, totalBytes: 111_078_397 },
+      targetFinal: { objectCount: 124, totalBytes: 111_078_397 },
+    });
+    expect(operationCount).toBe(248);
+    expect(progress).toHaveLength(124);
+    expect(progress.every((entry) => entry.result === 'NOOP_PRESENT_EXACT')).toBe(true);
   });
 
   it('builds durable 124/124 post-copy source and target generation evidence', async () => {

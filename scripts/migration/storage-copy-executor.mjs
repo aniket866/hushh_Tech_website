@@ -65,6 +65,10 @@ import {
   verifyExistingTargetObject,
   verifyRetainedHistoricalTargetObject,
 } from "./storage-live-inventory.mjs";
+import {
+  sevenBucketActivationFileDigestSha256,
+  validateSevenBucketActivation,
+} from "./storage-seven-bucket-contract.mjs";
 
 export const COPY_PLAN_SCHEMA = "gcs-storage-create-only-plan-v1";
 export const COPY_APPROVAL_SCHEMA = "gcs-storage-copy-approval-v1";
@@ -1825,6 +1829,117 @@ const performActivatedCreateOnlyCopy = async ({
     retainedHistoricalFinal,
     finalMigrationNamespace,
   };
+};
+
+export const executeActivatedKnownSixCreateOnly = async ({
+  activation,
+  approvalValidation,
+  combinedApproval,
+  combinedPlan,
+  source,
+  sourceFileDigestSha256,
+  preflight,
+  preflightFileDigestSha256,
+  plan,
+  planFileDigestSha256,
+  sourceClient,
+  gcsClient,
+  onProgress,
+}) => {
+  validateSevenBucketActivation(activation);
+  for (const [value, label] of [
+    [sourceFileDigestSha256, "known-six source file digest"],
+    [preflightFileDigestSha256, "known-six preflight file digest"],
+    [planFileDigestSha256, "known-six plan file digest"],
+  ]) requireSha256(value, "KNOWN_SIX_COMBINED_BINDING_INVALID", label);
+  if (
+    approvalValidation?.valid !== true ||
+    approvalValidation.approvalDigestSha256 !== combinedApproval?.approvalDigestSha256 ||
+    activation.contractState !== "UAT_CREATE_ONLY_ACTIVATED" ||
+    activation.executionPolicy.executionActivated !== true ||
+    combinedPlan?.contractState !== activation.contractState ||
+    combinedPlan?.executionActivated !== true ||
+    combinedPlan?.activationFileDigestSha256 !== sevenBucketActivationFileDigestSha256() ||
+    combinedPlan?.activationDigestSha256 !== activation.activationDigestSha256 ||
+    combinedApproval?.contractState !== activation.contractState ||
+    combinedApproval?.executionActivated !== true ||
+    combinedApproval?.activationFileDigestSha256 !== combinedPlan.activationFileDigestSha256 ||
+    combinedApproval?.activationDigestSha256 !== combinedPlan.activationDigestSha256 ||
+    combinedApproval?.planDigestSha256 !== combinedPlan.planDigestSha256 ||
+    combinedPlan.planDigestSha256 !==
+      calculateSelfBoundDigest(combinedPlan, "planDigestSha256")
+  ) {
+    fail(
+      "KNOWN_SIX_COMBINED_ACTIVATION_INVALID",
+      "The reviewed six-bucket executor requires the exact validated combined activation and approval.",
+    );
+  }
+  const reboundPlan = validatePlan(plan, source, preflight);
+  const validatedPreflight = validatePreflight(preflight, source);
+  const supersededActivationBlockers = [
+    "COPY_POLICY_NOT_ACTIVATED",
+    "COPY_EXECUTION_NOT_ALLOWED",
+  ];
+  if (
+    (source?.bucketCount ?? source?.bucketRecords?.length) !== 6 ||
+    source?.objectCount !== 124 ||
+    source?.totalBytes !== 111_078_397 ||
+    source?.tombstones?.length !== 0 ||
+    reboundPlan.actionCount !== 124 ||
+    reboundPlan.liveObjectCount !== 124 ||
+    reboundPlan.tombstoneCount !== 0 ||
+    reboundPlan.deleteCount !== 0 ||
+    reboundPlan.overwriteCount !== 0 ||
+    reboundPlan.actions.some((action) =>
+      !["CREATE_IF_ABSENT", "NOOP_PRESENT_EXACT"].includes(action.action)) ||
+    canonicalJson(validatedPreflight.blockers) !== canonicalJson(supersededActivationBlockers) ||
+    validatedPreflight.safeForCopy !== false
+  ) {
+    fail(
+      "KNOWN_SIX_COMBINED_INPUT_UNSAFE",
+      "The reviewed six-bucket source, preflight, or create-only plan changed.",
+    );
+  }
+  const exactBindings = [
+    [combinedPlan.knownSixSourceFileDigestSha256, sourceFileDigestSha256],
+    [combinedPlan.knownSixPreflightFileDigestSha256, preflightFileDigestSha256],
+    [combinedPlan.knownSixPreflightDigestSha256, reboundPlan.targetPreflightDigestSha256],
+    [combinedPlan.knownSixPlanFileDigestSha256, planFileDigestSha256],
+    [combinedPlan.knownSixPlanDigestSha256, reboundPlan.planDigestSha256],
+    [combinedPlan.knownSixActionCount, reboundPlan.actionCount],
+    [combinedPlan.knownSixActionCount, source.objectCount],
+    [combinedPlan.knownSixActions, reboundPlan.actions],
+  ];
+  if (exactBindings.some(([actual, expected]) =>
+    canonicalJson(actual) !== canonicalJson(expected))) {
+    fail(
+      "KNOWN_SIX_COMBINED_ARTIFACT_MISMATCH",
+      "The reviewed six-bucket artifacts do not match the combined plan.",
+    );
+  }
+  const result = await performActivatedCreateOnlyCopy({
+    source,
+    plan: reboundPlan,
+    preflight: validatedPreflight,
+    sourceClient,
+    gcsClient,
+    onProgress,
+  });
+  if (
+    result.createdCount + result.noopCount !== 124 ||
+    result.deletedCount !== 0 ||
+    result.overwrittenCount !== 0 ||
+    result.sourcePostRun?.objectCount !== 124 ||
+    result.sourcePostRun?.totalBytes !== 111_078_397 ||
+    result.targetFinal?.objectCount !== 124 ||
+    result.targetFinal?.totalBytes !== 111_078_397
+  ) {
+    fail(
+      "KNOWN_SIX_COMBINED_OUTPUT_MISMATCH",
+      "The reviewed six-bucket create/no-op output did not reconcile to the combined plan.",
+    );
+  }
+  return result;
 };
 
 export const buildCopyResultEvidence = ({

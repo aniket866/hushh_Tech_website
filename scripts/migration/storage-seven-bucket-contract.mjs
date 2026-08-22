@@ -475,20 +475,24 @@ export const buildSeventhTargetMetadata = (object) => ({
 
 export const validateKnownSixSource = (source) => {
   validateSevenBucketContract();
+  const buckets = Array.isArray(source?.buckets)
+    ? source.buckets
+    : source?.bucketRecords;
+  const bucketCount = source?.bucketCount ?? buckets?.length;
   if (
     !source ||
-    source.bucketCount !== 6 ||
+    bucketCount !== 6 ||
     source.objectCount !== 124 ||
     source.totalBytes !== 111_078_397 ||
     !Array.isArray(source.objects) ||
     source.objects.length !== 124 ||
-    !Array.isArray(source.buckets) ||
-    source.buckets.length !== 6
+    !Array.isArray(buckets) ||
+    buckets.length !== 6
   ) {
     fail("KNOWN_SIX_SOURCE_TOTAL_MISMATCH", "The known-six source totals changed.");
   }
   const expectedBuckets = STORAGE_CUTOVER_CONTRACT.buckets.map((bucket) => bucket.sourceBucket).sort();
-  const actualBuckets = source.buckets.map((bucket) => bucket.bucketId).sort();
+  const actualBuckets = buckets.map((bucket) => bucket.bucketId).sort();
   if (canonicalJson(actualBuckets) !== canonicalJson(expectedBuckets)) {
     fail("KNOWN_SIX_BUCKET_SET_MISMATCH", "The known-six bucket set changed.");
   }
