@@ -103,14 +103,14 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "1583a61ea086c28495f9b5f6dcef0402873987e4414d201ee57ffad07e6826ba",
+    "manifest_self_digest": "1fcd0831c9ca5871833720e6a41228c94e94a5f17dc53ca75efdd65b0edff0c7",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
   "runtime_byte_lock": {
     "cloud-run/hushh-tech-app-services/Dockerfile": "b7e52b350e1e07d6b2c2b7bcc7d63b0e50710cf8871bffb63bac443e833c321b",
     "cloud-run/hushh-tech-app-services/package-lock.json": "1c0ff0633b22047297a288ab73a059be5f7a49f7cb4db41dc32ea38366f10576",
-    "cloud-run/hushh-tech-app-services/package.json": "73a5a477348433b0f9c4e43b98868415dcfc94f1fec3ddcb22a9776b61dc9fb5",
+    "cloud-run/hushh-tech-app-services/package.json": "8f60bf0eeed17131ff2734b7c259008cb3e3123fa4a727f475785eb66614fbc1",
     "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
@@ -125,7 +125,7 @@
     "schema_version": 1,
     "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
     "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
-    "src_inventory_digest": "901e7a3cf682f854b08803877047c1c83b8019c018c58537be62f00ca0c7764e",
+    "src_inventory_digest": "b27363fb6dba9c67b629076380c302830db5169c68fe220895aabb83c7b2a669",
     "src_inventory": [
       {
         "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
@@ -176,6 +176,11 @@
         "path": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
         "bytes": 14226,
         "sha256": "aefae02382283bc28c625af4b8dd8d711387fbf32c7f98c831393d51d9fd5591"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/ai-runtime-batch.js",
+        "bytes": 81267,
+        "sha256": "8ee451dd045058a7fc56dcc7a77d0c1da10be0703a75f110fcb09a1bfc5cc376"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
