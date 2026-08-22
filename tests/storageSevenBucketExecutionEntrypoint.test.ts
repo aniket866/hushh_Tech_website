@@ -598,12 +598,14 @@ describe("seven-bucket detached approval execution entrypoint", () => {
         );
         live.preflightDigestSha256 = calculateSelfBoundDigest(live, "preflightDigestSha256");
       }
-      const collectFreshAllSevenTargetPreflight = vi.fn(async () =>
+      const collectLiveAllSevenTargetPreflight = vi.fn(async () =>
         variant === "malformed" ? "{" : Buffer.from(JSON.stringify(live)));
       const createReadOnlyDependencies = vi.fn(async () => ({
         sourceClient: {},
         policySnapshotProvider: vi.fn(async () => fixture.policy),
-        collectFreshAllSevenTargetPreflight,
+        knownSixTargetClient: {},
+        knownSixSourceRecords: [],
+        seventhTargetClient: {},
       }));
       const createWriteClients = vi.fn();
       const verifyLiveSource = vi.fn(async () => ({ verified: true }));
@@ -617,6 +619,7 @@ describe("seven-bucket detached approval execution entrypoint", () => {
         trustAnchor: fixture.trustAnchor,
         now,
         verifyLiveSource,
+        collectLiveAllSevenTargetPreflight,
       })).rejects.toMatchObject({
         code: variant === "stale"
           ? "ALL_SEVEN_TARGET_PREFLIGHT_STALE"
@@ -634,8 +637,8 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       });
       expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
       expect(verifyLiveSource).toHaveBeenCalledOnce();
-      expect(collectFreshAllSevenTargetPreflight).toHaveBeenCalledOnce();
-      expect(collectFreshAllSevenTargetPreflight.mock.calls[0][0]).not.toHaveProperty(
+      expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
+      expect(collectLiveAllSevenTargetPreflight.mock.calls[0][0]).not.toHaveProperty(
         "approvedTargetPreflight",
       );
       expect(createWriteClients).not.toHaveBeenCalled();
@@ -648,12 +651,14 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(sha256(Buffer.from(JSON.stringify(live)))).not.toBe(
       fixture.plan.allSevenTargetPreflightFileDigestSha256,
     );
-    const collectFreshAllSevenTargetPreflight = vi.fn(async () =>
+    const collectLiveAllSevenTargetPreflight = vi.fn(async () =>
       Buffer.from(JSON.stringify(live)));
     const createReadOnlyDependencies = vi.fn(async () => ({
       sourceClient: {},
       policySnapshotProvider: vi.fn(async () => fixture.policy),
-      collectFreshAllSevenTargetPreflight,
+      knownSixTargetClient: {},
+      knownSixSourceRecords: [],
+      seventhTargetClient: {},
     }));
     const writeFactoryReached = new Error("write-factory-reached");
     const createWriteClients = vi.fn(async () => {
@@ -668,10 +673,35 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       trustAnchor: fixture.trustAnchor,
       now: Date.parse("2026-08-22T01:30:00.000Z"),
       verifyLiveSource: vi.fn(async () => ({ verified: true })),
+      collectLiveAllSevenTargetPreflight,
     })).rejects.toBe(writeFactoryReached);
     expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
-    expect(collectFreshAllSevenTargetPreflight).toHaveBeenCalledOnce();
+    expect(collectLiveAllSevenTargetPreflight).toHaveBeenCalledOnce();
     expect(createWriteClients).toHaveBeenCalledOnce();
+  });
+
+  it("rejects injected proof callbacks and non-concrete target clients before write construction", async () => {
+    const fixture = createFixture();
+    const createReadOnlyDependencies = vi.fn(async () => ({
+      sourceClient: {},
+      policySnapshotProvider: vi.fn(async () => fixture.policy),
+      knownSixTargetClient: {},
+      knownSixSourceRecords: [],
+      seventhTargetClient: {},
+    }));
+    const createWriteClients = vi.fn();
+    await expect(__testing.executeSevenBucketWithTrustAnchor({
+      request: {
+        ...fixture.request,
+        createReadOnlyDependencies,
+        createWriteClients,
+      },
+      trustAnchor: fixture.trustAnchor,
+      now: Date.parse("2026-08-22T01:30:00.000Z"),
+      verifyLiveSource: vi.fn(async () => ({ verified: true })),
+    })).rejects.toMatchObject({ code: "FIXED_ALL_SEVEN_TARGET_COLLECTOR_REQUIRED" });
+    expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
+    expect(createWriteClients).not.toHaveBeenCalled();
   });
 
   it("rejects duplicate and prototype-like raw JSON keys before validation or delegation", () => {

@@ -15,6 +15,13 @@ import {
   executeActivatedKnownSixCreateOnly,
   validateKnownSixTargetPreflight,
 } from "./storage-copy-executor.mjs";
+import { collectLiveTargetPreflight } from "./storage-live-inventory.mjs";
+import { InCloudStoragePreflightClient } from "./storage-preflight-job.mjs";
+import {
+  FixedSeventhTargetReadClient,
+  buildFixedAllSevenTargetPreflight,
+  collectFixedSeventhTargetPreflight,
+} from "./storage-fixed-seventh-target-collector.mjs";
 import { performSeventhCreateOnlyCopy } from "./storage-seventh-quarantine-executor.mjs";
 import {
   MAXIMUM_APPROVAL_BYTES,
@@ -79,7 +86,11 @@ const SEVENTH_PREFLIGHT_KEYS = [
 ];
 
 const READ_ONLY_DEPENDENCY_KEYS = [
-  "sourceClient", "policySnapshotProvider", "collectFreshAllSevenTargetPreflight",
+  "sourceClient",
+  "policySnapshotProvider",
+  "knownSixTargetClient",
+  "knownSixSourceRecords",
+  "seventhTargetClient",
 ];
 
 const WRITE_CLIENT_KEYS = ["knownSixGcsClient", "seventhGcsClient"];
@@ -340,6 +351,41 @@ const semanticTargetPreflight = (artifact) => ({
   },
 });
 
+const collectConcreteAllSevenTargetPreflight = async ({
+  readDependencies,
+  request,
+  nowProvider,
+}) => {
+  if (
+    !(readDependencies.knownSixTargetClient instanceof InCloudStoragePreflightClient) ||
+    !(readDependencies.seventhTargetClient instanceof FixedSeventhTargetReadClient) ||
+    !Array.isArray(readDependencies.knownSixSourceRecords)
+  ) {
+    fail(
+      "FIXED_ALL_SEVEN_TARGET_COLLECTOR_REQUIRED",
+      "Execution requires the checked-in fixed all-seven target collectors.",
+    );
+  }
+  await readDependencies.knownSixTargetClient.initialize();
+  const [knownSixPreflight, seventhPreflight] = await Promise.all([
+    collectLiveTargetPreflight({
+      gcsClient: readDependencies.knownSixTargetClient,
+      sourceRecords: readDependencies.knownSixSourceRecords,
+      collectedAt: new Date(nowProvider()).toISOString(),
+    }),
+    collectFixedSeventhTargetPreflight({
+      client: readDependencies.seventhTargetClient,
+      seventhSource: request.planInputs.seventhSource,
+      now: nowProvider,
+    }),
+  ]);
+  return buildFixedAllSevenTargetPreflight({
+    knownSource: request.planInputs.knownSource,
+    knownSixPreflight,
+    seventhPreflight,
+  }).raw;
+};
+
 export const assertLiveAllSevenTargetMatchesApproval = ({ approved, live }) => {
   if (canonicalJson(semanticTargetPreflight(live)) !== canonicalJson(semanticTargetPreflight(approved))) {
     fail(
@@ -518,6 +564,7 @@ const executeSevenBucketCore = async ({
   trustAnchor,
   nowProvider,
   verifyLiveSource = verifyAllSevenLiveSource,
+  collectLiveAllSevenTargetPreflight = collectConcreteAllSevenTargetPreflight,
 }) => {
   if (
     request &&
@@ -550,8 +597,7 @@ const executeSevenBucketCore = async ({
     "combined six-plus-one read-only dependencies",
   );
   if (
-    typeof readDependencies.policySnapshotProvider !== "function" ||
-    typeof readDependencies.collectFreshAllSevenTargetPreflight !== "function"
+    typeof readDependencies.policySnapshotProvider !== "function"
   ) {
     fail(
       "COMBINED_READ_DEPENDENCY_SCHEMA",
@@ -573,9 +619,10 @@ const executeSevenBucketCore = async ({
     seventhSource: request.planInputs.seventhSource,
     sourceClient: readDependencies.sourceClient,
   });
-  const liveTargetRaw = await readDependencies.collectFreshAllSevenTargetPreflight({
-    plan: prepared.plan,
-    boundSources: prepared.boundSources,
+  const liveTargetRaw = await collectLiveAllSevenTargetPreflight({
+    readDependencies,
+    request,
+    nowProvider,
   });
   const liveTargetArtifact = rawJsonArtifact(
     liveTargetRaw,
@@ -665,6 +712,7 @@ export const __testing = Object.freeze({
     trustAnchor,
     now,
     verifyLiveSource,
+    collectLiveAllSevenTargetPreflight,
   }) => {
     if (process.env.NODE_ENV !== "test") {
       fail(
@@ -677,6 +725,7 @@ export const __testing = Object.freeze({
       trustAnchor,
       nowProvider: () => now,
       verifyLiveSource,
+      collectLiveAllSevenTargetPreflight,
     });
   },
 });
