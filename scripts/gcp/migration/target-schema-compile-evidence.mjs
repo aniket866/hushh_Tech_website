@@ -43,7 +43,7 @@ const ENCRYPTED_EVIDENCE_PATH = fileURLToPath(
 );
 const BASE_HEAD_SHA = "db16ad242cd3bff6164af401bb582862fdaf4e3e";
 const EXPECTED_EXACT_PLAN_SHA256 =
-  "41d67d038b8d142f35b90c4891c51b1bd89d8d9e7529bdebce407c769a7f3a7a";
+  "a0b849fe7747df94a47aa56600011234c889e583d99b9a6d7fca451eaf2c3549";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const FORBIDDEN_EVIDENCE = [
   /(?:^|["\s])\/(?:Users|private|tmp)\//i,

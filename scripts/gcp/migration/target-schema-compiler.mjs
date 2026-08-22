@@ -79,6 +79,7 @@ const SOURCE_ROLE_PATTERN = /\b(?:anon|authenticated|authenticator|service_role|
 const SOURCE_AUTH_CALL_PATTERN = /\bauth\s*\.\s*(?:uid|jwt)\s*\(/i;
 const SOURCE_AUTH_SCHEMA_PATTERN = /\bauth\s*\./i;
 const SOURCE_STORAGE_SCHEMA_PATTERN = /\bstorage\s*\./i;
+const SOURCE_EXTENSIONS_SCHEMA_PATTERN = /\bextensions\s*\./i;
 const TRANSACTION_CONTROL_PATTERN = /^(?:ABORT|BEGIN|COMMIT|END|ROLLBACK|START\s+TRANSACTION|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION)\b/i;
 const AUTH_USERS_REFERENCE_PATTERN = /\bREFERENCES\s+(?:"auth"|auth)\s*\.\s*(?:"users"|users)\s*\(\s*(?:"id"|id)\s*\)/gi;
 const SECRET_SHAPED_PATTERN = [
@@ -446,6 +447,8 @@ const CANONICAL_SOURCE_IDENTIFIERS = new Set([
   "service_role",
   "supabase_admin",
   "search_path",
+  "extensions",
+  "uuid_generate_v4",
 ]);
 
 function canonicalizeSourceIdentifiers(statement) {
@@ -592,6 +595,20 @@ function executablePatternTest(statement, pattern) {
     return plain;
   });
   return found;
+}
+
+function transformSourceExtensionCalls(statement) {
+  let translated = 0;
+  const transformed = rewriteExecutableSql(statement, (plain) =>
+    plain.replace(
+      /\bextensions\s*\.\s*uuid_generate_v4\s*\(\s*\)/gi,
+      () => {
+        translated += 1;
+        return "gen_random_uuid()";
+      },
+    ),
+  );
+  return { statement: transformed, translated };
 }
 
 function hasTopLevelComma(structure) {
@@ -1303,6 +1320,8 @@ AS $legacy_uuid$
    LIMIT 1
 $legacy_uuid$;
 
+ALTER SCHEMA hushh_identity OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};
+ALTER SCHEMA hushh_migration OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};
 ALTER FUNCTION hushh_identity.current_firebase_uid() OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};
 ALTER FUNCTION hushh_identity.current_legacy_user_uuid() OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};
 REVOKE ALL ON FUNCTION hushh_identity.current_firebase_uid() FROM PUBLIC;
@@ -1321,8 +1340,6 @@ function operationalMetadataSql() {
   ];
   const statements = [
     `ALTER SCHEMA public OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};`,
-    `ALTER SCHEMA hushh_identity OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};`,
-    `ALTER SCHEMA hushh_migration OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};`,
     `ALTER TABLE hushh_identity.identity_links OWNER TO ${TARGET_SCHEMA_OWNER_ROLE};`,
     `REVOKE ALL ON TABLE hushh_identity.identity_links FROM ${TARGET_DATABASE_ROLES.runtime};`,
     "DROP POLICY IF EXISTS identity_links_owner_active_lookup ON hushh_identity.identity_links;",
@@ -1988,7 +2005,9 @@ function classifySourceStatements(statements, contract, dumpEvidence) {
       );
       const principalTransform = transformLegacyPrincipalReferences(normalizedCreateTable);
       crossSchemaAuthForeignKeysTranslated += principalTransform.count;
-      const transformed = transformLegacyAuthCalls(principalTransform.statement);
+      const authTransformed = transformLegacyAuthCalls(principalTransform.statement);
+      const extensionTransform = transformSourceExtensionCalls(authTransformed);
+      const transformed = extensionTransform.statement;
       if (
         executablePatternTest(transformed, SOURCE_STORAGE_SCHEMA_PATTERN) ||
         executablePatternTest(transformed, SOURCE_ROLE_PATTERN)
@@ -2268,6 +2287,9 @@ export function validateCompiledTargetSchema({ phases, contract = SOURCE_CONTRAC
   }
   if (executablePatternTest(combined, SOURCE_STORAGE_SCHEMA_PATTERN)) {
     fail("SOURCE_SCHEMA_DEPENDENCY", "Compiled SQL still references the source storage schema.");
+  }
+  if (executablePatternTest(combined, SOURCE_EXTENSIONS_SCHEMA_PATTERN)) {
+    fail("SOURCE_SCHEMA_DEPENDENCY", "Compiled SQL still references the source extensions schema.");
   }
   const canonicalCombined = canonicalizeSourceIdentifiers(combined);
   if (/\bGRANT\b[\s\S]{0,300}\bTO\s+(?:PUBLIC|anon|authenticated|authenticator|service_role|supabase_admin)\b/i.test(canonicalCombined)) {

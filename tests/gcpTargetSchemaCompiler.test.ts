@@ -63,9 +63,9 @@ function syntheticSchemaDump() {
     'CREATE SCHEMA IF NOT EXISTS public;',
   ];
 
-  for (const table of SOURCE_CONTRACT.publicTables) {
+  for (const [index, table] of SOURCE_CONTRACT.publicTables.entries()) {
     statements.push(
-      `CREATE TABLE public.${quoteIdentifier(table)} (\n  id uuid NOT NULL\n);`,
+      `CREATE TABLE public.${quoteIdentifier(table)} (\n  id uuid${index === 0 ? ' DEFAULT "extensions"."uuid_generate_v4"()' : ''} NOT NULL\n);`,
     );
   }
 
@@ -261,6 +261,10 @@ describe('offline target schema compiler', () => {
     const combined = Object.values(result.phases).join('\n');
     expect(combined).not.toMatch(/\bauth\s*\./i);
     expect(combined).not.toMatch(/\bstorage\s*\./i);
+    expect(combined).not.toMatch(/\bextensions\s*\./i);
+    expect(result.phases['20_raw_parity_schema.sql.plan']).toContain(
+      'id uuid DEFAULT gen_random_uuid() NOT NULL',
+    );
     expect(combined).not.toMatch(/\bTO\s+(?:PUBLIC|anon|authenticated|service_role)\b/i);
     expect(combined).toContain("current_setting('app.firebase_uid', true)");
     expect(combined).toContain('hushh_identity.current_legacy_user_uuid()');

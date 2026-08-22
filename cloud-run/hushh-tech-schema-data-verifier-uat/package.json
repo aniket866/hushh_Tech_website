@@ -1,0 +1,13 @@
+{
+  "name": "@hushh-tech/schema-data-verifier-uat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.22.0"
+  },
+  "dependencies": {
+    "@google-cloud/cloud-sql-connector": "1.11.3",
+    "pg": "8.16.3"
+  }
+}
