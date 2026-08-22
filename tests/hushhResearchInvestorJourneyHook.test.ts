@@ -16,7 +16,7 @@ const hookHarness = vi.hoisted(() => ({
     };
   },
   status: "anonymous" as string,
-  supabaseClient: undefined as
+  gcpBackendClient: undefined as
     | { from: ReturnType<typeof vi.fn> }
     | undefined,
 }));
@@ -37,8 +37,8 @@ vi.mock("../src/auth/AuthSessionProvider", () => ({
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    get supabaseClient() {
-      return hookHarness.supabaseClient;
+    get gcpBackendClient() {
+      return hookHarness.gcpBackendClient;
     },
   },
 }));
@@ -95,7 +95,7 @@ describe("useInvestorJourneyCta Research boundary", () => {
       },
     };
     hookHarness.status = "authenticated";
-    hookHarness.supabaseClient = undefined;
+    hookHarness.gcpBackendClient = undefined;
     latestCta = null;
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     container = document.createElement("div");
@@ -171,14 +171,14 @@ describe("useInvestorJourneyCta Research boundary", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it("preserves the legacy catch fallback outside Research mode", async () => {
+  it("preserves the onboarding fallback when the unified GCP lookup fails", async () => {
     hookHarness.session = {
       user: {
         id: "legacy-user",
         app_metadata: { provider: "google" },
       },
     };
-    hookHarness.supabaseClient = {
+    hookHarness.gcpBackendClient = {
       from: vi.fn(() => {
         throw new Error("legacy lookup failed");
       }),

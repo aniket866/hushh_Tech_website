@@ -35,7 +35,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    supabaseClient: {
+    gcpBackendClient: {
       auth: {
         exchangeCodeForSession: (...args: unknown[]) =>
           mockExchangeCodeForSession(...args),

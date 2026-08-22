@@ -2,7 +2,7 @@
  * Auth Flow Tests — Verifies Google & Apple Sign-In, session management,
  * and the full auth chain (getUserDetails → isLoggedIn, getAccessToken, getFullName).
  *
- * These tests mock the Supabase client to validate logic without real OAuth redirects.
+ * These tests mock the Firebase-backed GCP client to validate logic without real OAuth redirects.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -69,20 +69,16 @@ const {
 // ─── Mock Modules ───────────────────────────────────────────────────────────
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    SUPABASE_URL: "https://ibsisfnjxeowvdtvgzff.supabase.co",
-    SUPABASE_ANON_KEY: "mock-anon-key",
     redirect_url: "https://hushhtech.com/auth/callback",
-    supabaseClient: mockSupabaseClient,
+    gcpBackendClient: mockSupabaseClient,
   },
 }));
 
 vi.mock("../src/resources/resources", () => ({
   default: {
     config: {
-      SUPABASE_URL: "https://ibsisfnjxeowvdtvgzff.supabase.co",
-      SUPABASE_ANON_KEY: "mock-anon-key",
       redirect_url: "https://hushhtech.com/auth/callback",
-      supabaseClient: mockSupabaseClient,
+      gcpBackendClient: mockSupabaseClient,
     },
   },
 }));
@@ -462,7 +458,7 @@ describe("Auth Flow — Sign Out", () => {
     vi.clearAllMocks();
   });
 
-  it("should call supabase auth.signOut", async () => {
+  it("should call Firebase-backed auth.signOut", async () => {
     mockSignOut.mockResolvedValue({ error: null });
 
     await signOut();
@@ -471,34 +467,33 @@ describe("Auth Flow — Sign Out", () => {
   });
 });
 
-describe("Auth Flow — Supabase Project Configuration (Regression Guard)", () => {
-  it("should use the correct (new) Supabase project URL in config", async () => {
+describe("Auth Flow — Firebase Project Configuration (Regression Guard)", () => {
+  it("should use the exact UAT Firebase authority in config", async () => {
     const config = (await import("../src/resources/config/config")).default;
 
-    expect(config.SUPABASE_URL).toContain("ibsisfnjxeowvdtvgzff");
-    expect(config.SUPABASE_URL).not.toContain("rpmzykoxqnbozgdoqbpc");
+    expect(config.gcpBackendClient).toBe(mockSupabaseClient);
+    expect(config).not.toHaveProperty("SUPABASE_URL");
   });
 
-  it("getUserDetails.ts must NOT contain old Supabase project reference", async () => {
+  it("getUserDetails.ts must use the validated GCP session path", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync(
       "src/services/authentication/getUserDetails.ts",
       "utf-8"
     );
 
-    expect(source).not.toContain("rpmzykoxqnbozgdoqbpc");
-    expect(source).toContain("getSession");
+    expect(source).not.toContain("supabase");
+    expect(source).toContain("getValidatedSession");
   });
 
-  it("checkRegistrationStatus.ts must NOT contain old Supabase URL", async () => {
+  it("checkRegistrationStatus.ts must not contain a legacy provider URL", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync(
       "src/services/authentication/checkRegistrationStatus.ts",
       "utf-8"
     );
 
-    expect(source).not.toContain("rpmzykoxqnbozgdoqbpc");
-    expect(source).not.toContain("https://rpmzykoxqnbozgdoqbpc.supabase.co");
+    expect(source).not.toContain("supabase.co");
   });
 });
 

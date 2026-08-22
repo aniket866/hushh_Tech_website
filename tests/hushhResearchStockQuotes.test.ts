@@ -10,8 +10,6 @@ describe("Hushh Research stock-quote boundary", () => {
   let root: Root;
 
   beforeEach(() => {
-    vi.stubEnv("VITE_SUPABASE_URL", "https://legacy.example.test");
-    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "legacy-public-anon-key");
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -27,7 +25,7 @@ describe("Hushh Research stock-quote boundary", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not invoke the Supabase stock function when disabled on first render", async () => {
+  it("does not invoke the stock gateway when disabled on first render", async () => {
     const legacyFetch = vi.fn();
     vi.stubGlobal("fetch", legacyFetch);
     const { useStockQuotes } = await import("../src/hooks/useStockQuotes");
@@ -46,7 +44,7 @@ describe("Hushh Research stock-quote boundary", () => {
     expect(legacyFetch).not.toHaveBeenCalled();
   });
 
-  it("preserves the legacy stock-function request when enabled", async () => {
+  it("uses the same-origin GCP stock gateway without browser credentials", async () => {
     const legacyFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -86,15 +84,18 @@ describe("Hushh Research stock-quote boundary", () => {
 
     expect(legacyFetch).toHaveBeenCalledOnce();
     expect(legacyFetch).toHaveBeenCalledWith(
-      "https://legacy.example.test/functions/v1/stock-quotes",
+      "/api/stock-quotes",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          Authorization: "Bearer legacy-public-anon-key",
-          apikey: "legacy-public-anon-key",
+          "Content-Type": "application/json",
         }),
+        credentials: "same-origin",
       }),
     );
+    const headers = (legacyFetch.mock.calls[0]?.[1] as RequestInit).headers as Record<string, string>;
+    expect(headers).not.toHaveProperty("Authorization");
+    expect(headers).not.toHaveProperty("apikey");
     const [, requestInit] = legacyFetch.mock.calls[0] as [string, RequestInit];
     const requestBody = String(requestInit.body);
     const parsedBody = JSON.parse(requestBody) as Record<string, unknown>;

@@ -1,27 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  SUPABASE_RETIREMENT_FUNCTION_REGISTRY,
-  SUPABASE_RETIREMENT_FUNCTION_REGISTRY_DIGEST,
-  SUPABASE_RETIREMENT_FUNCTION_REGISTRY_VERSION,
-  SUPABASE_RETIREMENT_FUNCTIONS,
+  GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY,
+  GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_DIGEST,
+  GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_VERSION,
+  GCP_BACKEND_RETIREMENT_FUNCTIONS,
   getSupabaseRetirementFunction,
   resolveSupabaseRetirementFunctionGate,
 } from "../api/shared/supabaseRetirementFunctionRegistry.js";
 
 describe("Supabase retirement runtime function registry", () => {
   it("ships the exact 112-function generated allowlist inside api/shared", () => {
-    expect(SUPABASE_RETIREMENT_FUNCTION_REGISTRY_VERSION).toBe(1);
-    expect(SUPABASE_RETIREMENT_FUNCTION_REGISTRY_DIGEST).toBe(
+    expect(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_VERSION).toBe(1);
+    expect(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_DIGEST).toBe(
       "76737491439f7898cb488125c3630ae605a666018848181fe88fc2916d22bbb3"
     );
-    expect(SUPABASE_RETIREMENT_FUNCTIONS).toHaveLength(112);
-    expect(Object.keys(SUPABASE_RETIREMENT_FUNCTION_REGISTRY)).toHaveLength(112);
-    expect(new Set(SUPABASE_RETIREMENT_FUNCTIONS.map((entry) => entry.slug)).size).toBe(112);
+    expect(GCP_BACKEND_RETIREMENT_FUNCTIONS).toHaveLength(112);
+    expect(Object.keys(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY)).toHaveLength(112);
+    expect(new Set(GCP_BACKEND_RETIREMENT_FUNCTIONS.map((entry) => entry.slug)).size).toBe(112);
   });
 
   it("contains only the runtime-safe migration fields", () => {
-    for (const entry of SUPABASE_RETIREMENT_FUNCTIONS) {
+    for (const entry of GCP_BACKEND_RETIREMENT_FUNCTIONS) {
       expect(Object.keys(entry).sort()).toEqual(
         [
           "auth_mode",
@@ -33,8 +33,8 @@ describe("Supabase retirement runtime function registry", () => {
       );
       expect(Object.isFrozen(entry)).toBe(true);
     }
-    expect(Object.isFrozen(SUPABASE_RETIREMENT_FUNCTIONS)).toBe(true);
-    expect(Object.isFrozen(SUPABASE_RETIREMENT_FUNCTION_REGISTRY)).toBe(true);
+    expect(Object.isFrozen(GCP_BACKEND_RETIREMENT_FUNCTIONS)).toBe(true);
+    expect(Object.isFrozen(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY)).toBe(true);
   });
 
   it("returns 410 FEATURE_RETIRED for get-secrets", () => {
@@ -50,7 +50,7 @@ describe("Supabase retirement runtime function registry", () => {
   });
 
   it("fails every non-retired function closed until PORTED_AND_VERIFIED", () => {
-    const nonRetired = SUPABASE_RETIREMENT_FUNCTIONS.filter(
+    const nonRetired = GCP_BACKEND_RETIREMENT_FUNCTIONS.filter(
       (entry) => entry.final_disposition !== "RETIRE_WITH_410"
     );
 

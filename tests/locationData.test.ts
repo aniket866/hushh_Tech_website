@@ -7,8 +7,8 @@
  *
  * Architecture under test:
  * - getAllCountries() → static array (no network)
- * - getStatesOfCountry() → Supabase Edge Function → fallback to countriesnow.space
- * - getCitiesOfState() → Supabase Edge Function → fallback to countriesnow.space
+ * - getStatesOfCountry() → same-origin GCP function → fallback to countriesnow.space
+ * - getCitiesOfState() → same-origin GCP function → fallback to countriesnow.space
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -16,8 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // We mock the config module before importing locationData
 vi.mock('../src/resources/config/config', () => ({
   default: {
-    SUPABASE_URL: 'https://test.supabase.co',
-    SUPABASE_ANON_KEY: 'test-anon-key',
+    GCP_API_BASE_URL: '/api/gcp',
   },
 }));
 
@@ -118,7 +117,7 @@ describe('locationData - Unit Tests', () => {
       expect(states).toEqual([]);
     });
 
-    it('should call Supabase Edge Function with correct URL and headers', async () => {
+    it('should call the same-origin GCP function without provider credentials', async () => {
       const mockStates = [
         { isoCode: 'CA', name: 'California' },
         { isoCode: 'NY', name: 'New York' },
@@ -133,8 +132,8 @@ describe('locationData - Unit Tests', () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const [url, options] = (global.fetch as any).mock.calls[0];
-      expect(url).toBe('https://test.supabase.co/functions/v1/get-locations?type=states&country=US');
-      expect(options.headers.apikey).toBe('test-anon-key');
+      expect(url).toBe('/api/gcp/functions/v1/get-locations?type=states&country=US');
+      expect(options).toEqual({ credentials: 'same-origin' });
       expect(states).toEqual(mockStates);
     });
 
@@ -257,7 +256,7 @@ describe('locationData - Unit Tests', () => {
       expect(cities).toEqual([]);
     });
 
-    it('should call Supabase Edge Function with correct params', async () => {
+    it('should call the same-origin GCP function with correct params', async () => {
       const mockCities = [
         { name: 'San Francisco' },
         { name: 'Los Angeles' },
@@ -272,7 +271,7 @@ describe('locationData - Unit Tests', () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const [url] = (global.fetch as any).mock.calls[0];
-      expect(url).toBe('https://test.supabase.co/functions/v1/get-locations?type=cities&country=US&state=CA');
+      expect(url).toBe('/api/gcp/functions/v1/get-locations?type=cities&country=US&state=CA');
       expect(cities).toEqual(mockCities);
     });
 

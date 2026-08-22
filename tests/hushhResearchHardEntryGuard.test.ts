@@ -14,7 +14,7 @@ const configHarness = vi.hoisted(() => ({
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    get supabaseClient() {
+    get gcpBackendClient() {
       return configHarness.client;
     },
   },
@@ -41,7 +41,7 @@ describe("Hushh Research hard SPA entry", () => {
     container.remove();
   });
 
-  it("stops a pre-existing legacy client and reloads before mounting Research children", async () => {
+  it("stops a pre-existing Firebase client and reloads before mounting Research children", async () => {
     const stopAutoRefresh = vi.fn();
     const replaceLocation = vi.fn();
     const legacyApiCall = vi.fn();

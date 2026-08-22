@@ -264,10 +264,7 @@ export const getStatesOfCountry = async (
   try {
     const url = `${getEdgeFunctionUrl()}?type=states&country=${encodeURIComponent(countryIsoCode)}`;
     const res = await fetch(url, {
-      headers: {
-        'apikey': config.FIREBASE_API_KEY,
-        'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
-      },
+      credentials: 'same-origin',
     });
 
     if (res.ok) {
@@ -298,10 +295,7 @@ export const getCitiesOfState = async (
   try {
     const url = `${getEdgeFunctionUrl()}?type=cities&country=${encodeURIComponent(countryIsoCode)}&state=${encodeURIComponent(stateCode)}`;
     const res = await fetch(url, {
-      headers: {
-        'apikey': config.FIREBASE_API_KEY,
-        'Authorization': `Bearer ${config.FIREBASE_API_KEY}`,
-      },
+      credentials: 'same-origin',
     });
 
     if (res.ok) {

@@ -16,9 +16,8 @@ const unsubscribeMock = vi.fn();
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    SUPABASE_URL: "https://test.supabase.co",
     redirect_url: "http://localhost:5173/auth/callback",
-    supabaseClient: {
+    gcpBackendClient: {
       auth: {
         storageKey: "sb-test-auth-token",
         getSession: (...args: unknown[]) => mockGetSession(...args),
@@ -333,11 +332,11 @@ describe("AuthSessionProvider Hushh Research adapter", () => {
     });
   });
 
-  it("keeps legacy users on the Supabase session path", async () => {
-    const legacyUser = { id: "supabase-user-123", email: "legacy@hushh.ai" };
+  it("keeps non-Research users on the unified Firebase session path", async () => {
+    const legacyUser = { id: "firebase-user-123", email: "user@hushh.ai" };
     const legacySession = {
-      access_token: "supabase-access-token",
-      refresh_token: "supabase-refresh-token",
+      access_token: "firebase-access-token",
+      refresh_token: "firebase-refresh-token",
       token_type: "bearer",
       expires_in: 3600,
       user: legacyUser,
@@ -363,7 +362,7 @@ describe("AuthSessionProvider Hushh Research adapter", () => {
       "authenticated"
     );
     expect(container.querySelector('[data-testid="user-id"]')?.textContent).toBe(
-      "supabase-user-123"
+      "firebase-user-123"
     );
     expect(mockGetSession).toHaveBeenCalled();
     expect(mockOnAuthStateChange).toHaveBeenCalled();

@@ -8,7 +8,7 @@ const maybeSingleMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    supabaseClient: {
+    gcpBackendClient: {
       from: vi.fn(() => ({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({

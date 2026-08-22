@@ -27,8 +27,8 @@ describe("Hushh Research report compatibility", () => {
   beforeEach(() => {
     vi.resetModules();
     compatibilityReadMock.mockReset();
-    vi.stubEnv("VITE_MARKET_SUPABASE_URL", "https://market.example.test");
-    vi.stubEnv("VITE_MARKET_SUPABASE_KEY", "legacy-public-anon-key");
+    vi.stubEnv("VITE_MARKET_GCP_API_BASE_URL", "https://market-gcp.example.test");
+    vi.stubEnv("VITE_MARKET_GCS_PUBLIC_KEY", "public-gcp-key");
   });
 
   afterEach(() => {
@@ -68,7 +68,7 @@ describe("Hushh Research report compatibility", () => {
     expect(legacyFetch).not.toHaveBeenCalled();
   });
 
-  it("never falls back to market Supabase after Research storage loss", async () => {
+  it("never falls back to the general GCP report API after Research storage loss", async () => {
     compatibilityReadMock.mockImplementation(
       (_recordType: string, options?: { researchBoundary?: boolean }) => {
         if (options?.researchBoundary) {
@@ -91,7 +91,7 @@ describe("Hushh Research report compatibility", () => {
     expect(legacyFetch).not.toHaveBeenCalled();
   });
 
-  it("preserves the existing Supabase REST translation outside Research mode", async () => {
+  it("uses the GCP REST and GCS translation outside Research mode", async () => {
     compatibilityReadMock.mockResolvedValue({ mode: "legacy" });
     const legacyFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -111,20 +111,20 @@ describe("Hushh Research report compatibility", () => {
     const result = await getReportById("legacy-report");
 
     expect(legacyFetch).toHaveBeenCalledWith(
-      "https://market.example.test/rest/v1/reports?id=eq.legacy-report&select=*",
+      "https://market-gcp.example.test/rest/v1/reports?id=eq.legacy-report&select=*",
       expect.objectContaining({
         cache: "no-store",
         headers: expect.objectContaining({
-          apikey: "legacy-public-anon-key",
-          Authorization: "Bearer legacy-public-anon-key",
+          apikey: "public-gcp-key",
+          Authorization: "Bearer public-gcp-key",
         }),
       }),
     );
     expect(result?.public_image_urls).toEqual([
-      "https://market.example.test/storage/v1/object/public/alohafundsreport-images/dmu14mar/chart.png",
+      "https://market-gcp.example.test/storage/v1/object/public/alohafundsreport-images/dmu14mar/chart.png",
     ]);
     expect(result?.public_video_urls).toEqual([
-      "https://market.example.test/storage/v1/object/public/alohafundsreport-videos/dmu14mar/briefing.mp4",
+      "https://market-gcp.example.test/storage/v1/object/public/alohafundsreport-videos/dmu14mar/briefing.mp4",
     ]);
   });
 });

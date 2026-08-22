@@ -487,7 +487,7 @@ describe("public stock-quotes GCP gateway", () => {
     }
   });
 
-  it("registers the candidate route without switching the existing browser caller", () => {
+  it("registers the same-origin route and removes the retired provider caller", () => {
     const serverSource = readFileSync(
       new URL("../server.js", import.meta.url),
       "utf8",
@@ -504,8 +504,11 @@ describe("public stock-quotes GCP gateway", () => {
     expect(serverSource.indexOf("app.all('/api/stock-quotes'")).toBeLessThan(
       serverSource.indexOf("app.use(express.json"),
     );
-    expect(hookSource).toContain("/functions/v1/stock-quotes");
-    expect(hookSource).not.toContain("fetch('/api/stock-quotes'");
+    expect(hookSource).toContain("const STOCK_QUOTES_API_URL = '/api/stock-quotes'");
+    expect(hookSource).toContain("fetch(STOCK_QUOTES_API_URL");
+    expect(hookSource).toContain("credentials: 'same-origin'");
+    expect(hookSource).not.toContain("/functions/v1/stock-quotes");
+    expect(hookSource).not.toContain("apikey");
     expect(gatewaySource.toLowerCase()).not.toContain("supabase");
     expect(PUBLIC_STOCK_QUOTES_GATEWAY_CONTRACT).toMatchObject({
       publicPath: "/api/stock-quotes",

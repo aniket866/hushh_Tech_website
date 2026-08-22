@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// GcpBackend URL for edge function
-const GCP_API_BASE_URL = import.meta.env.VITE_GCP_API_BASE_URL || '';
-const FIREBASE_API_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
+const STOCK_QUOTES_API_URL = '/api/stock-quotes';
 
 // Exact 27 stocks as specified by user
 const STOCK_SYMBOLS = [
@@ -190,18 +188,13 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
     try {
       setError(null);
 
-      if (!GCP_API_BASE_URL || !FIREBASE_API_KEY) {
-        throw new Error('VITE_GCP_API_BASE_URL or VITE_FIREBASE_API_KEY is not configured');
-      }
-      
-      // Call GcpBackend edge function
-      const response = await fetch(`${GCP_API_BASE_URL}/functions/v1/stock-quotes`, {
+      // Call the same-origin GCP gateway. Provider credentials stay server-side.
+      const response = await fetch(STOCK_QUOTES_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${FIREBASE_API_KEY}`,
-          'apikey': FIREBASE_API_KEY || '',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ symbols: STOCK_SYMBOLS }),
       });
 

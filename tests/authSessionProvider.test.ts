@@ -32,7 +32,7 @@ const unsubscribeMock = vi.fn();
 vi.mock("../src/resources/config/config", () => ({
   default: {
     redirect_url: "http://localhost:5173/auth/callback",
-    supabaseClient: {
+    gcpBackendClient: {
       auth: {
         storageKey: "sb-test-auth-token",
         getSession: (...args: unknown[]) => mockGetSession(...args),

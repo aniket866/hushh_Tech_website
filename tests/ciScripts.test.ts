@@ -147,17 +147,27 @@ describe("CI workflow scripts", () => {
   });
 
   it("keeps Cloud Run runtime dependencies aligned with server API imports", () => {
-    const supabaseHelper = fs.readFileSync(
-      path.join(repoRoot, "api/shared/supabaseServerClient.js"),
+    const gcpDataRuntime = fs.readFileSync(
+      path.join(repoRoot, "api/shared/gcpDataRuntime.js"),
+      "utf8"
+    );
+    const gcpServerClient = fs.readFileSync(
+      path.join(repoRoot, "api/shared/gcpServerClient.js"),
       "utf8"
     );
     const runtimePackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package-server.json"), "utf8")
     );
 
-    if (supabaseHelper.includes('from "ws"')) {
-      expect(runtimePackage.dependencies).toHaveProperty("ws");
-    }
+    expect(gcpDataRuntime).toContain('from "@google-cloud/cloud-sql-connector"');
+    expect(gcpDataRuntime).toContain('from "firebase-admin/app"');
+    expect(gcpDataRuntime).toContain('from "pg"');
+    expect(gcpDataRuntime).toContain('from "@google-cloud/storage"');
+    expect(gcpServerClient).toContain("storageRuntime().bucket(bucket)");
+    expect(runtimePackage.dependencies).toHaveProperty("@google-cloud/cloud-sql-connector");
+    expect(runtimePackage.dependencies).toHaveProperty("@google-cloud/storage");
+    expect(runtimePackage.dependencies).toHaveProperty("firebase-admin");
+    expect(runtimePackage.dependencies).toHaveProperty("pg");
 
     const investorProfileRoute = fs.readFileSync(
       path.join(repoRoot, "api/generate-investor-profile.js"),

@@ -15,8 +15,8 @@ vi.mock("@google/genai", () => ({
   GoogleGenAI,
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient,
+vi.mock("../api/shared/gcpServerClient.js", () => ({
+  createGcpServerClient: createClient,
 }));
 
 const createResponse = () => {
@@ -117,8 +117,8 @@ const importHandler = async () => {
 
 describe("generate investor profile GCP route", () => {
   beforeEach(() => {
-    process.env.SUPABASE_URL = "https://ibsisfnjxeowvdtvgzff.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME = "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat";
+    process.env.GCP_SERVER_ACTOR_UID = "test-server-actor";
     process.env.GEMINI_API_KEY = "gemini-key";
     delete process.env.GEMINI_INVESTOR_PROFILE_PROVIDER;
     delete process.env.GOOGLE_CLOUD_PROJECT;
@@ -135,8 +135,8 @@ describe("generate investor profile GCP route", () => {
   });
 
   afterEach(() => {
-    delete process.env.SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME;
+    delete process.env.GCP_SERVER_ACTOR_UID;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_INVESTOR_PROFILE_MODEL;
     delete process.env.GEMINI_INVESTOR_PROFILE_PROVIDER;
@@ -159,9 +159,8 @@ describe("generate investor profile GCP route", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ success: true, profile: validProfile });
     expect(createClient).toHaveBeenCalledWith(
-      "https://ibsisfnjxeowvdtvgzff.supabase.co",
-      "service-role",
-      expect.any(Object),
+      "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat",
+      "test-server-actor",
     );
     expect(getUser).toHaveBeenCalledWith("profile-token");
     expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: "gemini-key" });

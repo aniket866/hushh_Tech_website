@@ -1,46 +1,44 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createClientMock } = vi.hoisted(() => ({
-  createClientMock: vi.fn(),
+const { createGcpBackendClientMock } = vi.hoisted(() => ({
+  createGcpBackendClientMock: vi.fn(),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: unknown[]) => createClientMock(...args),
+vi.mock("../src/services/gcpBackend/client", () => ({
+  createGcpBackendClient: (...args: unknown[]) => createGcpBackendClientMock(...args),
 }));
 
-import {
-  buildClientConfig,
-  createSupabaseClient,
-} from "../src/resources/config/config";
+import { buildClientConfig } from "../src/resources/config/config";
 
 describe("client auth config", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createClientMock.mockReturnValue({ auth: {} });
+    createGcpBackendClientMock.mockReturnValue({ auth: {} });
   });
 
-  it("creates a Supabase client when required env vars are present", () => {
+  it("creates the Firebase and GCP backend client when required env vars are present", () => {
     const clientConfig = buildClientConfig(
       {
-        VITE_SUPABASE_URL: "https://ibsisfnjxeowvdtvgzff.supabase.co",
-        VITE_SUPABASE_ANON_KEY: "anon-key",
-        VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback",
+        VITE_FIREBASE_API_KEY: "public-api-key",
+        VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com",
+        VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat",
+        VITE_FIREBASE_STORAGE_BUCKET: "hushh-tech-uat.appspot.com",
+        VITE_FIREBASE_APP_ID: "1:123:web:test",
+        VITE_GCP_API_BASE_URL: "/api/gcp",
+        VITE_GCP_AUTH_REDIRECT_URL: "https://uat.hushhtech.com/auth/callback",
       },
-      "https://hushhtech.com/auth/callback"
+      "https://uat.hushhtech.com/auth/callback"
     );
 
-    const client = createSupabaseClient(clientConfig);
-
-    expect(createClientMock).toHaveBeenCalledWith(
-      "https://ibsisfnjxeowvdtvgzff.supabase.co",
-      "anon-key",
-      expect.objectContaining({
-        auth: expect.objectContaining({
-          detectSessionInUrl: true,
-        }),
-      })
-    );
-    expect(client).toEqual({ auth: {} });
+    expect(createGcpBackendClientMock).toHaveBeenCalledWith({
+      apiKey: "public-api-key",
+      authDomain: "hushh-tech-uat.firebaseapp.com",
+      projectId: "hushh-tech-uat",
+      storageBucket: "hushh-tech-uat.appspot.com",
+      appId: "1:123:web:test",
+    });
+    expect(clientConfig.gcpBackendClient).toEqual({ auth: {} });
+    expect(clientConfig.GCP_API_BASE_URL).toBe("/api/gcp");
   });
 
   it("fails cleanly when required env vars are absent", () => {
@@ -52,9 +50,8 @@ describe("client auth config", () => {
       {},
       "https://hushhtech.com/auth/callback"
     );
-    const client = createSupabaseClient(clientConfig);
-
-    expect(client).toBeUndefined();
+    expect(clientConfig.gcpBackendClient).toBeUndefined();
+    expect(createGcpBackendClientMock).not.toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
@@ -63,9 +60,7 @@ describe("client auth config", () => {
   it("normalizes redirect URLs before storing config", () => {
     const clientConfig = buildClientConfig(
       {
-        VITE_SUPABASE_URL: "https://ibsisfnjxeowvdtvgzff.supabase.co",
-        VITE_SUPABASE_ANON_KEY: "anon-key",
-        VITE_SUPABASE_REDIRECT_URL: "http://localhost:5173/",
+        VITE_GCP_AUTH_REDIRECT_URL: "http://localhost:5173/",
       },
       "https://hushhtech.com/auth/callback"
     );
