@@ -38,7 +38,7 @@
       "auth": {
         "outer": "google_service_identity",
         "allowed_callers": [
-          "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
         ],
         "user": "none_feature_retired"
       },
@@ -66,6 +66,172 @@
         },
         {
           "id": "web_gateway_invoker_iam",
+          "required": true
+        }
+      ]
+    },
+    "hushh-location-geocode": {
+      "desired_terminal_state": "PORTED_AND_VERIFIED",
+      "service_owner": "investor-api",
+      "route": {
+        "kind": "private_legacy_function",
+        "path": "/api/v1/legacy-functions/hushh-location-geocode"
+      },
+      "request": {
+        "methods": [
+          "POST"
+        ],
+        "query": "none",
+        "max_bytes": 16384
+      },
+      "response": {
+        "status_codes": [
+          200,
+          400,
+          401,
+          403,
+          413,
+          415,
+          429,
+          500,
+          503,
+          504
+        ],
+        "media_types": [
+          "application/json"
+        ],
+        "schema": "legacy success/data and success/error reverse-geocode response parity"
+      },
+      "auth": {
+        "outer": "google_service_identity",
+        "allowed_callers": [
+          "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "user": "firebase_bearer_hushh_tech_uat_product_bound_revocation_checked"
+      },
+      "body": {
+        "policy": "required_application_json_latitude_longitude",
+        "raw_body_required": false
+      },
+      "cache": {
+        "cache_control": "private, no-store",
+        "etag": false
+      },
+      "cors": {
+        "policy": "none_private_service_gateway_only",
+        "allow_origin": null
+      },
+      "idempotency": {
+        "policy": "read_only_no_mutation",
+        "key_required": false
+      },
+      "side_effects": [
+        "firestore_rate_limit_counter"
+      ],
+      "target_dependencies": [
+        {
+          "id": "private_cloud_run_ingress",
+          "required": true
+        },
+        {
+          "id": "web_gateway_invoker_iam",
+          "required": true
+        },
+        {
+          "id": "firebase_hushh_tech_uat_authority",
+          "required": true
+        },
+        {
+          "id": "firestore_rate_limit_database_ttl_and_iam",
+          "required": true
+        },
+        {
+          "id": "nominatim_reverse_geocode_https",
+          "required": true
+        }
+      ]
+    },
+    "nda-admin-fetch": {
+      "desired_terminal_state": "PORTED_AND_VERIFIED",
+      "service_owner": "engagement-api-worker",
+      "route": {
+        "kind": "private_legacy_function",
+        "path": "/api/v1/legacy-functions/nda-admin-fetch"
+      },
+      "request": {
+        "methods": [
+          "POST"
+        ],
+        "query": "none",
+        "max_bytes": 4096
+      },
+      "response": {
+        "status_codes": [
+          200,
+          400,
+          401,
+          403,
+          413,
+          415,
+          429,
+          500,
+          503,
+          504
+        ],
+        "media_types": [
+          "application/json"
+        ],
+        "schema": "success/count/records with record_id,signed_at,nda_version,pdf_available,highlighted only"
+      },
+      "auth": {
+        "outer": "google_service_identity",
+        "allowed_callers": [
+          "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "user": "firebase_bearer_hushh_tech_uat_revocation_checked_fund_admin_boolean_claim"
+      },
+      "body": {
+        "policy": "application_json_empty_or_optional_bounded_highlight_user_id",
+        "raw_body_required": false
+      },
+      "cache": {
+        "cache_control": "private, no-store",
+        "etag": false
+      },
+      "cors": {
+        "policy": "none_same_origin_gateway_only",
+        "allow_origin": null
+      },
+      "idempotency": {
+        "policy": "read_only_database_transaction",
+        "key_required": false
+      },
+      "side_effects": [
+        "firestore_rate_limit_counter"
+      ],
+      "target_dependencies": [
+        {
+          "id": "private_cloud_run_ingress",
+          "required": true
+        },
+        {
+          "id": "web_gateway_invoker_iam",
+          "required": true
+        },
+        {
+          "id": "firebase_hushh_tech_uat_fund_admin_claim_and_revocation_authority",
+          "required": true
+        },
+        {
+          "id": "cloud_sql_nda_signatures_five_column_select_and_claim_rls",
+          "required": true
+        },
+        {
+          "id": "firestore_rate_limit_database_ttl_and_iam",
+          "required": true
+        },
+        {
+          "id": "imported_real_admin_claim_readiness",
           "required": true
         }
       ]
@@ -105,7 +271,7 @@
       "auth": {
         "outer": "google_service_identity",
         "allowed_callers": [
-          "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com"
+          "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
         ],
         "user": "public_hmac_rate_key_no_browser_credential"
       },
