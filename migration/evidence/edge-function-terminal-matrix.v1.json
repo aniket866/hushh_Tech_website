@@ -39,6 +39,10 @@
     "retirementTest": {
       "path": "cloud-run/hushh-tech-app-services/test/app.test.js",
       "sha256": "59ba8fc14623f0e15d3b0fa112173e7f4a05e6e094dc932be2f28c3e777a56a9"
+    },
+    "live": {
+      "path": "migration/evidence/gcp-edge-function-uat-live.v1.json",
+      "sha256": "91c5b18331c213f7e5d0065cc41fd10680a03ae14dbf6c372ef6c5f5f1e41e7c"
     }
   },
   "source_capture": {
@@ -2063,7 +2067,7 @@
         "region": "us-central1",
         "service_owner": "identity-api",
         "contract_digest": "648ccc385b389432ab764212672af3db7ab55213a16b5490acd5b904b5ee1ba3",
-        "live_evidence_digest": null
+        "live_evidence_digest": "d9e99dd608ba5fc146d4838400d86e2eb9c513dd77f881e4b63b36ce641ef29a"
       },
       "blockers": []
     },
@@ -5492,5 +5496,5 @@
       ]
     }
   ],
-  "evidence_digest": "7124b4acaddf4ef014c605d6bcc19d1f093c9ca7ab6776c0c1f2cf57f28f2800"
+  "evidence_digest": "609eac253b6cfd5ef368bb41d5dd45ced21874d6799c22061b676da1ab38af3e"
 }

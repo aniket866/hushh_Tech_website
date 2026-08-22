@@ -212,6 +212,9 @@ export function buildTerminalMatrix({ manifest, registry, current, traffic, cont
       if (retirementProof !== true) {
         blockers.push(blocker("RETIREMENT_410_PROOF_MISSING", "runtime_or_test_contract_absent"));
       }
+      if (contract && !completeLiveProof(slug, desiredState, proof, contractDigest)) {
+        blockers.push(blocker("UAT_LIVE_TERMINAL_PROOF_MISSING", proof ? "incomplete_or_stale" : "absent"));
+      }
     } else if (contract && !completeLiveProof(slug, desiredState, proof, contractDigest)) {
       blockers.push(blocker("UAT_LIVE_TERMINAL_PROOF_MISSING", proof ? "incomplete_or_stale" : "absent"));
     }
@@ -302,9 +305,10 @@ export function readInputs(root = process.cwd()) {
     retirementProof:
       /entry\.final_disposition === "RETIRE_WITH_410"[\s\S]{0,220}"FEATURE_RETIRED"[\s\S]{0,160}\b410\b/.test(retirementRuntime) &&
       /legacy-functions\/get-secrets[\s\S]{0,160}response\.status, 410[\s\S]{0,160}"FEATURE_RETIRED"/.test(retirementTest),
-    fileDigests: Object.fromEntries(
-      Object.entries(bytes).map(([name, value]) => [name, { path: PATHS[name], sha256: sha256(value) }]),
-    ),
+    fileDigests: Object.fromEntries([
+      ...Object.entries(bytes).map(([name, value]) => [name, { path: PATHS[name], sha256: sha256(value) }]),
+      ...(liveBytes ? [["live", { path: PATHS.live, sha256: sha256(liveBytes) }]] : []),
+    ]),
   };
 }
 

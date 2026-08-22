@@ -29,6 +29,9 @@ describe("GCP edge-function terminal matrix", () => {
     expect(matrix.summary.blocker_code_counts.SOURCE_BUNDLE_UNAVAILABLE).toBe(15);
     expect(matrix.summary.blocker_code_counts.TARGET_CONTRACT_MISSING).toBe(110);
     expect(matrix.summary.blocker_code_counts.UAT_LIVE_TERMINAL_PROOF_MISSING).toBe(1);
+    const retired = matrix.entries.find(({ slug }) => slug === "get-secrets");
+    expect(retired?.observed_state).toBe("RETIRED");
+    expect(retired?.target.live_evidence_digest).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("binds every required contract surface before a function may be terminal", () => {

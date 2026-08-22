@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "evidence_id": "hushh-tech-edge-function-uat-live",
+  "target": {
+    "project_id": "hushh-tech-uat",
+    "region": "us-central1"
+  },
+  "entries": [
+    {
+      "slug": "get-secrets",
+      "contract_digest": "648ccc385b389432ab764212672af3db7ab55213a16b5490acd5b904b5ee1ba3",
+      "project_id": "hushh-tech-uat",
+      "region": "us-central1",
+      "service": "hushh-tech-identity-api",
+      "revision": "hushh-tech-identity-api-00001-cwf",
+      "traffic_percent": 100,
+      "image_digest": "sha256:d1d0f55a913f2fe43ec4a259766507ebdbfaaea7efdc629dee96eb0640ed489f",
+      "private_ingress_verified": true,
+      "direct_vpc_network": "default",
+      "direct_vpc_subnet": "default",
+      "direct_vpc_egress": "private-ranges-only",
+      "public_invoker_absent": true,
+      "allowed_invoker": "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+      "smoke_job": "hushh-tech-edge-smoke-uat",
+      "smoke_execution": "hushh-tech-edge-smoke-uat-5qxbg",
+      "smoke_identity": "hushh-tech-web-gateway-uat@hushh-tech-uat.iam.gserviceaccount.com",
+      "smoke_direct_vpc_egress": "all-traffic",
+      "smoke_cloud_router": "hushh-tech-uat-edge-smoke-router",
+      "smoke_cloud_nat": "hushh-tech-uat-edge-smoke-nat",
+      "smoke_job_retained_after_proof": false,
+      "smoke_router_and_nat_retained_after_proof": false,
+      "status_code": 410,
+      "response_code": "FEATURE_RETIRED",
+      "response_content_type": "application/json; charset=utf-8",
+      "external_unauthenticated_status_code": 404,
+      "source_write_mode": "GCP_UAT_ONLY_NO_SUPABASE_IO"
+    }
+  ]
+}
