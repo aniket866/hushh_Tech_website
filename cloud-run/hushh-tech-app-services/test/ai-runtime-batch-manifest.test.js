@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   parseAndValidateAiRuntimeBatchManifestText,
+  validateAiRuntimeBatchCandidateHandlerBytes,
   validateAiRuntimeBatchCandidateManifest,
   validateAiRuntimeBatchManifestDocument,
 } from "../../../scripts/gcp/migration/validate-ai-runtime-batch-candidates.mjs";
@@ -36,6 +37,8 @@ test("manifest validator rejects activation, evidence, auth, privacy, security, 
     ["top-level field", (value) => { value.enabled = true; }],
     ["production target", (value) => { value.target_project = "hushh-tech-prod"; }],
     ["runtime import", (value) => { value.candidate_implementation.runtime_imports.push("src/app.js"); }],
+    ["handler bytes", (value) => { value.candidate_implementation.bytes += 1; }],
+    ["handler digest", (value) => { value.candidate_implementation.sha256 = "0".repeat(64); }],
     ["enabled default", (value) => { value.candidate_implementation.enabled_by_default = true; }],
     ["approval artifact", (value) => { value.candidate_implementation.activation_artifact = "approved"; }],
     ["tool execution", (value) => { value.security_contract.tool_execution = "auto"; }],
@@ -64,6 +67,23 @@ test("manifest validator rejects activation, evidence, auth, privacy, security, 
     mutate(value);
     assert.throws(() => validateAiRuntimeBatchManifestDocument(value), undefined, name);
   }
+});
+
+test("candidate handler bytes are exact-hash bound and one-byte drift fails", async () => {
+  const matrix = await manifest();
+  const bytes = await readFile(new URL(matrix.candidate_implementation.path, repoRoot));
+  assert.doesNotThrow(() => validateAiRuntimeBatchCandidateHandlerBytes(matrix, bytes));
+
+  const drifted = Buffer.from(bytes);
+  drifted[Math.floor(drifted.length / 2)] ^= 1;
+  assert.throws(
+    () => validateAiRuntimeBatchCandidateHandlerBytes(matrix, drifted),
+    /candidate handler: exact digest/,
+  );
+  assert.throws(
+    () => validateAiRuntimeBatchCandidateHandlerBytes(matrix, bytes.subarray(0, -1)),
+    /candidate handler: exact bytes/,
+  );
 });
 
 test("raw manifest parser rejects nested and escaped-equivalent duplicate keys", async () => {

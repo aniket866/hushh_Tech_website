@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile);
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.ai-runtime-batch.v1.json";
 const EXPECTED_DIGEST =
-  "aa9d9d7363abb2d1beca6d4a56212c1333704e71ae994ee9e115d5387ec5583e";
+  "29322467899e48ef1ef0459c74035d7000fd455764c0f72076894e1d4eea4f50";
 const BASE_COMMIT = "51a3e6753e0f0194be8d55b68ba2bc99bfdc4bd9";
 const PROFILE_RECOVERY_REVISION = "cbfde1b1bf5ef97ebb71766953857750b711d791";
 const SLUGS = [
@@ -180,6 +180,16 @@ const SOURCE_CONTRACT_KEYS = [
   "side_effects",
   "pii",
 ];
+const CANDIDATE_IMPLEMENTATION_KEYS = [
+  "path",
+  "bytes",
+  "sha256",
+  "runtime_imports",
+  "enabled_by_default",
+  "activation_artifact",
+  "provider_adapters",
+  "durable_guards",
+];
 
 function stableJson(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -282,6 +292,20 @@ export function validateAiRuntimeBatchManifestDocument(matrix) {
   assert.equal(matrix.target_project, "hushh-tech-uat");
   assert.equal(matrix.target_region, "us-central1");
   assert.deepEqual(matrix.functions.map(({ slug }) => slug), SLUGS);
+  exactKeys(
+    matrix.candidate_implementation,
+    CANDIDATE_IMPLEMENTATION_KEYS,
+    "candidate_implementation",
+  );
+  assert.equal(
+    matrix.candidate_implementation.path,
+    "cloud-run/hushh-tech-app-services/src/handlers/ai-runtime-batch.js",
+  );
+  assert.ok(
+    Number.isSafeInteger(matrix.candidate_implementation.bytes) &&
+      matrix.candidate_implementation.bytes > 0,
+  );
+  assert.match(matrix.candidate_implementation.sha256, /^[0-9a-f]{64}$/);
   assert.deepEqual(matrix.candidate_implementation.runtime_imports, []);
   assert.equal(matrix.candidate_implementation.enabled_by_default, false);
   assert.equal(matrix.candidate_implementation.activation_artifact, "forbidden");
@@ -375,6 +399,21 @@ export function validateAiRuntimeBatchManifestDocument(matrix) {
   return matrix;
 }
 
+export function validateAiRuntimeBatchCandidateHandlerBytes(matrix, bytes) {
+  assert.ok(bytes instanceof Uint8Array, "candidate handler: bytes");
+  assert.equal(
+    bytes.byteLength,
+    matrix.candidate_implementation.bytes,
+    "candidate handler: exact bytes",
+  );
+  assert.equal(
+    digest(bytes),
+    matrix.candidate_implementation.sha256,
+    "candidate handler: exact digest",
+  );
+  return bytes;
+}
+
 async function readJson(root, relativePath) {
   const bytes = await readFile(path.join(root, relativePath));
   return { bytes, value: JSON.parse(bytes) };
@@ -405,6 +444,10 @@ export async function validateAiRuntimeBatchCandidateManifest({
   const root = repoRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
   const manifestBytes = await readFile(path.join(root, MANIFEST_PATH));
   const matrix = parseAndValidateAiRuntimeBatchManifestText(manifestBytes.toString("utf8"));
+  validateAiRuntimeBatchCandidateHandlerBytes(
+    matrix,
+    await readFile(path.join(root, matrix.candidate_implementation.path)),
+  );
   const [retirement, historical, current, traffic, terminal, registry] = await Promise.all([
     readJson(root, matrix.source_approval.historical_manifest_path),
     readJson(root, matrix.source_approval.historical_bundle_path),

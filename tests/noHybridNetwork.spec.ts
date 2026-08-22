@@ -368,7 +368,10 @@ test("all 112 compatibility routes have an explicit terminal or blocking respons
   expect(observed.filter((entry) => entry.status === 410)).toEqual([
     { slug: "get-secrets", status: 410, code: "FEATURE_RETIRED" },
   ]);
-  expect(observed.filter((entry) => entry.status === 503)).toHaveLength(111);
+  expect(observed.filter((entry) => entry.status === 404)).toEqual([
+    { slug: "hushh-location-geocode", status: 404, code: "FEATURE_DISABLED" },
+  ]);
+  expect(observed.filter((entry) => entry.status === 503)).toHaveLength(110);
   expect(new Set(observed.filter((entry) => entry.status === 503).map((entry) => entry.code))).toEqual(
     new Set(["FUNCTION_NOT_MIGRATED"]),
   );

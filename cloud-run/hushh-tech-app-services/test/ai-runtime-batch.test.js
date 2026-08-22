@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   AI_RUNTIME_BATCH_CANDIDATE_SLUGS,
   AI_RUNTIME_BATCH_CANDIDATE_STATE,
+  AI_RUNTIME_BATCH_PROFILE_SUBJECT_DIGEST,
   AI_RUNTIME_BATCH_READ_ONLY_MCP_TOOLS,
   createAiRuntimeBatchCandidateHandlers,
 } from "../src/handlers/ai-runtime-batch.js";
@@ -19,8 +20,16 @@ const ACTOR = Object.freeze({
 });
 const KEY = "client-operation-00000001";
 const SIGNAL = new AbortController().signal;
+const KYC_SUBJECT_HASH = "a".repeat(64);
 
-function guardHarness({ rateAllowed = true, budgetAllowed = true } = {}) {
+function guardHarness({
+  rateAllowed = true,
+  budgetAllowed = true,
+  releaseStatus = "RELEASED",
+  completionStatus = "COMMITTED",
+  abortStatus = "ABORTED",
+  claimResult,
+} = {}) {
   const calls = [];
   const records = new Map();
   const rateLimit = async (input) => {
@@ -30,6 +39,7 @@ function guardHarness({ rateAllowed = true, budgetAllowed = true } = {}) {
   rateLimit.durability = "cloud_firestore_atomic_fixed_window_v1";
   const budget = {
     durability: "cloud_sql_serializable_budget_reservation_v1",
+    acknowledgementContract: "cloud_sql_budget_release_ack_v1",
     async reserve(input) {
       calls.push({ method: "budget", input });
       return budgetAllowed
@@ -38,21 +48,41 @@ function guardHarness({ rateAllowed = true, budgetAllowed = true } = {}) {
     },
     async release(input) {
       calls.push({ method: "budgetRelease", input });
+      if (releaseStatus === "THROW") throw new Error("release unavailable");
+      return {
+        status: releaseStatus,
+        reservationId: input.reservationId,
+        reasonCode: input.reasonCode,
+      };
     },
   };
   const idempotency = {
     durability: "cloud_sql_serializable_fenced_operation_v1",
+    acknowledgementContract: "cloud_sql_fenced_settlement_ack_v1",
     resultProtection: "cloud_kms_envelope_v1",
     maxReplayTtlSeconds: 3_600,
     async claim(input) {
       calls.push({ method: "claim", input });
+      if (claimResult !== undefined) {
+        return typeof claimResult === "function" ? claimResult(input) : claimResult;
+      }
       const identity = `${input.scope}:${input.keyHash}`;
       const prior = records.get(identity);
       if (prior) {
         if (prior.requestHash !== input.requestHash) return { status: "conflict" };
-        return { status: "replay", response: prior.response };
+        if (prior.state === "COMMITTED") {
+          return {
+            status: "replay",
+            response: prior.response,
+            responseDigest: prior.responseDigest,
+          };
+        }
+        if (prior.state === "REJECTED") {
+          return { status: "rejected", terminal: true, retrySafe: false };
+        }
+        return { status: "in_progress" };
       }
-      records.set(identity, { requestHash: input.requestHash, response: null });
+      records.set(identity, { state: "CLAIMED", requestHash: input.requestHash });
       return { status: "claimed", fenceToken: "fence-token-0001" };
     },
     async complete(input) {
@@ -60,12 +90,52 @@ function guardHarness({ rateAllowed = true, budgetAllowed = true } = {}) {
       assert.equal(input.budgetDisposition, "COMMIT");
       assert.equal(input.budgetReservationId, "budget-reservation-0001");
       const identity = `${input.scope}:${input.keyHash}`;
-      records.set(identity, { requestHash: input.requestHash, response: input.response });
+      if (completionStatus === "THROW") throw new Error("completion unavailable");
+      if (completionStatus === "REJECTED") {
+        records.set(identity, {
+          state: "REJECTED",
+          requestHash: input.requestHash,
+          responseDigest: input.responseDigest,
+        });
+        return {
+          status: "REJECTED",
+          fenceToken: input.fenceToken,
+          budgetReservationId: input.budgetReservationId,
+          budgetDisposition: input.budgetDisposition,
+          responseDigest: input.responseDigest,
+          terminal: true,
+          retrySafe: false,
+          reasonCode: "DURABLE_SETTLEMENT_REJECTED",
+        };
+      }
+      if (completionStatus !== "COMMITTED") return { status: completionStatus };
+      records.set(identity, {
+        state: "COMMITTED",
+        requestHash: input.requestHash,
+        response: input.response,
+        responseDigest: input.responseDigest,
+      });
+      return {
+        status: "COMMITTED",
+        fenceToken: input.fenceToken,
+        budgetReservationId: input.budgetReservationId,
+        budgetDisposition: input.budgetDisposition,
+        responseDigest: input.responseDigest,
+      };
     },
     async abort(input) {
       calls.push({ method: "abort", input });
       assert.equal(input.budgetDisposition, "RELEASE");
+      if (abortStatus === "THROW") throw new Error("abort unavailable");
+      if (abortStatus !== "ABORTED") return { status: abortStatus };
       records.delete(`${input.scope}:${input.keyHash}`);
+      return {
+        status: "ABORTED",
+        fenceToken: input.fenceToken,
+        budgetReservationId: input.budgetReservationId,
+        budgetDisposition: input.budgetDisposition,
+        reasonCode: input.reasonCode,
+      };
     },
   };
   return {
@@ -75,6 +145,7 @@ function guardHarness({ rateAllowed = true, budgetAllowed = true } = {}) {
       budget,
       idempotency,
     },
+    records,
   };
 }
 
@@ -121,10 +192,11 @@ function enabledHandlers({ adapters = {}, guardOptions, allowedMediaBuckets = []
   };
 }
 
-function consent({ purpose, scope } = {}) {
+function consent({ purpose, scope, subjectDigest = KYC_SUBJECT_HASH } = {}) {
   return {
     receiptId: "48ff641c-adc3-45ea-94ef-d5e1e111fd3c",
     subjectUid: ACTOR.uid,
+    subjectDigest,
     purpose,
     scopes: [scope],
     expiresAt: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
@@ -141,10 +213,34 @@ function consentAdapter(overrides = {}) {
         valid: true,
         consumed: true,
         consumptionId: "consent_consumption_0001",
+        receiptId: input.receipt.receiptId,
+        subjectUid: input.actorUid,
+        subjectDigest: input.subjectDigest,
+        purpose: input.purpose,
+        scope: input.requiredScope,
+        fenceToken: input.fenceToken,
       };
     },
     ...overrides,
   };
+}
+
+function profileSubject(overrides = {}) {
+  return {
+    name: "Public Person",
+    email: "person@example.com",
+    country: "India",
+    contact: null,
+    ...overrides,
+  };
+}
+
+function profileConsent(subject = profileSubject()) {
+  return consent({
+    purpose: "public_profile_enrichment",
+    scope: "public_sources",
+    subjectDigest: AI_RUNTIME_BATCH_PROFILE_SUBJECT_DIGEST(subject),
+  });
 }
 
 function publicProfile(overrides = {}) {
@@ -228,7 +324,8 @@ test("KYC requires recent Firebase auth, a hashed identifier, and purpose-bound 
       kyc: {
         async check(input) {
           checks += 1;
-          assert.equal(input.userIdentifierHash, "a".repeat(64));
+          assert.equal(input.userIdentifierHash, KYC_SUBJECT_HASH);
+          assert.equal(input.subjectDigest, KYC_SUBJECT_HASH);
           assert.equal(input.consentReceipt.purpose, "kyc_verification");
           assert.equal(input.consentConsumptionId, "consent_consumption_0001");
           assert.equal(input.fenceToken, "fence-token-0001");
@@ -303,10 +400,61 @@ test("KYC requires recent Firebase auth, a hashed identifier, and purpose-bound 
   assert.equal(forgedReceipt.status, 403);
   assert.equal(forgedReceipt.body.error, "CONSENT_REQUIRED");
 
+  const callerSubjectSwap = await handlers["kyc-agent-a2a"](context({
+    path: "/functions/v1/kyc-agent-a2a/check",
+    idempotencyKey: "client-operation-00000007",
+    body: {
+      userIdentifierHash: KYC_SUBJECT_HASH,
+      consentReceipt: consent({
+        purpose: "kyc_verification",
+        scope: "kyc_attributes",
+        subjectDigest: "b".repeat(64),
+      }),
+      requestedAttributes: ["identity_verified"],
+    },
+  }));
+  assert.equal(callerSubjectSwap.status, 400);
+  assert.equal(checks, 0);
+
+  const ledgerSubjectSwap = enabledHandlers({
+    adapters: {
+      consent: consentAdapter({
+        async verifyAndConsume(input) {
+          return {
+            valid: true,
+            consumed: true,
+            consumptionId: "consent_consumption_0001",
+            receiptId: input.receipt.receiptId,
+            subjectUid: input.actorUid,
+            subjectDigest: "b".repeat(64),
+            purpose: input.purpose,
+            scope: input.requiredScope,
+            fenceToken: input.fenceToken,
+          };
+        },
+      }),
+      kyc: {
+        async check() { checks += 1; return { status: "PASS" }; },
+      },
+    },
+  });
+  const ledgerIdor = await ledgerSubjectSwap.handlers["kyc-agent-a2a"](context({
+    path: "/functions/v1/kyc-agent-a2a/check",
+    idempotencyKey: "client-operation-00000008",
+    body: {
+      userIdentifierHash: KYC_SUBJECT_HASH,
+      consentReceipt: consent({ purpose: "kyc_verification", scope: "kyc_attributes" }),
+      requestedAttributes: ["identity_verified"],
+    },
+  }));
+  assert.equal(ledgerIdor.status, 403);
+  assert.equal(ledgerIdor.body.error, "CONSENT_REQUIRED");
+  assert.equal(checks, 0);
+
   const valid = await handlers["kyc-agent-a2a"](context({
     path: "/functions/v1/kyc-agent-a2a/check",
     body: {
-      userIdentifierHash: "a".repeat(64),
+      userIdentifierHash: KYC_SUBJECT_HASH,
       consentReceipt: consent({ purpose: "kyc_verification", scope: "kyc_attributes" }),
       requestedAttributes: ["identity_verified"],
     },
@@ -382,7 +530,9 @@ test("investor chat separates untrusted prompts, minimizes public context, redac
         async generate(input) {
           generations += 1;
           lastGeneration = input;
-          return { text: "Reach me at person@example.com. bearer abcdefghijklmnopqrstuvwxyz" };
+          return {
+            text: "Reach person@example.com, SSN 123-45-6789, card 4111 1111 1111 1111. bearer abcdefghijklmnopqrstuvwxyz",
+          };
         },
       },
     },
@@ -402,6 +552,8 @@ test("investor chat separates untrusted prompts, minimizes public context, redac
   assert.equal(generations, 1);
   assert.match(first.body.reply, /\[private\]/);
   assert.match(first.body.reply, /\[redacted\]/);
+  assert.equal(first.body.reply.includes("123-45-6789"), false);
+  assert.equal(first.body.reply.includes("4111 1111 1111 1111"), false);
   assert.equal(lastGeneration.model, "gemini-2.0-flash-001");
   assert.equal(lastGeneration.maxOutputTokens, 512);
   assert.equal(lastGeneration.envelope.messages.at(-1).role, "user");
@@ -423,9 +575,191 @@ test("investor chat separates untrusted prompts, minimizes public context, redac
   );
 });
 
-test("investor context rejects private keys, private values, and unconfirmed profiles", async () => {
+test("replay rejects cache-policy drift and stored private data without a provider duplicate", async () => {
+  let generations = 0;
+  const { handlers, records } = enabledHandlers({
+    adapters: {
+      investorChat: {
+        async access() { return { allowed: true, accessType: "paid" }; },
+        async profile() { return publicProfile(); },
+        async generate() { generations += 1; return "Canonical public answer"; },
+      },
+    },
+  });
+  const input = context({
+    path: "/functions/v1/investor-chat",
+    idempotencyKey: "client-operation-private-replay-0001",
+    body: { slug: "public-investor", message: "Hello" },
+  });
+  const first = await handlers["investor-chat"](input);
+  assert.equal(first.status, 200);
+  const record = [...records.values()][0];
+  const cacheControl = record.response.headers["cache-control"];
+  record.response.headers["cache-control"] = "public, max-age=300";
+  const cacheAttack = await handlers["investor-chat"](input);
+  assert.equal(cacheAttack.status, 503);
+  assert.equal(cacheAttack.body.error, "CANDIDATE_UNAVAILABLE");
+
+  record.response.headers["cache-control"] = cacheControl;
+  record.response.body.reply = "Stored email person@example.com";
+  const privateDataAttack = await handlers["investor-chat"](input);
+  assert.equal(privateDataAttack.status, 503);
+  assert.equal(privateDataAttack.body.error, "CANDIDATE_UNAVAILABLE");
+  assert.equal(JSON.stringify(privateDataAttack.body).includes("person@example.com"), false);
+  assert.equal(generations, 1);
+});
+
+test("terminal settlement rejection is sticky and never returns success or duplicates provider work", async () => {
+  let generations = 0;
+  const { handlers, calls } = enabledHandlers({
+    guardOptions: { completionStatus: "REJECTED" },
+    adapters: {
+      investorChat: {
+        async access() { return { allowed: true, accessType: "paid" }; },
+        async profile() { return publicProfile(); },
+        async generate() { generations += 1; return "Answer"; },
+      },
+    },
+  });
+  const input = context({
+    path: "/functions/v1/investor-chat",
+    idempotencyKey: "client-operation-rejected-settlement-0001",
+    body: { slug: "public-investor", message: "Hello" },
+  });
+  const first = await handlers["investor-chat"](input);
+  const duplicate = await handlers["investor-chat"](input);
+  assert.equal(first.status, 503);
+  assert.equal(first.body.error, "SETTLEMENT_REJECTED");
+  assert.equal(duplicate.status, 503);
+  assert.equal(duplicate.body.error, "SETTLEMENT_REJECTED");
+  assert.equal(generations, 1);
+  assert.equal(calls.filter(({ method }) => method === "complete").length, 1);
+  assert.deepEqual(
+    calls.filter(({ method }) => method === "budgetRelease").map(({ input }) => input.reasonCode),
+    ["IDEMPOTENCY_TERMINAL_REJECTION"],
+  );
+});
+
+test("malformed durable acknowledgements fail closed and keep duplicates away from providers", async () => {
+  const adapters = {
+    investorChat: {
+      async access() { return { allowed: true, accessType: "paid" }; },
+      async profile() { return publicProfile(); },
+      async generate() { return "Answer"; },
+    },
+  };
+
+  let completionGenerations = 0;
+  const completion = enabledHandlers({
+    guardOptions: { completionStatus: "MALFORMED" },
+    adapters: {
+      investorChat: {
+        ...adapters.investorChat,
+        async generate() { completionGenerations += 1; return "Answer"; },
+      },
+    },
+  });
+  const completionInput = context({
+    path: "/functions/v1/investor-chat",
+    idempotencyKey: "client-operation-bad-completion-0001",
+    body: { slug: "public-investor", message: "Hello" },
+  });
+  const uncertain = await completion.handlers["investor-chat"](completionInput);
+  const inProgress = await completion.handlers["investor-chat"](completionInput);
+  assert.equal(uncertain.status, 503);
+  assert.equal(uncertain.body.error, "SETTLEMENT_UNCERTAIN");
+  assert.equal(inProgress.status, 409);
+  assert.equal(inProgress.body.error, "IDEMPOTENCY_IN_PROGRESS");
+  assert.equal(completionGenerations, 1);
+
+  let releaseGenerations = 0;
+  const release = enabledHandlers({
+    guardOptions: { releaseStatus: "REJECTED" },
+    adapters: {
+      investorChat: {
+        ...adapters.investorChat,
+        async generate() { releaseGenerations += 1; return "Answer"; },
+      },
+    },
+  });
+  const releaseInput = context({
+    path: "/functions/v1/investor-chat",
+    idempotencyKey: "client-operation-bad-release-0001",
+    body: { slug: "public-investor", message: "Hello" },
+  });
+  assert.equal((await release.handlers["investor-chat"](releaseInput)).status, 200);
+  const badRelease = await release.handlers["investor-chat"](releaseInput);
+  assert.equal(badRelease.status, 503);
+  assert.equal(badRelease.body.error, "CANDIDATE_UNAVAILABLE");
+  assert.equal(releaseGenerations, 1);
+
+  let abortGenerations = 0;
+  const abort = enabledHandlers({
+    guardOptions: { abortStatus: "REJECTED" },
+    adapters: {
+      investorChat: {
+        ...adapters.investorChat,
+        async generate() { abortGenerations += 1; throw new Error("provider failed"); },
+      },
+    },
+  });
+  const abortInput = context({
+    path: "/functions/v1/investor-chat",
+    idempotencyKey: "client-operation-bad-abort-0001",
+    body: { slug: "public-investor", message: "Hello" },
+  });
+  const badAbort = await abort.handlers["investor-chat"](abortInput);
+  const abortRetry = await abort.handlers["investor-chat"](abortInput);
+  assert.equal(badAbort.status, 503);
+  assert.equal(badAbort.body.error, "CANDIDATE_UNAVAILABLE");
+  assert.equal(abortRetry.status, 409);
+  assert.equal(abortRetry.body.error, "IDEMPOTENCY_IN_PROGRESS");
+  assert.equal(abortGenerations, 1);
+});
+
+test("malformed claim envelopes durably settle reservations before any provider call", async () => {
+  const attacks = [
+    { name: "conflict extra field", claim: { status: "conflict", extra: true }, settlement: "budgetRelease" },
+    { name: "replay missing digest", claim: { status: "replay", response: null }, settlement: "budgetRelease" },
+    { name: "in-progress extra field", claim: { status: "in_progress", extra: true }, settlement: "budgetRelease" },
+    { name: "rejected missing retry flag", claim: { status: "rejected", terminal: true }, settlement: "budgetRelease" },
+    {
+      name: "claimed extra field",
+      claim: { status: "claimed", fenceToken: "fence-token-0001", extra: true },
+      settlement: "abort",
+    },
+  ];
+  for (const attack of attacks) {
+    let generations = 0;
+    const { handlers, calls } = enabledHandlers({
+      guardOptions: { claimResult: attack.claim },
+      adapters: {
+        investorChat: {
+          async access() { return { allowed: true, accessType: "paid" }; },
+          async profile() { return publicProfile(); },
+          async generate() { generations += 1; return "Answer"; },
+        },
+      },
+    });
+    const response = await handlers["investor-chat"](context({
+      path: "/functions/v1/investor-chat",
+      idempotencyKey: "client-operation-malformed-claim-0001",
+      body: { slug: "public-investor", message: "Hello" },
+    }));
+    assert.equal(response.status, 503, attack.name);
+    assert.equal(response.body.error, "CANDIDATE_UNAVAILABLE", attack.name);
+    assert.equal(generations, 0, attack.name);
+    const settlement = calls.filter(({ method }) => method === attack.settlement);
+    assert.equal(settlement.length, 1, attack.name);
+    assert.equal(settlement[0].input.reasonCode, "IDEMPOTENCY_CLAIM_INVALID", attack.name);
+  }
+});
+
+test("investor context uses exact field schemas and rejects private values or unconfirmed profiles", async () => {
   const profiles = [
     publicProfile({ investorProfile: { accountNumber: "1234" } }),
+    publicProfile({ investorProfile: { favoriteColor: "blue" } }),
+    publicProfile({ investorProfile: { thesis: { text: "Climate" } } }),
     publicProfile({ investorProfile: { thesis: "Write person@example.com" } }),
     publicProfile({ userConfirmed: false }),
   ];
@@ -439,7 +773,7 @@ test("investor context rejects private keys, private values, and unconfirmed pro
       },
     },
   });
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < 5; index += 1) {
     const response = await handlers["investor-chat"](context({
       path: "/functions/v1/investor-chat",
       idempotencyKey: `client-private-test-0000000${index}`,
@@ -509,20 +843,18 @@ test("MCP exposes only server-owned read tools and keeps execution plan-only", a
 
 test("profile search requires scoped consent, fixed egress, and source-backed public facts", async () => {
   let searchInput;
+  let searches = 0;
   const { handlers } = enabledHandlers({
     adapters: {
       consent: consentAdapter(),
       profileSearch: {
         networkPolicy: "vertex_google_search_and_gravatar_only",
         async search(input) {
+          searches += 1;
           searchInput = input;
           return {
             facts: [
               { field: "occupation", value: "Founder", sourceUrl: "https://example.com/bio?subject=person%40example.com", confidence: 0.9, basis: "source_backed" },
-              { field: "age", value: "42", sourceUrl: "https://example.com/bio", confidence: 1, basis: "source_backed" },
-              { field: "occupation", value: "Investor", sourceUrl: "https://example.com/bio", confidence: 1, basis: "model_inference" },
-              { field: "public_biography", value: "Email person@example.com", sourceUrl: "https://example.com", confidence: 1, basis: "source_backed" },
-              { field: "professional_profile", value: "Internal", sourceUrl: "http://127.0.0.1/private", confidence: 1, basis: "source_backed" },
             ],
           };
         },
@@ -535,23 +867,124 @@ test("profile search requires scoped consent, fixed egress, and source-backed pu
       name: "Public Person",
       email: "person@example.com",
       country: "India",
-      consentReceipt: consent({ purpose: "public_profile_enrichment", scope: "public_sources" }),
+      consentReceipt: profileConsent(),
     },
   }));
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.data.facts, [{
-    field: "occupation",
-    value: "Founder",
-    sourceUrl: "https://example.com/bio",
-    confidence: 0.9,
-    basis: "source_backed",
-  }]);
+  assert.deepEqual(response.body.data.facts, [
+    {
+      field: "occupation",
+      value: "Founder",
+      sourceUrl: "https://example.com/bio",
+      confidence: 0.9,
+      basis: "source_backed",
+    },
+  ]);
   assert.equal(searchInput.grounding, "google_search_fixed_provider");
   assert.equal(searchInput.consentConsumptionId, "consent_consumption_0001");
+  assert.equal(searchInput.subjectDigest, AI_RUNTIME_BATCH_PROFILE_SUBJECT_DIGEST(profileSubject()));
   assert.equal(searchInput.gravatar, "fixed_https_host_email_hash_only");
   assert.equal(searchInput.model, "gemini-2.0-flash-001");
   assert.ok(searchInput.prohibitedInferences.includes("wealth"));
   assert.ok(searchInput.prohibitedInferences.includes("health"));
+
+  const subjectSwap = await handlers["hushh-profile-search"](context({
+    path: "/functions/v1/hushh-profile-search",
+    idempotencyKey: "client-operation-profile-idor-0001",
+    body: {
+      name: "Public Person",
+      email: "other@example.com",
+      country: "India",
+      consentReceipt: profileConsent(),
+    },
+  }));
+  assert.equal(subjectSwap.status, 400);
+  assert.equal(searches, 1);
+
+  let ledgerIdorSearches = 0;
+  const ledgerSubjectSwap = enabledHandlers({
+    adapters: {
+      consent: consentAdapter({
+        async verifyAndConsume(input) {
+          return {
+            valid: true,
+            consumed: true,
+            consumptionId: "consent_consumption_0001",
+            receiptId: input.receipt.receiptId,
+            subjectUid: input.actorUid,
+            subjectDigest: "b".repeat(64),
+            purpose: input.purpose,
+            scope: input.requiredScope,
+            fenceToken: input.fenceToken,
+          };
+        },
+      }),
+      profileSearch: {
+        networkPolicy: "vertex_google_search_and_gravatar_only",
+        async search() { ledgerIdorSearches += 1; return { facts: [] }; },
+      },
+    },
+  });
+  const ledgerIdor = await ledgerSubjectSwap.handlers["hushh-profile-search"](context({
+    path: "/functions/v1/hushh-profile-search",
+    idempotencyKey: "client-operation-profile-ledger-idor-0001",
+    body: {
+      name: "Public Person",
+      email: "person@example.com",
+      country: "India",
+      consentReceipt: profileConsent(),
+    },
+  }));
+  assert.equal(ledgerIdor.status, 403);
+  assert.equal(ledgerIdor.body.error, "CONSENT_REQUIRED");
+  assert.equal(ledgerIdorSearches, 0);
+});
+
+test("profile search rejects prohibited inference even inside allowlisted fact fields", async () => {
+  const prohibitedValues = [
+    "A 42 y/o founder",
+    "A founder who observes Ramadan",
+    "A wheelchair user and founder",
+    "A millionaire founder",
+  ];
+  let searches = 0;
+  const { handlers } = enabledHandlers({
+    adapters: {
+      consent: consentAdapter(),
+      profileSearch: {
+        networkPolicy: "vertex_google_search_and_gravatar_only",
+        async search() {
+          const value = prohibitedValues[searches];
+          searches += 1;
+          return {
+            facts: [{
+              field: "occupation",
+              value,
+              sourceUrl: "https://example.com/public",
+              confidence: 0.9,
+              basis: "source_backed",
+            }],
+          };
+        },
+      },
+    },
+  });
+  for (let index = 0; index < prohibitedValues.length; index += 1) {
+    const response = await handlers["hushh-profile-search"](context({
+      path: "/functions/v1/hushh-profile-search",
+      idempotencyKey: `client-profile-inference-00000${index}`,
+      body: {
+        name: "Public Person",
+        email: "person@example.com",
+        country: "India",
+        consentReceipt: profileConsent(),
+      },
+    }));
+    assert.equal(response.status, 502);
+    assert.equal(response.body.error, "UPSTREAM_UNAVAILABLE");
+    assert.equal(JSON.stringify(response.body).includes(prohibitedValues[index]), false);
+  }
+  assert.equal(searches, prohibitedValues.length);
 });
 
 test("Hushh AI rejects caller URLs and unowned media, pins generations and models, and redacts output", async () => {

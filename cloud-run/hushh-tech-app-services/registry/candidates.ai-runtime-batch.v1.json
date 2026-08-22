@@ -43,6 +43,8 @@
   },
   "candidate_implementation": {
     "path": "cloud-run/hushh-tech-app-services/src/handlers/ai-runtime-batch.js",
+    "bytes": 79850,
+    "sha256": "47fc23b8df55f82bab298dc60f94fde561a996e2cdd36b6ed49f9228fd6f9daf",
     "runtime_imports": [],
     "enabled_by_default": false,
     "activation_artifact": "forbidden",
@@ -51,7 +53,7 @@
   },
   "security_contract": {
     "actor_boundary": "Firebase Admin checkRevoked verification marker plus exact hushh-tech-uat project binding",
-    "consent_boundary": "Cloud SQL consent ledger verifies and atomically consumes actor-bound purpose and scope before KYC or profile provider use",
+    "consent_boundary": "Cloud SQL consent ledger atomically consumes the exact actor, receipt, purpose, scope, fence, and canonical request-subject digest before KYC or profile provider use",
     "prompt_boundary": "trusted policy, untrusted context, and user messages remain separate",
     "caller_system_roles": "forbidden",
     "caller_tool_schemas": "forbidden",
@@ -60,11 +62,11 @@
     "caller_urls": "forbidden",
     "media_boundary": "owner-prefixed GCS object plus exact generation, MIME, bytes, and SHA-256",
     "model_boundary": "server-pinned provider models and output limits",
-    "response_boundary": "PII and secret redaction before return",
+    "response_boundary": "Exact per-operation private no-store schemas, deterministic PII and secret redaction, profile facts limited to an exact server-owned occupation taxonomy, and response digests validated before durable storage, replay, or return",
     "logging_boundary": "hashes and reason codes only; prompts, media, credentials, and provider payloads forbidden",
-    "cost_boundary": "fail-closed durable actor rate and budget reservation before provider use; settlement is atomic with operation completion",
-    "budget_settlement": "COMMIT on fenced completion; RELEASE on conflict, replay, claim failure, or fenced abort",
-    "idempotency_boundary": "durable actor-scoped request hash, conflict, encrypted replay, and fence before provider use",
+    "cost_boundary": "fail-closed durable actor rate and budget reservation before provider use; success requires an exact fenced completion acknowledgement",
+    "budget_settlement": "COMMIT only on exact durable fenced completion acknowledgement; RELEASE requires an exact durable acknowledgement on conflict, replay, claim failure, or fenced abort",
+    "idempotency_boundary": "durable actor-scoped request hash, exact encrypted replay validation, terminal rejection, response digest, and fence before provider use",
     "idempotency_result_protection": "cloud_kms_envelope_v1",
     "replay_ttl_seconds_max": 86400,
     "status": "NOT_LIVE_PROVEN"

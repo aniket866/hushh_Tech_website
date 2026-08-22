@@ -36,6 +36,9 @@ describe("default-off AI runtime candidate source evidence", () => {
     const terminalBytes = await readFile(
       repoFile("migration/evidence/edge-function-terminal-matrix.v1.json"),
     );
+    const candidateHandlerBytes = await readFile(
+      repoFile(matrix.candidate_implementation.path),
+    );
     const historical = JSON.parse(historicalBytes.toString("utf8"));
     const current = JSON.parse(currentBytes.toString("utf8"));
     const traffic = JSON.parse(trafficBytes.toString("utf8"));
@@ -66,6 +69,8 @@ describe("default-off AI runtime candidate source evidence", () => {
         source_revision: null,
       },
       candidate_implementation: {
+        bytes: candidateHandlerBytes.length,
+        sha256: digest(candidateHandlerBytes),
         runtime_imports: [],
         enabled_by_default: false,
         activation_artifact: "forbidden",

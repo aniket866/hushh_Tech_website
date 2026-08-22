@@ -22,6 +22,7 @@ const SLUGS = Object.freeze([
   "hushh-ai-chat",
 ]);
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._~:+/-]{24,160}$/;
+const FENCE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,160}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,9 +37,11 @@ const PRIVATE_HOST_PATTERN =
 const SECRET_VALUE_PATTERN =
   /(?:bearer\s+[A-Za-z0-9._~+/-]{16,}|eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_(?:live|test)_[A-Za-z0-9]{8,}|AIza[A-Za-z0-9_-]{30,}|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,}|(?:api[_-]?key|secret|password|token)[=:_-][A-Za-z0-9._~-]{8,})/gi;
 const EMAIL_VALUE_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const SSN_VALUE_PATTERN = /(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)/g;
+const PAYMENT_CARD_VALUE_PATTERN = /(?<!\d)(?:\d[ -]?){13,19}(?!\d)/g;
+const LABELED_PRIVATE_VALUE_PATTERN =
+  /\b(?:account|routing|passport|tax\s*id|national\s*id|address)\s*(?:number|no\.?|id)?\s*[:=]\s*[^\n,;]{3,120}/gi;
 const PHONE_VALUE_PATTERN = /(?<!\w)\+?[1-9][0-9 ()-]{8,17}[0-9](?!\w)/g;
-const FORBIDDEN_CONTEXT_KEY =
-  /(?:email|phone|contact|address|dob|date[_-]?of[_-]?birth|ssn|tax[_-]?id|account|routing|credential|secret|token|password|income|wealth|net[_-]?worth|gender|religion|politic|sexual|health|allerg)/i;
 const KYC_ATTRIBUTES = new Set([
   "identity_verified",
   "address_verified",
@@ -109,15 +112,53 @@ const HUSHH_AI_MODELS = Object.freeze({
     temperature: 0.8,
   }),
 });
-const PROFILE_FACT_FIELDS = new Set([
-  "name",
-  "occupation",
-  "organisation",
-  "public_biography",
-  "professional_profile",
-  "public_achievement",
-  "public_news",
+const INVESTOR_PROFILE_SCHEMA = Object.freeze({
+  thesis: Object.freeze({ kind: "string", maxCharacters: 1_000 }),
+  stages: Object.freeze({ kind: "string_array", maxItems: 10, maxCharacters: 80 }),
+  sectors: Object.freeze({ kind: "string_array", maxItems: 20, maxCharacters: 100 }),
+  geographies: Object.freeze({ kind: "string_array", maxItems: 20, maxCharacters: 100 }),
+  checkSize: Object.freeze({ kind: "string", maxCharacters: 120 }),
+  investorType: Object.freeze({ kind: "string", maxCharacters: 120 }),
+  preferredBusinessModels: Object.freeze({
+    kind: "string_array",
+    maxItems: 20,
+    maxCharacters: 100,
+  }),
+  valueAdd: Object.freeze({ kind: "string", maxCharacters: 1_000 }),
+  publicAchievements: Object.freeze({
+    kind: "string_array",
+    maxItems: 20,
+    maxCharacters: 300,
+  }),
+});
+const PROFILE_OCCUPATION_ALLOWLIST = new Set([
+  "Advisor",
+  "Angel Investor",
+  "Chief Executive Officer",
+  "Chief Technology Officer",
+  "Co-Founder",
+  "Director",
+  "Engineer",
+  "Entrepreneur",
+  "Executive",
+  "Founder",
+  "General Partner",
+  "Investor",
+  "Limited Partner",
+  "Managing Partner",
+  "Partner",
+  "Principal",
+  "Product Manager",
+  "Professor",
+  "Researcher",
+  "Software Engineer",
+  "Venture Capitalist",
 ]);
+const PROFILE_FACT_SCHEMA = Object.freeze({
+  occupation: Object.freeze({ maxCharacters: 80, maxOccurrences: 3 }),
+});
+const PROFILE_SUBJECT_NAME_PATTERN =
+  /^[\p{L}\p{M}][\p{L}\p{M}'’.-]*(?: [\p{L}\p{M}][\p{L}\p{M}'’.-]*){0,5}$/u;
 const MEDIA_MIME_LIMITS = Object.freeze({
   "image/jpeg": 10_000_000,
   "image/png": 10_000_000,
@@ -167,6 +208,17 @@ function exactObject(value, allowed, label) {
   const extras = Object.keys(value).filter((key) => !allowed.has(key));
   if (extras.length > 0) {
     throw new CandidateInputError(`${label} contains unsupported fields.`);
+  }
+  return value;
+}
+
+function adapterObject(value, allowed, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CandidateAdapterError(`${label} is invalid.`);
+  }
+  const keys = Object.keys(value);
+  if (keys.some((key) => !allowed.has(key))) {
+    throw new CandidateAdapterError(`${label} contains unsupported fields.`);
   }
   return value;
 }
@@ -226,6 +278,21 @@ function stableJson(value) {
 
 function payloadDigest(value) {
   return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+function profileSubjectDigest(subject) {
+  return payloadDigest({
+    contract: "public_profile_enrichment_subject_v1",
+    subject,
+  });
+}
+
+function profileSubjectName(value) {
+  const name = cleanText(value, "Name", { max: 160 });
+  if (!PROFILE_SUBJECT_NAME_PATTERN.test(name)) {
+    throw new CandidateInputError("Name is invalid.");
+  }
+  return name;
 }
 
 function requestQueryEntries(request) {
@@ -345,48 +412,59 @@ function normalizeHistory(value, { maxMessages = 12, maxChars = 4_000 } = {}) {
 
 function redactText(value, max = 16_000) {
   return String(value ?? "")
+    .normalize("NFKC")
     .slice(0, max)
     .replace(SECRET_VALUE_PATTERN, "[redacted]")
     .replace(EMAIL_VALUE_PATTERN, "[private]")
+    .replace(SSN_VALUE_PATTERN, "[private]")
+    .replace(PAYMENT_CARD_VALUE_PATTERN, "[private]")
+    .replace(LABELED_PRIVATE_VALUE_PATTERN, "[private]")
     .replace(PHONE_VALUE_PATTERN, "[private]");
 }
 
-function publicProfileValue(value, label, depth = 0) {
-  if (depth > 4) throw new CandidateAdapterError("Investor profile is too deep.");
-  if (value === null || typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new CandidateAdapterError("Investor profile is invalid.");
-    return value;
+function adapterPublicText(value, label, maxCharacters) {
+  if (typeof value !== "string") throw new CandidateAdapterError(`${label} is invalid.`);
+  const cleaned = value.normalize("NFKC").trim();
+  if (
+    cleaned.length < 1 ||
+    cleaned.length > maxCharacters ||
+    CONTROL_PATTERN.test(cleaned) ||
+    Buffer.byteLength(cleaned, "utf8") > maxCharacters * 4 ||
+    redactText(cleaned, maxCharacters) !== cleaned
+  ) {
+    throw new CandidateAdapterError(`${label} is invalid.`);
   }
-  if (typeof value === "string") {
-    const cleaned = cleanText(value, label, { max: 500 });
-    const redacted = redactText(cleaned, 500);
-    if (redacted !== cleaned) {
-      throw new CandidateAdapterError("Investor profile contains private values.");
+  return cleaned;
+}
+
+function normalizeInvestorProfileFields(value) {
+  const allowedFields = new Set(Object.keys(INVESTOR_PROFILE_SCHEMA));
+  const source = adapterObject(value, allowedFields, "Investor profile fields");
+  const normalized = {};
+  for (const [field, schema] of Object.entries(INVESTOR_PROFILE_SCHEMA)) {
+    if (source[field] === undefined) continue;
+    if (schema.kind === "string") {
+      normalized[field] = adapterPublicText(
+        source[field],
+        `Investor profile ${field}`,
+        schema.maxCharacters,
+      );
+      continue;
     }
-    return cleaned;
+    if (!Array.isArray(source[field]) || source[field].length > schema.maxItems) {
+      throw new CandidateAdapterError(`Investor profile ${field} is invalid.`);
+    }
+    normalized[field] = Object.freeze(
+      source[field].map((item) =>
+        adapterPublicText(item, `Investor profile ${field}`, schema.maxCharacters),
+      ),
+    );
   }
-  if (Array.isArray(value)) {
-    if (value.length > 20) throw new CandidateAdapterError("Investor profile is too large.");
-    return value.map((item, index) => publicProfileValue(item, `${label}[${index}]`, depth + 1));
-  }
-  if (!value || typeof value !== "object") {
-    throw new CandidateAdapterError("Investor profile is invalid.");
-  }
-  const entries = Object.entries(value);
-  if (entries.length > 30) throw new CandidateAdapterError("Investor profile is too large.");
-  return Object.fromEntries(
-    entries.map(([key, item]) => {
-      if (FORBIDDEN_CONTEXT_KEY.test(key)) {
-        throw new CandidateAdapterError("Investor profile contains private fields.");
-      }
-      return [key, publicProfileValue(item, `Investor profile ${key}`, depth + 1)];
-    }),
-  );
+  return Object.freeze(normalized);
 }
 
 function minimizeInvestorContext(profile) {
-  const source = exactObject(
+  const source = adapterObject(
     profile,
     new Set(["ownerUid", "name", "organisation", "investorProfile", "isPublic", "userConfirmed"]),
     "Investor profile",
@@ -402,20 +480,20 @@ function minimizeInvestorContext(profile) {
   if (!investorProfile || typeof investorProfile !== "object" || Array.isArray(investorProfile)) {
     throw new CandidateAdapterError("Investor profile is invalid.");
   }
-  const name = publicProfileValue(source.name, "Profile name");
+  const name = adapterPublicText(source.name, "Profile name", 160);
   const organisation =
     source.organisation === undefined || source.organisation === null
       ? null
-      : publicProfileValue(source.organisation, "Organisation");
-  const context = {
+      : adapterPublicText(source.organisation, "Organisation", 240);
+  const context = Object.freeze({
     name,
     organisation,
-    investorProfile: publicProfileValue(investorProfile, "Investor profile"),
-  };
+    investorProfile: normalizeInvestorProfileFields(investorProfile),
+  });
   if (Buffer.byteLength(stableJson(context), "utf8") > 12_000) {
     throw new CandidateAdapterError("Investor profile is too large.");
   }
-  return Object.freeze(context);
+  return context;
 }
 
 function promptEnvelope({ policy, context = null, history = [], message, tools = [] }) {
@@ -451,6 +529,340 @@ async function guardedRead({ guards, actor, slug, action, work }) {
   return work();
 }
 
+function exactAdapterRecord(value, expectedKeys, label) {
+  const expected = new Set(expectedKeys);
+  const result = adapterObject(value, expected, label);
+  if (
+    Object.keys(result).length !== expected.size ||
+    [...expected].some((key) => !Object.hasOwn(result, key))
+  ) {
+    throw new CandidateAdapterError(`${label} is incomplete.`);
+  }
+  return result;
+}
+
+function normalizeIdempotencyClaim(value) {
+  const status = value?.status;
+  if (["conflict", "in_progress"].includes(status)) {
+    return exactAdapterRecord(value, ["status"], `Idempotency ${status} result`);
+  }
+  if (status === "replay") {
+    return exactAdapterRecord(
+      value,
+      ["status", "response", "responseDigest"],
+      "Idempotency replay result",
+    );
+  }
+  if (status === "rejected") {
+    return exactAdapterRecord(
+      value,
+      ["status", "terminal", "retrySafe"],
+      "Idempotency rejected result",
+    );
+  }
+  if (status === "claimed") {
+    const claim = exactAdapterRecord(
+      value,
+      ["status", "fenceToken"],
+      "Idempotency claimed result",
+    );
+    if (!FENCE_TOKEN_PATTERN.test(claim.fenceToken ?? "")) {
+      throw new CandidateAdapterError("Idempotency claimed result is invalid.");
+    }
+    return claim;
+  }
+  throw new CandidateAdapterError("Idempotency claim result is invalid.");
+}
+
+function normalizePrivateHeaders(value, expected) {
+  const source = exactAdapterRecord(value, Object.keys(expected), "Candidate response headers");
+  for (const [name, expectedValue] of Object.entries(expected)) {
+    if (source[name] !== expectedValue) {
+      throw new CandidateAdapterError("Candidate response headers are invalid.");
+    }
+  }
+  return expected;
+}
+
+function normalizeGuardedFailure({ slug, response }) {
+  normalizePrivateHeaders(response.headers, PRIVATE_JSON_HEADERS);
+  if (response.status === 502) {
+    const body = exactAdapterRecord(
+      response.body,
+      ["error", "message"],
+      "Rejected upstream response",
+    );
+    if (
+      body.error !== "UPSTREAM_RESPONSE_REJECTED" ||
+      body.message !== "Service response was rejected."
+    ) {
+      throw new CandidateAdapterError("Rejected upstream response is invalid.");
+    }
+    return failure(502, body.error, body.message);
+  }
+  if (slug === "veo-generate-video" && response.status === 400) {
+    const body = exactAdapterRecord(response.body, ["error", "message"], "Veo rejection");
+    if (body.error !== "PROMPT_REJECTED" || body.message !== "Prompt is not allowed.") {
+      throw new CandidateAdapterError("Veo rejection is invalid.");
+    }
+    return failure(400, body.error, body.message);
+  }
+  if (slug === "investor-chat" && response.status === 402) {
+    const body = exactAdapterRecord(response.body, ["error", "needsPayment"], "Chat rejection");
+    if (body.error !== "PAYMENT_REQUIRED" || body.needsPayment !== true) {
+      throw new CandidateAdapterError("Chat rejection is invalid.");
+    }
+    return json(402, { error: "PAYMENT_REQUIRED", needsPayment: true });
+  }
+  throw new CandidateAdapterError("Candidate rejection is invalid.");
+}
+
+function replayTextBody(value) {
+  let bytes;
+  if (Buffer.isBuffer(value)) {
+    bytes = value;
+  } else if (value instanceof Uint8Array) {
+    bytes = Buffer.from(value);
+  } else if (
+    value?.type === "Buffer" &&
+    Array.isArray(value.data) &&
+    value.data.length <= 128_000 &&
+    value.data.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
+  ) {
+    bytes = Buffer.from(value.data);
+  } else {
+    throw new CandidateAdapterError("Candidate text response is invalid.");
+  }
+  if (bytes.length < 1 || bytes.length > 128_000) {
+    throw new CandidateAdapterError("Candidate text response is invalid.");
+  }
+  return safeProviderText(bytes.toString("utf8"));
+}
+
+function normalizeGuardedResponse({ slug, action, request, response }) {
+  const envelope = exactAdapterRecord(response, ["status", "headers", "body"], "Candidate response");
+  if (!Number.isInteger(envelope.status)) {
+    throw new CandidateAdapterError("Candidate response status is invalid.");
+  }
+  if (envelope.status >= 400) return normalizeGuardedFailure({ slug, response: envelope });
+  if (slug === "veo-generate-video" && action === "generate") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(envelope.body, ["success", "operationId", "done"], "Veo response");
+    if (
+      envelope.status !== 202 ||
+      body.success !== true ||
+      body.done !== false ||
+      !/^[A-Za-z0-9_-]{16,200}$/.test(body.operationId ?? "")
+    ) {
+      throw new CandidateAdapterError("Veo response is invalid.");
+    }
+    return json(202, { success: true, operationId: body.operationId, done: false });
+  }
+  if (slug === "kyc-agent-a2a" && action === "check") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    if (envelope.status !== 200) throw new CandidateAdapterError("KYC response is invalid.");
+    return json(200, sanitizeKycResult(envelope.body, { preserveTimestamp: true }));
+  }
+  if (slug === "kyc-agent-a2a" && action === "rpc.CheckKYCStatus") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(envelope.body, ["jsonrpc", "result", "id"], "KYC RPC response");
+    if (
+      envelope.status !== 200 ||
+      body.jsonrpc !== "2.0" ||
+      body.id !== request.body.id
+    ) {
+      throw new CandidateAdapterError("KYC RPC response is invalid.");
+    }
+    return json(200, {
+      jsonrpc: "2.0",
+      result: sanitizeKycResult(body.result, { preserveTimestamp: true }),
+      id: body.id,
+    });
+  }
+  if (slug === "investor-chat" && action === "chat") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(envelope.body, ["reply", "accessInfo"], "Chat response");
+    const access = adapterObject(
+      body.accessInfo,
+      new Set(["accessType", "messagesRemaining"]),
+      "Chat access response",
+    );
+    if (
+      envelope.status !== 200 ||
+      !["free", "paid"].includes(access.accessType) ||
+      (Object.hasOwn(access, "messagesRemaining") &&
+        access.messagesRemaining !== undefined &&
+        (!Number.isSafeInteger(access.messagesRemaining) || access.messagesRemaining < 0))
+    ) {
+      throw new CandidateAdapterError("Chat response is invalid.");
+    }
+    const accessInfo = { accessType: access.accessType };
+    if (Number.isSafeInteger(access.messagesRemaining)) {
+      accessInfo.messagesRemaining = access.messagesRemaining;
+    }
+    return json(200, { reply: safeProviderText(body.reply), accessInfo });
+  }
+  if (slug === "investor-agent-mcp" && action === "chat") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(
+      envelope.body,
+      ["response", "slug", "mode", "toolExecution"],
+      "MCP response",
+    );
+    if (
+      envelope.status !== 200 ||
+      body.slug !== slugOrThrow(queryValue(request, "slug")) ||
+      body.mode !== "authenticated" ||
+      body.toolExecution !== "disabled"
+    ) {
+      throw new CandidateAdapterError("MCP response is invalid.");
+    }
+    return json(200, {
+      response: safeProviderText(body.response),
+      slug: body.slug,
+      mode: "authenticated",
+      toolExecution: "disabled",
+    });
+  }
+  if (slug === "investor-agent-mcp" && action === "rpc.SendMessage") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(envelope.body, ["jsonrpc", "result", "id"], "MCP RPC response");
+    const result = exactAdapterRecord(body.result, ["response", "toolExecution"], "MCP RPC result");
+    if (
+      envelope.status !== 200 ||
+      body.jsonrpc !== "2.0" ||
+      body.id !== request.body.id ||
+      result.toolExecution !== "disabled"
+    ) {
+      throw new CandidateAdapterError("MCP RPC response is invalid.");
+    }
+    return json(200, {
+      jsonrpc: "2.0",
+      result: { response: safeProviderText(result.response), toolExecution: "disabled" },
+      id: body.id,
+    });
+  }
+  if (slug === "hushh-profile-search" && action === "search") {
+    normalizePrivateHeaders(envelope.headers, PRIVATE_JSON_HEADERS);
+    const body = exactAdapterRecord(
+      envelope.body,
+      ["success", "data", "inferencePolicy"],
+      "Profile search response",
+    );
+    const data = exactAdapterRecord(body.data, ["facts"], "Profile search data");
+    if (
+      envelope.status !== 200 ||
+      body.success !== true ||
+      body.inferencePolicy !== "source_backed_public_facts_only"
+    ) {
+      throw new CandidateAdapterError("Profile search response is invalid.");
+    }
+    return json(200, {
+      success: true,
+      data: {
+        facts: sanitizeProfileSearch({ facts: data.facts }),
+      },
+      inferencePolicy: "source_backed_public_facts_only",
+    });
+  }
+  if (slug === "hushh-ai-chat" && action === "chat") {
+    const expectedModel = request.body.model ?? "flash";
+    const responseHeaders = exactAdapterRecord(
+      envelope.headers,
+      [...Object.keys(PRIVATE_TEXT_HEADERS), "x-cache", "x-message-id", "x-model-profile"],
+      "Hushh AI response headers",
+    );
+    normalizePrivateHeaders(
+      Object.fromEntries(Object.keys(PRIVATE_TEXT_HEADERS).map((name) => [name, responseHeaders[name]])),
+      PRIVATE_TEXT_HEADERS,
+    );
+    if (
+      envelope.status !== 200 ||
+      responseHeaders["x-cache"] !== "BYPASS" ||
+      !UUID_PATTERN.test(responseHeaders["x-message-id"] ?? "") ||
+      responseHeaders["x-model-profile"] !== expectedModel
+    ) {
+      throw new CandidateAdapterError("Hushh AI response is invalid.");
+    }
+    return text(200, replayTextBody(envelope.body), {
+      "x-cache": "BYPASS",
+      "x-message-id": responseHeaders["x-message-id"],
+      "x-model-profile": expectedModel,
+    });
+  }
+  throw new CandidateAdapterError("Candidate response contract is unavailable.");
+}
+
+function responseLedgerDigest(response) {
+  return payloadDigest({
+    status: response.status,
+    headers: response.headers,
+    body: Buffer.isBuffer(response.body)
+      ? { encoding: "base64", value: response.body.toString("base64") }
+      : response.body,
+  });
+}
+
+async function releaseBudgetOrThrow({ guards, reservationId, reasonCode }) {
+  let result;
+  try {
+    const acknowledgement = await guards.budget.release({ reservationId, reasonCode });
+    result = exactAdapterRecord(
+      acknowledgement,
+      ["status", "reservationId", "reasonCode"],
+      "Budget release acknowledgement",
+    );
+  } catch {
+    throw new CandidateConfigurationError("Budget release was not acknowledged.");
+  }
+  if (
+    result.status !== "RELEASED" ||
+    result.reservationId !== reservationId ||
+    result.reasonCode !== reasonCode
+  ) {
+    throw new CandidateConfigurationError("Budget release was not acknowledged.");
+  }
+}
+
+async function abortOperationOrThrow({
+  guards,
+  scope,
+  keyHash,
+  requestHash,
+  fenceToken,
+  reservationId,
+  reasonCode,
+}) {
+  let aborted;
+  try {
+    const acknowledgement = await guards.idempotency.abort({
+      scope,
+      keyHash,
+      requestHash,
+      fenceToken,
+      budgetReservationId: reservationId,
+      budgetDisposition: "RELEASE",
+      reasonCode,
+    });
+    aborted = exactAdapterRecord(
+      acknowledgement,
+      ["status", "fenceToken", "budgetReservationId", "budgetDisposition", "reasonCode"],
+      "Operation abort acknowledgement",
+    );
+  } catch {
+    throw new CandidateConfigurationError("Operation abort was not acknowledged.");
+  }
+  if (
+    aborted.status !== "ABORTED" ||
+    aborted.fenceToken !== fenceToken ||
+    aborted.budgetReservationId !== reservationId ||
+    aborted.budgetDisposition !== "RELEASE" ||
+    aborted.reasonCode !== reasonCode
+  ) {
+    throw new CandidateConfigurationError("Operation abort was not acknowledged.");
+  }
+}
+
 async function guardedCost({ guards, actor, request, slug, action, cost, work }) {
   const key = idempotencyKey(request);
   const requestHash = requestDigest(request);
@@ -481,64 +893,175 @@ async function guardedCost({ guards, actor, request, slug, action, cost, work })
       budgetReservationId: budget.reservationId,
     });
   } catch (error) {
-    await guards.budget.release({
+    await releaseBudgetOrThrow({
+      guards,
       reservationId: budget.reservationId,
       reasonCode: "IDEMPOTENCY_CLAIM_FAILED",
     });
     throw error;
   }
+  try {
+    claim = normalizeIdempotencyClaim(claim);
+  } catch {
+    if (claim?.status === "claimed" && FENCE_TOKEN_PATTERN.test(claim?.fenceToken ?? "")) {
+      await abortOperationOrThrow({
+        guards,
+        scope,
+        keyHash,
+        requestHash,
+        fenceToken: claim.fenceToken,
+        reservationId: budget.reservationId,
+        reasonCode: "IDEMPOTENCY_CLAIM_INVALID",
+      });
+    } else {
+      await releaseBudgetOrThrow({
+        guards,
+        reservationId: budget.reservationId,
+        reasonCode: "IDEMPOTENCY_CLAIM_INVALID",
+      });
+    }
+    throw new CandidateConfigurationError("Idempotency ledger is unavailable.");
+  }
   if (claim?.status === "conflict") {
-    await guards.budget.release({
+    await releaseBudgetOrThrow({
+      guards,
       reservationId: budget.reservationId,
       reasonCode: "IDEMPOTENCY_CONFLICT",
     });
     return failure(409, "IDEMPOTENCY_CONFLICT", "Request key was already used.");
   }
   if (claim?.status === "replay") {
-    await guards.budget.release({
+    await releaseBudgetOrThrow({
+      guards,
       reservationId: budget.reservationId,
       reasonCode: "IDEMPOTENCY_REPLAY",
     });
-    if (!claim.response || typeof claim.response.status !== "number") {
+    let replay;
+    try {
+      replay = normalizeGuardedResponse({ slug, action, request, response: claim.response });
+    } catch {
       throw new CandidateConfigurationError("Replay result is unavailable.");
     }
-    return claim.response;
+    if (!SHA256_PATTERN.test(claim.responseDigest ?? "") || responseLedgerDigest(replay) !== claim.responseDigest) {
+      throw new CandidateConfigurationError("Replay result is unavailable.");
+    }
+    return replay;
   }
-  if (claim?.status !== "claimed" || typeof claim.fenceToken !== "string") {
-    await guards.budget.release({
+  if (claim?.status === "in_progress") {
+    await releaseBudgetOrThrow({
+      guards,
       reservationId: budget.reservationId,
-      reasonCode: "IDEMPOTENCY_CLAIM_INVALID",
+      reasonCode: "IDEMPOTENCY_IN_PROGRESS",
     });
-    throw new CandidateConfigurationError("Idempotency ledger is unavailable.");
+    return failure(409, "IDEMPOTENCY_IN_PROGRESS", "Request is already in progress.");
   }
-
+  if (claim?.status === "rejected") {
+    await releaseBudgetOrThrow({
+      guards,
+      reservationId: budget.reservationId,
+      reasonCode: "IDEMPOTENCY_TERMINAL_REJECTION",
+    });
+    if (claim.terminal !== true || claim.retrySafe !== false) {
+      throw new CandidateConfigurationError("Idempotency rejection is invalid.");
+    }
+    return failure(503, "SETTLEMENT_REJECTED", "Request settlement was rejected.");
+  }
+  let rawResponse;
   try {
-    const response = await work({
+    rawResponse = await work({
       fenceToken: claim.fenceToken,
       budgetReservationId: budget.reservationId,
     });
-    await guards.idempotency.complete({
+  } catch (error) {
+    await abortOperationOrThrow({
+      guards,
+      scope,
+      keyHash,
+      requestHash,
+      fenceToken: claim.fenceToken,
+      reservationId: budget.reservationId,
+      reasonCode: "CANDIDATE_OPERATION_FAILED",
+    });
+    throw error;
+  }
+
+  let response;
+  try {
+    response = normalizeGuardedResponse({ slug, action, request, response: rawResponse });
+  } catch {
+    response = failure(502, "UPSTREAM_RESPONSE_REJECTED", "Service response was rejected.");
+  }
+  const responseDigest = responseLedgerDigest(response);
+  let acknowledgement;
+  try {
+    acknowledgement = await guards.idempotency.complete({
       scope,
       keyHash,
       requestHash,
       fenceToken: claim.fenceToken,
       budgetReservationId: budget.reservationId,
       budgetDisposition: "COMMIT",
+      responseDigest,
       response,
     });
-    return response;
-  } catch (error) {
-    await guards.idempotency.abort({
-      scope,
-      keyHash,
-      requestHash,
-      fenceToken: claim.fenceToken,
-      budgetReservationId: budget.reservationId,
-      budgetDisposition: "RELEASE",
-      reasonCode: "CANDIDATE_OPERATION_FAILED",
-    });
-    throw error;
+  } catch {
+    return failure(503, "SETTLEMENT_UNCERTAIN", "Request settlement is unavailable.");
   }
+  if (acknowledgement?.status === "COMMITTED") {
+    try {
+      const committed = exactAdapterRecord(
+        acknowledgement,
+        ["status", "fenceToken", "budgetReservationId", "budgetDisposition", "responseDigest"],
+        "Operation completion acknowledgement",
+      );
+      if (
+        committed.fenceToken !== claim.fenceToken ||
+        committed.budgetReservationId !== budget.reservationId ||
+        committed.budgetDisposition !== "COMMIT" ||
+        committed.responseDigest !== responseDigest
+      ) {
+        return failure(503, "SETTLEMENT_UNCERTAIN", "Request settlement is unavailable.");
+      }
+      return response;
+    } catch {
+      return failure(503, "SETTLEMENT_UNCERTAIN", "Request settlement is unavailable.");
+    }
+  }
+  if (acknowledgement?.status === "REJECTED") {
+    let rejected;
+    try {
+      rejected = exactAdapterRecord(
+        acknowledgement,
+        [
+          "status",
+          "fenceToken",
+          "budgetReservationId",
+          "budgetDisposition",
+          "responseDigest",
+          "terminal",
+          "retrySafe",
+          "reasonCode",
+        ],
+        "Operation rejection acknowledgement",
+      );
+    } catch {
+      return failure(503, "SETTLEMENT_UNCERTAIN", "Request settlement is unavailable.");
+    }
+    if (
+      rejected.fenceToken === claim.fenceToken &&
+      rejected.budgetReservationId === budget.reservationId &&
+      rejected.budgetDisposition === "COMMIT" &&
+      rejected.responseDigest === responseDigest &&
+      rejected.terminal === true &&
+      rejected.retrySafe === false &&
+      typeof rejected.reasonCode === "string" &&
+      rejected.reasonCode.length >= 3 &&
+      rejected.reasonCode.length <= 80
+    ) {
+      return failure(503, "SETTLEMENT_REJECTED", "Request settlement was rejected.");
+    }
+  }
+  return failure(503, "SETTLEMENT_UNCERTAIN", "Request settlement is unavailable.");
 }
 
 function validateGuards(guards) {
@@ -547,7 +1070,8 @@ function validateGuards(guards) {
     guards.rateLimit.durability !== "cloud_firestore_atomic_fixed_window_v1" ||
     typeof guards?.budget?.reserve !== "function" ||
     typeof guards?.budget?.release !== "function" ||
-    guards.budget.durability !== "cloud_sql_serializable_budget_reservation_v1"
+    guards.budget.durability !== "cloud_sql_serializable_budget_reservation_v1" ||
+    guards.budget.acknowledgementContract !== "cloud_sql_budget_release_ack_v1"
   ) {
     throw new CandidateConfigurationError("Cost guards are unavailable.");
   }
@@ -558,6 +1082,7 @@ function validateGuards(guards) {
   }
   if (
     guards.idempotency.durability !== "cloud_sql_serializable_fenced_operation_v1" ||
+    guards.idempotency.acknowledgementContract !== "cloud_sql_fenced_settlement_ack_v1" ||
     guards.idempotency.resultProtection !== "cloud_kms_envelope_v1" ||
     !Number.isSafeInteger(guards.idempotency.maxReplayTtlSeconds) ||
     guards.idempotency.maxReplayTtlSeconds < 60 ||
@@ -579,14 +1104,23 @@ function validateConsentReceipt(
   value,
   actor,
   now,
-  { purpose = "public_profile_enrichment", requiredScope = "public_sources" } = {},
+  {
+    purpose = "public_profile_enrichment",
+    requiredScope = "public_sources",
+    expectedSubjectDigest = null,
+  } = {},
 ) {
   exactObject(
     value,
-    new Set(["receiptId", "subjectUid", "purpose", "scopes", "expiresAt"]),
+    new Set(["receiptId", "subjectUid", "subjectDigest", "purpose", "scopes", "expiresAt"]),
     "Consent receipt",
   );
-  if (!UUID_PATTERN.test(value.receiptId ?? "") || value.subjectUid !== actor.uid) {
+  if (
+    !UUID_PATTERN.test(value.receiptId ?? "") ||
+    value.subjectUid !== actor.uid ||
+    !SHA256_PATTERN.test(value.subjectDigest ?? "") ||
+    (expectedSubjectDigest !== null && value.subjectDigest !== expectedSubjectDigest)
+  ) {
     throw new CandidateInputError("Consent receipt is invalid.");
   }
   if (value.purpose !== purpose) {
@@ -619,19 +1153,51 @@ function consentLedgerOrThrow(adapters) {
   return ledger;
 }
 
-async function consumeConsent({ ledger, actor, receipt, purpose, scope, fenceToken, signal }) {
+async function consumeConsent({
+  ledger,
+  actor,
+  receipt,
+  subjectDigest,
+  purpose,
+  scope,
+  fenceToken,
+  signal,
+}) {
   const result = await ledger.verifyAndConsume({
     actorUid: actor.uid,
     receipt,
+    subjectDigest,
     purpose,
     requiredScope: scope,
     fenceToken,
     signal,
   });
+  const exactResultKeys = [
+    "valid",
+    "consumed",
+    "consumptionId",
+    "receiptId",
+    "subjectUid",
+    "subjectDigest",
+    "purpose",
+    "scope",
+    "fenceToken",
+  ];
   if (
+    !result ||
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    Object.keys(result).length !== exactResultKeys.length ||
+    exactResultKeys.some((key) => !Object.hasOwn(result, key)) ||
     result?.valid !== true ||
     result?.consumed !== true ||
-    !/^[A-Za-z0-9_-]{16,160}$/.test(result?.consumptionId ?? "")
+    !/^[A-Za-z0-9_-]{16,160}$/.test(result.consumptionId ?? "") ||
+    result.receiptId !== receipt.receiptId ||
+    result.subjectUid !== actor.uid ||
+    result.subjectDigest !== subjectDigest ||
+    result.purpose !== purpose ||
+    result.scope !== scope ||
+    result.fenceToken !== fenceToken
   ) {
     throw new CandidateAuthError("Consent required.", 403, "CONSENT_REQUIRED");
   }
@@ -683,28 +1249,60 @@ function safeOrigin(raw) {
 }
 
 function sanitizeProfileSearch(result) {
-  if (!result || typeof result !== "object" || !Array.isArray(result.facts)) {
+  const source = adapterObject(result, new Set(["facts"]), "Profile search response");
+  if (!Array.isArray(source.facts) || source.facts.length > 30) {
     throw new CandidateAdapterError("Profile search response is invalid.");
   }
+  const fieldOrder = new Map(Object.keys(PROFILE_FACT_SCHEMA).map((field, index) => [field, index]));
+  const occurrences = new Map();
+  const identities = new Set();
   const facts = [];
-  for (const raw of result.facts.slice(0, 30)) {
-    if (!raw || typeof raw !== "object" || !PROFILE_FACT_FIELDS.has(raw.field)) continue;
-    if (raw.basis !== "source_backed") continue;
+  for (const candidate of source.facts) {
+    const raw = adapterObject(
+      candidate,
+      new Set(["field", "value", "sourceUrl", "confidence", "basis"]),
+      "Profile search fact",
+    );
+    const schema = PROFILE_FACT_SCHEMA[raw.field];
+    if (!schema || raw.basis !== "source_backed") {
+      throw new CandidateAdapterError("Profile search fact is not allowlisted.");
+    }
     const sourceUrl = safePublicUrl(raw.sourceUrl);
-    if (!sourceUrl) continue;
-    const value = redactText(raw.value, 1_000).trim();
-    if (!value || value.includes("[private]")) continue;
-    const confidence = Number(raw.confidence);
-    facts.push({
+    if (!sourceUrl) throw new CandidateAdapterError("Profile search source is invalid.");
+    const value = adapterPublicText(raw.value, "Profile search fact value", schema.maxCharacters);
+    if (!PROFILE_OCCUPATION_ALLOWLIST.has(value)) {
+      throw new CandidateAdapterError("Profile search fact value is not allowlisted.");
+    }
+    if (typeof raw.confidence !== "number" || !Number.isFinite(raw.confidence)) {
+      throw new CandidateAdapterError("Profile search confidence is invalid.");
+    }
+    if (raw.confidence < 0 || raw.confidence > 1) {
+      throw new CandidateAdapterError("Profile search confidence is invalid.");
+    }
+    const count = (occurrences.get(raw.field) ?? 0) + 1;
+    if (count > schema.maxOccurrences) {
+      throw new CandidateAdapterError("Profile search fact cardinality is invalid.");
+    }
+    occurrences.set(raw.field, count);
+    const identity = `${raw.field}\u0000${value}\u0000${sourceUrl}`;
+    if (identities.has(identity)) {
+      throw new CandidateAdapterError("Profile search fact is duplicated.");
+    }
+    identities.add(identity);
+    facts.push(Object.freeze({
       field: raw.field,
       value,
       sourceUrl,
-      confidence: Number.isFinite(confidence)
-        ? Math.min(1, Math.max(0, confidence))
-        : 0,
+      confidence: raw.confidence,
       basis: "source_backed",
-    });
+    }));
   }
+  facts.sort(
+    (left, right) =>
+      fieldOrder.get(left.field) - fieldOrder.get(right.field) ||
+      left.sourceUrl.localeCompare(right.sourceUrl) ||
+      left.value.localeCompare(right.value),
+  );
   return Object.freeze(facts);
 }
 
@@ -787,32 +1385,69 @@ async function verifyPinnedMediaRefs(refs, actor, chat, signal) {
   return refs;
 }
 
-function sanitizeKycResult(result) {
-  if (!result || typeof result !== "object" || !KYC_STATUSES.has(result.status)) {
+function sanitizeKycResult(result, { preserveTimestamp = false } = {}) {
+  const source = adapterObject(
+    result,
+    new Set([
+      "status",
+      "timestamp",
+      "riskBand",
+      "riskScore",
+      "verifiedAttributes",
+      "missingRequirements",
+      "verificationLevel",
+      "attestationAge",
+    ]),
+    "KYC response",
+  );
+  if (!KYC_STATUSES.has(source.status)) {
     throw new CandidateAdapterError("KYC response is invalid.");
   }
-  const response = { status: result.status, timestamp: new Date().toISOString() };
-  if (["LOW", "MEDIUM", "HIGH"].includes(result.riskBand)) response.riskBand = result.riskBand;
-  if (Number.isFinite(result.riskScore)) {
-    response.riskScore = Math.min(100, Math.max(0, Number(result.riskScore)));
+  let timestamp = new Date().toISOString();
+  if (preserveTimestamp) {
+    const parsed = Date.parse(source.timestamp);
+    if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== source.timestamp) {
+      throw new CandidateAdapterError("KYC response timestamp is invalid.");
+    }
+    timestamp = source.timestamp;
+  }
+  const response = { status: source.status, timestamp };
+  if (["LOW", "MEDIUM", "HIGH"].includes(source.riskBand)) response.riskBand = source.riskBand;
+  if (source.riskScore !== undefined) {
+    if (!Number.isFinite(source.riskScore)) {
+      throw new CandidateAdapterError("KYC risk score is invalid.");
+    }
+    response.riskScore = Math.min(100, Math.max(0, Number(source.riskScore)));
   }
   for (const [sourceKey, targetKey] of [
     ["verifiedAttributes", "verifiedAttributes"],
     ["missingRequirements", "missingRequirements"],
   ]) {
-    if (Array.isArray(result[sourceKey])) {
-      response[targetKey] = result[sourceKey]
-        .filter((value) => KYC_ATTRIBUTES.has(value))
-        .slice(0, 10);
+    if (source[sourceKey] !== undefined) {
+      if (!Array.isArray(source[sourceKey]) || source[sourceKey].length > 10) {
+        throw new CandidateAdapterError("KYC attributes are invalid.");
+      }
+      response[targetKey] = source[sourceKey].filter((value) => KYC_ATTRIBUTES.has(value));
     }
   }
-  if (typeof result.verificationLevel === "string") {
-    response.verificationLevel = redactText(result.verificationLevel, 40);
+  if (source.verificationLevel !== undefined) {
+    response.verificationLevel = adapterPublicText(
+      source.verificationLevel,
+      "KYC verification level",
+      40,
+    );
   }
-  if (Number.isSafeInteger(result.attestationAge) && result.attestationAge >= 0) {
-    response.attestationAge = result.attestationAge;
+  if (source.attestationAge !== undefined) {
+    if (
+      !Number.isSafeInteger(source.attestationAge) ||
+      source.attestationAge < 0 ||
+      source.attestationAge > 36_500
+    ) {
+      throw new CandidateAdapterError("KYC attestation age is invalid.");
+    }
+    response.attestationAge = source.attestationAge;
   }
-  return response;
+  return Object.freeze(response);
 }
 
 class CandidateInputError extends Error {
@@ -992,6 +1627,7 @@ function kycRequest(body, actor, now) {
     consentReceipt: validateConsentReceipt(body.consentReceipt, actor, now, {
       purpose: "kyc_verification",
       requiredScope: "kyc_attributes",
+      expectedSubjectDigest: body.userIdentifierHash,
     }),
     requestedAttributes: Object.freeze([...requestedAttributes]),
   });
@@ -1078,6 +1714,7 @@ function buildKycHandler({ adapters, guards, now, publicBaseUrl }) {
             ledger: consentLedger,
             actor,
             receipt: params.consentReceipt,
+            subjectDigest: params.userIdentifierHash,
             purpose: "kyc_verification",
             scope: "kyc_attributes",
             fenceToken,
@@ -1086,6 +1723,7 @@ function buildKycHandler({ adapters, guards, now, publicBaseUrl }) {
           const result = await kyc.check({
             ...params,
             actorUid: actor.uid,
+            subjectDigest: params.userIdentifierHash,
             consentConsumptionId,
             fenceToken,
             signal,
@@ -1118,6 +1756,7 @@ function buildKycHandler({ adapters, guards, now, publicBaseUrl }) {
               ledger: consentLedger,
               actor,
               receipt: params.consentReceipt,
+              subjectDigest: params.userIdentifierHash,
               purpose: "kyc_verification",
               scope: "kyc_attributes",
               fenceToken,
@@ -1126,6 +1765,7 @@ function buildKycHandler({ adapters, guards, now, publicBaseUrl }) {
             const result = await kyc.check({
               ...params,
               actorUid: actor.uid,
+              subjectDigest: params.userIdentifierHash,
               consentConsumptionId,
               fenceToken,
               signal,
@@ -1435,13 +2075,17 @@ function buildProfileSearchHandler({ adapters, guards, now }) {
       new Set(["name", "email", "country", "contact", "consentReceipt"]),
       "Request",
     );
-    const name = cleanText(body.name, "Name", { max: 160 });
+    const name = profileSubjectName(body.name);
     const email = cleanText(body.email, "Email", { max: 254 }).toLowerCase();
     if (!EMAIL_PATTERN.test(email)) throw new CandidateInputError("Email is invalid.");
     const country = body.country === undefined ? "Global" : cleanText(body.country, "Country", { max: 80 });
     const contact = body.contact === undefined ? null : cleanText(body.contact, "Contact", { max: 20 });
     if (contact && !PHONE_PATTERN.test(contact)) throw new CandidateInputError("Contact is invalid.");
-    const consentReceipt = validateConsentReceipt(body.consentReceipt, actor, now);
+    const subject = Object.freeze({ name, email, country, contact });
+    const subjectDigest = profileSubjectDigest(subject);
+    const consentReceipt = validateConsentReceipt(body.consentReceipt, actor, now, {
+      expectedSubjectDigest: subjectDigest,
+    });
     const search = requireAdapter(adapters.profileSearch, "Profile search adapter");
     const consentLedger = consentLedgerOrThrow(adapters);
     if (search.networkPolicy !== "vertex_google_search_and_gravatar_only") {
@@ -1463,6 +2107,7 @@ function buildProfileSearchHandler({ adapters, guards, now }) {
           ledger: consentLedger,
           actor,
           receipt: consentReceipt,
+          subjectDigest,
           purpose: "public_profile_enrichment",
           scope: "public_sources",
           fenceToken,
@@ -1470,7 +2115,8 @@ function buildProfileSearchHandler({ adapters, guards, now }) {
         });
         const result = await search.search({
           actorUid: actor.uid,
-          subject: { name, email, country, contact },
+          subject,
+          subjectDigest,
           consentReceipt,
           consentConsumptionId,
           model: "gemini-2.0-flash-001",
@@ -1683,3 +2329,4 @@ export const AI_RUNTIME_BATCH_CANDIDATE_SLUGS = SLUGS;
 export const AI_RUNTIME_BATCH_CANDIDATE_STATE = "INVENTORY_FROZEN_DEFAULT_OFF";
 export const AI_RUNTIME_BATCH_READ_ONLY_MCP_TOOLS = READ_ONLY_MCP_TOOLS;
 export const AI_RUNTIME_BATCH_MODEL_PROFILES = HUSHH_AI_MODELS;
+export const AI_RUNTIME_BATCH_PROFILE_SUBJECT_DIGEST = profileSubjectDigest;
