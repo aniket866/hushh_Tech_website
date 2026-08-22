@@ -22,11 +22,13 @@ import {
   SEVEN_BUCKET_ACTIVATION,
   SEVEN_BUCKET_CONTRACT,
   ZERO_GRANT_POLICY_EVIDENCE_SCHEMA,
+  buildCombinedSourceSummary,
   buildSeventhTargetMetadata,
   seventhSourceFingerprint,
   seventhSourceObjectId,
   seventhTargetObjectKey,
   validateSeventhSourceArtifact,
+  validateCombinedChangeManifest,
   validateSevenBucketActivation,
   validateSevenBucketContract,
 } from "../scripts/migration/storage-seven-bucket-contract.mjs";
@@ -262,6 +264,73 @@ describe("combined canonical seven-bucket migration", () => {
     )).toBe(true);
   });
 
+  it("builds the combined source summary from the real JSONL validator shape", () => {
+    const source = createKnownSource();
+    const actualShape = {
+      ...source,
+      bucketCount: undefined,
+      buckets: undefined,
+      bucketRecords: source.buckets,
+    };
+    const summary = buildCombinedSourceSummary({
+      knownSource: actualShape,
+      knownSourceFileDigestSha256: "7".repeat(64),
+      seventhSource: createSeventhSource(),
+    });
+    expect(summary).toMatchObject({
+      bucketCount: 7,
+      objectCount: 140,
+      totalBytes: 1_574_621_367,
+      knownSix: { bucketCount: 6, objectCount: 124, totalBytes: 111_078_397 },
+    });
+  });
+
+  it("rejects the old pre-copy schema plus manifest, head, path, and evidence drift", () => {
+    const reviewedCommitSha = "d".repeat(40);
+    const manifest = createChangeManifest(reviewedCommitSha);
+    expect(() => validateCombinedChangeManifest({
+      ...manifest,
+      schemaVersion: "hushh-tech-storage-precopy-iam-change-manifest-v1",
+      liveEvidence: { evidenceDigestSha256: "e".repeat(64) },
+    })).toThrowError(expect.objectContaining({ code: "COMBINED_CHANGE_MANIFEST_SCHEMA" }));
+    expect(() => validateCombinedChangeManifest({
+      ...manifest,
+      reviewedCommitSha: "e".repeat(40),
+    })).toThrowError(expect.objectContaining({
+      code: "COMBINED_CHANGE_MANIFEST_DIGEST_MISMATCH",
+    }));
+    expect(() => validateCombinedChangeManifest({
+      ...manifest,
+      changedPaths: manifest.changedPaths.map((entry, index) =>
+        index === 0 ? { ...entry, sha256: "f".repeat(64) } : entry),
+    })).toThrowError(expect.objectContaining({
+      code: "COMBINED_CHANGE_MANIFEST_DIGEST_MISMATCH",
+    }));
+
+    const knownSource = createKnownSource();
+    const planInputs = {
+      activation: SEVEN_BUCKET_ACTIVATION,
+      changeManifest: manifest,
+      changeManifestFileDigestSha256: "e".repeat(64),
+      knownSource,
+      knownSourceFileDigestSha256: "7".repeat(64),
+      seventhSource: createSeventhSource(),
+      knownSixPlan: createKnownPlan(knownSource),
+      knownSixPlanFileDigestSha256: "8".repeat(64),
+      knownSixPreflightFileDigestSha256: "9".repeat(64),
+      knownSixPreflightDigestSha256: "a".repeat(64),
+      seventhPreflightFileDigestSha256: "b".repeat(64),
+      seventhPreflightDigestSha256: "c".repeat(64),
+      seventhPreflightSafe: true,
+      seventhNamespaceObjectCount: 0,
+      zeroGrantPolicyEvidence: createZeroGrantEvidence(),
+      reviewedCommitSha: "e".repeat(40),
+    };
+    expect(() => buildCombinedSevenBucketPlan(planInputs)).toThrowError(
+      expect.objectContaining({ code: "COMBINED_CHANGE_MANIFEST_COMMIT_MISMATCH" }),
+    );
+  });
+
   it("rejects hardlinked private artifacts", () => {
     const directory = mkdtempSync("/private/tmp/seven-bucket-hardlink-");
     const original = join(directory, "source.json");
@@ -399,6 +468,25 @@ describe("combined canonical seven-bucket migration", () => {
       reviewerPublicKeyPem: publicPem,
       now: Date.parse("2026-08-22T01:30:00.000Z"),
     })).toThrowError(expect.objectContaining({ code: "COMBINED_APPROVAL_SCOPE_MISMATCH" }));
+
+    const evidenceDriftPlan = {
+      ...plan,
+      knownSixPreflightDigestSha256: "1".repeat(64),
+      planDigestSha256: null as string | null,
+    };
+    evidenceDriftPlan.planDigestSha256 = calculateSelfBoundDigest(
+      evidenceDriftPlan,
+      "planDigestSha256",
+    );
+    expect(() => validateCombinedSevenBucketApproval({
+      approval,
+      approvalFileDigestSha256: "0".repeat(64),
+      plan: evidenceDriftPlan,
+      planFileDigestSha256: "f".repeat(64),
+      zeroGrantPolicyEvidence: policy,
+      reviewerPublicKeyPem: publicPem,
+      now: Date.parse("2026-08-22T01:30:00.000Z"),
+    })).toThrowError(expect.objectContaining({ code: "COMBINED_APPROVAL_ARTIFACT_MISMATCH" }));
   });
 
   it("touches zero dependency factories for either false activation field", async () => {

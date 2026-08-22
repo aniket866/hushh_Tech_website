@@ -674,6 +674,7 @@ export const buildCombinedSourceSummary = ({
   seventhSource,
 }) => {
   validateKnownSixSource(knownSource);
+  const knownBucketCount = knownSource.bucketCount ?? knownSource.bucketRecords?.length;
   requireSha256(
     knownSourceFileDigestSha256,
     "KNOWN_SIX_FILE_DIGEST_INVALID",
@@ -684,14 +685,14 @@ export const buildCombinedSourceSummary = ({
   }
   const summary = {
     schemaVersion: "hushh-tech-storage-seven-bucket-source-summary-v1",
-    bucketCount: knownSource.bucketCount + 1,
+    bucketCount: knownBucketCount + 1,
     objectCount: knownSource.objectCount + seventhSource.objectCount,
     totalBytes: knownSource.totalBytes + seventhSource.totalBytes,
     knownSix: {
       sourceInventoryFileDigestSha256: knownSourceFileDigestSha256,
       sourceInventoryDigestSha256: knownSource.digestSha256,
       sourceArtifactDigestSha256: knownSource.sourceArtifactDigestSha256,
-      bucketCount: knownSource.bucketCount,
+      bucketCount: knownBucketCount,
       objectCount: knownSource.objectCount,
       totalBytes: knownSource.totalBytes,
     },
