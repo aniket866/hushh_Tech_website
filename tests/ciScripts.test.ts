@@ -202,7 +202,7 @@ describe("CI workflow scripts", () => {
     expect(orchestrator).toContain("npm ci --ignore-scripts");
     expect(orchestrator).toContain("npm run check");
     expect(orchestrator).toContain("npm audit --omit=dev");
-    expect(governance).toContain("8. `GCP Service Foundation`");
+    expect(governance).toContain("9. `GCP Service Foundation`");
   });
 
   it("runs the network-off Cloud SQL attestor on its exact Node runtime", () => {
@@ -238,7 +238,7 @@ describe("CI workflow scripts", () => {
       expect(workflow).toContain("run: npm run gcp:migration:check-cloudsql-attestor");
       expect(workflow).toContain("needs.gcp-cloudsql-attestor.result");
     }
-    expect(governance).toContain("9. `GCP Cloud SQL Attestor`");
+    expect(governance).toContain("10. `GCP Cloud SQL Attestor`");
   });
 
   it("registers each Hushh Research compatibility route once", () => {
