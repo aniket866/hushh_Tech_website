@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { RuntimeError } from "../errors.js";
 
 const JSON_HEADERS = Object.freeze({
@@ -6,16 +8,58 @@ const JSON_HEADERS = Object.freeze({
 });
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-const SOURCE_PINS = Object.freeze({
-  "ceo-calendar-booking": Object.freeze({ source: "063d336c9142cf5591f802da7c0eb8f508255e27a73bd2447e1a0a86f43b6559", live: "9a0626670fdff5690f4432d8d97e6e9839b71053da7b0ed712db8a17021646f6" }),
-  "coins-credit-notification": Object.freeze({ source: "206932300bcee3c16dddd9f020c2295f3fb3d8d3eb41c748b32e3a308c353353", live: "d9ffdf0335cea5580514e4bf165fbf7746aa9a24ee0a7a2f57a4487ee5118a2b" }),
-  "coins-deduction-notification": Object.freeze({ source: "b0dd1a82745024d78a90ab3e1921e5165a0d4b81eeb04ad22db8ab2661007cd6", live: "33d3f4948ae2515865bb9289f8e655aa26c9c7da19a1dc09bc01a37201e065f0" }),
-  "create-verification-session": Object.freeze({ source: "9a5b6367e5b91ca3bc6675b9f72016f2c03ffbc835e16375167864c4dcda5408", live: "68d4e52cae53277f583bb3a13ee54f24f226120d176a1c93d444accce6b71b9d" }),
-  "nda-signed-notification": Object.freeze({ source: "a7f7d6f4ee4619770bc1a6ea280e69289344631e857155d6274eaf1b873a7c7e", live: "71843e045083dc808bcb7f98eb1f7f0b1e79be800da66a9f330de46d692b11fc" }),
-  "nws-score-notification": Object.freeze({ source: "43170a799dbd64acf59a0bd9a0956a9faba83783cf068980c566ae9222fedd2f", live: "864be3d6ea5bca2d666f4803fcca203b60a51fc3e330e335ad9d8a0fcb1e2533" }),
-  "onboarding-funding-name-match": Object.freeze({ source: "f11f8ef2889f843fd6db4629dc707f1a28c6dfdfd1a9f49844ae2106a89a4293", live: "5005de2f287647ffe81bd473230aea0bdc81d2bff3995261ac940d1cb4909b7b" }),
-  "onboarding-proof-of-funds": Object.freeze({ source: "810befa91b3ebf18fce29e020947ccf6df27755c457409e2271c9bd4c687ddb8", live: "4f54923d7b0b6eec86451bf1e5c8f1b8c5a2fe1ab3344b7abe46700e1477cd3c" }),
+const HASH_PATTERN = /^[a-f0-9]{64}$/;
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._~:+/-]{16,200}$/;
+const PROVIDER_MESSAGE_ID_PATTERN = /^[A-Za-z0-9._~:+/@=-]{1,256}$/;
+const OPERATION_LEDGER_DURABILITY = "cloud_sql_unique_operation_key_v1";
+const SOURCE_EVIDENCE = Object.freeze({
+  sourceEvidenceFileSha256: "54d9535f80d3954902da8f99cf84c46609cd7d971d6344c16704bad5e0963703",
+  sourceEvidenceDigest: "abce166ff5f1af61b1ff7fa8f3839b21ff55d8a255efdf520fd724cfa8bba219",
+  canonicalSourceTreeDigest: "2f203e524b8749272f49ae9c4051fefe73e7a877458ac34c2a3cf7b9c322b7d0",
+  currentMetadataDigest: "b15f57a658b2ae2a1e8399551ae9af92db1a652ade7401ad08b1a148567c798b",
+  trafficEvidenceFileSha256: "5db78b99f880423c88528817ca422ab862aa1a42f93699e37b0e4ce03fc90ac0",
+  trafficEvidenceDigest: "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
+  deploymentInventoryDigest: "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
+  terminalMatrixFileSha256: "9c60b8343a615deb05893efaa3e840e1662bb6351363dfb3d0887d2930e0323c",
+  terminalMatrixEvidenceDigest: "e0cb9bb340113878a59088c16d787cf3a487b1558361ea65b3d93d9337f735f9",
 });
+const SOURCE_PINS = Object.freeze({
+  "ceo-calendar-booking": Object.freeze({ source: "063d336c9142cf5591f802da7c0eb8f508255e27a73bd2447e1a0a86f43b6559", live: "9a0626670fdff5690f4432d8d97e6e9839b71053da7b0ed712db8a17021646f6", functionId: "84e3138e-abbf-4554-b93b-a19de756d6de", manifestVersion: 6054, sourceVersion: 6097, verifyJwt: true, deploymentBindingSha256: "f8bdb5fae6f50d5b3b6dc06938dff966de302edd3cc37b9e2edef6cb047b620d" }),
+  "coins-credit-notification": Object.freeze({ source: "206932300bcee3c16dddd9f020c2295f3fb3d8d3eb41c748b32e3a308c353353", live: "d9ffdf0335cea5580514e4bf165fbf7746aa9a24ee0a7a2f57a4487ee5118a2b", functionId: "2794f5bb-724f-4bb0-a8cc-7ddbdaf48f96", manifestVersion: 5510, sourceVersion: 5553, verifyJwt: true, deploymentBindingSha256: "2c8f90e0d70d01a3e2daee9c6b23c304ee93192e9d6037b0e069e6d48f95c605" }),
+  "coins-deduction-notification": Object.freeze({ source: "b0dd1a82745024d78a90ab3e1921e5165a0d4b81eeb04ad22db8ab2661007cd6", live: "33d3f4948ae2515865bb9289f8e655aa26c9c7da19a1dc09bc01a37201e065f0", functionId: "c932996a-d681-4c1b-b296-c006150c29d3", manifestVersion: 5511, sourceVersion: 5554, verifyJwt: true, deploymentBindingSha256: "6c68319b1fe09728199044a2bb33fdceb81031556a3d4b1579dd4a7600788c6d" }),
+  "create-verification-session": Object.freeze({ source: "9a5b6367e5b91ca3bc6675b9f72016f2c03ffbc835e16375167864c4dcda5408", live: "68d4e52cae53277f583bb3a13ee54f24f226120d176a1c93d444accce6b71b9d", functionId: "b5f6d633-133b-4f54-a18b-3023d15faf30", manifestVersion: 5569, sourceVersion: 5612, verifyJwt: false, deploymentBindingSha256: "d0217d67dd93ab52ca1218f19474b41560f77bf040147e596189edf1fa1991e8" }),
+  "nda-signed-notification": Object.freeze({ source: "a7f7d6f4ee4619770bc1a6ea280e69289344631e857155d6274eaf1b873a7c7e", live: "71843e045083dc808bcb7f98eb1f7f0b1e79be800da66a9f330de46d692b11fc", functionId: "2d961ec8-deed-4cdc-a00a-2d61560dd1a9", manifestVersion: 6325, sourceVersion: 6368, verifyJwt: true, deploymentBindingSha256: "243b82f94e1eb6801c2431133d6bdffee6a072efc8f240029df7366aef00c3d3" }),
+  "nws-score-notification": Object.freeze({ source: "43170a799dbd64acf59a0bd9a0956a9faba83783cf068980c566ae9222fedd2f", live: "864be3d6ea5bca2d666f4803fcca203b60a51fc3e330e335ad9d8a0fcb1e2533", functionId: "4925c7a1-8163-4493-ae59-89f57f9e4cf3", manifestVersion: 5501, sourceVersion: 5544, verifyJwt: false, deploymentBindingSha256: "1abf397a5ab5b2761b89ad73df32352fcec57d8a86692ac7f944c26697fff845" }),
+  "onboarding-funding-name-match": Object.freeze({ source: "f11f8ef2889f843fd6db4629dc707f1a28c6dfdfd1a9f49844ae2106a89a4293", live: "5005de2f287647ffe81bd473230aea0bdc81d2bff3995261ac940d1cb4909b7b", functionId: "458116f3-1605-48e6-ac4f-4babbbbd56a6", manifestVersion: 2928, sourceVersion: 2971, verifyJwt: true, deploymentBindingSha256: "82f4a9c0ef1b49ac5930b9c3e29397bbb4615f11631e24b35d482e4631950a2c" }),
+  "onboarding-proof-of-funds": Object.freeze({ source: "810befa91b3ebf18fce29e020947ccf6df27755c457409e2271c9bd4c687ddb8", live: "4f54923d7b0b6eec86451bf1e5c8f1b8c5a2fe1ab3344b7abe46700e1477cd3c", functionId: "7108be41-f77f-4eda-b812-c74b0d9d9a24", manifestVersion: 3070, sourceVersion: 3113, verifyJwt: true, deploymentBindingSha256: "44486613074d5164c5d4b4f8c51d2c5ef77b0de4887f09041d530c85b6edbce6" }),
+});
+
+const AUTHORITATIVE_BLOCKER_CODES = Object.freeze([
+  "SOURCE_BUNDLE_VERSION_UNBOUND",
+  "SOURCE_METADATA_END_CHECK_MISSING",
+  "SOURCE_REVISION_UNPROVEN",
+  "SOURCE_VERSION_DRIFT",
+  "TARGET_CONTRACT_MISSING",
+  "TARGET_REGISTRY_NOT_ENABLED",
+]);
+
+function blockerEvidence(pin) {
+  return Object.freeze([
+    Object.freeze({ code: "SOURCE_BUNDLE_VERSION_UNBOUND", evidence: "NOT_PROVEN_WITHOUT_END_METADATA_CHECK" }),
+    Object.freeze({ code: "SOURCE_METADATA_END_CHECK_MISSING", evidence: "NOT_PERFORMED_IN_V2_BLOCKING" }),
+    Object.freeze({ code: "SOURCE_REVISION_UNPROVEN", evidence: "NOT_PROVEN" }),
+    Object.freeze({ code: "SOURCE_VERSION_DRIFT", evidence: `manifest=${pin.manifestVersion};current=${pin.sourceVersion}` }),
+    Object.freeze({ code: "TARGET_CONTRACT_MISSING", evidence: "terminal contract entry absent" }),
+    Object.freeze({ code: "TARGET_REGISTRY_NOT_ENABLED", evidence: "INVENTORY_FROZEN" }),
+  ]);
+}
+
+export const NOTIFY_WRITE_SOURCE_EVIDENCE = SOURCE_EVIDENCE;
+export const NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(SOURCE_PINS).map(([slug, pin]) => [slug, blockerEvidence(pin)]),
+  ),
+);
 
 export const NOTIFY_WRITE_SOURCE_PINS = SOURCE_PINS;
 export const NOTIFY_WRITE_SLUGS = Object.freeze(Object.keys(SOURCE_PINS).sort());
@@ -82,13 +126,116 @@ function actorUid(actor) {
   fail("ACCESS_DENIED", "Access denied.", 403);
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function stableJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+}
+
+function exactKeys(value, expected) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join("\0") === [...expected].sort().join("\0")
+  );
+}
+
+function approvalMaterial(slug, row) {
+  return stableJson({
+    schemaVersion: 1,
+    slug,
+    checkedInSourceSha256: row.checkedInSourceSha256,
+    liveV2BundleSha256: row.liveV2BundleSha256,
+    functionId: row.functionId,
+    manifestVersion: row.manifestVersion,
+    sourceVersion: row.sourceVersion,
+    verifyJwt: row.verifyJwt,
+    metadataEndCheckPassed: row.metadataEndCheckPassed,
+    metadataEndCheckDigestSha256: row.metadataEndCheckDigestSha256,
+    deploymentBindingSha256: row.deploymentBindingSha256,
+    sourceEvidenceFileSha256: row.sourceEvidenceFileSha256,
+    sourceEvidenceDigest: row.sourceEvidenceDigest,
+    canonicalSourceTreeDigest: row.canonicalSourceTreeDigest,
+    currentMetadataDigest: row.currentMetadataDigest,
+    trafficEvidenceFileSha256: row.trafficEvidenceFileSha256,
+    trafficEvidenceDigest: row.trafficEvidenceDigest,
+    deploymentInventoryDigest: row.deploymentInventoryDigest,
+    terminalMatrixFileSha256: row.terminalMatrixFileSha256,
+    terminalMatrixEvidenceDigest: row.terminalMatrixEvidenceDigest,
+    authoritativeBlockers: row.authoritativeBlockers,
+  });
+}
+
+export function calculateNotifyWriteApprovalBinding(slug, row) {
+  return sha256(approvalMaterial(slug, row));
+}
+
+export function calculateNotifyWriteEndMetadataBinding(slug, row) {
+  return sha256(stableJson({
+    schemaVersion: 1,
+    slug,
+    functionId: row.functionId,
+    sourceVersion: row.sourceVersion,
+    liveV2BundleSha256: row.liveV2BundleSha256,
+    metadataEndCheckPassed: row.metadataEndCheckPassed,
+    currentMetadataDigest: row.currentMetadataDigest,
+    deploymentBindingSha256: row.deploymentBindingSha256,
+  }));
+}
+
 function requireEvidence(evidence, slug) {
   const pin = SOURCE_PINS[slug];
   const row = evidence?.[slug];
+  const blockers = NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS[slug];
+  const expectedFields = [
+    "approved",
+    "schemaVersion",
+    "checkedInSourceSha256",
+    "liveV2BundleSha256",
+    "functionId",
+    "manifestVersion",
+    "sourceVersion",
+    "verifyJwt",
+    "metadataEndCheckPassed",
+    "metadataEndCheckDigestSha256",
+    "deploymentBindingSha256",
+    "sourceEvidenceFileSha256",
+    "sourceEvidenceDigest",
+    "canonicalSourceTreeDigest",
+    "currentMetadataDigest",
+    "trafficEvidenceFileSha256",
+    "trafficEvidenceDigest",
+    "deploymentInventoryDigest",
+    "terminalMatrixFileSha256",
+    "terminalMatrixEvidenceDigest",
+    "authoritativeBlockers",
+    "bindingSha256",
+  ];
   if (
+    !exactKeys(row, expectedFields) ||
     row?.approved !== true ||
-    row.sourceSha256 !== pin.source ||
-    row.liveBundleSha256 !== pin.live
+    row.schemaVersion !== 1 ||
+    row.checkedInSourceSha256 !== pin.source ||
+    row.liveV2BundleSha256 !== pin.live ||
+    row.functionId !== pin.functionId ||
+    row.manifestVersion !== pin.manifestVersion ||
+    row.sourceVersion !== pin.sourceVersion ||
+    !Number.isSafeInteger(row.sourceVersion) ||
+    row.sourceVersion < 1 ||
+    row.verifyJwt !== pin.verifyJwt ||
+    row.metadataEndCheckPassed !== true ||
+    row.deploymentBindingSha256 !== pin.deploymentBindingSha256 ||
+    Object.entries(SOURCE_EVIDENCE).some(([key, value]) => row[key] !== value) ||
+    row.authoritativeBlockers?.map(({ code }) => code).join("\0") !== AUTHORITATIVE_BLOCKER_CODES.join("\0") ||
+    stableJson(row.authoritativeBlockers) !== stableJson(blockers) ||
+    row.metadataEndCheckDigestSha256 !== calculateNotifyWriteEndMetadataBinding(slug, row) ||
+    row.bindingSha256 !== calculateNotifyWriteApprovalBinding(slug, row) ||
+    !HASH_PATTERN.test(row.bindingSha256)
   ) {
     fail("CANDIDATE_EVIDENCE_REQUIRED");
   }
@@ -106,6 +253,268 @@ function requireDatabase(database) {
   return database;
 }
 
+function requireOperationLedger(operationLedger) {
+  const methods = ["claim", "complete", "markRetryable", "reserveDelivery", "finishDelivery"];
+  if (
+    operationLedger?.configured !== true ||
+    operationLedger.durability !== OPERATION_LEDGER_DURABILITY ||
+    methods.some((name) => typeof operationLedger[name] !== "function")
+  ) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  return operationLedger;
+}
+
+function canonicalIdempotencyKey(request) {
+  const raw = request?.headers?.["idempotency-key"];
+  if (
+    typeof raw !== "string" ||
+    raw !== raw.trim() ||
+    !IDEMPOTENCY_KEY_PATTERN.test(raw)
+  ) {
+    fail("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key required.", 400);
+  }
+  return raw;
+}
+
+function actorScope(actor, uid = null) {
+  if (actor?.kind === "firebase" && typeof actor.uid === "string" && actor.uid) {
+    return `firebase:${actor.uid}`;
+  }
+  if (actor?.kind === "google-service") {
+    const identity = String(actor.subject || actor.email || "");
+    if (!identity || identity.length > 320 || /[\u0000-\u001f\u007f]/.test(identity)) {
+      fail("ACCESS_DENIED", "Access denied.", 403);
+    }
+    return `google:${identity}${uid ? `:firebase:${uid}` : ""}`;
+  }
+  fail("ACCESS_DENIED", "Access denied.", 403);
+}
+
+function operationDescriptor({ slug, actor, uid, request, payload }) {
+  const idempotencyKey = canonicalIdempotencyKey(request);
+  const scopeHash = sha256(actorScope(actor, uid));
+  const idempotencyKeyHash = sha256(idempotencyKey);
+  return Object.freeze({
+    slug,
+    operationKey: `${slug}:${sha256(`notify-write-operation-v1\0${slug}\0${scopeHash}\0${idempotencyKey}`)}`,
+    scopeHash,
+    idempotencyKeyHash,
+    payloadHash: sha256(stableJson(payload)),
+  });
+}
+
+function normalizeReplayResponse(response) {
+  if (
+    !exactKeys(response, ["status", "headers", "body"]) ||
+    !Number.isInteger(response.status) ||
+    response.status < 200 ||
+    response.status > 599 ||
+    stableJson(response.headers) !== stableJson(JSON_HEADERS)
+  ) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  return json(response.status, response.body);
+}
+
+function operationFailure(error) {
+  if (error instanceof RuntimeError) return error;
+  return new RuntimeError("PROVIDER_OPERATION_FAILED", "Service unavailable.", 503);
+}
+
+async function callLedger(action) {
+  try {
+    return await action();
+  } catch (error) {
+    if (error instanceof RuntimeError && error.code === "DURABLE_OPERATION_LEDGER_UNAVAILABLE") {
+      throw error;
+    }
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+}
+
+async function runDurableOperation({ operationLedger, descriptor, signal, execute }) {
+  const ledger = requireOperationLedger(operationLedger);
+  const claim = await callLedger(() => ledger.claim({
+    schemaVersion: 1,
+    ...descriptor,
+    signal,
+  }));
+  throwIfAborted(signal);
+  if (
+    claim?.operationKey !== descriptor.operationKey ||
+    claim?.payloadHash !== descriptor.payloadHash
+  ) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  if (claim.disposition === "COMPLETED" && claim.acquired === false) {
+    return normalizeReplayResponse(claim.response);
+  }
+  if (
+    claim.disposition !== "ACQUIRED" ||
+    claim.acquired !== true ||
+    !Number.isSafeInteger(claim.attempt) ||
+    claim.attempt < 1
+  ) {
+    if (claim?.disposition === "PROCESSING") {
+      fail("OPERATION_IN_PROGRESS", "Request is already processing.", 409);
+    }
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+
+  try {
+    const response = await execute(Object.freeze({
+      operationKey: descriptor.operationKey,
+      attempt: claim.attempt,
+      ledger,
+    }));
+    const normalized = normalizeReplayResponse(response);
+    const completion = await callLedger(() => ledger.complete({
+      schemaVersion: 1,
+      operationKey: descriptor.operationKey,
+      payloadHash: descriptor.payloadHash,
+      response: normalized,
+      signal,
+    }));
+    if (
+      completion?.state !== "COMPLETED" ||
+      completion.operationKey !== descriptor.operationKey ||
+      completion.payloadHash !== descriptor.payloadHash
+    ) {
+      fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+    }
+    throwIfAborted(signal);
+    return normalized;
+  } catch (error) {
+    const bounded = operationFailure(error);
+    const receipt = await callLedger(() => ledger.markRetryable({
+      schemaVersion: 1,
+      operationKey: descriptor.operationKey,
+      payloadHash: descriptor.payloadHash,
+      failureCode: bounded.code,
+    }));
+    if (
+      !["RETRYABLE", "COMPLETED"].includes(receipt?.state) ||
+      receipt.operationKey !== descriptor.operationKey ||
+      receipt.payloadHash !== descriptor.payloadHash
+    ) {
+      fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+    }
+    throw bounded;
+  }
+}
+
+function providerFailure(error, prefix) {
+  const rawCode = String(error?.code ?? error?.name ?? "").toUpperCase();
+  const timedOut = ["ABORTERROR", "ABORT_ERR", "DEADLINE_EXCEEDED", "ETIMEDOUT", "TIMEOUT"].some(
+    (value) => rawCode.includes(value),
+  );
+  return new RuntimeError(
+    timedOut ? `${prefix}_TIMEOUT` : `${prefix}_FAILED`,
+    "Service unavailable.",
+    503,
+  );
+}
+
+async function callProvider(action, prefix) {
+  try {
+    return await action();
+  } catch (error) {
+    throw providerFailure(error, prefix);
+  }
+}
+
+function providerMessageId(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return typeof value === "string" && PROVIDER_MESSAGE_ID_PATTERN.test(value)
+    ? value
+    : null;
+}
+
+async function sendDurableMail({
+  ledger,
+  operationKey,
+  delivery,
+  provider,
+  recipients,
+  data,
+  signal,
+}) {
+  const deliveryKey = `${operationKey}:${delivery}`;
+  const reservation = await callLedger(() => ledger.reserveDelivery({
+    schemaVersion: 1,
+    operationKey,
+    deliveryKey,
+    channel: "email",
+    template: delivery,
+    recipients,
+    signal,
+  }));
+  if (reservation?.deliveryKey !== deliveryKey || reservation?.persisted !== true) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  if (reservation.state === "SENT" && reservation.acquired === false) {
+    return Object.freeze({ success: true, replayed: true, messageId: providerMessageId(reservation.providerMessageId) });
+  }
+  if (reservation.state === "UNKNOWN" && reservation.acquired === false) {
+    fail("DELIVERY_OUTCOME_UNKNOWN");
+  }
+  if (
+    reservation.state !== "PENDING" ||
+    reservation.acquired !== true ||
+    !Number.isSafeInteger(reservation.attempt) ||
+    reservation.attempt < 1
+  ) {
+    if (reservation?.state === "PENDING") {
+      fail("DELIVERY_IN_PROGRESS", "Request is already processing.", 409);
+    }
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+
+  let result;
+  try {
+    result = await callProvider(
+      () => provider.send({
+        template: delivery,
+        recipients,
+        data,
+        idempotencyKey: deliveryKey,
+        signal,
+      }),
+      "MAIL_SEND",
+    );
+  } catch (error) {
+    const receipt = await callLedger(() => ledger.finishDelivery({
+      schemaVersion: 1,
+      operationKey,
+      deliveryKey,
+      status: "UNKNOWN",
+      failureCode: error.code,
+    }));
+    if (receipt?.deliveryKey !== deliveryKey || receipt?.state !== "UNKNOWN") {
+      fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+    }
+    throw error;
+  }
+
+  const success = result?.success === true;
+  const status = success ? "SENT" : "FAILED";
+  const messageId = success ? providerMessageId(result?.messageId) : null;
+  const failureCode = success ? null : "MAIL_SEND_REJECTED";
+  const receipt = await callLedger(() => ledger.finishDelivery({
+    schemaVersion: 1,
+    operationKey,
+    deliveryKey,
+    status,
+    providerMessageId: messageId,
+    failureCode,
+  }));
+  if (receipt?.deliveryKey !== deliveryKey || receipt?.state !== status) {
+    fail("DURABLE_OPERATION_LEDGER_UNAVAILABLE");
+  }
+  return Object.freeze({ success, replayed: false, messageId, failureCode });
+}
+
 async function uidInTransaction(actor, client) {
   const direct = actorUid(actor);
   if (direct) return direct;
@@ -119,7 +528,10 @@ async function uidInTransaction(actor, client) {
 
 async function identityFor(identityDirectory, uid, signal) {
   const provider = requireProvider(identityDirectory, ["getUser"], "IDENTITY_DIRECTORY_UNAVAILABLE");
-  const user = await provider.getUser(uid, { signal });
+  const user = await callProvider(
+    () => provider.getUser(uid, { signal }),
+    "IDENTITY_DIRECTORY",
+  );
   throwIfAborted(signal);
   const rawEmail = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
   if (user?.uid !== uid || !EMAIL_PATTERN.test(rawEmail) || rawEmail.length > 320) {
@@ -238,6 +650,7 @@ function maxBalanceCents(rows) {
 
 export function createNotifyWriteBatchHandlers({
   evidence = null,
+  operationLedger = null,
   calendar = null,
   mailer = null,
   identityDirectory = null,
@@ -256,7 +669,10 @@ export function createNotifyWriteBatchHandlers({
       const params = new URLSearchParams(request.route.search);
       const days = params.has("days") ? finite(params.get("days"), 1, 31) : 14;
       if (!Number.isInteger(days)) fail("INVALID_REQUEST", "Invalid request.", 400);
-      const availability = await provider.availability({ days, signal });
+      const availability = await callProvider(
+        () => provider.availability({ days, signal }),
+        "CALENDAR_READ",
+      );
       throwIfAborted(signal);
       if (!Array.isArray(availability)) fail("CALENDAR_RESPONSE_INVALID");
       return json(200, { success: true, ceo: { name: "Manish Sainani", email: "manish@hushh.ai" }, timezone: "America/Los_Angeles", meetingDuration: 60, availability });
@@ -267,18 +683,55 @@ export function createNotifyWriteBatchHandlers({
     const start = iso(body.startTime, { futureOf: clock, maxFutureMs: 62 * 86_400_000 });
     const end = iso(body.endTime);
     if (end.getTime() - start.getTime() !== 3_600_000) fail("INVALID_REQUEST", "Invalid request.", 400);
-    const identity = await identityFor(identityDirectory, uid, signal);
     const db = requireDatabase(database);
-    await db.transaction(async (client) => client.query("SELECT 1 FROM public.ceo_meeting_payments WHERE user_id = $1 LIMIT 1", [uid]));
-    const result = await provider.book({ startTime: start.toISOString(), endTime: end.toISOString(), attendeeEmail: identity.email, attendeeName: text(body.attendeeName, 160) || identity.name, requestId: request.requestId, signal });
-    throwIfAborted(signal);
-    const eventId = text(result?.eventId, 256, { required: true });
-    const meetLink = text(result?.meetLink, 2_048);
-    await db.transaction(async (client) => client.query(
-      "UPDATE public.ceo_meeting_payments SET calendly_booked = TRUE, meeting_event_id = $2, meeting_start_time = $3, updated_at = $4 WHERE user_id = $1",
-      [uid, eventId, start.toISOString(), clock.toISOString()],
-    ));
-    return json(200, { success: true, eventId, ...(meetLink ? { meetLink } : {}), startTime: start.toISOString(), endTime: end.toISOString(), message: `Meeting booked with Manish Sainani. Calendar invite sent to ${identity.email}.` });
+    const requestedAttendeeName = text(body.attendeeName, 160);
+    const descriptor = operationDescriptor({
+      slug: "ceo-calendar-booking",
+      actor,
+      uid,
+      request,
+      payload: {
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        attendeeName: requestedAttendeeName,
+      },
+    });
+    return runDurableOperation({
+      operationLedger,
+      descriptor,
+      signal,
+      execute: async ({ operationKey }) => {
+        await db.transaction(async (client) => client.query("SELECT 1 FROM public.ceo_meeting_payments WHERE user_id = $1 LIMIT 1", [uid]));
+        const identity = await identityFor(identityDirectory, uid, signal);
+        const attendeeName = requestedAttendeeName || identity.name;
+        const result = await callProvider(
+          () => provider.book({
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            attendeeEmail: identity.email,
+            attendeeName,
+            idempotencyKey: operationKey,
+            signal,
+          }),
+          "CALENDAR_WRITE",
+        );
+        throwIfAborted(signal);
+        const eventId = text(result?.eventId, 256, { required: true });
+        const meetLink = text(result?.meetLink, 2_048);
+        await db.transaction(async (client) => client.query(
+          "UPDATE public.ceo_meeting_payments SET calendly_booked = TRUE, meeting_event_id = $2, meeting_start_time = $3, updated_at = $4 WHERE user_id = $1",
+          [uid, eventId, start.toISOString(), clock.toISOString()],
+        ));
+        return json(200, {
+          success: true,
+          eventId,
+          ...(meetLink ? { meetLink } : {}),
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          message: "Meeting booked. Calendar invite sent.",
+        });
+      },
+    });
   }
 
   async function notifyCoins(kind, { actor, request, signal }) {
@@ -296,13 +749,50 @@ export function createNotifyWriteBatchHandlers({
     );
     const recipient = email(body.recipientEmail);
     const uid = actorUid(actor);
-    const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
-    if (identity) assertRecipient(actor, recipient, identity);
     const amount = body[amountKey] === undefined ? 300_000 : finite(body[amountKey], 1, 1_000_000_000_000);
-    const result = await provider.send({ template: kind === "credit" ? "coins_credit" : "coins_deduction", recipients: [recipient], data: { recipientName: text(body.recipientName, 160) || identity?.name || "Hushh User", coins: amount, meetingDate: text(body.meetingDate, 64) || "TBD", meetingTime: text(body.meetingTime, 64) || "TBD" }, idempotencyKey: `${slug}:${request.requestId}`, signal });
-    throwIfAborted(signal);
-    if (result?.success !== true) return json(500, { error: text(result?.error, 512) || "Failed to send email" });
-    return json(200, { success: true, message: kind === "credit" ? "Coins credit email sent" : "Deduction email sent", messageId: text(result.messageId, 256) });
+    const delivery = kind === "credit" ? "coins_credit" : "coins_deduction";
+    const requestedRecipientName = text(body.recipientName, 160);
+    const mailFields = {
+      coins: amount,
+      meetingDate: text(body.meetingDate, 64) || "TBD",
+      meetingTime: text(body.meetingTime, 64) || "TBD",
+    };
+    const descriptor = operationDescriptor({
+      slug,
+      actor,
+      uid,
+      request,
+      payload: { delivery, recipients: [recipient], requestedRecipientName, mailFields },
+    });
+    return runDurableOperation({
+      operationLedger,
+      descriptor,
+      signal,
+      execute: async ({ operationKey, ledger }) => {
+        const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
+        if (identity) assertRecipient(actor, recipient, identity);
+        const data = {
+          recipientName: requestedRecipientName || identity?.name || "Hushh User",
+          ...mailFields,
+        };
+        const result = await sendDurableMail({
+          ledger,
+          operationKey,
+          delivery,
+          provider,
+          recipients: [recipient],
+          data,
+          signal,
+        });
+        throwIfAborted(signal);
+        if (!result.success) fail("MAIL_SEND_REJECTED");
+        return json(200, {
+          success: true,
+          message: kind === "credit" ? "Coins credit email sent" : "Deduction email sent",
+          ...(result.messageId ? { messageId: result.messageId } : {}),
+        });
+      },
+    });
   }
 
   async function verification({ actor, request, database, signal }) {
@@ -311,26 +801,51 @@ export function createNotifyWriteBatchHandlers({
     const body = exactObject(request.body, ["email", "phone", "returnUrl", "metadata"]);
     const uid = actorUid(actor);
     if (!uid) fail("ACCESS_DENIED", "Access denied.", 403);
-    const identity = await identityFor(identityDirectory, uid, signal);
     const requestedEmail = email(body.email, false);
-    if (requestedEmail && requestedEmail !== identity.email) fail("RECIPIENT_MISMATCH", "Access denied.", 403);
     const phone = text(body.phone, 32);
     const safeReturnUrl = safeSiteUrl(siteUrl, body.returnUrl, "/onboarding/verify-complete");
     const db = requireDatabase(database);
-    await db.transaction(async (client) => client.query("SELECT 1 FROM public.identity_verifications WHERE user_id = $1 LIMIT 1", [uid]));
-    const session = await provider.create({ userId: uid, email: requestedEmail || identity.email, phone, returnUrl: safeReturnUrl, metadata: { ...metadata(body.metadata), user_id: uid }, idempotencyKey: `identity:${request.requestId}`, signal });
-    throwIfAborted(signal);
-    const sessionId = text(session?.id, 256, { required: true });
-    const sessionUrl = text(session?.url, 2_048, { required: true });
-    const status = text(session?.status, 64, { required: true });
-    const clientSecret = text(session?.clientSecret, 2_048);
-    const stored = await db.transaction(async (client) => client.query(
-      "INSERT INTO public.identity_verifications (user_id, stripe_session_id, stripe_status, provided_email, provided_phone, stripe_response, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (user_id) DO UPDATE SET stripe_session_id=EXCLUDED.stripe_session_id, stripe_status=EXCLUDED.stripe_status, provided_email=EXCLUDED.provided_email, provided_phone=EXCLUDED.provided_phone, stripe_response=EXCLUDED.stripe_response RETURNING id",
-      [uid, sessionId, status, requestedEmail || identity.email, phone, { id: sessionId, status, type: session?.type ?? null, created: session?.created ?? null }, now().toISOString()],
-    ));
-    const verificationId = stored?.rows?.[0]?.id;
-    if (!verificationId) fail("DATABASE_RESPONSE_INVALID");
-    return json(200, { success: true, session: { id: sessionId, url: sessionUrl, status, ...(clientSecret ? { client_secret: clientSecret } : {}) }, verification_id: verificationId });
+    const boundedMetadata = metadata(body.metadata);
+    const descriptor = operationDescriptor({
+      slug: "create-verification-session",
+      actor,
+      uid,
+      request,
+      payload: { requestedEmail, phone, returnUrl: safeReturnUrl, metadata: boundedMetadata },
+    });
+    return runDurableOperation({
+      operationLedger,
+      descriptor,
+      signal,
+      execute: async ({ operationKey }) => {
+        await db.transaction(async (client) => client.query("SELECT 1 FROM public.identity_verifications WHERE user_id = $1 LIMIT 1", [uid]));
+        const identity = await identityFor(identityDirectory, uid, signal);
+        if (requestedEmail && requestedEmail !== identity.email) fail("RECIPIENT_MISMATCH", "Access denied.", 403);
+        const providerInput = {
+          userId: uid,
+          email: requestedEmail || identity.email,
+          phone,
+          returnUrl: safeReturnUrl,
+          metadata: { ...boundedMetadata, user_id: uid },
+        };
+        const session = await callProvider(
+          () => provider.create({ ...providerInput, idempotencyKey: operationKey, signal }),
+          "VERIFICATION_PROVIDER",
+        );
+        throwIfAborted(signal);
+        const sessionId = text(session?.id, 256, { required: true });
+        const sessionUrl = text(session?.url, 2_048, { required: true });
+        const status = text(session?.status, 64, { required: true });
+        const clientSecret = text(session?.clientSecret, 2_048);
+        const stored = await db.transaction(async (client) => client.query(
+          "INSERT INTO public.identity_verifications (user_id, stripe_session_id, stripe_status, provided_email, provided_phone, stripe_response, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (user_id) DO UPDATE SET stripe_session_id=EXCLUDED.stripe_session_id, stripe_status=EXCLUDED.stripe_status, provided_email=EXCLUDED.provided_email, provided_phone=EXCLUDED.provided_phone, stripe_response=EXCLUDED.stripe_response RETURNING id",
+          [uid, sessionId, status, requestedEmail || identity.email, phone, { id: sessionId, status, type: session?.type ?? null, created: session?.created ?? null }, now().toISOString()],
+        ));
+        const verificationId = stored?.rows?.[0]?.id;
+        if (!verificationId) fail("DATABASE_RESPONSE_INVALID");
+        return json(200, { success: true, session: { id: sessionId, url: sessionUrl, status, ...(clientSecret ? { client_secret: clientSecret } : {}) }, verification_id: verificationId });
+      },
+    });
   }
 
   async function ndaNotification({ actor, request, database, signal }) {
@@ -343,24 +858,67 @@ export function createNotifyWriteBatchHandlers({
     const documents = body.documentsAcknowledged ?? [];
     if (!Array.isArray(documents) || documents.length > 32 || documents.some((item) => !text(item, 160, { required: true }))) fail("INVALID_REQUEST", "Invalid request.", 400);
     const db = requireDatabase(database);
-    let uid;
-    await db.transaction(async (client) => {
-      uid = await uidInTransaction(actor, client);
-      await client.query("UPDATE public.nda_signatures SET signature_id = $2, signer_user_agent = $3, updated_at = $4 WHERE user_id = $1", [uid, text(body.signatureId, 256), text(body.userAgent, 1_024), now().toISOString()]);
-    });
-    const identity = await identityFor(identityDirectory, uid, signal);
+    canonicalIdempotencyKey(request);
+    const uid = await db.transaction(async (client) => uidInTransaction(actor, client));
     const adminRecipients = Array.isArray(provider.adminRecipients) ? provider.adminRecipients.map((value) => email(value)) : [];
     if (adminRecipients.length < 1 || adminRecipients.length > 16) fail("MAIL_PROVIDER_UNAVAILABLE");
-    const data = { signerName, signerEmail: identity.email, signedAt: text(body.signedAt, 64) || now().toISOString(), ndaVersion: text(body.ndaVersion, 128), pdfUrl: text(body.pdfUrl, 2_048), pdfBase64: pdf, documentsAcknowledged: documents, userAgent: text(body.userAgent, 1_024), signatureId: text(body.signatureId, 256), signedAtLocal: text(body.signedAtLocal, 128), consentVersion: text(body.consentVersion, 128) };
-    const admin = await provider.send({ template: "nda_admin", recipients: adminRecipients, data, idempotencyKey: `nda-admin:${request.requestId}`, signal });
-    const signer = await provider.send({ template: "nda_signer", recipients: [identity.email], data, idempotencyKey: `nda-signer:${request.requestId}`, signal });
-    throwIfAborted(signal);
-    await db.transaction(async (client) => {
-      for (const [type, recipients, result] of [["nda_admin", adminRecipients, admin], ["nda_signer", [identity.email], signer]]) {
-        await client.query("INSERT INTO public.fund_payment_notifications (user_id, notification_type, recipient_email, subject, status, provider_message_id, error_message, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", [uid, type, recipients.join(", "), type === "nda_admin" ? `[Hushh NDA] Agreement Signed by ${signerName}` : "Your signed NDA — Hushh Technologies", result?.success === true ? "sent" : "failed", result?.messageId ?? null, result?.error ?? null, result?.success === true ? now().toISOString() : null]);
-      }
+    const dataWithoutIdentity = { signerName, signedAt: text(body.signedAt, 64) || now().toISOString(), ndaVersion: text(body.ndaVersion, 128), pdfUrl: text(body.pdfUrl, 2_048), pdfBase64: pdf, documentsAcknowledged: documents, userAgent: text(body.userAgent, 1_024), signatureId: text(body.signatureId, 256), signedAtLocal: text(body.signedAtLocal, 128), consentVersion: text(body.consentVersion, 128) };
+    const descriptor = operationDescriptor({
+      slug: "nda-signed-notification",
+      actor,
+      uid,
+      request,
+      payload: { adminRecipients, uid, data: dataWithoutIdentity },
     });
-    return json(200, { success: true, adminSent: admin?.success === true, signerSent: signer?.success === true, pdfMissing: !pdf, email_delivery: { admin: { success: admin?.success === true, error: admin?.error ?? null, recipients: adminRecipients }, signer: { success: signer?.success === true, error: signer?.error ?? null } } });
+    return runDurableOperation({
+      operationLedger,
+      descriptor,
+      signal,
+      execute: async ({ operationKey, ledger }) => {
+        await db.transaction(async (client) => client.query(
+          "UPDATE public.nda_signatures SET signature_id = $2, signer_user_agent = $3, updated_at = $4 WHERE user_id = $1",
+          [uid, text(body.signatureId, 256), text(body.userAgent, 1_024), now().toISOString()],
+        ));
+        const identity = await identityFor(identityDirectory, uid, signal);
+        const data = { ...dataWithoutIdentity, signerEmail: identity.email };
+        // reserveDelivery must persist one unique PENDING row before each send.
+        // finishDelivery updates that same row; no adapter is wired until the
+        // Cloud SQL uniqueness/lease contract has independent live proof.
+        const admin = await sendDurableMail({
+          ledger,
+          operationKey,
+          delivery: "nda_admin",
+          provider,
+          recipients: adminRecipients,
+          data,
+          signal,
+        });
+        throwIfAborted(signal);
+        const signer = await sendDurableMail({
+          ledger,
+          operationKey,
+          delivery: "nda_signer",
+          provider,
+          recipients: [identity.email],
+          data,
+          signal,
+        });
+        throwIfAborted(signal);
+        if (!admin.success || !signer.success) {
+          fail("NDA_DELIVERY_PARTIAL");
+        }
+        return json(200, {
+          success: true,
+          adminSent: true,
+          signerSent: true,
+          pdfMissing: !pdf,
+          email_delivery: {
+            admin: { success: true, replayed: admin.replayed },
+            signer: { success: true, replayed: signer.replayed },
+          },
+        });
+      },
+    });
   }
 
   async function nwsNotification({ actor, request, signal }) {
@@ -370,13 +928,36 @@ export function createNotifyWriteBatchHandlers({
     const body = exactObject(request.body, keys, ["user_email", "user_name", "nws_score", "nws_tier", "total_cash_balance", "total_investment_value", "num_accounts", "account_types"]);
     const recipient = email(body.user_email);
     const uid = actorUid(actor);
-    const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
-    if (identity) assertRecipient(actor, recipient, identity);
     if (!Array.isArray(body.account_types) || body.account_types.length > 32 || body.account_types.some((item) => !text(item, 64, { required: true }))) fail("INVALID_REQUEST", "Invalid request.", 400);
     const data = { user_name: text(body.user_name, 160, { required: true }), nws_score: finite(body.nws_score, 0, 100), nws_tier: text(body.nws_tier, 64, { required: true }), total_cash_balance: finite(body.total_cash_balance, 0, 1e15), total_investment_value: finite(body.total_investment_value, 0, 1e15), num_accounts: finite(body.num_accounts, 0, 10_000), account_types: body.account_types, primary_institution: text(body.primary_institution, 160), address_city: text(body.address_city, 160), address_state: text(body.address_state, 160), identity_verification_score: body.identity_verification_score == null ? null : finite(body.identity_verification_score, 0, 100), profile_url: safeSiteUrl(siteUrl, body.profile_url, "/hushh-user-profile") };
-    const result = await provider.send({ template: "nws_score", recipients: [recipient], data, idempotencyKey: `nws:${request.requestId}`, signal });
-    if (result?.success !== true) return json(500, { error: "Failed to send email", details: text(result?.error, 512) });
-    return json(200, { success: true, email_id: text(result.messageId, 256) });
+    const descriptor = operationDescriptor({
+      slug: "nws-score-notification",
+      actor,
+      uid,
+      request,
+      payload: { delivery: "nws_score", recipients: [recipient], data },
+    });
+    return runDurableOperation({
+      operationLedger,
+      descriptor,
+      signal,
+      execute: async ({ operationKey, ledger }) => {
+        const identity = uid ? await identityFor(identityDirectory, uid, signal) : null;
+        if (identity) assertRecipient(actor, recipient, identity);
+        const result = await sendDurableMail({
+          ledger,
+          operationKey,
+          delivery: "nws_score",
+          provider,
+          recipients: [recipient],
+          data,
+          signal,
+        });
+        throwIfAborted(signal);
+        if (!result.success) fail("MAIL_SEND_REJECTED");
+        return json(200, { success: true, ...(result.messageId ? { email_id: result.messageId } : {}) });
+      },
+    });
   }
 
   async function fundingNameMatch({ actor, request, database, signal }) {

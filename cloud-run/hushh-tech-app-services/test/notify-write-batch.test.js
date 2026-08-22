@@ -9,8 +9,12 @@ import {
 } from "../src/contracts.js";
 import { RuntimeError } from "../src/errors.js";
 import {
+  calculateNotifyWriteApprovalBinding,
+  calculateNotifyWriteEndMetadataBinding,
   createNotifyWriteBatchHandlers,
+  NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS,
   NOTIFY_WRITE_SLUGS,
+  NOTIFY_WRITE_SOURCE_EVIDENCE,
   NOTIFY_WRITE_SOURCE_PINS,
 } from "../src/handlers/notify-write-batch.js";
 import { LEGACY_FUNCTION_REGISTRY } from "../src/registry.js";
@@ -23,19 +27,36 @@ const GOOGLE = Object.freeze({ kind: "google-service", email: "worker@hushh-tech
 const INTERNAL = Object.freeze({ kind: "google-service", email: "gateway@hushh-tech-uat.iam.gserviceaccount.com", subject: "gateway-1" });
 
 function evidence(overrides = {}) {
-  return Object.fromEntries(NOTIFY_WRITE_SLUGS.map((slug) => [slug, {
-    approved: true,
-    sourceSha256: NOTIFY_WRITE_SOURCE_PINS[slug].source,
-    liveBundleSha256: NOTIFY_WRITE_SOURCE_PINS[slug].live,
-    ...overrides[slug],
-  }]));
+  return Object.fromEntries(NOTIFY_WRITE_SLUGS.map((slug) => {
+    const pin = NOTIFY_WRITE_SOURCE_PINS[slug];
+    const override = overrides[slug] ?? {};
+    const row = {
+      approved: true,
+      schemaVersion: 1,
+      checkedInSourceSha256: pin.source,
+      liveV2BundleSha256: pin.live,
+      functionId: pin.functionId,
+      manifestVersion: pin.manifestVersion,
+      sourceVersion: pin.sourceVersion,
+      verifyJwt: pin.verifyJwt,
+      metadataEndCheckPassed: true,
+      metadataEndCheckDigestSha256: null,
+      deploymentBindingSha256: pin.deploymentBindingSha256,
+      ...NOTIFY_WRITE_SOURCE_EVIDENCE,
+      authoritativeBlockers: NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS[slug],
+      ...override,
+    };
+    row.metadataEndCheckDigestSha256 = override.metadataEndCheckDigestSha256 ?? calculateNotifyWriteEndMetadataBinding(slug, row);
+    row.bindingSha256 = override.bindingSha256 ?? calculateNotifyWriteApprovalBinding(slug, row);
+    return [slug, row];
+  }));
 }
 
-function context({ slug, actor = FIREBASE, body = {}, method = "POST", search = "", database = null } = {}) {
+function context({ slug, actor = FIREBASE, body = {}, method = "POST", search = "", database = null, idempotencyKey = "idempotency-test-0001", requestId = "request-test-1" } = {}) {
   return {
     actor,
     database,
-    request: { method, headers: {}, route: { slug, suffix: [], search }, requestId: "request-test-1", body },
+    request: { method, headers: idempotencyKey === null ? {} : { "idempotency-key": idempotencyKey }, route: { slug, suffix: [], search }, requestId, body },
     signal: SIGNAL,
   };
 }
@@ -57,6 +78,69 @@ function db(responder) {
   };
 }
 
+function durableLedger({ beforeClaim = null, beforeReserve = null, beforeFinish = null } = {}) {
+  const operations = new Map();
+  const deliveries = new Map();
+  const calls = [];
+  return {
+    configured: true,
+    durability: "cloud_sql_unique_operation_key_v1",
+    operations,
+    deliveries,
+    calls,
+    async claim(input) {
+      calls.push({ name: "claim", input });
+      await beforeClaim?.(input);
+      const existing = operations.get(input.operationKey);
+      if (existing?.state === "COMPLETED") {
+        assert.equal(existing.payloadHash, input.payloadHash);
+        return { disposition: "COMPLETED", acquired: false, operationKey: input.operationKey, payloadHash: input.payloadHash, response: existing.response };
+      }
+      if (existing?.state === "PROCESSING") {
+        return { disposition: "PROCESSING", acquired: false, operationKey: input.operationKey, payloadHash: input.payloadHash };
+      }
+      const attempt = (existing?.attempt ?? 0) + 1;
+      operations.set(input.operationKey, { state: "PROCESSING", payloadHash: input.payloadHash, attempt });
+      return { disposition: "ACQUIRED", acquired: true, operationKey: input.operationKey, payloadHash: input.payloadHash, attempt };
+    },
+    async complete(input) {
+      calls.push({ name: "complete", input });
+      operations.set(input.operationKey, { state: "COMPLETED", payloadHash: input.payloadHash, response: input.response });
+      return { state: "COMPLETED", operationKey: input.operationKey, payloadHash: input.payloadHash };
+    },
+    async markRetryable(input) {
+      calls.push({ name: "markRetryable", input });
+      const existing = operations.get(input.operationKey);
+      operations.set(input.operationKey, { ...existing, state: "RETRYABLE" });
+      return { state: "RETRYABLE", operationKey: input.operationKey, payloadHash: input.payloadHash };
+    },
+    async reserveDelivery(input) {
+      calls.push({ name: "reserveDelivery", input });
+      await beforeReserve?.(input);
+      const existing = deliveries.get(input.deliveryKey);
+      if (existing?.state === "SENT") {
+        return { state: "SENT", acquired: false, persisted: true, deliveryKey: input.deliveryKey, providerMessageId: existing.providerMessageId };
+      }
+      if (existing?.state === "UNKNOWN") {
+        return { state: "UNKNOWN", acquired: false, persisted: true, deliveryKey: input.deliveryKey };
+      }
+      if (existing?.state === "PENDING") {
+        return { state: "PENDING", acquired: false, persisted: true, deliveryKey: input.deliveryKey };
+      }
+      const attempt = (existing?.attempt ?? 0) + 1;
+      deliveries.set(input.deliveryKey, { state: "PENDING", attempt });
+      return { state: "PENDING", acquired: true, persisted: true, deliveryKey: input.deliveryKey, attempt };
+    },
+    async finishDelivery(input) {
+      calls.push({ name: "finishDelivery", input });
+      await beforeFinish?.(input);
+      const previous = deliveries.get(input.deliveryKey);
+      deliveries.set(input.deliveryKey, { state: input.status, attempt: previous?.attempt ?? 1, providerMessageId: input.providerMessageId ?? null, failureCode: input.failureCode ?? null });
+      return { state: input.status, deliveryKey: input.deliveryKey };
+    },
+  };
+}
+
 function code(error, expected, status = 503) {
   assert.ok(error instanceof RuntimeError);
   assert.equal(error.code, expected);
@@ -68,12 +152,19 @@ test("candidate manifest pins all eight checked-in and live sources while regist
   const matrix = JSON.parse(await readFile(new URL("../registry/candidates.notify-write-batch.v1.json", import.meta.url), "utf8"));
   assert.equal(matrix.deployment_state, "DEFAULT_OFF");
   assert.equal(matrix.required_registry_state, "INVENTORY_FROZEN");
+  assert.equal(matrix.source_approval.status, "BLOCKED");
+  assert.equal(matrix.source_approval.metadata_end_check_passed, false);
+  assert.equal(matrix.durable_operation_ledger.status, "NOT_LIVE_PROVEN");
   assert.deepEqual(matrix.functions.map(({ slug }) => slug).sort(), NOTIFY_WRITE_SLUGS);
   for (const row of matrix.functions) {
     assert.equal(row.source_sha256, NOTIFY_WRITE_SOURCE_PINS[row.slug].source);
     assert.equal(row.live_bundle_sha256, NOTIFY_WRITE_SOURCE_PINS[row.slug].live);
+    assert.equal(row.source_version, NOTIFY_WRITE_SOURCE_PINS[row.slug].sourceVersion);
+    assert.equal(row.deployment_binding_sha256, NOTIFY_WRITE_SOURCE_PINS[row.slug].deploymentBindingSha256);
     assert.equal(LEGACY_FUNCTION_REGISTRY[row.slug].migration_state, "INVENTORY_FROZEN");
-    assert.ok(row.blockers.length > 0);
+    assert.deepEqual(row.blockers, NOTIFY_WRITE_AUTHORITATIVE_BLOCKERS[row.slug]);
+    assert.equal(row.blockers.length, 6);
+    assert.ok(row.candidate_activation_blockers.includes("DURABLE_OPERATION_LEDGER_CLOUD_SQL_LIVE_PROOF_MISSING"));
   }
 });
 
@@ -96,7 +187,7 @@ test("contracts preserve methods, query/body limits, same-origin responses, and 
 test("every handler rejects missing or forged approval before any provider or database call", async () => {
   let sideEffects = 0;
   const handlers = createNotifyWriteBatchHandlers({
-    evidence: evidence({ "ceo-calendar-booking": { liveBundleSha256: "0".repeat(64) } }),
+    evidence: evidence({ "ceo-calendar-booking": { liveV2BundleSha256: "0".repeat(64) } }),
     calendar: { configured: true, availability: async () => { sideEffects += 1; }, book: async () => { sideEffects += 1; } },
   });
   await assert.rejects(handlers["ceo-calendar-booking"](context({ slug: "ceo-calendar-booking", method: "GET" })), (error) => code(error, "CANDIDATE_EVIDENCE_REQUIRED"));
@@ -107,10 +198,44 @@ test("every handler rejects missing or forged approval before any provider or da
   }
 });
 
+test("source approval rejects sentinel versions, missing end checks, digest drift, extra fields, and forged bindings", async () => {
+  const mutations = [
+    { sourceVersion: -1 },
+    { metadataEndCheckPassed: false },
+    { metadataEndCheckDigestSha256: "0".repeat(64) },
+    { deploymentBindingSha256: "0".repeat(64) },
+    { sourceEvidenceFileSha256: "0".repeat(64) },
+    { sourceEvidenceDigest: "0".repeat(64) },
+    { canonicalSourceTreeDigest: "0".repeat(64) },
+    { currentMetadataDigest: "0".repeat(64) },
+    { trafficEvidenceFileSha256: "0".repeat(64) },
+    { trafficEvidenceDigest: "0".repeat(64) },
+    { deploymentInventoryDigest: "0".repeat(64) },
+    { terminalMatrixFileSha256: "0".repeat(64) },
+    { terminalMatrixEvidenceDigest: "0".repeat(64) },
+    { authoritativeBlockers: [] },
+    { bindingSha256: "0".repeat(64) },
+    { unexpected: true },
+  ];
+  for (const mutation of mutations) {
+    let providerCalls = 0;
+    const handlers = createNotifyWriteBatchHandlers({
+      evidence: evidence({ "ceo-calendar-booking": mutation }),
+      calendar: { configured: true, availability: async () => { providerCalls += 1; return []; }, book: async () => { providerCalls += 1; } },
+    });
+    await assert.rejects(
+      handlers["ceo-calendar-booking"](context({ slug: "ceo-calendar-booking", method: "GET" })),
+      (error) => code(error, "CANDIDATE_EVIDENCE_REQUIRED"),
+    );
+    assert.equal(providerCalls, 0);
+  }
+});
+
 test("coin notifications bind Firebase recipients, reject forged authority, and return no PII", async () => {
   const sends = [];
+  const ledger = durableLedger();
   const handlers = createNotifyWriteBatchHandlers({
-    evidence: evidence(), identityDirectory: identityDirectory(),
+    evidence: evidence(), operationLedger: ledger, identityDirectory: identityDirectory(),
     mailer: { configured: true, send: async (mail) => { sends.push(mail); return { success: true, messageId: "message-1" }; } },
   });
   const credit = await handlers["coins-credit-notification"](context({
@@ -119,6 +244,9 @@ test("coin notifications bind Firebase recipients, reject forged authority, and 
   assert.deepEqual(credit.body, { success: true, message: "Coins credit email sent", messageId: "message-1" });
   assert.equal(JSON.stringify(credit.body).includes("user@example.com"), false);
   assert.equal(credit.headers["access-control-allow-origin"], undefined);
+  assert.match(sends[0].idempotencyKey, /^coins-credit-notification:[a-f0-9]{64}:coins_credit$/);
+  assert.equal("requestId" in sends[0], false);
+  assert.deepEqual(ledger.calls.slice(0, 4).map(({ name }) => name), ["claim", "reserveDelivery", "finishDelivery", "complete"]);
   await assert.rejects(handlers["coins-deduction-notification"](context({
     slug: "coins-deduction-notification", actor: { ...FIREBASE, fundAdmin: "true" }, body: { recipientEmail: "victim@example.com" },
   })), (error) => code(error, "RECIPIENT_MISMATCH", 403));
@@ -127,13 +255,14 @@ test("coin notifications bind Firebase recipients, reject forged authority, and 
 
 test("calendar validates one-hour future slots, checks table first, then records provider result", async () => {
   const order = [];
+  let bookingInput = null;
   const database = db((text) => { order.push(text.startsWith("SELECT") ? "preflight" : "update"); return { rows: [{ ok: 1 }] }; });
   const handlers = createNotifyWriteBatchHandlers({
-    evidence: evidence(), identityDirectory: identityDirectory(), now: () => NOW,
+    evidence: evidence(), operationLedger: durableLedger(), identityDirectory: identityDirectory(), now: () => NOW,
     calendar: {
       configured: true,
       availability: async ({ days }) => [{ date: "2026-08-24", slots: [], days }],
-      book: async ({ attendeeEmail }) => { order.push(`book:${attendeeEmail}`); return { eventId: "event-1", meetLink: "https://meet.google.com/abc" }; },
+      book: async (input) => { bookingInput = input; order.push(`book:${input.attendeeEmail}`); return { eventId: "event-1", meetLink: "https://meet.google.com/abc" }; },
     },
   });
   const available = await handlers["ceo-calendar-booking"](context({ slug: "ceo-calendar-booking", method: "GET", search: "?days=3", body: null }));
@@ -141,6 +270,8 @@ test("calendar validates one-hour future slots, checks table first, then records
   const booked = await handlers["ceo-calendar-booking"](context({ slug: "ceo-calendar-booking", database, body: { startTime: "2026-08-24T18:00:00.000Z", endTime: "2026-08-24T19:00:00.000Z", attendeeName: "Ada" } }));
   assert.deepEqual(order, ["preflight", "book:user@example.com", "update"]);
   assert.equal(booked.body.eventId, "event-1");
+  assert.match(bookingInput.idempotencyKey, /^ceo-calendar-booking:[a-f0-9]{64}$/);
+  assert.equal("requestId" in bookingInput, false);
   await assert.rejects(handlers["ceo-calendar-booking"](context({ slug: "ceo-calendar-booking", database, body: { startTime: "2026-08-24T18:00:00.000Z", endTime: "2026-08-24T20:00:00.000Z" } })), (error) => code(error, "INVALID_REQUEST", 400));
 });
 
@@ -148,21 +279,24 @@ test("verification fail-closes on table readiness and prevents metadata or retur
   const providerCalls = [];
   const database = db((text) => /RETURNING id/.test(text) ? { rows: [{ id: "verification-1" }] } : { rows: [] });
   const handlers = createNotifyWriteBatchHandlers({
-    evidence: evidence(), identityDirectory: identityDirectory(), siteUrl: "https://uat.hushhtech.com", now: () => NOW,
+    evidence: evidence(), operationLedger: durableLedger(), identityDirectory: identityDirectory(), siteUrl: "https://uat.hushhtech.com", now: () => NOW,
     verificationProvider: { configured: true, create: async (input) => { providerCalls.push(input); return { id: "vs_1", url: "https://verify.example/session", status: "requires_input", clientSecret: "secret_ephemeral" }; } },
   });
   await assert.rejects(handlers["create-verification-session"](context({ slug: "create-verification-session", database, body: { metadata: { user_id: "attacker" } } })), (error) => code(error, "INVALID_REQUEST", 400));
   const result = await handlers["create-verification-session"](context({ slug: "create-verification-session", database, body: { email: "user@example.com", returnUrl: "https://evil.example/phish", metadata: { campaign: "uat" } } }));
   assert.equal(providerCalls[0].returnUrl, "https://uat.hushhtech.com/onboarding/verify-complete");
   assert.equal(providerCalls[0].metadata.user_id, "user-1");
+  assert.match(providerCalls[0].idempotencyKey, /^create-verification-session:[a-f0-9]{64}$/);
+  assert.equal("requestId" in providerCalls[0], false);
   assert.equal(result.body.verification_id, "verification-1");
 });
 
 test("NDA sends only configured admin and signer copies, logs delivery, and rejects client IP forgery", async () => {
   const sends = [];
+  const ledger = durableLedger();
   const database = db((text) => /current_setting/.test(text) ? { rows: [{ user_id: "user-1" }] } : { rows: [] });
   const handlers = createNotifyWriteBatchHandlers({
-    evidence: evidence(), identityDirectory: identityDirectory(), now: () => NOW,
+    evidence: evidence(), operationLedger: ledger, identityDirectory: identityDirectory(), now: () => NOW,
     mailer: { configured: true, adminRecipients: ["manish@hushh.ai", "ankit@hushh.ai"], send: async (mail) => { sends.push(mail); return { success: true, messageId: `mail-${sends.length}` }; } },
   });
   await assert.rejects(handlers["nda-signed-notification"](context({ slug: "nda-signed-notification", actor: GOOGLE, database, body: { signerName: "Ada", signerIp: "1.2.3.4" } })), (error) => code(error, "INVALID_REQUEST", 400));
@@ -171,7 +305,222 @@ test("NDA sends only configured admin and signer copies, logs delivery, and reje
   assert.deepEqual(sends[0].recipients, ["manish@hushh.ai", "ankit@hushh.ai"]);
   assert.deepEqual(sends[1].recipients, ["user@example.com"]);
   assert.equal(JSON.stringify(result.body).includes("user@example.com"), false);
-  assert.equal(database.calls.filter(({ text }) => /fund_payment_notifications/.test(text)).length, 2);
+  assert.deepEqual([...ledger.deliveries.values()].map(({ state }) => state), ["SENT", "SENT"]);
+  const reserveIndexes = ledger.calls.map(({ name }) => name).reduce((out, name, index) => name === "reserveDelivery" ? [...out, index] : out, []);
+  assert.equal(reserveIndexes.length, 2);
+  assert.ok(reserveIndexes[0] < ledger.calls.findIndex(({ name }) => name === "finishDelivery"));
+});
+
+test("canonical Idempotency-Key replays the prior result and never derives provider keys from requestId", async () => {
+  let sends = 0;
+  const ledger = durableLedger();
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: {
+      configured: true,
+      send: async ({ idempotencyKey }) => {
+        sends += 1;
+        assert.match(idempotencyKey, /^coins-credit-notification:[a-f0-9]{64}:coins_credit$/);
+        assert.equal(idempotencyKey.includes("fresh-request"), false);
+        return { success: true, messageId: "message-replay" };
+      },
+    },
+  });
+  const input = {
+    slug: "coins-credit-notification",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+    idempotencyKey: "stable-client-key-0001",
+  };
+  const first = await handlers["coins-credit-notification"](context({ ...input, requestId: "fresh-request-0001" }));
+  const replay = await handlers["coins-credit-notification"](context({ ...input, requestId: "fresh-request-0002" }));
+  assert.deepEqual(replay, first);
+  assert.equal(sends, 1);
+  assert.equal(ledger.calls.filter(({ name }) => name === "claim").length, 2);
+  assert.equal(ledger.calls.filter(({ name }) => name === "complete").length, 1);
+});
+
+test("mutating providers reject missing, short, padded, or malformed Idempotency-Key before a persisted claim", async () => {
+  let sends = 0;
+  const ledger = durableLedger();
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { sends += 1; return { success: true }; } },
+  });
+  for (const idempotencyKey of [null, "short", " padded-client-key-0001", "bad key with spaces"]) {
+    await assert.rejects(
+      handlers["coins-credit-notification"](context({
+        slug: "coins-credit-notification",
+        body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+        idempotencyKey,
+      })),
+      (error) => code(error, "IDEMPOTENCY_KEY_REQUIRED", 400),
+    );
+  }
+  assert.equal(sends, 0);
+  assert.equal(ledger.calls.length, 0);
+
+  const ndaDatabase = db((text) => /current_setting/.test(text) ? { rows: [{ user_id: "user-1" }] } : { rows: [] });
+  const ndaHandlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: {
+      configured: true,
+      adminRecipients: ["admin@hushh.ai"],
+      send: async () => { sends += 1; return { success: true }; },
+    },
+  });
+  await assert.rejects(
+    ndaHandlers["nda-signed-notification"](context({
+      slug: "nda-signed-notification",
+      actor: GOOGLE,
+      database: ndaDatabase,
+      idempotencyKey: null,
+      body: { signerName: "Ada" },
+    })),
+    (error) => code(error, "IDEMPOTENCY_KEY_REQUIRED", 400),
+  );
+  assert.equal(ndaDatabase.calls.length, 0);
+  assert.equal(sends, 0);
+  assert.equal(ledger.calls.length, 0);
+});
+
+test("raw identity provider errors are bounded before any mail send", async () => {
+  let sends = 0;
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: durableLedger(),
+    identityDirectory: {
+      configured: true,
+      getUser: async () => {
+        throw new RuntimeError("PRIVATE_PROVIDER_CODE", "private identity user@example.com", 503);
+      },
+    },
+    mailer: { configured: true, send: async () => { sends += 1; return { success: true }; } },
+  });
+  await assert.rejects(
+    handlers["coins-credit-notification"](context({
+      slug: "coins-credit-notification",
+      body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+    })),
+    (error) => {
+      assert.equal(code(error, "IDENTITY_DIRECTORY_FAILED"), true);
+      assert.equal(error.message.includes("private identity"), false);
+      return true;
+    },
+  );
+  assert.equal(sends, 0);
+});
+
+test("NDA preserves a second-send failure, then retries only the failed unique delivery", async () => {
+  const sends = [];
+  const ledger = durableLedger();
+  const database = db((text) => /current_setting/.test(text) ? { rows: [{ user_id: "user-1" }] } : { rows: [] });
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    now: () => NOW,
+    mailer: {
+      configured: true,
+      adminRecipients: ["admin@hushh.ai"],
+      send: async (mail) => {
+        sends.push(mail.template);
+        if (sends.length === 2) {
+          return { success: false, error: "raw provider failure for user@example.com" };
+        }
+        return { success: true, messageId: `message-${sends.length}` };
+      },
+    },
+  });
+  const input = context({
+    slug: "nda-signed-notification",
+    actor: GOOGLE,
+    database,
+    idempotencyKey: "nda-partial-retry-0001",
+    body: { signerName: "Ada", ndaVersion: "v1", documentsAcknowledged: ["NDA"] },
+  });
+  await assert.rejects(
+    handlers["nda-signed-notification"](input),
+    (error) => code(error, "NDA_DELIVERY_PARTIAL"),
+  );
+  assert.deepEqual(sends, ["nda_admin", "nda_signer"]);
+  assert.deepEqual([...ledger.deliveries.values()].map(({ state }) => state), ["SENT", "FAILED"]);
+  assert.equal(JSON.stringify(ledger.calls).includes("raw provider failure"), false);
+  assert.equal(JSON.stringify(ledger.calls).includes("user@example.com"), true);
+  const retry = await handlers["nda-signed-notification"](input);
+  assert.deepEqual(sends, ["nda_admin", "nda_signer", "nda_signer"]);
+  assert.equal(retry.body.email_delivery.admin.replayed, true);
+  assert.equal(retry.body.email_delivery.signer.replayed, false);
+  assert.deepEqual([...ledger.deliveries.values()].map(({ state }) => state), ["SENT", "SENT"]);
+});
+
+test("ambiguous mail timeout is redacted, stored as UNKNOWN, and never auto-resends", async () => {
+  let sends = 0;
+  const ledger = durableLedger();
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: {
+      configured: true,
+      send: async () => {
+        sends += 1;
+        const error = new Error("timeout delivering private recipient user@example.com");
+        error.code = "ETIMEDOUT";
+        throw error;
+      },
+    },
+  });
+  const input = context({
+    slug: "coins-credit-notification",
+    idempotencyKey: "ambiguous-timeout-0001",
+    body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+  });
+  await assert.rejects(
+    handlers["coins-credit-notification"](input),
+    (error) => code(error, "MAIL_SEND_TIMEOUT"),
+  );
+  assert.equal([...ledger.deliveries.values()][0].state, "UNKNOWN");
+  assert.equal([...ledger.deliveries.values()][0].failureCode, "MAIL_SEND_TIMEOUT");
+  assert.equal(JSON.stringify(ledger.calls).includes("private recipient"), false);
+  await assert.rejects(
+    handlers["coins-credit-notification"](input),
+    (error) => code(error, "DELIVERY_OUTCOME_UNKNOWN"),
+  );
+  assert.equal(sends, 1);
+});
+
+test("pre-provider Cloud SQL reservation failure sends nothing and exposes no raw database error", async () => {
+  let sends = 0;
+  const ledger = durableLedger({
+    beforeReserve: async () => {
+      throw new Error("private Cloud SQL host and user@example.com");
+    },
+  });
+  const handlers = createNotifyWriteBatchHandlers({
+    evidence: evidence(),
+    operationLedger: ledger,
+    identityDirectory: identityDirectory(),
+    mailer: { configured: true, send: async () => { sends += 1; return { success: true }; } },
+  });
+  await assert.rejects(
+    handlers["coins-credit-notification"](context({
+      slug: "coins-credit-notification",
+      body: { recipientEmail: "user@example.com", coinsAwarded: 25 },
+    })),
+    (error) => {
+      assert.equal(code(error, "DURABLE_OPERATION_LEDGER_UNAVAILABLE"), true);
+      assert.equal(error.message.includes("private Cloud SQL"), false);
+      return true;
+    },
+  );
+  assert.equal(sends, 0);
+  assert.equal(ledger.calls.some(({ name }) => name === "markRetryable"), true);
 });
 
 test("funding handlers preserve status parity without leaking holder names or balances", async () => {
