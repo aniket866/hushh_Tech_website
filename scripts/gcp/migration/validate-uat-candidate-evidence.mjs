@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalHash } from "./canonical-hash.mjs";
-import { validateExpected } from "../../../cloud-run/hushh-tech-schema-data-verifier-uat/index.mjs";
+import { validateExpected } from "../../../migration/cloud-run/hushh-tech-schema-data-verifier-uat/index.mjs";
 
 export const PINNED_CANDIDATE_EVIDENCE_SHA256 =
   "3e8c0dd7f40b47887fd9cce8002f988305003d793ad9276771f4f63433020938";
@@ -206,7 +206,7 @@ export function validateUatCandidateEvidence(
     evidence.verifierBuild?.image?.digest !== IMAGE_DIGEST ||
     evidence.verifierBuild?.image?.uri !== IMAGE_URI
   ) fail("CANDIDATE_BUILD_PROVENANCE_MISMATCH");
-  const localRoot = verifierRoot ?? fileURLToPath(new URL("../../../cloud-run/hushh-tech-schema-data-verifier-uat", import.meta.url));
+  const localRoot = verifierRoot ?? fileURLToPath(new URL("../../../migration/cloud-run/hushh-tech-schema-data-verifier-uat", import.meta.url));
   const localContext = buildLocalContext(resolve(localRoot));
   if (
     canonicalHash(localContext.files) !== canonicalHash(evidence.verifierBuild.context.files) ||

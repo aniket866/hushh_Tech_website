@@ -1,4 +1,13 @@
-import { readFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -8,9 +17,12 @@ import {
   assessEngagementNdaBoundary,
   assessEngagementRuntimeBoundary,
   validateExpected,
-} from '../cloud-run/hushh-tech-schema-data-verifier-uat/index.mjs';
+} from '../migration/cloud-run/hushh-tech-schema-data-verifier-uat/index.mjs';
 
-const expectedPath = new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json', import.meta.url);
+const verifierRoot = new URL('../migration/cloud-run/hushh-tech-schema-data-verifier-uat/', import.meta.url);
+const expectedPath = new URL('expected-manifest.v1.json', verifierRoot);
+const deployableExpectedPath = new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json', import.meta.url);
+const noHybridGatePath = new URL('../scripts/ci/check-no-hybrid-runtime.mjs', import.meta.url);
 
 function expectedInput() {
   return JSON.parse(readFileSync(expectedPath, 'utf8'));
@@ -95,6 +107,53 @@ function exactEngagementRuntimeObservation() {
 }
 
 describe('reproducible UAT schema/data verifier input', () => {
+  it('keeps the verifier source under the classified migration-only root', () => {
+    expect(existsSync(verifierRoot)).toBe(true);
+    expect(existsSync(deployableExpectedPath)).toBe(false);
+  });
+
+  it.runIf(existsSync(noHybridGatePath))('is excluded as migration evidence while the same bytes under cloud-run fail closed', async () => {
+    const { loadNoHybridPolicy, scanNoHybridRuntime } = await import(noHybridGatePath.href);
+    const root = mkdtempSync(join(tmpdir(), 'hushh-schema-verifier-classification-'));
+    const migrationTarget = join(root, 'migration/cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json');
+    const runtimeTarget = join(root, 'cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json');
+    const policy = structuredClone(loadNoHybridPolicy());
+    policy.source_surfaces = [{ path: 'cloud-run', kind: 'standalone-cloud-run-source' }];
+    policy.runtime_entrypoints = [];
+    policy.generated_artifact_roots = [];
+
+    try {
+      mkdirSync(dirname(migrationTarget), { recursive: true });
+      copyFileSync(expectedPath, migrationTarget);
+      const classified = scanNoHybridRuntime({
+        root,
+        policy,
+        validateWiring: false,
+        enforceCanonicalPolicy: false,
+      });
+      expect(classified.valid).toBe(true);
+      expect(classified.scanned.runtime_files).toBe(0);
+
+      mkdirSync(dirname(runtimeTarget), { recursive: true });
+      copyFileSync(expectedPath, runtimeTarget);
+      const deployable = scanNoHybridRuntime({
+        root,
+        policy,
+        validateWiring: false,
+        enforceCanonicalPolicy: false,
+      });
+      expect(deployable.valid).toBe(false);
+      expect(deployable.violations).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PROVIDER_PROJECT_REF',
+          file: 'cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json',
+        }),
+      ]));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('accepts the checked-in exact governed input', () => {
     const expected = expectedInput();
     expect(expected.expectedSha256).toBe(PINNED_EXPECTED_SHA256);
@@ -139,7 +198,7 @@ describe('reproducible UAT schema/data verifier input', () => {
   });
 
   it('builds the image from a declared checked-in manifest', () => {
-    const dockerfile = readFileSync(new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/Dockerfile', import.meta.url), 'utf8');
+    const dockerfile = readFileSync(new URL('Dockerfile', verifierRoot), 'utf8');
     expect(dockerfile).toContain('COPY --chown=node:node index.mjs expected-manifest.v1.json ./');
     expect(dockerfile).not.toContain('expected.json');
   });

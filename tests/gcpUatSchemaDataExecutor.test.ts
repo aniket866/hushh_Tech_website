@@ -369,7 +369,7 @@ describe('reviewed phase activation and row parity', () => {
 
 describe('retained 70-table key manifest', () => {
   const expected = JSON.parse(readFileSync(
-    new URL('../cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json', import.meta.url),
+    new URL('../migration/cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json', import.meta.url),
     'utf8',
   ));
 
