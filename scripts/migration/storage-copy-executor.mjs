@@ -113,7 +113,7 @@ const parseJsonArtifact = (artifact, code, label) => {
   }
 };
 
-const validatePreflight = (artifact, source) => {
+export const validateKnownSixTargetPreflight = (artifact, source) => {
   requireExactKeys(
     artifact,
     [
@@ -531,7 +531,7 @@ const validatePreflight = (artifact, source) => {
 
 export const buildCreateOnlyCopyPlan = (source, preflight) => {
   validateCopyPolicyCandidate();
-  const validatedPreflight = validatePreflight(preflight, source);
+  const validatedPreflight = validateKnownSixTargetPreflight(preflight, source);
   const liveActions = source.objects.map((sourceObject) => {
     const objectId = sourceObjectId(sourceObject);
     const evidence = validatedPreflight.objectById.get(objectId);
@@ -738,8 +738,8 @@ const buildPreflightNamespaceEvidence = (preflight, source) => {
 };
 
 export const assertFreshPreflightCompatible = (approvedPreflight, freshPreflight, source) => {
-  const approved = validatePreflight(approvedPreflight, source);
-  const fresh = validatePreflight(freshPreflight, source);
+  const approved = validateKnownSixTargetPreflight(approvedPreflight, source);
+  const fresh = validateKnownSixTargetPreflight(freshPreflight, source);
   const approvedNamespace = buildPreflightNamespaceEvidence(approved, source);
   const freshNamespace = buildPreflightNamespaceEvidence(fresh, source);
   if (
@@ -1953,7 +1953,7 @@ export const executeActivatedKnownSixCreateOnly = async ({
     );
   }
   const reboundPlan = validatePlan(plan, source, preflight);
-  const validatedPreflight = validatePreflight(preflight, source);
+  const validatedPreflight = validateKnownSixTargetPreflight(preflight, source);
   const supersededActivationBlockers = [
     "COPY_POLICY_NOT_ACTIVATED",
     "COPY_EXECUTION_NOT_ALLOWED",

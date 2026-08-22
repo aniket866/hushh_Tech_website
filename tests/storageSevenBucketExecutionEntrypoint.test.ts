@@ -2,8 +2,20 @@ import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { STORAGE_CUTOVER_CONTRACT } from "../scripts/migration/storage-cutover-contract.mjs";
-import { sourceObjectId } from "../scripts/migration/storage-live-inventory.mjs";
-import { buildMigrationTargetObjectKey } from "../scripts/migration/storage-live-policy.mjs";
+import {
+  TARGET_COPY_PREFLIGHT_SCHEMA,
+  buildExpectedTargetMetadata,
+  sourceObjectId,
+} from "../scripts/migration/storage-live-inventory.mjs";
+import {
+  COPY_POLICY_CANDIDATE,
+  buildMigrationTargetObjectKey,
+  copyPolicyCandidateFileDigestSha256,
+} from "../scripts/migration/storage-live-policy.mjs";
+import {
+  ISOLATED_CUTOVER_CONTRACT,
+  isolatedCutoverContractFileDigestSha256,
+} from "../scripts/migration/storage-isolated-cutover-contract.mjs";
 import {
   COMBINED_CHANGE_MANIFEST_SCHEMA,
   SEVEN_BUCKET_APPROVAL_SCHEMA,
@@ -25,6 +37,7 @@ import {
 import {
   calculateSelfBoundDigest,
   canonicalJson,
+  contractFileDigestSha256,
   sha256,
 } from "../scripts/migration/storage-live-common.mjs";
 
@@ -55,6 +68,9 @@ const createKnownSource = () => ({
   totalBytes: 111_078_397,
   digestSha256: "1".repeat(64),
   sourceArtifactDigestSha256: "2".repeat(64),
+  previousCheckpoint: null,
+  previousCheckpointFileDigestSha256: null,
+  tombstones: [],
   buckets: STORAGE_CUTOVER_CONTRACT.buckets.map((bucket) => ({ bucketId: bucket.sourceBucket })),
   objects: Array.from({ length: 124 }, (_, index) => ({
     bucketId: STORAGE_CUTOVER_CONTRACT.buckets[index % 6].sourceBucket,
@@ -157,21 +173,98 @@ const createFixture = () => {
   };
   manifest.manifestDigestSha256 = calculateSelfBoundDigest(manifest, "manifestDigestSha256");
   const rawChangeManifest = Buffer.from(JSON.stringify(manifest));
+  const emptySetDigestSha256 = sha256(canonicalJson([]));
   const knownSixPreflight = {
-    schemaVersion: "gcs-storage-copy-preflight-v1",
+    schemaVersion: TARGET_COPY_PREFLIGHT_SCHEMA,
     collectedAt: "2026-08-22T01:29:00.000Z",
+    environment: "uat",
     project: "hushh-tech-uat",
     region: "us-central1",
+    contractFileDigestSha256: contractFileDigestSha256(),
+    isolatedCutoverContractFileDigestSha256: isolatedCutoverContractFileDigestSha256(),
+    migrationWriterRole: ISOLATED_CUTOVER_CONTRACT.migrationWriterRole,
+    migrationWriterRolePermissions: [...ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions],
+    migrationWriterRolePermissionDigestSha256: sha256(canonicalJson(
+      ISOLATED_CUTOVER_CONTRACT.migrationWriterPermissions,
+    )),
+    migrationWriterRoleExact: true,
+    copyPolicyCandidateFileDigestSha256: copyPolicyCandidateFileDigestSha256(),
+    sourceInventoryDigestSha256: knownSource.digestSha256,
+    sourceArtifactDigestSha256: knownSource.sourceArtifactDigestSha256,
+    previousCheckpointFileDigestSha256: null,
+    previousCheckpointDigestSha256: null,
+    migrationNamespace: COPY_POLICY_CANDIDATE.copyPolicy.migrationNamespace,
     bucketCount: 6,
-    buckets: STORAGE_CUTOVER_CONTRACT.buckets.map(() => ({
+    expectedObjectCount: knownSource.objectCount,
+    expectedTotalBytes: knownSource.totalBytes,
+    existingMigrationObjectCount: 0,
+    unmanagedObjectCount: 0,
+    unmanagedTotalBytes: 0,
+    retainedHistoricalObjectCount: 0,
+    retainedHistoricalTotalBytes: 0,
+    buckets: STORAGE_CUTOVER_CONTRACT.buckets.map((bucket) => ({
+      bucketName: bucket.targetBucket,
       bucketConfigurationSafe: true,
       iamMatchesFrozenAllowlist: true,
+      location: STORAGE_CUTOVER_CONTRACT.targetPolicy.bucketLocation,
+      storageClass: ISOLATED_CUTOVER_CONTRACT.storageClass,
+      uniformBucketLevelAccess: true,
+      publicAccessPrevention: "enforced",
+      versioningEnabled: true,
+      retentionPeriodSeconds: ISOLATED_CUTOVER_CONTRACT.retentionPeriodSeconds,
+      retentionPolicyLocked: false,
+      softDeleteRetentionSeconds: ISOLATED_CUTOVER_CONTRACT.softDeleteRetentionSeconds,
       isolationSafe: true,
       inheritedAccessNeutralized: true,
+      isolationTagValueNamespacedName: `${ISOLATED_CUTOVER_CONTRACT.isolationTagKey}/fixture`,
+      isolationTagBindingDigestSha256: sha256(`tag:${bucket.targetBucket}`),
+      isolationDenyPolicyDigestSha256: sha256("deny-policy"),
+      isolationDenyRuleDigestSha256: sha256(`deny-rule:${bucket.targetBucket}`),
+      isolationExceptionPrincipalDigestSha256: sha256(`exceptions:${bucket.targetBucket}`),
+      isolationInheritedIamDigestSha256: emptySetDigestSha256,
+      bucketIamEvidenceDigestSha256: sha256(`iam:${bucket.targetBucket}`),
+      inheritedIamEvidenceDigestSha256: emptySetDigestSha256,
+      bucketIamBindingCount: bucket.allowedIamBindings.length,
+      inheritedStorageIamBindingCount: 0,
+      publicIamMemberCount: 0,
+      prohibitedPreCopyBucketPrincipalCount: 0,
+      expectedMigrationObjectCount: knownSource.objects.filter(
+        (object) => object.bucketId === bucket.sourceBucket,
+      ).length,
+      existingMigrationObjectCount: 0,
+      unknownMigrationObjectCount: 0,
+      retainedHistoricalObjectCount: 0,
+      retainedHistoricalTotalBytes: 0,
+      retainedHistoricalObjectSetDigestSha256: emptySetDigestSha256,
+      unmanagedObjectCount: 0,
+      unmanagedTotalBytes: 0,
+      unmanagedInventoryDigestSha256: sha256(`unmanaged:${bucket.targetBucket}`),
     })),
-    migrationWriterRoleExact: true,
-    unmanagedObjectCount: 0,
-    retainedHistoricalObjectCount: 0,
+    objects: knownSource.objects.map((object) => {
+      const bucket = STORAGE_CUTOVER_CONTRACT.buckets.find(
+        (candidate) => candidate.sourceBucket === object.bucketId,
+      )!;
+      return {
+        objectId: sourceObjectId(object),
+        targetBucket: bucket.targetBucket,
+        targetObjectKeyDigestSha256: sha256(buildMigrationTargetObjectKey(
+          object.bucketId,
+          object.objectKey,
+          object.fingerprint,
+        )),
+        expectedBytes: object.sizeBytes,
+        expectedSha256: object.sha256,
+        state: "ABSENT",
+        generation: null,
+        verifiedSha256: null,
+        verifiedCrc32c: null,
+        verifiedMd5Hash: null,
+        targetMetadataDigestSha256: sha256(canonicalJson(buildExpectedTargetMetadata(object))),
+      };
+    }).sort((left, right) => left.objectId.localeCompare(right.objectId)),
+    retainedHistoricalObjects: [],
+    blockers: ["COPY_POLICY_NOT_ACTIVATED", "COPY_EXECUTION_NOT_ALLOWED"],
+    safeForCopy: false,
     preflightDigestSha256: null as string | null,
   };
   knownSixPreflight.preflightDigestSha256 = calculateSelfBoundDigest(
@@ -181,9 +274,12 @@ const createFixture = () => {
   const seventhPreflight = {
     schemaVersion: "gcs-storage-quarantine-preflight-v2",
     capturedAt: "2026-08-22T01:29:00.000Z",
+    collectionStartedAt: "2026-08-22T01:28:59.000Z",
+    collectionCompletedAt: "2026-08-22T01:29:00.000Z",
+    collectionDurationMs: 1_000,
     project: "hushh-tech-uat",
     bucket: "hushh-tech-supabase-quarantine-uat",
-    namespace: "_hushh_migrations/test",
+    namespace: SEVEN_BUCKET_CONTRACT.seventh.targetPrefix,
     sourceFileDigestSha256: seventhSource.sourceFileDigestSha256,
     sourceArtifactDigestSha256: seventhSource.sourceArtifactDigestSha256,
     sourceContentSetDigestSha256: seventhSource.contentSetDigestSha256,
@@ -194,7 +290,7 @@ const createFixture = () => {
     tagBindingsDigestSha256: "9".repeat(64),
     denyPolicyDigestSha256: "a".repeat(64),
     runtimeReferenceDigestSha256: "b".repeat(64),
-    namespaceObjectSetDigestSha256: "c".repeat(64),
+    namespaceObjectSetDigestSha256: emptySetDigestSha256,
     runtimeRoutingReferenceCount: 0,
     namespaceObjectCount: 0,
     namespaceTotalBytes: 0,
@@ -322,6 +418,11 @@ const refreshTargetProof = (
     "preflightDigestSha256",
   );
   live.seventhPreflight.capturedAt = capturedAt;
+  live.seventhPreflight.collectionStartedAt = new Date(
+    Date.parse(capturedAt) - 1_000,
+  ).toISOString();
+  live.seventhPreflight.collectionCompletedAt = capturedAt;
+  live.seventhPreflight.collectionDurationMs = 1_000;
   live.seventhPreflight.preflightDigestSha256 = calculateSelfBoundDigest(
     live.seventhPreflight,
     "preflightDigestSha256",
@@ -448,9 +549,17 @@ describe("seven-bucket detached approval execution entrypoint", () => {
     expect(fixture.request.createWriteClients).not.toHaveBeenCalled();
   });
 
-  it("runs the read-only path but constructs zero write clients for stale, mutated, or malformed live proof", async () => {
+  it("runs reads but constructs zero write clients for every stale, drifted, or truncated live proof", async () => {
     const now = Date.parse("2026-08-22T01:30:00.000Z");
-    for (const variant of ["stale", "mutated", "malformed"] as const) {
+    for (const variant of [
+      "stale",
+      "mutated",
+      "malformed",
+      "missing-field",
+      "wrong-namespace",
+      "known-six-truncated",
+      "long-duration",
+    ] as const) {
       const fixture = createFixture();
       const live = refreshTargetProof(
         fixture,
@@ -458,6 +567,31 @@ describe("seven-bucket detached approval execution entrypoint", () => {
       );
       if (variant === "mutated") {
         live.seventhPreflight.iamDigestSha256 = "f".repeat(64);
+        live.seventhPreflight.preflightDigestSha256 = calculateSelfBoundDigest(
+          live.seventhPreflight,
+          "preflightDigestSha256",
+        );
+        live.preflightDigestSha256 = calculateSelfBoundDigest(live, "preflightDigestSha256");
+      }
+      if (variant === "missing-field") {
+        delete (live.seventhPreflight as Record<string, unknown>).runtimeReferenceDigestSha256;
+        live.preflightDigestSha256 = calculateSelfBoundDigest(live, "preflightDigestSha256");
+      }
+      if (variant === "wrong-namespace") {
+        live.seventhPreflight.namespace = "_hushh_migrations/wrong";
+        live.seventhPreflight.preflightDigestSha256 = calculateSelfBoundDigest(
+          live.seventhPreflight,
+          "preflightDigestSha256",
+        );
+        live.preflightDigestSha256 = calculateSelfBoundDigest(live, "preflightDigestSha256");
+      }
+      if (variant === "known-six-truncated") {
+        delete (live.knownSixPreflight as Record<string, unknown>).migrationWriterRolePermissions;
+        live.preflightDigestSha256 = calculateSelfBoundDigest(live, "preflightDigestSha256");
+      }
+      if (variant === "long-duration") {
+        live.seventhPreflight.collectionStartedAt = "2026-08-22T01:24:59.999Z";
+        live.seventhPreflight.collectionDurationMs = 300_001;
         live.seventhPreflight.preflightDigestSha256 = calculateSelfBoundDigest(
           live.seventhPreflight,
           "preflightDigestSha256",
@@ -488,7 +622,15 @@ describe("seven-bucket detached approval execution entrypoint", () => {
           ? "ALL_SEVEN_TARGET_PREFLIGHT_STALE"
           : variant === "mutated"
             ? "ALL_SEVEN_TARGET_MUTATED_AFTER_APPROVAL"
-            : "LIVE_ALL_SEVEN_TARGET_PREFLIGHT_JSON_INVALID",
+            : variant === "malformed"
+              ? "LIVE_ALL_SEVEN_TARGET_PREFLIGHT_JSON_INVALID"
+              : variant === "missing-field"
+                ? "SEVENTH_FRESH_TARGET_PREFLIGHT_SCHEMA"
+                : variant === "wrong-namespace"
+                  ? "SEVENTH_FRESH_TARGET_PREFLIGHT_MISMATCH"
+                  : variant === "known-six-truncated"
+                    ? "TARGET_PREFLIGHT_SCHEMA_MISMATCH"
+                    : "SEVENTH_FRESH_TARGET_PREFLIGHT_DURATION_INVALID",
       });
       expect(createReadOnlyDependencies).toHaveBeenCalledOnce();
       expect(verifyLiveSource).toHaveBeenCalledOnce();

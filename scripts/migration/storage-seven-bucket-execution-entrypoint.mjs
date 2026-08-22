@@ -7,10 +7,14 @@ import {
 } from "./storage-seven-bucket-orchestrator.mjs";
 import {
   SEVEN_BUCKET_ACTIVATION,
+  SEVEN_BUCKET_CONTRACT,
   validateZeroGrantPolicyEvidence,
   validateCombinedChangeManifest,
 } from "./storage-seven-bucket-contract.mjs";
-import { executeActivatedKnownSixCreateOnly } from "./storage-copy-executor.mjs";
+import {
+  executeActivatedKnownSixCreateOnly,
+  validateKnownSixTargetPreflight,
+} from "./storage-copy-executor.mjs";
 import { performSeventhCreateOnlyCopy } from "./storage-seventh-quarantine-executor.mjs";
 import {
   MAXIMUM_APPROVAL_BYTES,
@@ -63,7 +67,8 @@ const FRESH_PREFLIGHT_KEYS = [
 ];
 
 const SEVENTH_PREFLIGHT_KEYS = [
-  "schemaVersion", "capturedAt", "project", "bucket", "namespace",
+  "schemaVersion", "capturedAt", "collectionStartedAt", "collectionCompletedAt",
+  "collectionDurationMs", "project", "bucket", "namespace",
   "sourceFileDigestSha256", "sourceArtifactDigestSha256", "sourceContentSetDigestSha256",
   "sourceObjectCount", "sourceTotalBytes", "configurationDigestSha256", "iamDigestSha256",
   "tagBindingsDigestSha256", "denyPolicyDigestSha256", "runtimeReferenceDigestSha256",
@@ -97,7 +102,7 @@ const assertNoDuplicateOrPrototypeJsonKeys = (text, code) => {
     offset += 1;
     for (;;) {
       const character = text[offset];
-      if (character === undefined || /[\u0000-\u001f]/.test(character)) {
+      if (character === undefined || character.charCodeAt(0) <= 0x1f) {
         fail(code, "A JSON string was malformed.");
       }
       if (character === '"') {
@@ -209,6 +214,7 @@ export const validateFreshAllSevenTargetPreflight = ({
   artifact,
   fileDigestSha256,
   plan,
+  knownSource,
   now,
   bindingMode = "approved",
 }) => {
@@ -227,6 +233,7 @@ export const validateFreshAllSevenTargetPreflight = ({
   }
   requireFreshTimestamp(artifact.capturedAt, now, "all-seven target preflight capture time");
   const known = artifact.knownSixPreflight;
+  validateKnownSixTargetPreflight(known, knownSource);
   if (
     known?.schemaVersion !== "gcs-storage-copy-preflight-v1" ||
     known.project !== "hushh-tech-uat" ||
@@ -259,6 +266,7 @@ export const validateFreshAllSevenTargetPreflight = ({
     seventh.schemaVersion !== "gcs-storage-quarantine-preflight-v2" ||
     seventh.project !== "hushh-tech-uat" ||
     seventh.bucket !== "hushh-tech-supabase-quarantine-uat" ||
+    seventh.namespace !== SEVEN_BUCKET_CONTRACT.seventh.targetPrefix ||
     seventh.preflightDigestSha256 !== calculateSelfBoundDigest(seventh, "preflightDigestSha256") ||
     (bindingMode === "approved" && seventh.preflightDigestSha256 !== plan.seventhPreflightDigestSha256) ||
     seventh.sourceFileDigestSha256 !== plan.seventhSourceFileDigestSha256 ||
@@ -269,12 +277,37 @@ export const validateFreshAllSevenTargetPreflight = ({
     seventh.tagIsolationBound !== true || seventh.denyPolicyActive !== true ||
     seventh.runtimeRoutingReferenceCount !== 0 || seventh.namespaceObjectCount !== 0 ||
     seventh.namespaceTotalBytes !== 0 || seventh.createOnly !== true ||
+    seventh.namespaceObjectSetDigestSha256 !== sha256(canonicalJson([])) ||
     seventh.ifGenerationMatch !== 0 || seventh.overwriteAllowed !== false ||
     seventh.deleteAllowed !== false || seventh.safeForCopy !== true
   ) {
     fail("SEVENTH_FRESH_TARGET_PREFLIGHT_MISMATCH", "The fresh seventh target security proof changed.");
   }
   requireFreshTimestamp(seventh.capturedAt, now, "seventh target preflight time");
+  requireIsoTimestamp(
+    seventh.collectionStartedAt,
+    "SEVENTH_FRESH_TARGET_PREFLIGHT_DURATION_INVALID",
+    "seventh target collection start time",
+  );
+  requireIsoTimestamp(
+    seventh.collectionCompletedAt,
+    "SEVENTH_FRESH_TARGET_PREFLIGHT_DURATION_INVALID",
+    "seventh target collection completion time",
+  );
+  const collectionDurationMs =
+    Date.parse(seventh.collectionCompletedAt) - Date.parse(seventh.collectionStartedAt);
+  if (
+    seventh.collectionCompletedAt !== seventh.capturedAt ||
+    !Number.isSafeInteger(seventh.collectionDurationMs) ||
+    seventh.collectionDurationMs !== collectionDurationMs ||
+    collectionDurationMs < 0 ||
+    collectionDurationMs > 300_000
+  ) {
+    fail(
+      "SEVENTH_FRESH_TARGET_PREFLIGHT_DURATION_INVALID",
+      "The seventh target collection duration must be exact and at most five minutes.",
+    );
+  }
   const bindingDigest = sha256(canonicalJson({
     knownSixPreflightDigestSha256: known.preflightDigestSha256,
     seventhPreflightDigestSha256: seventh.preflightDigestSha256,
@@ -300,6 +333,9 @@ const semanticTargetPreflight = (artifact) => ({
   seventhPreflight: {
     ...artifact.seventhPreflight,
     capturedAt: null,
+    collectionStartedAt: null,
+    collectionCompletedAt: null,
+    collectionDurationMs: null,
     preflightDigestSha256: null,
   },
 });
@@ -461,6 +497,7 @@ export const validateDetachedSevenBucketExecution = ({
     artifact: freshTargetArtifact.value,
     fileDigestSha256: freshTargetArtifact.fileDigestSha256,
     plan: recomputedPlan,
+    knownSource: request.planInputs.knownSource,
     now,
   });
 
@@ -550,6 +587,7 @@ const executeSevenBucketCore = async ({
     artifact: liveTargetArtifact.value,
     fileDigestSha256: liveTargetArtifact.fileDigestSha256,
     plan: prepared.plan,
+    knownSource: request.planInputs.knownSource,
     now: nowProvider(),
     bindingMode: "live",
   });
