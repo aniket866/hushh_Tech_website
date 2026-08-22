@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 
 import {
   CAPTURE_TOOL_VERSION,
@@ -24,8 +25,187 @@ import {
 const compareUtf8 = (left, right) =>
   Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
 
+const TRUST_ANCHOR_URL = new URL(
+  "../../contracts/supabase-local-docker-function-bundle-trust-anchor.v1.json",
+  import.meta.url
+);
+const COLLECTOR_SOURCE_URL = new URL(
+  "./capture-supabase-current-function-bundles-local-docker.mjs",
+  import.meta.url
+);
+const CAPTURE_CORE_SOURCE_URL = new URL(
+  "../../../scripts/ci/capture-supabase-current-function-bundles.mjs",
+  import.meta.url
+);
+const TRUST_ANCHOR_FILE_SHA256 =
+  "6b9e589d36e9923714a95e4b5291691ed965278cc56d119d888008f73864cf37";
+const TRUST_ANCHOR_KEYS = Object.freeze([
+  "schema_version",
+  "provisioning_status",
+  "project_ref",
+  "tool",
+  "tool_version",
+  "bundle_transport",
+  "raw_body_surface",
+  "collector_closure_digest_sha256",
+  "docker_image",
+  "docker_image_id",
+  "docker_image_os",
+  "docker_image_architecture",
+  "provider_metadata_digest_sha256",
+  "raw_body_attempts_digest_sha256",
+]);
+const PROVISIONED_TRUST_FIELDS = Object.freeze([
+  "collector_closure_digest_sha256",
+  "docker_image",
+  "docker_image_id",
+  "docker_image_os",
+  "docker_image_architecture",
+  "provider_metadata_digest_sha256",
+  "raw_body_attempts_digest_sha256",
+]);
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
+};
+
+const digestCanonicalTrustRecords = (domain, records) => {
+  const hash = crypto.createHash("sha256");
+  hash.update(
+    encodeCanonicalRecord([
+      "hushh-local-docker-function-bundle-trust-anchor",
+      CANONICAL_RECORD_ENCODING,
+      domain,
+      String(records.length),
+    ])
+  );
+  for (const record of records) hash.update(encodeCanonicalRecord(record));
+  return hash.digest("hex");
+};
+
+const digestProviderMetadata = (metadata) =>
+  digestCanonicalTrustRecords(
+    "provider-metadata-v1",
+    metadata.map((entry) => [
+      entry.slug,
+      entry.function_id,
+      entry.status,
+      String(entry.current_version),
+      String(entry.manifest_version),
+      String(entry.version_delta),
+      String(entry.verify_jwt),
+      entry.provider_bundle_digest ?? "NULL",
+    ])
+  );
+
+const digestRawBodyAttempts = (attempts) =>
+  digestCanonicalTrustRecords(
+    "raw-body-attempts-v1",
+    attempts.map((attempt, index) => [
+      String(index),
+      attempt.slug,
+      String(attempt.status),
+      String(attempt.bytes),
+      attempt.sha256 ?? "NULL",
+    ])
+  );
+
+const digestCollectorClosure = () =>
+  digestCanonicalTrustRecords(
+    "collector-executable-closure-v1",
+    [
+      [
+        "migration/scripts/ci/capture-supabase-current-function-bundles-local-docker.mjs",
+        fs.readFileSync(COLLECTOR_SOURCE_URL),
+      ],
+      [
+        "scripts/ci/capture-supabase-current-function-bundles.mjs",
+        fs.readFileSync(CAPTURE_CORE_SOURCE_URL),
+      ],
+    ].map(([relativePath, bytes]) => [
+      relativePath,
+      sha256(bytes),
+      String(bytes.length),
+    ])
+  );
+
+const assertFixedTrustAnchorIdentity = (anchor) => {
+  assert(exactKeys(anchor, TRUST_ANCHOR_KEYS), "Local-Docker trust-anchor fields are invalid.");
+  assert(anchor.schema_version === 1, "Local-Docker trust-anchor schema is invalid.");
+  assert(anchor.project_ref === EXPECTED_PROJECT_REF, "Local-Docker trust-anchor project is invalid.");
+  assert(
+    anchor.tool === "supabase_cli_metadata_plus_direct_management_api_body" &&
+      anchor.tool_version === CAPTURE_TOOL_VERSION,
+    "Local-Docker trust-anchor tool identity is invalid."
+  );
+  assert(
+    anchor.bundle_transport === BUNDLE_TRANSPORT && anchor.raw_body_surface === RAW_BODY_SURFACE,
+    "Local-Docker trust-anchor transport identity is invalid."
+  );
+  return anchor;
+};
+
+const assertReviewedTrustAnchor = (anchor) => {
+  assertFixedTrustAnchorIdentity(anchor);
+  assert(
+    anchor.provisioning_status === "REVIEWED",
+    "Local-Docker trust anchor is unprovisioned; no recovery snapshot may be accepted."
+  );
+  for (const field of [
+    "collector_closure_digest_sha256",
+    "provider_metadata_digest_sha256",
+    "raw_body_attempts_digest_sha256",
+  ]) {
+    assert(
+      typeof anchor[field] === "string" && /^[a-f0-9]{64}$/.test(anchor[field]),
+      `Local-Docker trust-anchor ${field} is invalid.`
+    );
+  }
+  assert(
+    typeof anchor.docker_image === "string" &&
+      /^public\.ecr\.aws\/supabase\/edge-runtime@sha256:[a-f0-9]{64}$/.test(anchor.docker_image),
+    "Local-Docker trust-anchor image is invalid."
+  );
+  assert(
+    typeof anchor.docker_image_id === "string" && /^sha256:[a-f0-9]{64}$/.test(anchor.docker_image_id),
+    "Local-Docker trust-anchor image ID is invalid."
+  );
+  assert(anchor.docker_image_os === "linux", "Local-Docker trust-anchor image OS is invalid.");
+  assert(
+    anchor.docker_image_architecture === "amd64" || anchor.docker_image_architecture === "arm64",
+    "Local-Docker trust-anchor image architecture is invalid."
+  );
+  assert(
+    anchor.collector_closure_digest_sha256 === digestCollectorClosure(),
+    "Local-Docker collector closure changed from the reviewed trust anchor."
+  );
+  return anchor;
+};
+
+const loadFrozenTrustAnchor = () => {
+  const bytes = fs.readFileSync(TRUST_ANCHOR_URL);
+  assert(
+    sha256(bytes) === TRUST_ANCHOR_FILE_SHA256,
+    "Local-Docker trust-anchor file changed from its immutable lock."
+  );
+  let anchor;
+  try {
+    anchor = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    throw new Error("Local-Docker trust-anchor file is invalid JSON.");
+  }
+  assert(
+    bytes.equals(Buffer.from(JSON.stringify(anchor, null, 2) + "\n")),
+    "Local-Docker trust-anchor file is not exact canonical JSON."
+  );
+  assertFixedTrustAnchorIdentity(anchor);
+  if (anchor.provisioning_status === "UNPROVISIONED") {
+    assert(
+      PROVISIONED_TRUST_FIELDS.every((field) => anchor[field] === null),
+      "Unprovisioned Local-Docker trust anchor contains review claims."
+    );
+  }
+  return assertReviewedTrustAnchor(anchor);
 };
 
 const exactKeys = (value, keys) =>
@@ -80,7 +260,13 @@ const exactSnapshotCounts = (snapshot) => ({
   ),
 });
 
-export const inspectLocalDockerRecoverySnapshot = ({ snapshot, manifest, limits }) => {
+const inspectLocalDockerRecoverySnapshotWithTrustAnchor = ({
+  snapshot,
+  manifest,
+  limits,
+  trustAnchor,
+}) => {
+  const reviewedTrustAnchor = assertReviewedTrustAnchor(trustAnchor);
   assert(snapshot?.files instanceof Map, "Recovery snapshot files are invalid.");
   assert(snapshot?.directories instanceof Set, "Recovery snapshot directories are invalid.");
   const observedCounts = exactSnapshotCounts(snapshot);
@@ -166,6 +352,21 @@ export const inspectLocalDockerRecoverySnapshot = ({ snapshot, manifest, limits 
     transportReceipt.raw_body_surface === RAW_BODY_SURFACE,
     "Local-Docker raw body surface is invalid."
   );
+  for (const field of [
+    "tool",
+    "tool_version",
+    "bundle_transport",
+    "raw_body_surface",
+    "docker_image",
+    "docker_image_id",
+    "docker_image_os",
+    "docker_image_architecture",
+  ]) {
+    assert(
+      transportReceipt[field] === reviewedTrustAnchor[field],
+      `Local-Docker transport ${field} changed from the reviewed trust anchor.`
+    );
+  }
   assert(
     typeof transportReceipt.docker_image === "string" &&
       /^public\.ecr\.aws\/supabase\/edge-runtime@sha256:[a-f0-9]{64}$/.test(
@@ -287,6 +488,16 @@ export const inspectLocalDockerRecoverySnapshot = ({ snapshot, manifest, limits 
     startMetadata: normalizedMetadata,
     endMetadata: normalizedEndMetadata,
   });
+  assert(
+    digestProviderMetadata(normalizedMetadata) ===
+      reviewedTrustAnchor.provider_metadata_digest_sha256,
+    "Provider metadata changed from the reviewed trust anchor."
+  );
+  assert(
+    digestRawBodyAttempts(transportReceipt.raw_body_attempts) ===
+      reviewedTrustAnchor.raw_body_attempts_digest_sha256,
+    "Raw function body receipts changed from the reviewed trust anchor."
+  );
 
   const legacyReceipt = {
     schema_version: 1,
@@ -332,6 +543,18 @@ export const inspectLocalDockerRecoverySnapshot = ({ snapshot, manifest, limits 
     recoverySnapshotDigest: digestRecoverySnapshot(snapshot.files),
   });
 };
+
+export const inspectLocalDockerRecoverySnapshot = ({ snapshot, manifest, limits }) =>
+  inspectLocalDockerRecoverySnapshotWithTrustAnchor({
+    snapshot,
+    manifest,
+    ...(limits ? { limits } : {}),
+    trustAnchor: loadFrozenTrustAnchor(),
+  });
+
+export const __testing = Object.freeze({
+  inspectLocalDockerRecoverySnapshotWithTrustAnchor,
+});
 
 export const buildLocalDockerCurrentFunctionBundleEvidence = (options) => {
   assert(

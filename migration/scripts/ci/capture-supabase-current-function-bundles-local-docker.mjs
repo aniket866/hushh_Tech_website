@@ -483,7 +483,7 @@ const responseForRawBodyStatus = ({ slug, status }) => {
         project_ref: EXPECTED_PROJECT_REF,
         function_slugs: [slug],
       }),
-      stderr: `Downloading function: ${slug}\n`,
+      stderr: "",
     };
   }
   if (status === 404) {
