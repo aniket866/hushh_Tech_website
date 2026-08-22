@@ -35,7 +35,8 @@ const createResponse = () => {
 
 describe("delete-account API route", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    createDeleteAccountAdminClientFromEnvMock.mockReset();
+    executeDeleteAccountMock.mockReset();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -54,6 +55,7 @@ describe("delete-account API route", () => {
     createDeleteAccountAdminClientFromEnvMock.mockReturnValue({
       adminClient: { marker: "admin" },
       auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
     });
     executeDeleteAccountMock.mockResolvedValue({
       status: 200,
@@ -73,6 +75,7 @@ describe("delete-account API route", () => {
       adminClient: { marker: "admin" },
       authHeader: "Bearer live-token",
       auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({
@@ -106,10 +109,42 @@ describe("delete-account API route", () => {
     });
   });
 
+  it("fails closed without invoking a legacy function when GCS storage is disabled", async () => {
+    const disabledError = Object.assign(
+      new Error("Delete-account storage is disabled until the GCP copy is reconciled."),
+      { code: "GCP_DELETE_ACCOUNT_STORAGE_DISABLED" }
+    );
+    createDeleteAccountAdminClientFromEnvMock.mockImplementation(() => {
+      throw disabledError;
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = createResponse();
+    await deleteAccountHandler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer user-token" },
+      },
+      res
+    );
+
+    expect(createDeleteAccountAdminClientFromEnvMock).toHaveBeenCalledOnce();
+    expect(executeDeleteAccountMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      success: false,
+      error: "Account deletion is temporarily unavailable",
+      details: "GCP_DELETE_ACCOUNT_STORAGE_DISABLED",
+    });
+  });
+
   it("preserves an authentication denial from the GCP deletion service", async () => {
     createDeleteAccountAdminClientFromEnvMock.mockReturnValue({
       adminClient: { marker: "admin" },
       auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
     });
     executeDeleteAccountMock.mockResolvedValue({
       status: 401,

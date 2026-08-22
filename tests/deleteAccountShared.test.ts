@@ -98,6 +98,13 @@ describe("delete-account shared contract", () => {
         "https://example.supabase.co/storage/v1/object/public/assets/other/path.pdf"
       )
     ).toBeNull();
+
+    expect(
+      deleteAccountServiceTesting.buildSignedNdaAssetPathFromUrl(
+        "https://storage.googleapis.com/example/signed-ndas/nda_other-user_111.pdf",
+        "user-123"
+      )
+    ).toBeNull();
   });
 
   it("purges first-party analytics by user, session, and anonymous hash", async () => {

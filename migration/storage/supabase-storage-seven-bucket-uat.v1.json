@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "hushh-tech-storage-seven-bucket-contract-v1",
+  "contractState": "REVIEW_REQUIRED_EXECUTION_DISABLED",
+  "environment": "uat",
+  "project": "hushh-tech-uat",
+  "region": "us-central1",
+  "productionProject": "hushh-tech-prod",
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "bucketCount": 7,
+  "objectCount": 140,
+  "totalBytes": 1574621367,
+  "knownSix": {
+    "contractFileDigestSha256": "2dc544e786df5c640b631a24e5bd43b7e3d5e06c60715f23ab5a872d69fa39ac",
+    "bucketCount": 6,
+    "objectCount": 124,
+    "totalBytes": 111078397
+  },
+  "seventh": {
+    "sourceBucketIdSha256": "2fe7c2abb18b9540ad46b15b3fe9656b6180baa11a778838c85ca207c8feac96",
+    "sourcePublic": true,
+    "objectCount": 16,
+    "totalBytes": 1463542970,
+    "maximumObjectBytes": 1073741824,
+    "targetBucket": "hushh-tech-supabase-quarantine-uat",
+    "targetPrefix": "_hushh_migrations/supabase-cutover-v1-quarantine/2fe7c2abb18b9540ad46b15b3fe9656b6180baa11a778838c85ca207c8feac96",
+    "targetAccessMode": "RESTRICTED_QUARANTINE_NO_RUNTIME_ROUTE",
+    "targetCacheControl": "private, no-store"
+  },
+  "executionPolicy": {
+    "createOnly": true,
+    "ifGenerationMatch": 0,
+    "sourceMutationAllowed": false,
+    "targetOverwriteAllowed": false,
+    "targetDeleteAllowed": false,
+    "productionMutationAllowed": false,
+    "runtimeRoutingAllowed": false,
+    "unknownEighthBucketAllowed": false,
+    "twoPassMetadataRequired": true,
+    "contentHashPassRequired": true,
+    "postCopyFullReconciliationRequired": true,
+    "postCopyZeroSourceDeltaRequired": true,
+    "executionActivated": false
+  },
+  "approvalPolicy": {
+    "schemaVersion": "hushh-tech-storage-seven-bucket-approval-v1",
+    "reviewerLane": "LANE_7",
+    "independentReviewerRequired": true,
+    "maximumLifetimeSeconds": 7200,
+    "exactPlanDigestRequired": true,
+    "exactSourceDigestsRequired": true,
+    "exactPreflightDigestsRequired": true,
+    "zeroTemporaryGrantPolicyHashesRequired": true,
+    "detachedSignatureRequired": true
+  }
+}

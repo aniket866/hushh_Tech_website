@@ -201,6 +201,12 @@ export const assertPrivateInputPath = (
   const absolutePath = resolve(inputPath);
   const status = lstatPathWithoutSymlinks(absolutePath);
   if (!status?.isFile()) fail("PRIVATE_ARTIFACT_NOT_REGULAR", "A private artifact is not a regular file.");
+  if (status.nlink !== 1) {
+    fail(
+      "PRIVATE_ARTIFACT_HARDLINK_BLOCKED",
+      "Private input artifacts must have exactly one filesystem link.",
+    );
+  }
   if (status.size > maximumBytes) {
     fail("PRIVATE_ARTIFACT_TOO_LARGE", `A private artifact exceeds ${maximumBytes} bytes.`);
   }
@@ -220,9 +226,13 @@ export const readPrivateBytes = (
     const openedStatus = fstatSync(descriptor);
     if (
       !openedStatus.isFile() ||
+      initialStatus.nlink !== 1 ||
+      openedStatus.nlink !== 1 ||
       openedStatus.dev !== initialStatus.dev ||
       openedStatus.ino !== initialStatus.ino ||
       openedStatus.size !== initialStatus.size ||
+      openedStatus.mtimeMs !== initialStatus.mtimeMs ||
+      openedStatus.ctimeMs !== initialStatus.ctimeMs ||
       openedStatus.size > maximumBytes
     ) {
       fail("PRIVATE_ARTIFACT_CHANGED", "A private artifact changed while it was opened.");
@@ -237,6 +247,18 @@ export const readPrivateBytes = (
     const probe = Buffer.alloc(1);
     if (offset !== bytes.length || readSync(descriptor, probe, 0, 1, offset) !== 0) {
       fail("PRIVATE_ARTIFACT_CHANGED", "A private artifact changed while it was read.");
+    }
+    const finalStatus = fstatSync(descriptor);
+    if (
+      !finalStatus.isFile() ||
+      finalStatus.nlink !== 1 ||
+      finalStatus.dev !== openedStatus.dev ||
+      finalStatus.ino !== openedStatus.ino ||
+      finalStatus.size !== openedStatus.size ||
+      finalStatus.mtimeMs !== openedStatus.mtimeMs ||
+      finalStatus.ctimeMs !== openedStatus.ctimeMs
+    ) {
+      fail("PRIVATE_ARTIFACT_CHANGED", "A private artifact changed while its descriptor was read.");
     }
     return bytes;
   } finally {

@@ -1,4 +1,5 @@
 import { createHmac } from "crypto";
+import { createGcpDeleteAccountStorageAdapterFromEnv } from "./shared/gcp-delete-account-storage.js";
 import { createGcpServerClient } from "./shared/gcpServerClient.js";
 
 export const DELETE_ACCOUNT_DELETED_SCOPES = [
@@ -23,7 +24,6 @@ const DEFAULT_DELETE_ACCOUNT_RESULT_DETAILS = {
 
 const AUDIT_KEY_PREFIX = "deleted_account_payment_audit:";
 const DELETE_ACCOUNT_HASH_NAMESPACE = "delete-account-payment-audit";
-const SIGNED_NDA_MARKER = "/storage/v1/object/public/assets/";
 const MISSING_RELATION_CODES = new Set(["42P01", "PGRST202", "PGRST205"]);
 
 const buildDeleteAccountSuccessPayload = (details = {}) => ({
@@ -101,22 +101,26 @@ const resolveUserValidationMessage = (error) => {
 
 const dedupeDeleteAccountPaths = (values) => uniqueValues(values.map((value) => value?.trim?.()));
 
-const buildSignedNdaAssetPathFromUrl = (urlValue) => {
+const buildSignedNdaAssetPathFromUrl = (urlValue, expectedUserId = null) => {
   if (!urlValue) return null;
 
   try {
     const url = new URL(urlValue);
-    const markerIndex = url.pathname.indexOf(SIGNED_NDA_MARKER);
-
-    if (markerIndex === -1) {
-      return null;
+    const segments = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+    const signedNdaIndex = segments.indexOf("signed-ndas");
+    if (signedNdaIndex === -1 || signedNdaIndex !== segments.length - 2) return null;
+    const assetPath = segments.slice(signedNdaIndex).join("/");
+    if (!assetPath.startsWith("signed-ndas/")) return null;
+    if (expectedUserId !== null) {
+      const userId = String(expectedUserId);
+      if (!/^[A-Za-z0-9-]{1,128}$/.test(userId)) return null;
+      const fileName = segments.at(-1);
+      if (!fileName?.startsWith(`nda_${userId}_`)) return null;
     }
-
-    const assetPath = decodeURIComponent(
-      url.pathname.slice(markerIndex + SIGNED_NDA_MARKER.length)
-    );
-
-    return assetPath.startsWith("signed-ndas/") ? assetPath : null;
+    return assetPath;
   } catch {
     return null;
   }
@@ -196,64 +200,26 @@ async function deleteIn(adminClient, table, column, values) {
   }
 }
 
-async function listStorageFiles(adminClient, bucket, prefix) {
-  const files = [];
-
-  async function walk(path) {
-    const { data, error } = await adminClient.storage.from(bucket).list(path, {
-      limit: 1000,
-      offset: 0,
-      sortBy: { column: "name", order: "asc" },
-    });
-
-    if (error) {
-      const message = `${getErrorMessage(error)}`.toLowerCase();
-      if (message.includes("not found") || message.includes("no such bucket")) {
-        return;
-      }
-
-      throw new Error(`Failed to list storage objects in ${bucket}: ${getErrorMessage(error)}`);
-    }
-
-    for (const entry of toArray(data)) {
-      if (!entry?.name) continue;
-
-      const childPath = path ? `${path}/${entry.name}` : entry.name;
-      if (entry.id || entry.metadata) {
-        files.push(childPath);
-        continue;
-      }
-
-      await walk(childPath);
-    }
-  }
-
-  await walk(prefix);
-  return files;
+async function listStorageFiles(storageAdapter, bucket, prefix) {
+  const objects = await storageAdapter.listSourcePrefix(bucket, prefix);
+  return dedupeDeleteAccountPaths(objects.map((object) => object.sourceObjectKey));
 }
 
-async function deleteBucketPaths(adminClient, bucket, paths) {
+async function deleteBucketPaths(storageAdapter, bucket, paths) {
   const filePaths = dedupeDeleteAccountPaths(paths);
 
   if (filePaths.length === 0) {
     return 0;
   }
 
-  for (const chunk of chunkArray(filePaths, 100)) {
-    const { error } = await adminClient.storage.from(bucket).remove(chunk);
-    if (error) {
-      throw new Error(
-        `Failed to delete storage objects from ${bucket}: ${getErrorMessage(error)}`
-      );
-    }
-  }
-
-  return filePaths.length;
+  return storageAdapter.deleteSourcePaths(bucket, filePaths, {
+    reason: "account-deletion",
+  });
 }
 
-async function deleteHushhAiMedia(adminClient, userId) {
-  const files = await listStorageFiles(adminClient, "hushh-ai-media", userId);
-  return deleteBucketPaths(adminClient, "hushh-ai-media", files);
+async function deleteHushhAiMedia(storageAdapter, userId) {
+  const files = await listStorageFiles(storageAdapter, "hushh-ai-media", userId);
+  return deleteBucketPaths(storageAdapter, "hushh-ai-media", files);
 }
 
 function buildFormerUserIdHash(userId, auditSecret) {
@@ -382,7 +348,7 @@ async function collectDeleteContext(adminClient, userId) {
     leadIds,
     ndaAssetPaths: dedupeDeleteAccountPaths(
       [...mapColumnValues(ndaSignatureRows, "pdf_url"), ...mapColumnValues(onboardingRows, "nda_pdf_url")].map(
-        buildSignedNdaAssetPathFromUrl
+        (url) => buildSignedNdaAssetPathFromUrl(url, userId)
       )
     ),
     plaidAccountIds: mapColumnValues(plaidAccountRows, "plaid_account_id"),
@@ -546,6 +512,7 @@ export function createDeleteAccountAdminClientFromEnv() {
   return {
     adminClient: createGcpServerClient(),
     auditSecret,
+    storageAdapter: createGcpDeleteAccountStorageAdapterFromEnv(),
   };
 }
 
@@ -553,6 +520,7 @@ export async function executeDeleteAccount({
   adminClient,
   authHeader,
   auditSecret,
+  storageAdapter,
 }) {
   if (!authHeader) {
     return buildErrorResult(401, "Missing authorization header");
@@ -582,9 +550,12 @@ export async function executeDeleteAccount({
 
   try {
     const context = await collectDeleteContext(adminClient, user.id);
-    const hushhAiMediaObjectsDeleted = await deleteHushhAiMedia(adminClient, user.id);
+    if (!storageAdapter) {
+      throw new Error("GCP delete-account storage adapter is missing");
+    }
+    const hushhAiMediaObjectsDeleted = await deleteHushhAiMedia(storageAdapter, user.id);
     const ndaAssetObjectsDeleted = await deleteBucketPaths(
-      adminClient,
+      storageAdapter,
       "assets",
       context.ndaAssetPaths
     );

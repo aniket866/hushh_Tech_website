@@ -45,6 +45,12 @@
     "GOOGLE_CLOUD_PROJECT",
     "GOOGLE_CLOUD_LOCATION",
     "GCP_PROJECT_ID",
+    "GCP_DELETE_ACCOUNT_STORAGE_ENABLED",
+    "GCP_DELETE_ACCOUNT_STORAGE_PROJECT",
+    "GCP_DELETE_ACCOUNT_STORAGE_ENVIRONMENT",
+    "GCP_DELETE_ACCOUNT_STORAGE_MANIFEST_DIGEST",
+    "GCP_DELETE_ACCOUNT_STORAGE_ACTIVATION_DIGEST",
+    "GCP_DELETE_ACCOUNT_STORAGE_BINDING_DIGEST",
     "OPENAI_API_KEY",
     "HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED",
     "HUSHH_TECH_INVESTOR_API_URL",
@@ -234,6 +240,24 @@
     ],
     "PROFILE_INTELLIGENCE_TIMEOUT_MS": [
       "api/generate-profile-intelligence.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ENABLED": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_PROJECT": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ENVIRONMENT": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_MANIFEST_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ACTIVATION_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_BINDING_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
     ],
     "OPENAI_API_KEY": [
       "api/enrich-preferences.js"
