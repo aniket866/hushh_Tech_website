@@ -143,24 +143,23 @@ const PROVIDER_SDK_RE = /(?:@supabase\/supabase-js|npm:\s*@?supabase|jsr:\s*@?su
 const PROVIDER_CLI_RE = /(?:^|\s)(?:npx\s+)?supabase\s+(?:db|functions|gen|inspect|link|migration|projects|secrets|start|status|stop)\b/i;
 const PROVIDER_CLIENT_RE = /\bsupabaseClient\b|\bsupabase\s*(?:\?\.|\.)\s*(?:auth|from|functions|rpc|storage)\b/i;
 
-// These two exact values are inert provenance labels on Google Cloud Storage
-// objects. They identify the source migration generation; they are not a
-// provider hostname, credential, client, or data-plane route. Only complete
-// string literals are removed. Concatenated, escaped, extended, or executable
-// provider references remain visible to every detector below.
-const INERT_STORAGE_MIGRATION_LINEAGE_LITERALS = Object.freeze([
-  "_hushh_migrations/supabase-cutover-v1",
-  "supabase-cutover-v1",
-]);
-
-function stripInertStorageMigrationLineageLiterals(source) {
-  let result = source;
-  for (const value of INERT_STORAGE_MIGRATION_LINEAGE_LITERALS) {
-    for (const quote of ['"', "'", "`"]) {
-      result = result.replaceAll(`${quote}${value}${quote}`, `${quote}storage-migration-lineage${quote}`);
-    }
+// These two exact statements are inert provenance checks inside the reviewed
+// Google Cloud Storage adapter. The exception is deliberately bound to that
+// file and complete syntax. Any renamed variable, concatenation, escaping,
+// extension, or additional executable reference remains visible below.
+function stripInertStorageMigrationLineageStatements(source, relativePath) {
+  if (normalizeRelative(relativePath) !== "api/shared/gcp-delete-account-storage.js") {
+    return source;
   }
-  return result;
+  return source
+    .replace(
+      'const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1";',
+      'const MIGRATION_NAMESPACE = "storage-migration-lineage";',
+    )
+    .replace(
+      'metadata["hushh-migration-schema"] !== "supabase-cutover-v1"',
+      'metadata["hushh-migration-schema"] !== "storage-migration-lineage"',
+    );
 }
 
 function normalizeRelative(value) {
@@ -496,11 +495,17 @@ function usesPublicFirebaseKeyAsCredential(source) {
 
 export function analyzeExecutableContent(source, relativePath = "fixture.ts") {
   const stripped = stripExecutableComments(source, relativePath);
-  const executable = stripInertStorageMigrationLineageLiterals(stripped);
+  const executable = stripInertStorageMigrationLineageStatements(stripped, relativePath);
   const decoded = decodeEscapes(executable);
   const compact = decoded.replace(/[\s'"`+,[\](){}]/g, "");
   const derived = collectDerivedStrings(executable);
   const directSignals = matchSignals(`${executable}\n${decoded}\n${compact}`);
+  if (
+    normalizeRelative(relativePath) === "api/shared/gcp-delete-account-storage.js" &&
+    /\bsupabase\b/i.test(executable)
+  ) {
+    directSignals.push("OBFUSCATED_PROVIDER_REFERENCE");
+  }
   if (usesPublicFirebaseKeyAsCredential(executable)) {
     directSignals.push("PUBLIC_FIREBASE_KEY_AS_CREDENTIAL");
   }

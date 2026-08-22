@@ -184,23 +184,38 @@ describe("fail-closed no-hybrid runtime gate", () => {
 
   it("permits only exact inert storage-migration lineage while still rejecting provider access", () => {
     const gcsOnly = `
-      const prefix = "_hushh_migrations/supabase-cutover-v1";
-      const schema = "supabase-cutover-v1";
-      const object = { storage: { prefix, schema } };
+      const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1";
+      const metadata = input;
+      if (metadata["hushh-migration-schema"] !== "supabase-cutover-v1") throw new Error("bad");
+      const object = { storage: { prefix: MIGRATION_NAMESPACE } };
       fetch("https://storage.googleapis.com/storage/v1/b/example/o", {
         headers: { Authorization: \`Bearer \${token}\` },
       });
     `;
-    expect(analyzeExecutableContent(gcsOnly).violations).toEqual([]);
+    const adapterPath = "api/shared/gcp-delete-account-storage.js";
+    expect(analyzeExecutableContent(gcsOnly, adapterPath).violations).toEqual([]);
 
     const providerAccess = `${gcsOnly}\nconst supabaseClient = client; supabaseClient.storage.from("assets");`;
-    expect(analyzeExecutableContent(providerAccess).violations.map((entry) => entry.code)).toEqual(
-      expect.arrayContaining(["PROVIDER_CLIENT_ACCESS", "PROVIDER_DATA_OR_AUTH_ACCESS"]),
-    );
+    expect(
+      analyzeExecutableContent(providerAccess, adapterPath).violations.map((entry) => entry.code),
+    ).toEqual(expect.arrayContaining(["PROVIDER_CLIENT_ACCESS", "PROVIDER_DATA_OR_AUTH_ACCESS"]));
 
-    const extendedLineage = `const schema = "supabase-cutover-v1/tenant"; client.storage.from("assets");`;
-    expect(analyzeExecutableContent(extendedLineage).violations.map((entry) => entry.code)).toContain(
-      "PROVIDER_DATA_OR_AUTH_ACCESS",
+    const attacks = [
+      `${gcsOnly}\nconst schema = "supabase-cutover-v1" + "/tenant"; client.storage.from("assets");`,
+      `${gcsOnly}\nconst p = "supabase-cutover-v1".slice(0, 8); const url = "https://tenant." + p + ".co"; fetch(url);`,
+      gcsOnly.replace(
+        'const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1";',
+        'const MIGRATION_NAMESPACE = "_hushh_migrations/supabase-cutover-v1" + "/tenant";',
+      ),
+    ];
+    for (const attack of attacks) {
+      expect(
+        analyzeExecutableContent(attack, adapterPath).violations.map((entry) => entry.code),
+      ).toEqual(expect.arrayContaining(["OBFUSCATED_PROVIDER_REFERENCE"]));
+    }
+
+    expect(analyzeExecutableContent(gcsOnly).violations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "OBFUSCATED_PROVIDER_REFERENCE" })]),
     );
   });
 
