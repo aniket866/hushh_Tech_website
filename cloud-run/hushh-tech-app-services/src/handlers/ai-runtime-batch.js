@@ -1204,7 +1204,35 @@ async function consumeConsent({
   return result.consumptionId;
 }
 
+function decodedPublicUrlComponent(raw) {
+  let decoded = raw;
+  let stable = false;
+  for (let pass = 0; pass < 8; pass += 1) {
+    let next;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return null;
+    }
+    if (next === decoded) {
+      stable = true;
+      break;
+    }
+    decoded = next;
+  }
+  if (!stable) return null;
+  const normalized = decoded.normalize("NFKC");
+  if (
+    CONTROL_PATTERN.test(normalized) ||
+    redactText(normalized, normalized.length + 1) !== normalized
+  ) {
+    return null;
+  }
+  return normalized;
+}
+
 function safePublicUrl(raw) {
+  if (typeof raw !== "string" || raw.length < 1 || raw.length > 2_048) return null;
   try {
     const url = new URL(raw);
     if (
@@ -1219,6 +1247,12 @@ function safePublicUrl(raw) {
     }
     url.hash = "";
     url.search = "";
+    if (
+      decodedPublicUrlComponent(url.hostname) === null ||
+      decodedPublicUrlComponent(url.pathname) === null
+    ) {
+      return null;
+    }
     return url.toString();
   } catch {
     return null;

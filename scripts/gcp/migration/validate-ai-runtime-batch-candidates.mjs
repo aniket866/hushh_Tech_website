@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile);
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.ai-runtime-batch.v1.json";
 const EXPECTED_DIGEST =
-  "29322467899e48ef1ef0459c74035d7000fd455764c0f72076894e1d4eea4f50";
+  "9bec7260fbd07b5106a3d58eb999ffbeecef2b4435e62b0f6d1a0d30f07c182b";
 const BASE_COMMIT = "51a3e6753e0f0194be8d55b68ba2bc99bfdc4bd9";
 const PROFILE_RECOVERY_REVISION = "cbfde1b1bf5ef97ebb71766953857750b711d791";
 const SLUGS = [
