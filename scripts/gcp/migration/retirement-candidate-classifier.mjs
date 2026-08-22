@@ -4,13 +4,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import {
-  validateLiveFunctionBundleEvidence,
-  validateManifest,
-} from "../../ci/check-supabase-retirement-manifest.mjs";
-import { validateCurrentFunctionBundleEvidence } from "../../ci/check-supabase-current-function-bundle-evidence.mjs";
-import { validateFunctionTrafficEvidence } from "../../ci/check-supabase-function-traffic-evidence.mjs";
-
 export const CONTRACT = Object.freeze({
   schema_version: 1,
   classifier_id: "hushh-tech-supabase-retirement-candidate-classifier",
@@ -50,27 +43,84 @@ export const CONTRACT = Object.freeze({
       sha256:
         "7e6240c341c3a388e63e43e5d7459de722f339b19a1610d1216ac73a40ccbb4f",
     }),
-    retirement_checker: Object.freeze({
-      path: "scripts/ci/check-supabase-retirement-manifest.mjs",
+  }),
+  executable_roots: Object.freeze([
+    "scripts/ci/check-supabase-retirement-manifest.mjs",
+    "scripts/ci/check-supabase-current-function-bundle-evidence.mjs",
+    "scripts/ci/check-supabase-function-traffic-evidence.mjs",
+  ]),
+  executable_closure: Object.freeze({
+    "scripts/ci/capture-supabase-current-function-bundles.mjs": Object.freeze({
+      oid: "241dac19a90cd3992b743e7e1266f2820f7d81a5",
       sha256:
-        "5e2cc953debe0c54cfbe69fc2fa563548475c7202e1e362440072f7ecbe01457",
+        "e234705516ead1d03090ac068f69eb098ba2b79887a419681285ec39e54d9c36",
+      dependencies: Object.freeze([]),
     }),
-    current_source_checker: Object.freeze({
-      path: "scripts/ci/check-supabase-current-function-bundle-evidence.mjs",
-      sha256:
-        "5b48ac2bf58f6ad36acd183aad177ab53acf8f86dafdd9f956f231dcc0515e3f",
-    }),
-    traffic_checker: Object.freeze({
-      path: "scripts/ci/check-supabase-function-traffic-evidence.mjs",
+    "scripts/ci/check-supabase-current-function-bundle-evidence.mjs":
+      Object.freeze({
+        oid: "1fbdf8e82b2d0a9e1d5b8148c31ef97b511e2b1c",
+        sha256:
+          "5b48ac2bf58f6ad36acd183aad177ab53acf8f86dafdd9f956f231dcc0515e3f",
+        dependencies: Object.freeze([
+          "scripts/ci/capture-supabase-current-function-bundles.mjs",
+          "scripts/ci/check-supabase-retirement-manifest.mjs",
+          "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs",
+        ]),
+      }),
+    "scripts/ci/check-supabase-function-traffic-evidence.mjs": Object.freeze({
+      oid: "03990d0e73557bb35ddc1427a6626e3588b20edd",
       sha256:
         "fd4171160826c0b157bd0a066b3043b61c30069a5d28f34033a85e1542dfe2a4",
+      dependencies: Object.freeze([
+        "scripts/ci/generate-supabase-function-traffic-evidence.mjs",
+        "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs",
+      ]),
     }),
-    historical_generator: Object.freeze({
-      path: "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs",
+    "scripts/ci/check-supabase-retirement-manifest.mjs": Object.freeze({
+      oid: "85c22ef61e1aa220278435d3df0125995242434a",
       sha256:
-        "35eb33b00a1dd79ef8da6ee35cd5480123dc037c1c444e47e4eb78f54a07ac43",
+        "5e2cc953debe0c54cfbe69fc2fa563548475c7202e1e362440072f7ecbe01457",
+      dependencies: Object.freeze([
+        "scripts/ci/check-supabase-function-traffic-evidence.mjs",
+        "scripts/ci/generate-supabase-function-traffic-evidence.mjs",
+        "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs",
+        "scripts/ci/generate-supabase-retirement-function-registry.mjs",
+      ]),
     }),
+    "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs":
+      Object.freeze({
+        oid: "d82a89a3eef5096d5f459c46769692347959cb19",
+        sha256:
+          "b328360de8f0b82aa304878baddcd5a00b21000be7ec6bf924073e8df611f387",
+        dependencies: Object.freeze([
+          "scripts/ci/capture-supabase-current-function-bundles.mjs",
+        ]),
+      }),
+    "scripts/ci/generate-supabase-function-traffic-evidence.mjs": Object.freeze(
+      {
+        oid: "6a0f32d6e6dc84afe03a3617123f9261683d4fb6",
+        sha256:
+          "265a078df6895b6568bb206ccdd3922637503d4e2fe6e62cae138ac8502b10ee",
+        dependencies: Object.freeze([]),
+      },
+    ),
+    "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs":
+      Object.freeze({
+        oid: "769b92bdcbfbea2c9e05f7d33905b4b01242342b",
+        sha256:
+          "35eb33b00a1dd79ef8da6ee35cd5480123dc037c1c444e47e4eb78f54a07ac43",
+        dependencies: Object.freeze([]),
+      }),
+    "scripts/ci/generate-supabase-retirement-function-registry.mjs":
+      Object.freeze({
+        oid: "d09372ad6be80a8371837904ddd88936f8e55217",
+        sha256:
+          "49949e11e51d94c6a877f696cced496b59a616e69239eca852b6eab3bbde55c3",
+        dependencies: Object.freeze([]),
+      }),
   }),
+  executable_closure_sha256:
+    "dcc92122d36985a064f1a74f9559ffafe593b9ed626d84883b43f6b844eb1573",
   caller_corpus_sha256:
     "b6961373852d774b4b490785d751c22ec25fce48ae1e7d3fe7ca56b7dc768bf6",
   caller_graph_sha256:
@@ -83,6 +133,18 @@ const ELIGIBLE = "ELIGIBLE_FOR_OWNER_AND_LEGAL_REVIEW";
 const APPROVALS = Object.freeze({
   owner: "REQUIRED_NOT_GRANTED",
   legal: "REQUIRED_NOT_GRANTED",
+});
+const SECURITY_RETIREMENT_410_CONTRACT = Object.freeze({
+  slug: "get-secrets",
+  owner_group: "security-retirement",
+  final_disposition: "RETIRE_WITH_410",
+  gcp_owner: "cloud-run:hushh-tech-identity-api",
+  auth_mode: "none_feature_retired",
+  migration_method: "do_not_port_return_410_feature_retired",
+  parity_check: "always_410_feature_retired_with_no_secret_payload",
+  response_status: 410,
+  response_code: "FEATURE_RETIRED",
+  secret_payload_allowed: false,
 });
 const SOURCE_EXTENSIONS = new Set([
   ".cjs",
@@ -125,6 +187,13 @@ export const stableJson = (value) => JSON.stringify(stableValue(value));
 export const sha256 = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
 
+const gitBlobOid = (bytes) =>
+  crypto
+    .createHash("sha1")
+    .update(Buffer.from(`blob ${bytes.length}\0`, "utf8"))
+    .update(bytes)
+    .digest("hex");
+
 function git(root, args, encoding = "utf8") {
   return execFileSync("git", args, {
     cwd: root,
@@ -135,6 +204,300 @@ function git(root, args, encoding = "utf8") {
 
 function readGitObject(root, relativePath) {
   return git(root, ["show", `${CONTRACT.base_commit}:${relativePath}`], null);
+}
+
+function assertPinnedBase(root) {
+  const observedCommit = git(root, [
+    "rev-parse",
+    `${CONTRACT.base_commit}^{commit}`,
+  ]).trim();
+  const observedTree = git(root, [
+    "rev-parse",
+    `${CONTRACT.base_commit}^{tree}`,
+  ]).trim();
+  if (
+    observedCommit !== CONTRACT.base_commit ||
+    observedTree !== CONTRACT.base_tree
+  ) {
+    throw new Error("EXECUTABLE_BASE_OBJECT_MISMATCH");
+  }
+}
+
+function resolveModuleDependency(modulePath, specifier) {
+  if (specifier.startsWith("node:")) return null;
+  if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
+    throw new Error("EXECUTABLE_NON_BUILTIN_DEPENDENCY");
+  }
+  const resolved = path.posix.normalize(
+    path.posix.join(path.posix.dirname(modulePath), specifier),
+  );
+  if (
+    resolved.startsWith("../") ||
+    path.posix.isAbsolute(resolved) ||
+    !resolved.endsWith(".mjs")
+  ) {
+    throw new Error("EXECUTABLE_DEPENDENCY_PATH_DRIFT");
+  }
+  return resolved;
+}
+
+function findDeclarationEnd(source, start) {
+  const end = source.indexOf(";", start);
+  if (end < 0) throw new Error("EXECUTABLE_IMPORT_PARSE_INCOMPLETE");
+  return end + 1;
+}
+
+function extractModuleSpecifierRecords(modulePath, bytes) {
+  const source = bytes.toString("utf8");
+  if (Buffer.from(source, "utf8").compare(bytes) !== 0) {
+    throw new Error("EXECUTABLE_MODULE_NOT_UTF8");
+  }
+  const records = [];
+  const declarationPattern = /(^|\n)[\t ]*(import|export)\b/g;
+  for (const match of source.matchAll(declarationPattern)) {
+    const declarationStart = match.index + match[1].length;
+    const keywordEnd =
+      match.index + match[0].lastIndexOf(match[2]) + match[2].length;
+    const afterKeyword = source.slice(keywordEnd).trimStart();
+    if (match[2] === "import" && afterKeyword.startsWith("(")) continue;
+    const declarationEnd = findDeclarationEnd(source, declarationStart);
+    const declaration = source.slice(declarationStart, declarationEnd);
+    const fromMatch = /\bfrom\s*(["'])([^"']+)\1\s*;?\s*$/.exec(declaration);
+    const sideEffectMatch = /^\s*import\s*(["'])([^"']+)\1\s*;?\s*$/.exec(
+      declaration,
+    );
+    const specifierMatch = fromMatch ?? sideEffectMatch;
+    if (!specifierMatch) {
+      if (match[2] === "import") {
+        throw new Error("EXECUTABLE_IMPORT_PARSE_INCOMPLETE");
+      }
+      continue;
+    }
+    const specifier = specifierMatch[2];
+    const quoted = `${specifierMatch[1]}${specifier}${specifierMatch[1]}`;
+    const quoteOffset = declaration.lastIndexOf(quoted);
+    if (quoteOffset < 0) throw new Error("EXECUTABLE_IMPORT_PARSE_INCOMPLETE");
+    const start = declarationStart + quoteOffset + 1;
+    records.push({
+      specifier,
+      dependency: resolveModuleDependency(modulePath, specifier),
+      start,
+      end: start + specifier.length,
+    });
+  }
+
+  const dynamicPattern = /\bimport\s*\(/g;
+  for (const match of source.matchAll(dynamicPattern)) {
+    const tail = source.slice(match.index);
+    const literal = /^import\s*\(\s*(["'])([^"']+)\1\s*\)/.exec(tail);
+    if (!literal) throw new Error("EXECUTABLE_DYNAMIC_IMPORT_NOT_LITERAL");
+    const quoted = `${literal[1]}${literal[2]}${literal[1]}`;
+    const quoteOffset = literal[0].indexOf(quoted);
+    const start = match.index + quoteOffset + 1;
+    records.push({
+      specifier: literal[2],
+      dependency: resolveModuleDependency(modulePath, literal[2]),
+      start,
+      end: start + literal[2].length,
+    });
+  }
+  return records.sort((left, right) => left.start - right.start);
+}
+
+export function digestExecutableClosureContract(roots, closure) {
+  return sha256(
+    stableJson({
+      roots: [...roots].sort(compareUtf8),
+      modules: Object.fromEntries(
+        Object.entries(closure)
+          .sort(([left], [right]) => compareUtf8(left, right))
+          .map(([modulePath, pin]) => [
+            modulePath,
+            {
+              oid: pin.oid,
+              sha256: pin.sha256,
+              dependencies: [...pin.dependencies].sort(compareUtf8),
+            },
+          ]),
+      ),
+    }),
+  );
+}
+
+function parsePinnedTreeRecord(root, modulePath, pin) {
+  const output = git(root, [
+    "ls-tree",
+    CONTRACT.base_commit,
+    "--",
+    modulePath,
+  ]).trim();
+  const match = /^(\d+)\s+(\w+)\s+([a-f0-9]+)\t(.+)$/.exec(output);
+  if (
+    !match ||
+    match[1] !== "100644" ||
+    match[2] !== "blob" ||
+    match[3] !== pin.oid ||
+    match[4] !== modulePath
+  ) {
+    throw new Error("EXECUTABLE_GIT_OBJECT_PATH_OR_MODE_DRIFT");
+  }
+}
+
+export function verifyExecutableClosure(
+  root,
+  {
+    roots = CONTRACT.executable_roots,
+    closure = CONTRACT.executable_closure,
+    expectedDigest = CONTRACT.executable_closure_sha256,
+  } = {},
+) {
+  assertPinnedBase(root);
+  const absoluteRoot = path.resolve(root);
+  const rootStat = fs.lstatSync(absoluteRoot);
+  if (
+    !rootStat.isDirectory() ||
+    rootStat.isSymbolicLink() ||
+    fs.realpathSync(absoluteRoot) !== absoluteRoot
+  ) {
+    throw new Error("EXECUTABLE_ROOT_PATH_DRIFT");
+  }
+  if (digestExecutableClosureContract(roots, closure) !== expectedDigest) {
+    throw new Error("EXECUTABLE_CLOSURE_CONTRACT_DIGEST_MISMATCH");
+  }
+
+  const pinnedPaths = Object.keys(closure).sort(compareUtf8);
+  const moduleRecords = new Map();
+  for (const modulePath of pinnedPaths) {
+    if (
+      modulePath !== path.posix.normalize(modulePath) ||
+      modulePath.startsWith("/") ||
+      modulePath.includes("..")
+    ) {
+      throw new Error("EXECUTABLE_PINNED_PATH_DRIFT");
+    }
+    const pin = closure[modulePath];
+    parsePinnedTreeRecord(root, modulePath, pin);
+    const gitBytes = readGitObject(root, modulePath);
+    if (sha256(gitBytes) !== pin.sha256 || gitBlobOid(gitBytes) !== pin.oid) {
+      throw new Error("EXECUTABLE_GIT_OBJECT_SUBSTITUTION");
+    }
+    const records = extractModuleSpecifierRecords(modulePath, gitBytes);
+    const dependencies = [
+      ...new Set(records.map((record) => record.dependency).filter(Boolean)),
+    ].sort(compareUtf8);
+    if (
+      stableJson(dependencies) !==
+      stableJson([...pin.dependencies].sort(compareUtf8))
+    ) {
+      throw new Error("EXECUTABLE_DEPENDENCY_EDGE_DRIFT");
+    }
+
+    const absolutePath = path.join(absoluteRoot, ...modulePath.split("/"));
+    let stat;
+    try {
+      stat = fs.lstatSync(absolutePath);
+    } catch {
+      throw new Error("EXECUTABLE_WORKTREE_MODULE_MISSING");
+    }
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      fs.realpathSync(absolutePath) !== absolutePath
+    ) {
+      throw new Error("EXECUTABLE_WORKTREE_PATH_OR_SYMLINK_DRIFT");
+    }
+    const worktreeBytes = fs.readFileSync(absolutePath);
+    if (
+      sha256(worktreeBytes) !== pin.sha256 ||
+      gitBlobOid(worktreeBytes) !== pin.oid ||
+      !worktreeBytes.equals(gitBytes)
+    ) {
+      throw new Error("EXECUTABLE_WORKTREE_SUBSTITUTION");
+    }
+    moduleRecords.set(modulePath, { bytes: gitBytes, records });
+  }
+
+  const discovered = new Set();
+  const pending = [...roots];
+  while (pending.length > 0) {
+    const modulePath = pending.pop();
+    if (discovered.has(modulePath)) continue;
+    if (!moduleRecords.has(modulePath)) {
+      throw new Error("EXECUTABLE_CLOSURE_MODULE_MISSING");
+    }
+    discovered.add(modulePath);
+    pending.push(...closure[modulePath].dependencies);
+  }
+  if (
+    stableJson([...discovered].sort(compareUtf8)) !== stableJson(pinnedPaths)
+  ) {
+    throw new Error("EXECUTABLE_CLOSURE_MISSING_OR_EXTRA_MODULE");
+  }
+  return {
+    closure_sha256: expectedDigest,
+    modules: moduleRecords,
+    roots: [...roots],
+  };
+}
+
+function buildVerifiedModuleDataUrl(modulePath, verified, memo, visiting) {
+  if (memo.has(modulePath)) return memo.get(modulePath);
+  if (visiting.has(modulePath)) throw new Error("EXECUTABLE_CLOSURE_CYCLE");
+  visiting.add(modulePath);
+  const moduleRecord = verified.modules.get(modulePath);
+  if (!moduleRecord) throw new Error("EXECUTABLE_CLOSURE_MODULE_MISSING");
+  let source = moduleRecord.bytes.toString("utf8");
+  const replacements = [];
+  for (const record of moduleRecord.records) {
+    if (!record.dependency) continue;
+    replacements.push({
+      start: record.start,
+      end: record.end,
+      value: buildVerifiedModuleDataUrl(
+        record.dependency,
+        verified,
+        memo,
+        visiting,
+      ),
+    });
+  }
+  for (const replacement of replacements.sort(
+    (left, right) => right.start - left.start,
+  )) {
+    source = `${source.slice(0, replacement.start)}${replacement.value}${source.slice(replacement.end)}`;
+  }
+  visiting.delete(modulePath);
+  const dataUrl = `data:text/javascript;base64,${Buffer.from(source, "utf8").toString("base64")}#${encodeURIComponent(modulePath)}`;
+  memo.set(modulePath, dataUrl);
+  return dataUrl;
+}
+
+async function importVerifiedCheckerModules(verified) {
+  const memo = new Map();
+  const visiting = new Set();
+  const urls = Object.fromEntries(
+    verified.roots.map((modulePath) => [
+      modulePath,
+      buildVerifiedModuleDataUrl(modulePath, verified, memo, visiting),
+    ]),
+  );
+  const retirement = await import(
+    urls["scripts/ci/check-supabase-retirement-manifest.mjs"]
+  );
+  const current = await import(
+    urls["scripts/ci/check-supabase-current-function-bundle-evidence.mjs"]
+  );
+  const traffic = await import(
+    urls["scripts/ci/check-supabase-function-traffic-evidence.mjs"]
+  );
+  return {
+    validateManifest: retirement.validateManifest,
+    validateLiveFunctionBundleEvidence:
+      retirement.validateLiveFunctionBundleEvidence,
+    validateCurrentFunctionBundleEvidence:
+      current.validateCurrentFunctionBundleEvidence,
+    validateFunctionTrafficEvidence: traffic.validateFunctionTrafficEvidence,
+  };
 }
 
 function assertDigest(label, bytes, expected) {
@@ -401,6 +764,50 @@ function pushIf(target, condition, code) {
   if (condition) target.push(code);
 }
 
+function securityRetirementContractFor(registryEntry) {
+  const markers =
+    registryEntry?.source?.slug === SECURITY_RETIREMENT_410_CONTRACT.slug ||
+    registryEntry?.owner_group ===
+      SECURITY_RETIREMENT_410_CONTRACT.owner_group ||
+    registryEntry?.final_disposition ===
+      SECURITY_RETIREMENT_410_CONTRACT.final_disposition ||
+    registryEntry?.gcp_owner === SECURITY_RETIREMENT_410_CONTRACT.gcp_owner ||
+    registryEntry?.auth_mode === SECURITY_RETIREMENT_410_CONTRACT.auth_mode ||
+    registryEntry?.migration_method ===
+      SECURITY_RETIREMENT_410_CONTRACT.migration_method ||
+    registryEntry?.parity_check ===
+      SECURITY_RETIREMENT_410_CONTRACT.parity_check;
+  if (!markers) return null;
+  const exact =
+    registryEntry.source.slug === SECURITY_RETIREMENT_410_CONTRACT.slug &&
+    registryEntry.owner_group ===
+      SECURITY_RETIREMENT_410_CONTRACT.owner_group &&
+    registryEntry.final_disposition ===
+      SECURITY_RETIREMENT_410_CONTRACT.final_disposition &&
+    registryEntry.gcp_owner === SECURITY_RETIREMENT_410_CONTRACT.gcp_owner &&
+    registryEntry.auth_mode === SECURITY_RETIREMENT_410_CONTRACT.auth_mode &&
+    registryEntry.migration_method ===
+      SECURITY_RETIREMENT_410_CONTRACT.migration_method &&
+    registryEntry.parity_check ===
+      SECURITY_RETIREMENT_410_CONTRACT.parity_check;
+  return {
+    exact,
+    blocker: exact
+      ? "SECURITY_RETIREMENT_410_TERMINAL_ONLY"
+      : "SECURITY_RETIREMENT_410_CONTRACT_MISMATCH",
+    contract: {
+      slug: SECURITY_RETIREMENT_410_CONTRACT.slug,
+      owner_group: SECURITY_RETIREMENT_410_CONTRACT.owner_group,
+      final_disposition: SECURITY_RETIREMENT_410_CONTRACT.final_disposition,
+      response_status: SECURITY_RETIREMENT_410_CONTRACT.response_status,
+      response_code: SECURITY_RETIREMENT_410_CONTRACT.response_code,
+      secret_payload_allowed:
+        SECURITY_RETIREMENT_410_CONTRACT.secret_payload_allowed,
+      handling: "EXPLICIT_TERMINAL_APPROVAL_ONLY",
+    },
+  };
+}
+
 export function classifyCandidateEntry({
   registryEntry,
   currentEntry,
@@ -420,6 +827,7 @@ export function classifyCandidateEntry({
     );
   }
   const trafficCount = trafficEntry.request_count;
+  const securityRetirement = securityRetirementContractFor(registryEntry);
   const reachableCallerSetValid = Array.isArray(callerEntry.reachable_callers);
   const reachableCallers = reachableCallerSetValid
     ? callerEntry.reachable_callers
@@ -443,6 +851,7 @@ export function classifyCandidateEntry({
   }
 
   const blockers = [...globalBlockers];
+  if (securityRetirement) blockers.push(securityRetirement.blocker);
   pushIf(blockers, trafficCount !== 0, "TRAFFIC_COUNT_NOT_PROVEN_ZERO");
   pushIf(
     blockers,
@@ -544,6 +953,9 @@ export function classifyCandidateEntry({
     reachable_callers: reachableCallers,
     approvals: APPROVALS,
     retirement_authorized: false,
+    ...(securityRetirement
+      ? { terminal_contract: securityRetirement.contract }
+      : {}),
   };
 }
 
@@ -575,7 +987,12 @@ export function verifyPinnedCallerGraph(callerGraphResult) {
   return true;
 }
 
-export function classifyPinnedInputs({ inputBytes, callerGraphResult }) {
+export function classifyPinnedInputs({
+  inputBytes,
+  callerGraphResult,
+  validators,
+  verifiedExecutableClosure,
+}) {
   verifyPinnedBytes(inputBytes);
   verifyPinnedCallerGraph(callerGraphResult);
   const manifest = JSON.parse(inputBytes.manifest.toString("utf8"));
@@ -587,21 +1004,25 @@ export function classifyPinnedInputs({ inputBytes, callerGraphResult }) {
   );
   const trafficEvidence = JSON.parse(inputBytes.traffic.toString("utf8"));
 
-  const manifestValidation = validateManifest(manifest);
-  const historicalValidation = validateLiveFunctionBundleEvidence(
+  const manifestValidation = validators.validateManifest(manifest);
+  const historicalValidation = validators.validateLiveFunctionBundleEvidence(
     manifest,
     historicalEvidence,
   );
-  const currentValidation = validateCurrentFunctionBundleEvidence({
+  const currentValidation = validators.validateCurrentFunctionBundleEvidence({
     manifest,
     historicalEvidence,
     evidence: currentEvidence,
     manifestBytes: inputBytes.manifest,
     historicalEvidenceBytes: inputBytes.historical_source,
-    canonicalCheckerBytes: inputBytes.retirement_checker,
-    historicalGeneratorBytes: inputBytes.historical_generator,
+    canonicalCheckerBytes: verifiedExecutableClosure.modules.get(
+      "scripts/ci/check-supabase-retirement-manifest.mjs",
+    ).bytes,
+    historicalGeneratorBytes: verifiedExecutableClosure.modules.get(
+      "scripts/ci/generate-supabase-live-function-bundle-evidence.mjs",
+    ).bytes,
   });
-  const trafficValidation = validateFunctionTrafficEvidence(
+  const trafficValidation = validators.validateFunctionTrafficEvidence(
     manifest,
     historicalEvidence,
     trafficEvidence,
@@ -678,6 +1099,20 @@ export function classifyPinnedInputs({ inputBytes, callerGraphResult }) {
         { path: pin.path, sha256: pin.sha256 },
       ]),
     ),
+    executable_closure: {
+      sha256: verifiedExecutableClosure.closure_sha256,
+      pinned_modules: verifiedExecutableClosure.modules.size,
+      evaluated_modules: verifiedExecutableClosure.modules.size,
+      evaluation_source: "VERIFIED_BASE_GIT_OBJECT_DATA_URLS",
+      modules: Object.entries(CONTRACT.executable_closure)
+        .sort(([left], [right]) => compareUtf8(left, right))
+        .map(([modulePath, pin]) => ({
+          path: modulePath,
+          git_blob_oid: pin.oid,
+          sha256: pin.sha256,
+          dependencies: [...pin.dependencies],
+        })),
+    },
     caller_graph: {
       corpus_sha256: callerGraphResult.corpus_sha256,
       graph_sha256: callerGraphResult.graph_sha256,
@@ -697,22 +1132,7 @@ export function classifyPinnedInputs({ inputBytes, callerGraphResult }) {
 }
 
 export function loadPinnedInputs(root) {
-  const observedCommit = git(root, [
-    "rev-parse",
-    `${CONTRACT.base_commit}^{commit}`,
-  ]).trim();
-  const observedTree = git(root, [
-    "rev-parse",
-    `${CONTRACT.base_commit}^{tree}`,
-  ]).trim();
-  if (
-    observedCommit !== CONTRACT.base_commit ||
-    observedTree !== CONTRACT.base_tree
-  ) {
-    throw new Error(
-      "Pinned classifier base commit or tree is unavailable or forged.",
-    );
-  }
+  assertPinnedBase(root);
   return Object.fromEntries(
     Object.entries(CONTRACT.inputs).map(([name, pin]) => [
       name,
@@ -721,23 +1141,11 @@ export function loadPinnedInputs(root) {
   );
 }
 
-function verifyLoadedCheckerModules(root) {
-  for (const name of [
-    "retirement_checker",
-    "current_source_checker",
-    "traffic_checker",
-  ]) {
-    const pin = CONTRACT.inputs[name];
-    assertDigest(
-      `loaded ${name}`,
-      fs.readFileSync(path.join(root, pin.path)),
-      pin.sha256,
-    );
-  }
-}
-
-export function runPinnedClassifier(root) {
-  verifyLoadedCheckerModules(root);
+export async function runPinnedClassifier(root) {
+  const verifiedExecutableClosure = verifyExecutableClosure(root);
+  const validators = await importVerifiedCheckerModules(
+    verifiedExecutableClosure,
+  );
   const inputBytes = loadPinnedInputs(root);
   verifyPinnedBytes(inputBytes);
   const policy = JSON.parse(inputBytes.runtime_policy.toString("utf8"));
@@ -747,7 +1155,12 @@ export function runPinnedClassifier(root) {
     policy,
     registryEntries: manifest.functions,
   });
-  return classifyPinnedInputs({ inputBytes, callerGraphResult });
+  return classifyPinnedInputs({
+    inputBytes,
+    callerGraphResult,
+    validators,
+    verifiedExecutableClosure,
+  });
 }
 
 const isDirectExecution =
@@ -755,8 +1168,9 @@ const isDirectExecution =
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isDirectExecution) {
-  const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
   if (process.argv.includes("--inspect-pins")) {
+    const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
+    const verifiedExecutableClosure = verifyExecutableClosure(root);
     const inputBytes = loadPinnedInputs(root);
     verifyPinnedBytes(inputBytes);
     const caller = buildPinnedCallerGraph({
@@ -766,7 +1180,17 @@ if (isDirectExecution) {
         .functions,
     });
     process.stdout.write(
-      `${JSON.stringify({ corpus_sha256: caller.corpus_sha256, graph_sha256: caller.graph_sha256 }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          corpus_sha256: caller.corpus_sha256,
+          graph_sha256: caller.graph_sha256,
+          executable_closure_sha256: verifiedExecutableClosure.closure_sha256,
+          provider_calls_performed: 0,
+          files_written: 0,
+        },
+        null,
+        2,
+      )}\n`,
     );
   } else if (!process.argv.includes(CONTRACT.required_flag)) {
     process.stdout.write(
@@ -777,12 +1201,15 @@ if (isDirectExecution) {
         required_flag: CONTRACT.required_flag,
         serving_registry_mutated: false,
         retirement_authorized: false,
+        provider_calls_performed: 0,
+        files_written: 0,
       })}\n`,
     );
   } else {
     try {
+      const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
       process.stdout.write(
-        `${JSON.stringify(runPinnedClassifier(root), null, 2)}\n`,
+        `${JSON.stringify(await runPinnedClassifier(root), null, 2)}\n`,
       );
     } catch (error) {
       process.stdout.write(
@@ -796,6 +1223,8 @@ if (isDirectExecution) {
           ),
           serving_registry_mutated: false,
           retirement_authorized: false,
+          provider_calls_performed: 0,
+          files_written: 0,
         })}\n`,
       );
       process.exitCode = 1;

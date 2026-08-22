@@ -1,4 +1,7 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -8,13 +11,63 @@ import {
   buildPinnedCallerGraph,
   classifyCandidateEntry,
   deriveGlobalEvidenceBlockers,
+  digestExecutableClosureContract,
   loadPinnedInputs,
   runPinnedClassifier,
+  verifyExecutableClosure,
   verifyPinnedCallerGraph,
   verifyPinnedBytes,
 } from "../scripts/gcp/migration/retirement-candidate-classifier.mjs";
 
 const root = process.cwd();
+const classifierRelativePath =
+  "scripts/gcp/migration/retirement-candidate-classifier.mjs";
+
+function createClassifierClone() {
+  const requestedClone = fs.mkdtempSync(
+    path.join(os.tmpdir(), "retirement-classifier-adversarial-"),
+  );
+  execFileSync("git", [
+    "clone",
+    "--quiet",
+    "--no-hardlinks",
+    root,
+    requestedClone,
+  ]);
+  const clone = fs.realpathSync(requestedClone);
+  const destination = path.join(clone, classifierRelativePath);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.copyFileSync(path.join(root, classifierRelativePath), destination);
+  return clone;
+}
+
+function runClassifierProcess(
+  clone: string,
+  args: string[],
+  markerPath: string,
+) {
+  return spawnSync(
+    process.execPath,
+    [path.join(clone, classifierRelativePath), ...args],
+    {
+      cwd: clone,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        RETIREMENT_CLASSIFIER_MARKER_PATH: markerPath,
+      },
+    },
+  );
+}
+
+function appendExecutionMarker(clone: string, modulePath: string) {
+  const markerPath = path.join(clone, "unverified-module-executed.marker");
+  fs.appendFileSync(
+    path.join(clone, modulePath),
+    `\nif (process.env.RETIREMENT_CLASSIFIER_MARKER_PATH) fs.writeFileSync(process.env.RETIREMENT_CLASSIFIER_MARKER_PATH, "executed");\n`,
+  );
+  return markerPath;
+}
 
 function candidateFixture() {
   return {
@@ -236,6 +289,82 @@ describe("retirement candidate decision contract", () => {
     });
   });
 
+  it("never treats the exact get-secrets 410 security retirement contract as a generic eligible candidate", () => {
+    const fixture = candidateFixture();
+    fixture.registryEntry.source.slug = "get-secrets";
+    fixture.currentEntry.slug = "get-secrets";
+    fixture.trafficEntry.slug = "get-secrets";
+    fixture.callerEntry.slug = "get-secrets";
+    Object.assign(fixture.registryEntry, {
+      owner_group: "security-retirement",
+      final_disposition: "RETIRE_WITH_410",
+      gcp_owner: "cloud-run:hushh-tech-identity-api",
+      auth_mode: "none_feature_retired",
+      migration_method: "do_not_port_return_410_feature_retired",
+      parity_check: "always_410_feature_retired_with_no_secret_payload",
+    });
+
+    expect(classifyCandidateEntry(fixture)).toEqual({
+      slug: "get-secrets",
+      classification: "BLOCKED",
+      reason_codes: ["SECURITY_RETIREMENT_410_TERMINAL_ONLY"],
+      traffic_request_count: 0,
+      reachable_callers: [],
+      approvals: {
+        owner: "REQUIRED_NOT_GRANTED",
+        legal: "REQUIRED_NOT_GRANTED",
+      },
+      retirement_authorized: false,
+      terminal_contract: {
+        slug: "get-secrets",
+        owner_group: "security-retirement",
+        final_disposition: "RETIRE_WITH_410",
+        response_status: 410,
+        response_code: "FEATURE_RETIRED",
+        secret_payload_allowed: false,
+        handling: "EXPLICIT_TERMINAL_APPROVAL_ONLY",
+      },
+    });
+  });
+
+  it("blocks a partial or forged security-retirement marker as a 410 contract mismatch", () => {
+    const fixture = candidateFixture();
+    fixture.registryEntry.source.slug = "get-secrets";
+    fixture.currentEntry.slug = "get-secrets";
+    fixture.trafficEntry.slug = "get-secrets";
+    fixture.callerEntry.slug = "get-secrets";
+
+    expect(classifyCandidateEntry(fixture)).toMatchObject({
+      classification: "BLOCKED",
+      reason_codes: ["SECURITY_RETIREMENT_410_CONTRACT_MISMATCH"],
+      retirement_authorized: false,
+    });
+  });
+
+  it.each([
+    ["owner group", { owner_group: "security-retirement" }],
+    ["final disposition", { final_disposition: "RETIRE_WITH_410" }],
+    ["GCP owner", { gcp_owner: "cloud-run:hushh-tech-identity-api" }],
+    ["retired auth mode", { auth_mode: "none_feature_retired" }],
+    [
+      "migration method",
+      { migration_method: "do_not_port_return_410_feature_retired" },
+    ],
+    [
+      "parity contract",
+      { parity_check: "always_410_feature_retired_with_no_secret_payload" },
+    ],
+  ])("blocks an isolated %s 410 marker", (_label, marker) => {
+    const fixture = candidateFixture();
+    Object.assign(fixture.registryEntry, marker);
+
+    expect(classifyCandidateEntry(fixture)).toMatchObject({
+      classification: "BLOCKED",
+      reason_codes: ["SECURITY_RETIREMENT_410_CONTRACT_MISMATCH"],
+      retirement_authorized: false,
+    });
+  });
+
   it("only emits review eligibility and keeps both human approvals outstanding", () => {
     expect(classifyCandidateEntry(candidateFixture())).toEqual({
       slug: "candidate-function",
@@ -249,6 +378,141 @@ describe("retirement candidate decision contract", () => {
       },
       retirement_authorized: false,
     });
+  });
+});
+
+describe("verified executable dependency bootstrap", () => {
+  it("has no static executable dependency outside Node built-ins", () => {
+    const source = fs.readFileSync(
+      path.join(root, classifierRelativePath),
+      "utf8",
+    );
+    const staticImports = [
+      ...source.matchAll(/^import .* from "([^"]+)";/gm),
+    ].map((match) => match[1]);
+
+    expect(staticImports.length).toBeGreaterThan(0);
+    expect(
+      staticImports.every((specifier) => specifier.startsWith("node:")),
+    ).toBe(true);
+    expect(source).not.toMatch(/from "\.\.\/\.\.\/ci\//);
+  });
+
+  it.each([
+    ["direct", "scripts/ci/check-supabase-retirement-manifest.mjs"],
+    [
+      "transitive",
+      "scripts/ci/generate-supabase-function-traffic-evidence.mjs",
+    ],
+  ])(
+    "never executes a substituted %s module in default-off or machine mode",
+    (_kind, modulePath) => {
+      const clone = createClassifierClone();
+      try {
+        const markerPath = appendExecutionMarker(clone, modulePath);
+
+        const disabled = runClassifierProcess(clone, [], markerPath);
+        expect(disabled.status).toBe(0);
+        expect(JSON.parse(disabled.stdout)).toMatchObject({
+          state: "DISABLED_BY_DEFAULT",
+          provider_calls_performed: 0,
+          files_written: 0,
+        });
+        expect(fs.existsSync(markerPath)).toBe(false);
+
+        const machine = runClassifierProcess(
+          clone,
+          ["--machine-evaluate"],
+          markerPath,
+        );
+        expect(machine.status).toBe(1);
+        expect(JSON.parse(machine.stdout)).toMatchObject({
+          state: "BLOCKED",
+          error_code: "PINNED_CLASSIFIER_FAILURE",
+          provider_calls_performed: 0,
+          files_written: 0,
+        });
+        expect(fs.existsSync(markerPath)).toBe(false);
+      } finally {
+        fs.rmSync(clone, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("rejects missing, extra, symlinked, and root-path-drift closure states", () => {
+    const missingClosure = { ...CONTRACT.executable_closure };
+    delete missingClosure[
+      "scripts/ci/capture-supabase-current-function-bundles.mjs"
+    ];
+    expect(() =>
+      verifyExecutableClosure(root, {
+        closure: missingClosure,
+        expectedDigest: digestExecutableClosureContract(
+          CONTRACT.executable_roots,
+          missingClosure,
+        ),
+      }),
+    ).toThrow(/EXECUTABLE_CLOSURE_MODULE_MISSING/);
+
+    const extraPath = "scripts/ci/check-env-contract.mjs";
+    const extraBytes = execFileSync(
+      "git",
+      ["show", `${CONTRACT.base_commit}:${extraPath}`],
+      { cwd: root },
+    );
+    const extraClosure = {
+      ...CONTRACT.executable_closure,
+      [extraPath]: {
+        oid: execFileSync(
+          "git",
+          ["rev-parse", `${CONTRACT.base_commit}:${extraPath}`],
+          { cwd: root, encoding: "utf8" },
+        ).trim(),
+        sha256: crypto.createHash("sha256").update(extraBytes).digest("hex"),
+        dependencies: [],
+      },
+    };
+    expect(() =>
+      verifyExecutableClosure(root, {
+        closure: extraClosure,
+        expectedDigest: digestExecutableClosureContract(
+          CONTRACT.executable_roots,
+          extraClosure,
+        ),
+      }),
+    ).toThrow(/EXECUTABLE_CLOSURE_MISSING_OR_EXTRA_MODULE/);
+
+    const clone = createClassifierClone();
+    const directPath = path.join(
+      clone,
+      "scripts/ci/check-supabase-retirement-manifest.mjs",
+    );
+    const directBytes = fs.readFileSync(directPath);
+    const rootLink = `${clone}-path-drift`;
+    try {
+      fs.unlinkSync(directPath);
+      expect(() => verifyExecutableClosure(clone)).toThrow(
+        /EXECUTABLE_WORKTREE_MODULE_MISSING/,
+      );
+      fs.writeFileSync(directPath, directBytes);
+
+      const realPath = `${directPath}.real`;
+      fs.renameSync(directPath, realPath);
+      fs.symlinkSync(path.basename(realPath), directPath);
+      expect(() => verifyExecutableClosure(clone)).toThrow(
+        /EXECUTABLE_WORKTREE_PATH_OR_SYMLINK_DRIFT/,
+      );
+      fs.unlinkSync(directPath);
+      fs.renameSync(realPath, directPath);
+
+      fs.symlinkSync(clone, rootLink, "dir");
+      expect(() => verifyExecutableClosure(rootLink)).toThrow(
+        /EXECUTABLE_ROOT_PATH_DRIFT/,
+      );
+    } finally {
+      fs.rmSync(rootLink, { force: true });
+      fs.rmSync(clone, { recursive: true, force: true });
+    }
   });
 });
 
@@ -271,16 +535,20 @@ describe("pinned default-off execution", () => {
       required_flag: "--machine-evaluate",
       serving_registry_mutated: false,
       retirement_authorized: false,
+      provider_calls_performed: 0,
+      files_written: 0,
     });
   });
 
-  it("classifies all 112 pinned functions without making anything retirement-eligible", () => {
-    const result = runPinnedClassifier(root);
+  it("classifies all 112 pinned functions without making anything retirement-eligible", async () => {
+    const result = await runPinnedClassifier(root);
 
     expect(result.base_commit).toBe(CONTRACT.base_commit);
-    expect(result.counts.MUST_PORT + result.counts.BLOCKED).toBe(112);
-    expect(result.counts.MUST_PORT).toBeGreaterThanOrEqual(18);
-    expect(result.counts.ELIGIBLE_FOR_OWNER_AND_LEGAL_REVIEW).toBe(0);
+    expect(result.counts).toEqual({
+      MUST_PORT: 27,
+      BLOCKED: 85,
+      ELIGIBLE_FOR_OWNER_AND_LEGAL_REVIEW: 0,
+    });
     expect(result.global_blockers).toEqual(
       expect.arrayContaining([
         "CALLER_GRAPH_GLOBAL_INCOMPLETE",
@@ -296,6 +564,12 @@ describe("pinned default-off execution", () => {
       retirement_authorized: false,
       provider_calls_performed: 0,
       files_written: 0,
+      executable_closure: {
+        sha256: CONTRACT.executable_closure_sha256,
+        pinned_modules: 8,
+        evaluated_modules: 8,
+        evaluation_source: "VERIFIED_BASE_GIT_OBJECT_DATA_URLS",
+      },
     });
   });
 });
