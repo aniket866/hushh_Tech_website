@@ -429,18 +429,22 @@ jobs:
 
       - name: Upload UAT smoke artifact
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: uat-oauth-smoke
           if-no-files-found: error
+          retention-days: 7
           path: /tmp/uat-oauth-smoke.json
 
       - name: Upload UAT sensitive NDA gate artifact
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: uat-sensitive-nda-gate
           if-no-files-found: warn
+          retention-days: 7
           path: /tmp/uat-sensitive-nda-gate.json
 
       - name: Upload UAT Research client smoke artifact

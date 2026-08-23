@@ -46,10 +46,12 @@ jobs:
 
       - name: Upload DCO report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: dco-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/dco-report.txt
 
   secret-scan:
@@ -87,10 +89,12 @@ jobs:
 
       - name: Upload env contract report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: env-contract-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/env-contract-report.json
 
   supabase-retirement-contract:
@@ -254,10 +258,12 @@ jobs:
 
       - name: Upload PR hygiene report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: pr-hygiene-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/pr-hygiene-report.json
 
   phase2-pr-policy:
@@ -279,10 +285,12 @@ jobs:
 
       - name: Upload Phase 2 PR policy report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: phase2-pr-policy-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/phase2-pr-policy-report.json
 
   semantic-pr-guard:
@@ -307,10 +315,12 @@ jobs:
 
       - name: Upload semantic PR guard report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: semantic-pr-guard-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/semantic-pr-guard-report.json
 
   web-validation:
@@ -353,10 +363,12 @@ jobs:
 
       - name: Upload lint report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: eslint-full-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/eslint-full-report.json
 
   security-audit:
@@ -384,10 +396,12 @@ jobs:
 
       - name: Upload audit report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: npm-audit-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/npm-audit-report.json
 
   sensitive-nda-gate:
