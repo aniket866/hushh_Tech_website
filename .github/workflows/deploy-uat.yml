@@ -343,7 +343,7 @@ jobs:
             --port=8080 \
             --timeout=240s \
             --update-env-vars="$runtime_env" \
-            --update-secrets="$runtime_secrets" \
+            --set-secrets="$runtime_secrets" \
             --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}" \
             --clear-base-image \
             --quiet
