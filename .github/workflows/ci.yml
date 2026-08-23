@@ -345,6 +345,12 @@ jobs:
       - name: Run test, type-check, and build
         run: bash scripts/ci/orchestrate.sh web
 
+      # A Dockerfile COPY source excluded by .gcloudignore only fails inside
+      # Cloud Build, at deploy time. Nothing else in CI performs a source
+      # deploy, so this is the only place it can be caught before shipping.
+      - name: Validate deploy build context
+        run: node scripts/ci/check-deploy-build-context.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
