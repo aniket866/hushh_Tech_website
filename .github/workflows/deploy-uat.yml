@@ -449,18 +449,22 @@ jobs:
 
       - name: Upload UAT Research client smoke artifact
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: uat-hushh-research-client-smoke
           if-no-files-found: error
+          retention-days: 7
           path: /tmp/uat-hushh-research-client-smoke.json
 
       - name: Upload UAT predeploy and release evidence
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: uat-revision-safety
           if-no-files-found: warn
+          retention-days: 7
           path: |
             /tmp/uat-predeploy-state.json
             /tmp/uat-release-identity.json
@@ -503,8 +507,10 @@ jobs:
 
       - name: Upload UAT rollback evidence
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: uat-rollback-state
           if-no-files-found: warn
+          retention-days: 7
           path: /tmp/uat-rollback-state.json

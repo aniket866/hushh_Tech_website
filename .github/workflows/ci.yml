@@ -134,10 +134,12 @@ jobs:
 
       - name: Upload no-hybrid report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: no-hybrid-runtime-report
           if-no-files-found: error
+          retention-days: 7
           path: tmp/ci/no-hybrid-runtime-report.json
 
   gcp-service-foundation:

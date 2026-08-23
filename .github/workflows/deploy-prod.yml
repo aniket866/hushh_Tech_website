@@ -295,8 +295,10 @@ jobs:
 
       - name: Upload production Research hard-off proof
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: prod-hushh-research-client-smoke
           if-no-files-found: error
+          retention-days: 7
           path: /tmp/prod-hushh-research-client-smoke.json
