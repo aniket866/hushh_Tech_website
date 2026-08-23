@@ -48,14 +48,14 @@ export async function generateProfileIntelligence(
   }
 
   try {
-    const supabase = resources.config.supabaseClient;
+    const gcpBackend = resources.config.gcpBackendClient;
 
-    if (!supabase) {
-      throw new Error("Supabase client not initialized");
+    if (!gcpBackend) {
+      throw new Error("GcpBackend client not initialized");
     }
 
     const session = await getAuthenticatedSession(
-      supabase,
+      gcpBackend,
       "User not logged in. Please sign in to generate profile intelligence."
     );
 

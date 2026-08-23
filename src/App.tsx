@@ -34,6 +34,8 @@ import DeleteAccountPage from './pages/delete-account';
 import { ReactNode } from 'react';
 import Profile from './pages/profile';
 import AuthCallback from './pages/AuthCallback';
+import HushhResearchAuthCallback from './pages/HushhResearchAuthCallback';
+import HushhResearchAuthStart from './pages/HushhResearchAuthStart';
 import NDARequestModalComponent from './components/NDARequestModal';
 import UserProfilePage from './pages/user-profile/page';
 import InvestorProfilePage from './pages/investor-profile';
@@ -80,7 +82,6 @@ import DocumentViewerPage from './pages/document-viewer';
 import NDAAdminPage from './pages/nda-admin';
 import { AuthSessionProvider, useAuthSession } from './auth/AuthSessionProvider';
 import AuthRequiredRoute from './components/AuthRequiredRoute';
-import HushhHackathonPage from './pages/hushh-hackathon/ui';
 import MetricsPage from './pages/metrics';
 import DeploymentsPage from './pages/deployments/ui';
 import NotFound from './pages/NotFound';
@@ -88,6 +89,12 @@ import FundAdminPage from './pages/fund-admin/ui';
 import FundAdminInvestorDetail from './pages/fund-admin/detail/ui';
 import FundAdminAnalytics from './pages/fund-admin/analytics/ui';
 import FundAdminRoute from './components/FundAdminRoute';
+import HushhResearchHardEntryGuard from './components/HushhResearchHardEntryGuard';
+import {
+  HUSHH_RESEARCH_SOURCE,
+  isHushhResearchAuthRoute,
+} from './services/hushhResearch/contracts';
+import { isHushhResearchAuthMode } from './services/hushhResearch/firebaseAuth';
 
 const KaiIndiaApp = React.lazy(() => import('./kai-india/pages'));
 
@@ -95,7 +102,9 @@ const KaiIndiaApp = React.lazy(() => import('./kai-india/pages'));
 const ContentWrapper = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const isHomePage = location.pathname === '/' || location.pathname === '/signUp' || location.pathname === '/solutions';
-  const isAuthCallback = location.pathname.startsWith('/auth/callback');
+  const isAuthCallback =
+    location.pathname.startsWith('/auth/callback') ||
+    location.pathname.startsWith('/auth/hushh-research/');
   const isUserRegistration = location.pathname === '/user-registration';
   const isOnboarding = location.pathname.startsWith('/onboarding');
   const isInvestorGuide = location.pathname === '/investor-guide';
@@ -144,8 +153,9 @@ const ContentWrapper = ({ children }: { children: ReactNode }) => {
 };
 
 // Layout visibility hook - determines which components to show based on route
-const useLayoutVisibility = () => {
+const useLayoutVisibility = (isResearchBoundary = false) => {
   const location = useLocation();
+  const isResearchAuth = isHushhResearchAuthRoute(location.pathname);
   const isHomePage = location.pathname === '/';
   const isHushhAI = location.pathname.startsWith('/hushh-ai');
   const isKai = location.pathname.startsWith('/kai');
@@ -201,6 +211,13 @@ const useLayoutVisibility = () => {
     isLegalPublicPage ||
     isModernPublicPage ||
     isAboutPublicPage;
+  if (isResearchAuth || isResearchBoundary) {
+    return {
+      showNavbar: false,
+      showFooter: false,
+      showMobileNav: false,
+    };
+  }
   return {
     showNavbar: !hideOld,
     showFooter: !hideOld || showPublicWebsiteFooter,
@@ -208,11 +225,15 @@ const useLayoutVisibility = () => {
   };
 };
 
-function App() {
-  // Inner layout component that uses hooks for conditional rendering
-  const AppLayout = () => {
-    const { showNavbar, showFooter, showMobileNav } = useLayoutVisibility();
+// Inner layout component that uses hooks for conditional rendering
+const AppLayout = () => {
     const { session } = useAuthSession();
+    const isResearchBoundary =
+      isHushhResearchAuthMode() ||
+      session?.user?.app_metadata?.auth_source === HUSHH_RESEARCH_SOURCE;
+    const { showNavbar, showFooter, showMobileNav } = useLayoutVisibility(
+      isResearchBoundary,
+    );
     
     return (
       <div className="min-h-screen flex flex-col">
@@ -267,6 +288,8 @@ function App() {
 
             } />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/hushh-research/start" element={<HushhResearchAuthStart />} />
+            <Route path="/auth/hushh-research/callback" element={<HushhResearchAuthCallback />} />
             {/* Public goodbye / signed-out acknowledgement (PD-5) */}
             <Route path="/signed-out" element={<SignedOutPage />} />
             {/* Investor Onboarding Guide - Public landing page */}
@@ -451,7 +474,7 @@ function App() {
             {/* NDA Admin Page - Password protected view of all NDA agreements */}
             <Route path='/nda-admin' element={<NDAAdminPage />} />
             <Route path='/deployments' element={<DeploymentsPage />} />
-            {/* Hushh Fund investor verification — team-gated (Supabase auth + allowlist) */}
+            {/* Hushh Fund investor verification — team-gated (GcpBackend auth + allowlist) */}
             <Route path='/fund-admin' element={
               <FundAdminRoute>
                 <FundAdminPage />
@@ -475,12 +498,14 @@ function App() {
         {showMobileNav && <MobileBottomNav />}
       </div>
     );
-  };
+};
 
+function App() {
   return (
     <ChakraProvider theme={theme}>
-      <AuthSessionProvider>
-        <Router>
+      <Router>
+        <HushhResearchHardEntryGuard>
+          <AuthSessionProvider>
           <GoogleAnalyticsRouteTracker />
           <SiteBehaviorTracker />
           <OnboardingSessionTracker />
@@ -489,8 +514,9 @@ function App() {
           <GlobalNDAGate>
             <AppLayout />
           </GlobalNDAGate>
-        </Router>
-      </AuthSessionProvider>
+          </AuthSessionProvider>
+        </HushhResearchHardEntryGuard>
+      </Router>
     </ChakraProvider>
   );
 }

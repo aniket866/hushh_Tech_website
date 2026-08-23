@@ -68,6 +68,9 @@ export default defineConfig({
     },
   },
   resolve: {
+    alias: {
+      '@': new URL('./src', import.meta.url).pathname,
+    },
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.mdx'],
   },
 })

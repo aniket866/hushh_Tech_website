@@ -14,11 +14,14 @@ concurrency:
 
 env:
   NODE_VERSION: "20.19.0"
-  VITE_SUPABASE_URL: "https://example.supabase.co"
-  VITE_SUPABASE_ANON_KEY: "ci-anon-key"
-  VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
+  VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com"
+  VITE_FIREBASE_API_KEY: "ci-anon-key"
+  VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat"
+  VITE_FIREBASE_APP_ID: "ci-app-id"
+  VITE_GCP_AUTH_REDIRECT_URL: "https://hushhtech.com/auth/callback"
   VITE_PLAID_REDIRECT_URI: "https://hushhtech.com/onboarding/financial-link"
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   smoke-gate:
@@ -36,8 +39,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify exhaustive route inventory
+        run: npm run migration:no-hybrid:routes
+
+      - name: Validate no-hybrid source contract
+        run: npm run migration:no-hybrid:source
+
+      - name: Validate frozen migration inventory
+        run: bash scripts/ci/orchestrate.sh retirement
+
       - name: Build green main artifact
         run: npm run build:web
+
+      - name: Validate no-hybrid deploy artifact
+        run: npm run migration:no-hybrid:check
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Validate no-hybrid browser network
+        run: npm run test:e2e:no-hybrid
 
       - name: Run compact smoke suite
         env:

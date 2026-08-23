@@ -6,8 +6,8 @@
 import config from '../../resources/config/config';
 import { getNdaGenerationUrl } from '../runtime/mainWeb';
 
-// Supabase function URL for NDA notification
-const NDA_NOTIFICATION_FUNCTION_URL = `${config.SUPABASE_URL}/functions/v1/nda-signed-notification`;
+// GcpBackend function URL for NDA notification
+const NDA_NOTIFICATION_FUNCTION_URL = `${config.GCP_API_BASE_URL}/functions/v1/nda-signed-notification`;
 
 export interface NDAStatus {
   hasSignedNda: boolean;
@@ -33,8 +33,8 @@ export interface SignNDAResult {
  */
 export const checkNDAStatus = async (userId: string): Promise<NDAStatus> => {
   try {
-    if (!config.supabaseClient) {
-      console.error('Supabase client not initialized');
+    if (!config.gcpBackendClient) {
+      console.error('GcpBackend client not initialized');
       return {
         hasSignedNda: false,
         signedAt: null,
@@ -43,7 +43,7 @@ export const checkNDAStatus = async (userId: string): Promise<NDAStatus> => {
       };
     }
     
-    const { data, error } = await config.supabaseClient
+    const { data, error } = await config.gcpBackendClient
       .rpc('check_user_nda_status', { p_user_id: userId });
     
     if (error) {
@@ -79,18 +79,18 @@ export const signNDA = async (
   consentVersion?: string,
 ): Promise<SignNDAResult> => {
   try {
-    if (!config.supabaseClient) {
-      console.error('Supabase client not initialized');
+    if (!config.gcpBackendClient) {
+      console.error('GcpBackend client not initialized');
       return {
         success: false,
-        error: 'Supabase client not initialized',
+        error: 'GcpBackend client not initialized',
       };
     }
 
     // The full electronic-signature evidence (real IP via x-forwarded-for, the
     // device, and the signature ID) is captured + persisted server-side by the
     // nda-signed-notification edge function — the browser is never trusted for it.
-    const { data, error } = await config.supabaseClient
+    const { data, error } = await config.gcpBackendClient
       .rpc('sign_global_nda', {
         p_signer_name: signerName,
         p_nda_version: ndaVersion,
@@ -227,14 +227,14 @@ export const sendNDANotification = async (
     // JWT and derives identity from it, so the endpoint can't be abused.
     let bearer = accessToken;
     if (!bearer) {
-      const { data: sessionData } = await config.supabaseClient!.auth.getSession();
+      const { data: sessionData } = await config.gcpBackendClient!.auth.getSession();
       bearer = sessionData?.session?.access_token ?? undefined;
     }
     if (!bearer) {
       return { success: false, error: 'Not authenticated — cannot send NDA notification' };
     }
 
-    // Call the Supabase Edge Function
+    // Call the GcpBackend Edge Function
     const response = await fetch(NDA_NOTIFICATION_FUNCTION_URL, {
       method: 'POST',
       headers: {
@@ -267,25 +267,25 @@ export const sendNDANotification = async (
 };
 
 /**
- * Upload signed NDA PDF to Supabase Storage
+ * Upload signed NDA PDF to GcpBackend Storage
  */
 export const uploadSignedNDA = async (
   userId: string,
   pdfBlob: Blob
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
-    if (!config.supabaseClient) {
-      console.error('Supabase client not initialized');
+    if (!config.gcpBackendClient) {
+      console.error('GcpBackend client not initialized');
       return {
         success: false,
-        error: 'Supabase client not initialized',
+        error: 'GcpBackend client not initialized',
       };
     }
     
     const fileName = `nda_${userId}_${Date.now()}.pdf`;
     const filePath = `signed-ndas/${fileName}`;
     
-    const { data, error } = await config.supabaseClient.storage
+    const { data, error } = await config.gcpBackendClient.storage
       .from('assets')
       .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
@@ -301,7 +301,7 @@ export const uploadSignedNDA = async (
     }
     
     // Get public URL
-    const { data: urlData } = config.supabaseClient.storage
+    const { data: urlData } = config.gcpBackendClient.storage
       .from('assets')
       .getPublicUrl(filePath);
     
@@ -332,12 +332,12 @@ export interface NDARecord {
  */
 export const getNDARecord = async (userId: string): Promise<NDARecord | null> => {
   try {
-    if (!config.supabaseClient) {
-      console.error('Supabase client not initialized');
+    if (!config.gcpBackendClient) {
+      console.error('GcpBackend client not initialized');
       return null;
     }
 
-    const { data, error } = await config.supabaseClient
+    const { data, error } = await config.gcpBackendClient
       .from('nda_signatures')
       .select('signer_name, nda_version, signed_at, pdf_url')
       .eq('user_id', userId)

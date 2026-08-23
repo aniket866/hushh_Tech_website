@@ -1,0 +1,19 @@
+{
+  "name": "@hushh-tech/cloudsql-attestor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.22.0"
+  },
+  "scripts": {
+    "check": "node scripts/static-checks.mjs",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "test:postgres17": "node test/postgres17-adversarial.mjs",
+    "verify": "npm run check && npm test && npm audit --omit=dev --audit-level=low"
+  },
+  "dependencies": {
+    "@google-cloud/cloud-sql-connector": "1.11.3",
+    "pg": "8.16.3"
+  }
+}

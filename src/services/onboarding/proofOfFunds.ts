@@ -5,7 +5,7 @@
  * (§10). It is a funding-readiness signal, never a hard submit block (consistent
  * with the codebase's review-flag philosophy).
  *
- * The Deno copy lives at supabase/functions/_shared/proofOfFunds.ts (used by the
+ * The Deno copy lives at gcpBackend/functions/_shared/proofOfFunds.ts (used by the
  * admin detail + onboarding-proof-of-funds edge functions).
  */
 export type ProofOfFundsStatus = 'funds_sufficient' | 'funds_insufficient' | 'balance_unavailable';

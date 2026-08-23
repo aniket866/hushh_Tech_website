@@ -359,15 +359,22 @@ export default function HushhAIPage() {
     abortControllerRef.current = controller;
 
     try {
-      const supabaseUrl = config.SUPABASE_URL;
-      const supabaseKey = config.SUPABASE_ANON_KEY;
+      const client = config.gcpBackendClient;
+      if (!client) throw new Error('GCP backend is unavailable');
+      const {
+        data: { session },
+        error: sessionError,
+      } = await client.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error('Sign in required');
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/hushh-ai-chat`, {
+      const response = await fetch('/functions/v1/hushh-ai-chat', {
         method: 'POST',
         signal: controller.signal, // Add abort signal
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           message,

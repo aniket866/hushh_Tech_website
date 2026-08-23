@@ -1,15 +1,15 @@
 /**
  * Message Repository Implementation
- * Implements IMessageRepository using Supabase data source
+ * Implements IMessageRepository using GcpBackend data source
  */
 import { IMessageRepository } from '../../domain/repositories';
 import { Message, MessageRole, MessageMetadata } from '../../domain/entities';
-import { SupabaseMessageDataSource } from '../datasources';
+import { GcpBackendMessageDataSource } from '../datasources';
 import { messageMapper } from '../models/mappers';
 import { retryWithBackoff } from '../../core/utils';
 
 export class MessageRepositoryImpl implements IMessageRepository {
-  constructor(private dataSource: SupabaseMessageDataSource) {}
+  constructor(private dataSource: GcpBackendMessageDataSource) {}
 
   async getAll(chatId: string, limit?: number): Promise<Message[]> {
     const dtos = await retryWithBackoff(() =>

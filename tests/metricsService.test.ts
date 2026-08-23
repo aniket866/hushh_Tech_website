@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import WebSocket from "ws";
 
 import {
   __testing,
@@ -9,13 +8,13 @@ import {
 } from "../api/metrics/service.js";
 
 describe("metrics service", () => {
-  it("configures Supabase Realtime with a Node-compatible WebSocket transport", () => {
-    const client = __testing.createSupabaseAdminClient(
-      "https://example.supabase.co",
-      "test-service-role-key"
-    );
+  it("configures the server-side GCP data client without a realtime vendor transport", () => {
+    const client = __testing.createGcpBackendAdminClient();
 
-    expect(client.realtime.transport).toBe(WebSocket);
+    expect(client.from).toBeTypeOf("function");
+    expect(client.rpc).toBeTypeOf("function");
+    expect(client.storage.from).toBeTypeOf("function");
+    expect(client).not.toHaveProperty("realtime");
   });
 
   it("builds a Pacific-time rolling window", () => {
@@ -294,8 +293,8 @@ describe("metrics service", () => {
             suppressedMinimumCount: 5,
           },
         }),
-        fetchSupabaseStackMetrics: async () => ({
-          source: "website-supabase",
+        fetchGcpBackendStackMetrics: async () => ({
+          source: "website-gcpBackend",
           tables: [{ table: "site_analytics_events", available: true, total: 55, windowCount: 55 }],
         }),
         fetchGcpMetrics: async () => ({
@@ -339,7 +338,7 @@ describe("metrics service", () => {
     });
 
     expect(summary.audience).toMatchObject({
-      source: "website-supabase-site-analytics",
+      source: "website-gcpBackend-site-analytics",
       dau: 7,
       sessions: 33,
     });
@@ -374,7 +373,7 @@ describe("metrics service", () => {
       gcpAvailable: true,
       searchConsoleAvailable: true,
       ga4RegionAvailable: true,
-      supabaseAggregateTables: 1,
+      gcpBackendAggregateTables: 1,
     });
   });
 

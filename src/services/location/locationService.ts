@@ -30,9 +30,6 @@ import {
 import { normalizeDetectedAddress } from './addressNormalization.js';
 
 // API Endpoints
-const LOCATIONS_API = `${config.SUPABASE_URL}/functions/v1/get-locations`;
-const GEOCODE_API = `${config.SUPABASE_URL}/functions/v1/hushh-location-geocode`;
-
 // IP Geolocation fallback (free, no API key needed)
 // NOTE: ipapi.co is frequently blocked (403) in many environments. Use ipwho.is instead.
 const IP_GEO_API_PRIMARY = 'https://ipwho.is/';
@@ -410,28 +407,26 @@ export class LocationService {
 
   /**
    * Call geocode API to convert GPS coordinates to address.
-   * Uses Google Geocoding API via Supabase Edge Function.
+   * Uses Google Geocoding API via GcpBackend Edge Function.
    */
   async geocodeCoordinates(coords: Coordinates): Promise<LocationData> {
     const providers: Array<{ name: string; run: () => Promise<LocationData> }> = [
       {
-        name: 'supabase-geocode',
+        name: 'gcpBackend-geocode',
         run: async () => {
           this.abortController = new AbortController();
-          const response = await fetch(GEOCODE_API, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': config.SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+          const client = config.gcpBackendClient;
+          if (!client) throw new Error('GCP backend is unavailable');
+          const { data: result, error } = await client.functions.invoke<GeocodeApiResponse>(
+            'hushh-location-geocode',
+            {
+              body: coords,
+              method: 'POST',
+              signal: this.abortController.signal,
             },
-            body: JSON.stringify(coords),
-            signal: this.abortController.signal,
-          });
-
-          const result: GeocodeApiResponse = await response.json();
-          if (!result.success || !result.data) {
-            throw new Error(result.error || 'Geocoding failed');
+          );
+          if (error || !result?.success || !result.data) {
+            throw new Error(error?.message || result?.error || 'Geocoding failed');
           }
           return result.data;
         },
@@ -631,8 +626,13 @@ export class LocationService {
    */
   async fetchCountries(): Promise<Country[]> {
     try {
-      const response = await fetch(`${LOCATIONS_API}?type=countries`);
-      const result: LocationsApiResponse<Country> = await response.json();
+      const client = config.gcpBackendClient;
+      if (!client) throw new Error('GCP backend is unavailable');
+      const { data: result, error } = await client.functions.invoke<LocationsApiResponse<Country>>(
+        'get-locations',
+        { method: 'GET', query: { type: 'countries' } },
+      );
+      if (error || !result) throw new Error(error?.message || 'Failed to load countries');
       if (result.error) throw new Error(result.error);
       return result.data || [];
     } catch (error) {
@@ -647,8 +647,13 @@ export class LocationService {
   async fetchStates(countryCode: string): Promise<State[]> {
     if (!countryCode) return [];
     try {
-      const response = await fetch(`${LOCATIONS_API}?type=states&country=${countryCode}`);
-      const result: LocationsApiResponse<State> = await response.json();
+      const client = config.gcpBackendClient;
+      if (!client) throw new Error('GCP backend is unavailable');
+      const { data: result, error } = await client.functions.invoke<LocationsApiResponse<State>>(
+        'get-locations',
+        { method: 'GET', query: { country: countryCode, type: 'states' } },
+      );
+      if (error || !result) throw new Error(error?.message || 'Failed to load states');
       if (result.error) throw new Error(result.error);
       return result.data || [];
     } catch (error) {
@@ -663,8 +668,13 @@ export class LocationService {
   async fetchCities(countryCode: string, stateCode: string): Promise<City[]> {
     if (!countryCode || !stateCode) return [];
     try {
-      const response = await fetch(`${LOCATIONS_API}?type=cities&country=${countryCode}&state=${stateCode}`);
-      const result: LocationsApiResponse<City> = await response.json();
+      const client = config.gcpBackendClient;
+      if (!client) throw new Error('GCP backend is unavailable');
+      const { data: result, error } = await client.functions.invoke<LocationsApiResponse<City>>(
+        'get-locations',
+        { method: 'GET', query: { country: countryCode, state: stateCode, type: 'cities' } },
+      );
+      if (error || !result) throw new Error(error?.message || 'Failed to load cities');
       if (result.error) throw new Error(result.error);
       return result.data || [];
     } catch (error) {
@@ -685,8 +695,8 @@ export class LocationService {
     const cacheRecord = this.createLocationCacheRecord(locationData, source, existingRecord);
     await this.writeSharedLocationCache(userId, cacheRecord);
 
-    if (!config.supabaseClient) {
-      console.warn('[LocationService] Supabase client not configured; location mirrored only to shared cache');
+    if (!config.gcpBackendClient) {
+      console.warn('[LocationService] GcpBackend client not configured; location mirrored only to shared cache');
       return cacheRecord;
     }
 
@@ -724,9 +734,9 @@ export class LocationService {
       return sharedCache.data;
     }
 
-    if (!config.supabaseClient) return null;
+    if (!config.gcpBackendClient) return null;
 
-    const { data, error } = await config.supabaseClient
+    const { data, error } = await config.gcpBackendClient
       .from('onboarding_data')
       .select('*')
       .eq('user_id', userId)

@@ -1,0 +1,10 @@
+**
+!api/
+!api/**
+!migration/
+!migration/docker/
+!migration/docker/edge-gateway-smoke.Dockerfile
+!migration/docker/edge-gateway-smoke.cloudbuild.yaml
+!migration/smoke/
+!migration/smoke/edge-function-gateway-uat.mjs
+!package-server.json

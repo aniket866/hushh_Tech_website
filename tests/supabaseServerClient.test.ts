@@ -1,17 +1,31 @@
 import { describe, expect, it } from "vitest";
-import WebSocket from "ws";
 
-import { createSupabaseServerClient } from "../api/shared/supabaseServerClient.js";
+import { createGcpServerClient } from "../api/shared/gcpServerClient.js";
 
-describe("Supabase server client helper", () => {
-  it("uses fail-closed server auth defaults and a Node-compatible WebSocket transport", () => {
-    const client = createSupabaseServerClient(
-      "https://example.supabase.co",
-      "test-service-role-key"
-    );
+describe("GCP server client helper", () => {
+  it("exposes the bounded data, auth, and storage compatibility surface", () => {
+    const client = createGcpServerClient();
 
-    expect(client.realtime.transport).toBe(WebSocket);
-    expect(client.auth).toBeDefined();
+    expect(client.from).toEqual(expect.any(Function));
+    expect(client.rpc).toEqual(expect.any(Function));
+    expect(client.auth.getUser).toEqual(expect.any(Function));
+    expect(client.auth.admin.deleteUser).toEqual(expect.any(Function));
+    expect(client.auth.admin.listUsers).toEqual(expect.any(Function));
+    expect(client.storage.from).toEqual(expect.any(Function));
+    expect(client).not.toHaveProperty("realtime");
+  });
+
+  it("returns same-origin storage URLs without a provider credential", () => {
+    const client = createGcpServerClient();
+    const result = client.storage
+      .from("profile-images")
+      .getPublicUrl("users/user-a/avatar image.png");
+
+    expect(result).toEqual({
+      data: {
+        publicUrl:
+          "/api/gcp/storage/profile-images/users/user-a/avatar%20image.png",
+      },
+    });
   });
 });
-

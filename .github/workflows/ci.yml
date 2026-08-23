@@ -19,11 +19,16 @@ concurrency:
 
 env:
   NODE_VERSION: "20.19.0"
-  VITE_SUPABASE_URL: "https://example.supabase.co"
-  VITE_SUPABASE_ANON_KEY: "ci-anon-key"
-  VITE_SUPABASE_REDIRECT_URL: "https://hushhtech.com/auth/callback"
+  SERVICE_NODE_VERSION: "22.23.2"
+  ATTESTOR_NODE_VERSION: "22.22.0"
+  VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com"
+  VITE_FIREBASE_API_KEY: "ci-anon-key"
+  VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat"
+  VITE_FIREBASE_APP_ID: "ci-app-id"
+  VITE_GCP_AUTH_REDIRECT_URL: "https://hushhtech.com/auth/callback"
   VITE_PLAID_REDIRECT_URI: "https://hushhtech.com/onboarding/financial-link"
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   dco:
@@ -91,6 +96,91 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: tmp/ci/env-contract-report.json
+
+  supabase-retirement-contract:
+    name: Supabase Retirement Contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate frozen migration inventory
+        run: bash scripts/ci/orchestrate.sh retirement
+
+  no-hybrid-runtime:
+    name: No-Hybrid Runtime Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Prove source, build, and browser are GCP-only
+        run: bash scripts/ci/orchestrate.sh no-hybrid
+
+      - name: Upload no-hybrid report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-hybrid-runtime-report
+          if-no-files-found: error
+          retention-days: 7
+          path: tmp/ci/no-hybrid-runtime-report.json
+
+  gcp-service-foundation:
+    name: GCP Service Foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.SERVICE_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cloud-run/hushh-tech-app-services/package-lock.json
+
+      - name: Validate the fail-closed Cloud Run service package
+        run: bash scripts/ci/orchestrate.sh service
+
+  gcp-cloudsql-attestor:
+    name: GCP Cloud SQL Attestor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.ATTESTOR_NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cloud-run/hushh-tech-cloudsql-attestor/package-lock.json
+
+      - name: Install pinned attestor dependencies
+        run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor ci
+
+      - name: Validate the network-off Cloud SQL attestor
+        run: npm run gcp:migration:check-cloudsql-attestor
+
+      - name: Reject vulnerable runtime dependencies
+        run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor audit --omit=dev --audit-level=high
 
   reviewer-context:
     name: Reviewer Context & Compliance
@@ -241,6 +331,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -342,6 +434,10 @@ jobs:
       - dco
       - secret-scan
       - env-contract
+      - supabase-retirement-contract
+      - no-hybrid-runtime
+      - gcp-service-foundation
+      - gcp-cloudsql-attestor
       - reviewer-context
       - pr-hygiene
       - phase2-pr-policy
@@ -359,6 +455,10 @@ jobs:
             ["DCO"]="${{ needs.dco.result }}"
             ["Secret Scan"]="${{ needs.secret-scan.result }}"
             ["Env Contract Check"]="${{ needs.env-contract.result }}"
+            ["Supabase Retirement Contract"]="${{ needs.supabase-retirement-contract.result }}"
+            ["No-Hybrid Runtime Gate"]="${{ needs.no-hybrid-runtime.result }}"
+            ["GCP Service Foundation"]="${{ needs.gcp-service-foundation.result }}"
+            ["GCP Cloud SQL Attestor"]="${{ needs.gcp-cloudsql-attestor.result }}"
             ["Reviewer Context & Compliance"]="${{ needs.reviewer-context.result }}"
             ["PR Hygiene"]="${{ needs.pr-hygiene.result }}"
             ["Phase 2 PR Policy"]="${{ needs.phase2-pr-policy.result }}"

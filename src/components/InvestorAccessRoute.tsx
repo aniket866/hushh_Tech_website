@@ -115,7 +115,7 @@ const InvestorAccessRoute: React.FC<InvestorAccessRouteProps> = ({ children }) =
           shouldSettleLoading = false;
           return;
         }
-        if (!config.supabaseClient) {
+        if (!config.gcpBackendClient) {
           redirectToLogin();
           return;
         }
@@ -125,7 +125,7 @@ const InvestorAccessRoute: React.FC<InvestorAccessRouteProps> = ({ children }) =
         }
 
         const onboardingData = await fetchResolvedOnboardingProgress(
-          config.supabaseClient,
+          config.gcpBackendClient,
           userId
         );
 

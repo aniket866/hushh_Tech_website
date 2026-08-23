@@ -3,27 +3,27 @@
  * Run with: node src/scripts/testReportsApi.js
  */
 
-const MARKET_SUPABASE_URL =
-  process.env.MARKET_SUPABASE_URL || process.env.VITE_MARKET_SUPABASE_URL || '';
+const MARKET_GCP_API_BASE_URL =
+  process.env.MARKET_GCP_API_BASE_URL || process.env.VITE_MARKET_GCP_API_BASE_URL || '';
 const API_BASE_URL =
-  process.env.MARKET_SUPABASE_API_BASE_URL ||
-  process.env.MARKET_SUPABASE_API_BASE ||
-  (MARKET_SUPABASE_URL ? `${MARKET_SUPABASE_URL}/rest/v1` : '');
+  process.env.MARKET_GCS_PUBLIC_API_BASE_URL ||
+  process.env.MARKET_GCS_PUBLIC_API_BASE ||
+  (MARKET_GCP_API_BASE_URL ? `${MARKET_GCP_API_BASE_URL}/rest/v1` : '');
 const API_KEY =
-  process.env.MARKET_SUPABASE_ANON_KEY ||
-  process.env.VITE_MARKET_SUPABASE_KEY ||
+  process.env.MARKET_FIREBASE_API_KEY ||
+  process.env.VITE_MARKET_GCS_PUBLIC_KEY ||
   '';
 
 // Storage bucket URLs for testing images and videos
 const STORAGE_BUCKETS = {
-  IMAGES: 'https://spmxyqxjqxcyywkapong.supabase.co/storage/v1/object/public/alohafundsreport-images',
-  VIDEOS: 'https://spmxyqxjqxcyywkapong.supabase.co/storage/v1/object/public/alohafundsreport-videos'
+  IMAGES: '/api/gcp/storage/alohafundsreport-images',
+  VIDEOS: '/api/gcp/storage/alohafundsreport-videos'
 };
 
 async function testApiConnection() {
   try {
     if (!API_BASE_URL || !API_KEY) {
-      throw new Error('Set MARKET_SUPABASE_API_BASE_URL and MARKET_SUPABASE_ANON_KEY before running this script.');
+      throw new Error('Set MARKET_GCS_PUBLIC_API_BASE_URL and MARKET_FIREBASE_API_KEY before running this script.');
     }
 
     console.log('Testing API connection with updated key...');

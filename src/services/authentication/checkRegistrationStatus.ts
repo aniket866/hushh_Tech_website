@@ -8,7 +8,7 @@ export interface RegistrationStatus {
 
 /**
  * Check if a user has completed their profile registration.
- * Uses the Supabase client from config instead of hardcoded URLs/keys.
+ * Uses the GcpBackend client from config instead of hardcoded URLs/keys.
  * @param email - User's email to check registration status
  * @returns RegistrationStatus object indicating registration state
  */
@@ -16,8 +16,8 @@ export default async function checkRegistrationStatus(
   email: string
 ): Promise<RegistrationStatus> {
   try {
-    // Use the configured Supabase client instead of hardcoded old project URL
-    const { data, error } = await config.supabaseClient!
+    // Use the configured GcpBackend client instead of hardcoded old project URL
+    const { data, error } = await config.gcpBackendClient!
       .from("users")
       .select("*")
       .ilike("email", `%${email}%`);

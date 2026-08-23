@@ -53,6 +53,20 @@ function findUserLinkedTables() {
 }
 
 describe("delete-account shared contract", () => {
+  it("contains no dormant vendor REST, Auth, or Storage client", () => {
+    const runtimeSource = readFileSync(
+      path.resolve(process.cwd(), "api/delete-account-service.js"),
+      "utf8"
+    );
+
+    expect(runtimeSource).not.toContain('"/auth/v1/user"');
+    expect(runtimeSource).not.toContain('`/auth/v1/admin/users/');
+    expect(runtimeSource).not.toContain('`/rest/v1/');
+    expect(runtimeSource).not.toContain('`/storage/v1/object/list/');
+    expect(runtimeSource).not.toContain('`/storage/v1/object/${');
+    expect(runtimeSource).not.toContain("apikey:");
+  });
+
   it("builds the structured success payload", () => {
     expect(
       buildDeleteAccountSuccessPayload({
@@ -82,6 +96,13 @@ describe("delete-account shared contract", () => {
     expect(
       buildSignedNdaAssetPathFromUrl(
         "https://example.supabase.co/storage/v1/object/public/assets/other/path.pdf"
+      )
+    ).toBeNull();
+
+    expect(
+      deleteAccountServiceTesting.buildSignedNdaAssetPathFromUrl(
+        "https://storage.googleapis.com/example/signed-ndas/nda_other-user_111.pdf",
+        "user-123"
       )
     ).toBeNull();
   });

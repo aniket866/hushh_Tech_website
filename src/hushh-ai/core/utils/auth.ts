@@ -10,10 +10,10 @@ import config from '../../../resources/config/config';
  */
 export async function hushhAIGoogleSignIn() {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      console.error('Supabase client is not initialized');
-      return { error: 'Supabase client not initialized' };
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      console.error('GcpBackend client is not initialized');
+      return { error: 'GcpBackend client not initialized' };
     }
 
     // Set redirect to come back to Hushh AI
@@ -21,7 +21,7 @@ export async function hushhAIGoogleSignIn() {
       config.redirect_url || `${window.location.origin}/auth/callback`;
     const redirectTo = `${baseRedirectUrl}?redirect=${encodeURIComponent('/hushh-ai')}`;
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await gcpBackend.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
@@ -52,10 +52,10 @@ export async function hushhAIGoogleSignIn() {
  */
 export async function hushhAIAppleSignIn() {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      console.error('Supabase client is not initialized');
-      return { error: 'Supabase client not initialized' };
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      console.error('GcpBackend client is not initialized');
+      return { error: 'GcpBackend client not initialized' };
     }
 
     // Set redirect to come back to Hushh AI
@@ -64,7 +64,7 @@ export async function hushhAIAppleSignIn() {
     const redirectTo = `${baseRedirectUrl}?redirect=${encodeURIComponent('/hushh-ai')}`;
     console.info('[HushhAI][AppleSignIn] Starting Apple OAuth', { redirectTo });
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await gcpBackend.auth.signInWithOAuth({
       provider: 'apple',
       options: {
         redirectTo,

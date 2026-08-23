@@ -52,11 +52,11 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleEmailVerification = async () => {
       try {
-        const supabase = config.supabaseClient;
-        if (!supabase) {
+        const gcpBackend = config.gcpBackendClient;
+        if (!gcpBackend) {
           setVerificationStatus('error');
           setErrorMessage('Configuration error');
-          console.error('[Hushh][AuthCallback] Supabase client missing - cannot restore session');
+          console.error('[Hushh][AuthCallback] GcpBackend client missing - cannot restore session');
           return;
         }
 
@@ -82,7 +82,7 @@ const AuthCallback: React.FC = () => {
         // Always exchange an OAuth code when present. A stale cached session must not
         // block the new Apple/Google identity from becoming the active session.
         if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          const { error: exchangeError } = await gcpBackend.auth.exchangeCodeForSession(code);
           if (exchangeError) {
             setVerificationStatus('error');
             setErrorMessage(exchangeError.message);
@@ -109,8 +109,8 @@ const AuthCallback: React.FC = () => {
             return;
           }
 
-          // Set the session with Supabase
-          const { error } = await supabase.auth.setSession({
+          // Set the session with GcpBackend
+          const { error } = await gcpBackend.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
           });
@@ -134,7 +134,7 @@ const AuthCallback: React.FC = () => {
 
         const user = sessionSnapshot.user;
         const onboardingData = await fetchResolvedOnboardingProgress(
-          supabase,
+          gcpBackend,
           user.id,
         );
 

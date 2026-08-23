@@ -19,18 +19,29 @@ permissions:
   checks: read
 
 concurrency:
-  group: deploy-uat-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.inputs.sha || github.run_id }}
+  group: deploy-uat
   cancel-in-progress: false
 
 env:
   NODE_VERSION: "20.19.0"
   SMOKE_BASE_URL: https://uat.hushhtech.com
   SHARED_SECRETS_PROJECT: "53407187172"
-  VITE_SUPABASE_REDIRECT_URL: https://uat.hushhtech.com/auth/callback
+  VITE_GCP_AUTH_REDIRECT_URL: https://uat.hushhtech.com/auth/callback
   VITE_PLAID_REDIRECT_URI: https://uat.hushhtech.com/onboarding/financial-link
-  VITE_SUPABASE_URL: https://example.supabase.co
-  VITE_SUPABASE_ANON_KEY: ci-anon-key
+  VITE_FIREBASE_AUTH_DOMAIN: hushh-tech-uat.firebaseapp.com
+  VITE_FIREBASE_API_KEY: ci-anon-key
+  VITE_FIREBASE_PROJECT_ID: hushh-tech-uat
+  VITE_FIREBASE_APP_ID: ci-app-id
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_API_BASE_URL: https://api.uat.hushh.ai
+  HUSHH_RESEARCH_WEB_BASE_URL: https://uat.one.hushh.ai
+  HUSHH_RESEARCH_AUDIENCE: hushh-tech-uat
+  HUSHH_RESEARCH_REDIRECT_URI: https://uat.hushhtech.com/auth/hushh-research/callback
+  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda
+  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda.firebaseapp.com
+  HUSHH_RESEARCH_DEVELOPER_APP_ID: app_hushh-technologies_cd1895ef
+  HUSHH_TECH_GCP_FUNCTIONS_ENABLED: "true"
+  HUSHH_TECH_INVESTOR_API_URL: https://hushh-tech-investor-api-175298245599.us-central1.run.app
 
 jobs:
   deploy:
@@ -40,6 +51,9 @@ jobs:
     environment:
       name: UAT – hushh-tech
       url: https://uat.hushhtech.com
+    env:
+      HUSHH_RESEARCH_CLIENT_ENABLED: ${{ vars.HUSHH_RESEARCH_CLIENT_ENABLED || 'false' }}
+      HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST: ${{ vars.HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST || '' }}
     steps:
       - name: Assert manual dispatch originates from main
         if: github.event_name == 'workflow_dispatch'
@@ -93,6 +107,12 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
 
+      - name: Verify exhaustive route inventory
+        run: npm run migration:no-hybrid:routes
+
+      - name: Validate no-hybrid source contract
+        run: npm run migration:no-hybrid:source
+
       # 2. Auth with GCP and load shared web-build secrets
       # Prefer an environment-scoped GCP_SA_KEY_UAT secret so deploy approval gates access.
       - uses: google-github-actions/auth@v2
@@ -114,37 +134,67 @@ jobs:
             exit 1
           fi
 
+      - name: Capture predeploy Cloud Run revision
+        id: predeploy-state
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          if [ -z "$revision" ]; then
+            echo "::error::Expected exactly one explicit 100%-serving UAT revision."
+            exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          jq -n \
+            --arg revision "$revision" \
+            --arg sha "${{ steps.resolve-sha.outputs.sha }}" \
+            '{captured_revision:$revision,requested_sha:$sha}' \
+            > /tmp/uat-predeploy-state.json
+
       - name: Load web auth build env from Secret Manager
         shell: bash
         run: |
           set -euo pipefail
-          supabase_url="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SUPABASE_URL")"
-          supabase_anon_key="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SUPABASE_ANON_KEY")"
-          supabase_service_role_key="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SUPABASE_SERVICE_ROLE_KEY")"
+          firebase_auth_domain="hushh-tech-uat.firebaseapp.com"
+          firebase_project_id="hushh-tech-uat"
+          firebase_api_key="$(gcloud secrets versions access latest --project=hushh-tech-uat --secret=hushh-tech-firebase-web-api-key)"
+          firebase_app_id="$(gcloud secrets versions access latest --project=hushh-tech-uat --secret=hushh-tech-firebase-web-app-id)"
+          gcp_server_actor_uid="$(gcloud secrets versions access latest --project=hushh-tech-uat --secret=hushh-tech-server-actor-uid)"
           analytics_hash_salt="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="ANALYTICS_HASH_SALT" 2>/dev/null || true)"
           ga4_property_id="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="GA4_PROPERTY_ID" 2>/dev/null || true)"
           ga4_allowed_hostnames="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="GA4_ALLOWED_HOSTNAMES" 2>/dev/null || true)"
           search_console_site_url="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SEARCH_CONSOLE_SITE_URL" 2>/dev/null || true)"
-          if [ -z "$supabase_url" ] || [ -z "$supabase_anon_key" ]; then
-            echo "::error::Supabase web auth secrets are empty"
+          if [ -z "$firebase_auth_domain" ] || [ -z "$firebase_project_id" ] || [ -z "$firebase_api_key" ] || [ -z "$firebase_app_id" ]; then
+            echo "::error::Firebase web auth secrets are empty"
             exit 1
           fi
-          if [ -z "$supabase_service_role_key" ]; then
-            echo "::error::Supabase service role secret is empty"
+          if [ -z "$gcp_server_actor_uid" ]; then
+            echo "::error::GCP server actor secret is empty"
             exit 1
           fi
-          echo "::add-mask::$supabase_url"
-          echo "::add-mask::$supabase_anon_key"
-          echo "::add-mask::$supabase_service_role_key"
+          echo "::add-mask::$firebase_auth_domain"
+          echo "::add-mask::$firebase_api_key"
+          echo "::add-mask::$firebase_app_id"
+          echo "::add-mask::$gcp_server_actor_uid"
           [ -n "$analytics_hash_salt" ] && echo "::add-mask::$analytics_hash_salt"
           [ -n "$ga4_property_id" ] && echo "::add-mask::$ga4_property_id"
           [ -n "$ga4_allowed_hostnames" ] && echo "::add-mask::$ga4_allowed_hostnames"
           [ -n "$search_console_site_url" ] && echo "::add-mask::$search_console_site_url"
-          printf 'VITE_SUPABASE_URL=%s\n' "$supabase_url" >> "$GITHUB_ENV"
-          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$supabase_anon_key" >> "$GITHUB_ENV"
-          printf 'SUPABASE_URL=%s\n' "$supabase_url" >> "$GITHUB_ENV"
-          printf 'SUPABASE_ANON_KEY=%s\n' "$supabase_anon_key" >> "$GITHUB_ENV"
-          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$supabase_service_role_key" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_AUTH_DOMAIN=%s\n' "$firebase_auth_domain" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_API_KEY=%s\n' "$firebase_api_key" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_PROJECT_ID=%s\n' "$firebase_project_id" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_APP_ID=%s\n' "$firebase_app_id" >> "$GITHUB_ENV"
+          printf 'GCP_SERVER_ACTOR_UID=%s\n' "$gcp_server_actor_uid" >> "$GITHUB_ENV"
           [ -n "$analytics_hash_salt" ] && printf 'ANALYTICS_HASH_SALT=%s\n' "$analytics_hash_salt" >> "$GITHUB_ENV"
           [ -n "$ga4_property_id" ] && printf 'GA4_PROPERTY_ID=%s\n' "$ga4_property_id" >> "$GITHUB_ENV"
           [ -n "$ga4_allowed_hostnames" ] && printf 'GA4_ALLOWED_HOSTNAMES=%s\n' "$ga4_allowed_hostnames" >> "$GITHUB_ENV"
@@ -157,8 +207,10 @@ jobs:
           printf 'SEARCH_CONSOLE_ROW_LIMIT=25\n' >> "$GITHUB_ENV"
 
           runtime_secret_names=(
-            hushh-tech-supabase-url
-            hushh-tech-supabase-service-role-key
+            hushh-tech-firebase-web-api-key
+            hushh-tech-firebase-web-app-id
+            hushh-tech-server-actor-uid
+            hushh-tech-delete-account-audit-secret
             hushh-tech-gemini-api-key
             hushh-tech-analytics-hash-salt
             hushh-tech-metrics-ga4-allowed-hostnames
@@ -169,6 +221,10 @@ jobs:
             hushh-tech-metrics-search-console-type
             hushh-tech-metrics-search-console-data-state
             hushh-tech-metrics-search-console-row-limit
+            hushh-tech-uat-research-developer-token
+            hushh-tech-uat-research-x25519-private-key
+            hushh-tech-uat-research-firebase-api-key
+            hushh-tech-uat-research-firebase-app-id
           )
 
           for secret_name in "${runtime_secret_names[@]}"; do
@@ -204,7 +260,7 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_SUPABASE_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
+          for name in VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID VITE_GCP_AUTH_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for the web auth build"
               missing=1
@@ -217,16 +273,42 @@ jobs:
             echo "::error::VITE_ALLOW_INSECURE_BROWSER_LLM must remain false in UAT."
             exit 1
           fi
+          if [ "$HUSHH_TECH_GCP_FUNCTIONS_ENABLED" != "true" ] || \
+             [ "$HUSHH_TECH_INVESTOR_API_URL" != "https://hushh-tech-investor-api-175298245599.us-central1.run.app" ]; then
+            echo "::error::The UAT legacy-function gateway target must remain exact."
+            exit 1
+          fi
+          case "$HUSHH_RESEARCH_CLIENT_ENABLED" in
+            true)
+              if [ -z "$HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST" ]; then
+                echo "::error::HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST is required when the UAT Research client is enabled."
+                exit 1
+              fi
+              ;;
+            false) ;;
+            *)
+              echo "::error::HUSHH_RESEARCH_CLIENT_ENABLED must be true or false."
+              exit 1
+              ;;
+          esac
       - run: npm run env:check
       - run: npm run build:web
+      - name: Validate no-hybrid deploy artifact
+        run: npm run migration:no-hybrid:check
 
       # 4. Deploy pre-built dist/ to Cloud Run (runtime-only Dockerfile)
       - name: Deploy to Cloud Run
         shell: bash
         run: |
-          runtime_env="NODE_ENV=staging,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-uat,GOOGLE_CLOUD_LOCATION=us-central1,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true"
-          runtime_secrets="SUPABASE_URL=hushh-tech-supabase-url:latest"
-          runtime_secrets+=",SUPABASE_SERVICE_ROLE_KEY=hushh-tech-supabase-service-role-key:latest"
+          deploy_sha="${{ steps.resolve-sha.outputs.sha }}"
+          if ! [[ "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Resolved deployment SHA is not a full lowercase Git SHA."
+            exit 1
+          fi
+          short_sha="${deploy_sha:0:8}"
+          runtime_env="^|^NODE_ENV=staging|DEPLOY_COMMIT_SHA=${deploy_sha}|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=false|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
+          runtime_secrets="GCP_SERVER_ACTOR_UID=hushh-tech-server-actor-uid:latest"
+          runtime_secrets+=",DELETE_ACCOUNT_AUDIT_SECRET=hushh-tech-delete-account-audit-secret:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
           if [ "${GMAIL_RUNTIME_SECRETS_AVAILABLE:-0}" = "1" ]; then
             runtime_secrets+=",GMAIL_USER=hushh-tech-gmail-user:latest"
@@ -241,10 +323,15 @@ jobs:
           runtime_secrets+=",SEARCH_CONSOLE_TYPE=hushh-tech-metrics-search-console-type:latest"
           runtime_secrets+=",SEARCH_CONSOLE_DATA_STATE=hushh-tech-metrics-search-console-data-state:latest"
           runtime_secrets+=",SEARCH_CONSOLE_ROW_LIMIT=hushh-tech-metrics-search-console-row-limit:latest"
-          build_tag="build-$(echo '${{ steps.resolve-sha.outputs.sha }}' | cut -c1-8)"
+          runtime_secrets+=",HUSHH_RESEARCH_DEVELOPER_TOKEN=hushh-tech-uat-research-developer-token:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY=hushh-tech-uat-research-x25519-private-key:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_API_KEY=hushh-tech-uat-research-firebase-api-key:latest"
+          runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_APP_ID=hushh-tech-uat-research-firebase-app-id:latest"
+          build_tag="build-${short_sha}"
           gcloud run deploy hushh-tech-website \
             --source . \
             --project=hushh-tech-uat \
+            --service-account=hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com \
             --tag="$build_tag" \
             --region=us-central1 \
             --platform=managed \
@@ -257,8 +344,71 @@ jobs:
             --timeout=240s \
             --update-env-vars="$runtime_env" \
             --update-secrets="$runtime_secrets" \
+            --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}" \
             --clear-base-image \
             --quiet
+
+      - name: Verify exact UAT release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_sha="${{ steps.resolve-sha.outputs.sha }}"
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          serving_revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          positive_traffic_targets="$(jq '[.status.traffic[]? | select((.percent // 0) > 0)] | length' <<<"$service_json")"
+          if [ -z "$serving_revision" ] || [ "$positive_traffic_targets" -ne 1 ]; then
+            echo "::error::Expected exactly one UAT revision at 100% traffic after deploy."
+            exit 1
+          fi
+
+          revision_json="$(gcloud run revisions describe "$serving_revision" \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          label_sha="$(jq -r '.metadata.labels["deploy-commit"] // empty' <<<"$revision_json")"
+          env_sha="$(jq -r '
+            [.spec.containers[0].env[]?
+              | select(.name == "DEPLOY_COMMIT_SHA")
+              | .value
+              | select(type == "string")]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$revision_json")"
+          image_digest="$(jq -r '.status.imageDigest // empty' <<<"$revision_json")"
+          if [ "$label_sha" != "$deploy_sha" ] || [ "$env_sha" != "$deploy_sha" ]; then
+            echo "::error::Cloud Run revision does not bind the exact deployment SHA."
+            exit 1
+          fi
+          if ! [[ "$image_digest" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Cloud Run revision does not expose an immutable image digest."
+            exit 1
+          fi
+
+          release_json="$(curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors --max-time 15 \
+            "$SMOKE_BASE_URL/api/release")"
+          if [ "$(jq -r '.status // empty' <<<"$release_json")" != "ok" ] || \
+             [ "$(jq -r '.service // empty' <<<"$release_json")" != "hushh-tech-website" ] || \
+             [ "$(jq -r '.revision // empty' <<<"$release_json")" != "$serving_revision" ] || \
+             [ "$(jq -r '.commit_sha // empty' <<<"$release_json")" != "$deploy_sha" ]; then
+            echo "::error::The served UAT release identity does not match the deployed revision."
+            exit 1
+          fi
+
+          jq -n \
+            --arg sha "$deploy_sha" \
+            --arg revision "$serving_revision" \
+            --arg image "$image_digest" \
+            '{status:"verified",commit_sha:$sha,serving_revision:$revision,image_digest:$image,traffic_percent:100}' \
+            > /tmp/uat-release-identity.json
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -271,6 +421,11 @@ jobs:
         run: |
           set -euo pipefail
           npm --silent run verify:sensitive-nda-gate -- --target=uat --expected-min=1 2>&1 | tee /tmp/uat-sensitive-nda-gate.json
+
+      - name: Verify Research client contract
+        env:
+          EXPECTED_HUSHH_RESEARCH_CLIENT_ENABLED: ${{ env.HUSHH_RESEARCH_CLIENT_ENABLED }}
+        run: node scripts/smoke-hushh-research-client.mjs "$SMOKE_BASE_URL" > /tmp/uat-hushh-research-client-smoke.json
 
       - name: Upload UAT smoke artifact
         if: always()
@@ -291,3 +446,71 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: /tmp/uat-sensitive-nda-gate.json
+
+      - name: Upload UAT Research client smoke artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-hushh-research-client-smoke
+          if-no-files-found: error
+          retention-days: 7
+          path: /tmp/uat-hushh-research-client-smoke.json
+
+      - name: Upload UAT predeploy and release evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-revision-safety
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            /tmp/uat-predeploy-state.json
+            /tmp/uat-release-identity.json
+
+      # Keep rollback after every required evidence upload. If GitHub artifact
+      # storage is unavailable, that release-proof failure must restore the
+      # previously serving revision instead of leaving an unproven revision live.
+      - name: Restore captured revision after a failed deploy, smoke, or proof upload
+        if: failure() && steps.predeploy-state.outputs.revision != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          captured_revision="${{ steps.predeploy-state.outputs.revision }}"
+          gcloud run services update-traffic hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --to-revisions="${captured_revision}=100" \
+            --quiet
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --format=json)"
+          serving_revision="$(jq -r '
+            [.status.traffic[]?
+              | select((.percent // 0) == 100)
+              | .revisionName
+              | select(type == "string" and length > 0)]
+            | if length == 1 then .[0] else empty end
+          ' <<<"$service_json")"
+          positive_traffic_targets="$(jq '[.status.traffic[]? | select((.percent // 0) > 0)] | length' <<<"$service_json")"
+          if [ "$serving_revision" != "$captured_revision" ] || [ "$positive_traffic_targets" -ne 1 ]; then
+            echo "::error::Rollback did not restore one captured revision at 100% traffic."
+            exit 1
+          fi
+          jq -n \
+            --arg revision "$serving_revision" \
+            --arg sha "${{ steps.resolve-sha.outputs.sha }}" \
+            '{status:"rolled_back",serving_revision:$revision,failed_sha:$sha,traffic_percent:100}' \
+            > /tmp/uat-rollback-state.json
+
+      - name: Upload UAT rollback evidence
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-rollback-state
+          if-no-files-found: warn
+          retention-days: 7
+          path: /tmp/uat-rollback-state.json

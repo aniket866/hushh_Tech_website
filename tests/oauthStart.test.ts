@@ -41,7 +41,7 @@ describe("startUnifiedOAuth", () => {
     });
   });
 
-  it("returns missing_client when the build lacks a Supabase client", async () => {
+  it("returns missing_client when the build lacks a GCP auth client", async () => {
     const result = await startUnifiedOAuth("apple", undefined);
 
     expect(result).toMatchObject({
@@ -68,10 +68,10 @@ describe("startUnifiedOAuth", () => {
     expect(assignMock).not.toHaveBeenCalled();
   });
 
-  it("redirects to the provider when Supabase returns an authorization URL", async () => {
+  it("redirects to the provider when an authorization URL is returned", async () => {
     const signInWithOAuth = vi.fn().mockResolvedValue({
       data: {
-        url: "https://ibsisfnjxeowvdtvgzff.supabase.co/auth/v1/authorize?provider=google",
+        url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
       },
       error: null,
     });
@@ -92,13 +92,31 @@ describe("startUnifiedOAuth", () => {
       })
     );
     expect(assignMock).toHaveBeenCalledWith(
-      "https://ibsisfnjxeowvdtvgzff.supabase.co/auth/v1/authorize?provider=google"
+      "https://accounts.google.com/o/oauth2/v2/auth?client_id=test"
     );
     expect(result).toEqual({
       ok: true,
       provider: "google",
       redirectTo:
-        "https://ibsisfnjxeowvdtvgzff.supabase.co/auth/v1/authorize?provider=google",
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
+    });
+  });
+
+  it("accepts Firebase-managed redirects that return no authorization URL", async () => {
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { provider: "google", url: null },
+      error: null,
+    });
+
+    const result = await startUnifiedOAuth("google", {
+      auth: { signInWithOAuth },
+    } as any);
+
+    expect(assignMock).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      provider: "google",
+      redirectTo: "https://hushhtech.com/auth/callback",
     });
   });
 });

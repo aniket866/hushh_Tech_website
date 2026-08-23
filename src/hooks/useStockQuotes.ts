@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// Supabase URL for edge function
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const STOCK_QUOTES_API_URL = '/api/stock-quotes';
 
 // Exact 27 stocks as specified by user
 const STOCK_SYMBOLS = [
@@ -173,29 +171,30 @@ function generateFallbackData(): StockQuote[] {
   }));
 }
 
-// Hook for fetching stock quotes via Supabase edge function
-export function useStockQuotes(refreshInterval = 120000) {
+// Hook for fetching stock quotes via GcpBackend edge function
+export function useStockQuotes(refreshInterval = 120000, enabled = true) {
   const [quotes, setQuotes] = useState<StockQuote[]>(generateFallbackData());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchAllQuotes = useCallback(async () => {
+    if (!enabled) {
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setError(null);
 
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        throw new Error('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is not configured');
-      }
-      
-      // Call Supabase edge function
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/stock-quotes`, {
+      // Call the same-origin GCP gateway. Provider credentials stay server-side.
+      const response = await fetch(STOCK_QUOTES_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'apikey': SUPABASE_ANON_KEY || '',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({ symbols: STOCK_SYMBOLS }),
       });
 
@@ -227,20 +226,28 @@ export function useStockQuotes(refreshInterval = 120000) {
       setError('Failed to fetch stock quotes');
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   // Initial fetch
   useEffect(() => {
-    fetchAllQuotes();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        void fetchAllQuotes();
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, [fetchAllQuotes]);
 
   // Auto-refresh at specified interval (default 2 minutes for 27 stocks)
   useEffect(() => {
-    if (refreshInterval > 0) {
+    if (enabled && refreshInterval > 0) {
       const interval = setInterval(fetchAllQuotes, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [refreshInterval, fetchAllQuotes]);
+  }, [enabled, refreshInterval, fetchAllQuotes]);
 
   return {
     quotes,

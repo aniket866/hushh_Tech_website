@@ -12,18 +12,21 @@ permissions:
   checks: read
 
 concurrency:
-  group: deploy-production-${{ github.event.inputs.sha || github.run_id }}
+  group: deploy-production
   cancel-in-progress: false
 
 env:
   NODE_VERSION: "20.19.0"
   SMOKE_BASE_URL: https://hushhtech.com
   SHARED_SECRETS_PROJECT: "53407187172"
-  VITE_SUPABASE_REDIRECT_URL: https://hushhtech.com/auth/callback
+  VITE_GCP_AUTH_REDIRECT_URL: https://hushhtech.com/auth/callback
   VITE_PLAID_REDIRECT_URI: https://hushhtech.com/onboarding/financial-link
-  VITE_SUPABASE_URL: https://example.supabase.co
-  VITE_SUPABASE_ANON_KEY: ci-anon-key
+  VITE_FIREBASE_AUTH_DOMAIN: hushh-tech-prod.firebaseapp.com
+  VITE_FIREBASE_API_KEY: ci-anon-key
+  VITE_FIREBASE_PROJECT_ID: hushh-tech-prod
+  VITE_FIREBASE_APP_ID: ci-app-id
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false"
+  HUSHH_RESEARCH_CLIENT_ENABLED: "false"
 
 jobs:
   deploy:
@@ -69,6 +72,12 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
 
+      - name: Verify exhaustive route inventory
+        run: npm run migration:no-hybrid:routes
+
+      - name: Validate no-hybrid source contract
+        run: npm run migration:no-hybrid:source
+
       # 2. Auth with GCP and load shared web-build secrets
       # Prefer an environment-scoped GCP_SA_KEY_PROD secret so deploy approval gates access.
       - uses: google-github-actions/auth@v2
@@ -90,20 +99,47 @@ jobs:
             exit 1
           fi
 
+      - name: Refuse drifted Research bindings in production
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-prod \
+            --region=us-central1 \
+            --format=json)"
+          jq -e '
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              | length == 0)
+            or
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              == [{"name":"HUSHH_RESEARCH_CLIENT_ENABLED","value":"false"}])
+          ' <<<"$service_json" >/dev/null
+          jq -e '
+            [.spec.template.spec.containers[0].env[]?
+              | select(.name != "HUSHH_RESEARCH_CLIENT_ENABLED")
+              | select(.name | startswith("HUSHH_RESEARCH_"))]
+              | length == 0
+          ' <<<"$service_json" >/dev/null
+
       - name: Load web auth build env from Secret Manager
         shell: bash
         run: |
           set -euo pipefail
-          supabase_url="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SUPABASE_URL")"
-          supabase_anon_key="$(gcloud secrets versions access latest --project="$SHARED_SECRETS_PROJECT" --secret="SUPABASE_ANON_KEY")"
-          if [ -z "$supabase_url" ] || [ -z "$supabase_anon_key" ]; then
-            echo "::error::Supabase web auth secrets are empty"
+          firebase_auth_domain="hushh-tech-prod.firebaseapp.com"
+          firebase_project_id="hushh-tech-prod"
+          firebase_api_key="$(gcloud secrets versions access latest --project=hushh-tech-prod --secret=hushh-tech-firebase-web-api-key)"
+          firebase_app_id="$(gcloud secrets versions access latest --project=hushh-tech-prod --secret=hushh-tech-firebase-web-app-id)"
+          if [ -z "$firebase_auth_domain" ] || [ -z "$firebase_project_id" ] || [ -z "$firebase_api_key" ] || [ -z "$firebase_app_id" ]; then
+            echo "::error::Firebase web auth secrets are empty"
             exit 1
           fi
 
           runtime_secret_names=(
-            hushh-tech-supabase-url
-            hushh-tech-supabase-service-role-key
+            hushh-tech-firebase-web-api-key
+            hushh-tech-firebase-web-app-id
+            hushh-tech-server-actor-uid
             hushh-tech-gemini-api-key
             hushh-tech-analytics-hash-salt
             hushh-tech-metrics-ga4-property-id
@@ -146,17 +182,20 @@ jobs:
             echo "Optional production Gmail runtime secrets are not configured; preserving current Cloud Run behavior without Gmail env bindings."
           fi
 
-          echo "::add-mask::$supabase_url"
-          echo "::add-mask::$supabase_anon_key"
-          printf 'VITE_SUPABASE_URL=%s\n' "$supabase_url" >> "$GITHUB_ENV"
-          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$supabase_anon_key" >> "$GITHUB_ENV"
+          echo "::add-mask::$firebase_auth_domain"
+          echo "::add-mask::$firebase_api_key"
+          echo "::add-mask::$firebase_app_id"
+          printf 'VITE_FIREBASE_AUTH_DOMAIN=%s\n' "$firebase_auth_domain" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_API_KEY=%s\n' "$firebase_api_key" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_PROJECT_ID=%s\n' "$firebase_project_id" >> "$GITHUB_ENV"
+          printf 'VITE_FIREBASE_APP_ID=%s\n' "$firebase_app_id" >> "$GITHUB_ENV"
 
       # 3. Build Vite app in runner (FAST)
       - name: Validate client auth env
         shell: bash
         run: |
           missing=0
-          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_SUPABASE_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
+          for name in VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID VITE_GCP_AUTH_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for the web auth build"
               missing=1
@@ -171,14 +210,16 @@ jobs:
           fi
       - run: npm run env:check
       - run: npm run build:web
+      - name: Validate no-hybrid deploy artifact
+        run: npm run migration:no-hybrid:check
 
       # 4. Deploy pre-built dist/ to Cloud Run (runtime-only Dockerfile)
       - name: Deploy to Cloud Run
         shell: bash
         run: |
-          runtime_env="NODE_ENV=production,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-prod,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-prod,GOOGLE_CLOUD_LOCATION=us-central1,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true"
-          runtime_secrets="SUPABASE_URL=hushh-tech-supabase-url:latest"
-          runtime_secrets+=",SUPABASE_SERVICE_ROLE_KEY=hushh-tech-supabase-service-role-key:latest"
+          runtime_env="NODE_ENV=production,COMMUNITY_CONTENT_BACKEND=gcp,COMMUNITY_CONTENT_COLLECTION=community_posts,COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-prod,COMMUNITY_CONTENT_CACHE_SECONDS=300,GEMINI_INVESTOR_PROFILE_PROVIDER=vertex,GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash,GOOGLE_CLOUD_PROJECT=hushh-tech-prod,GOOGLE_CLOUD_LOCATION=us-central1,GCP_DATA_RUNTIME_ENABLED=false,CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-prod:us-central1:hushh-tech-app-pg-prod,CLOUD_SQL_DATABASE=hushh_tech_app,CLOUD_SQL_IAM_USER=hushh-tech-web-prod@hushh-tech-prod.iam,FIREBASE_PROJECT_ID=hushh-tech-prod,GCP_STORAGE_BUCKET_PREFIX=hushh-tech-prod,PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app,PROFILE_INTELLIGENCE_TIMEOUT_MS=180000,PROFILE_INTELLIGENCE_DISABLED=true,HUSHH_RESEARCH_CLIENT_ENABLED=false"
+          runtime_secrets="CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-cloudsql-instance:latest"
+          runtime_secrets+=",GCP_SERVER_ACTOR_UID=hushh-tech-server-actor-uid:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
           if [ "${GMAIL_RUNTIME_SECRETS_AVAILABLE:-0}" = "1" ]; then
             runtime_secrets+=",GMAIL_USER=hushh-tech-gmail-user:latest"
@@ -214,6 +255,28 @@ jobs:
             --clear-base-image \
             --quiet
 
+      - name: Verify Research client remains absent in production
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_HUSHH_RESEARCH_CLIENT_ENABLED=false \
+            node scripts/smoke-hushh-research-client.mjs "$SMOKE_BASE_URL" \
+            > /tmp/prod-hushh-research-client-smoke.json
+          service_json="$(gcloud run services describe hushh-tech-website \
+            --project=hushh-tech-prod \
+            --region=us-central1 \
+            --format=json)"
+          jq -e '
+            [.spec.template.spec.containers[0].env[]?
+              | select(.name == "HUSHH_RESEARCH_CLIENT_ENABLED")]
+              == [{"name":"HUSHH_RESEARCH_CLIENT_ENABLED","value":"false"}]
+            and
+            ([.spec.template.spec.containers[0].env[]?
+              | select(.name != "HUSHH_RESEARCH_CLIENT_ENABLED")
+              | select(.name | startswith("HUSHH_RESEARCH_"))]
+              | length == 0)
+          ' <<<"$service_json" >/dev/null
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
@@ -229,3 +292,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           path: /tmp/prod-oauth-smoke.json
+
+      - name: Upload production Research hard-off proof
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-hushh-research-client-smoke
+          if-no-files-found: error
+          retention-days: 7
+          path: /tmp/prod-hushh-research-client-smoke.json

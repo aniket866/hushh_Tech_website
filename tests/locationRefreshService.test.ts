@@ -15,9 +15,8 @@ const upsertOnboardingDataMock = vi.fn();
 
 vi.mock('../src/resources/config/config', () => ({
   default: {
-    SUPABASE_URL: 'https://test.supabase.co',
-    SUPABASE_ANON_KEY: 'test-anon-key',
-    supabaseClient: {
+    GCP_API_BASE_URL: '/api/gcp',
+    gcpBackendClient: {
       from: (...args: unknown[]) => fromMock(...args),
     },
   },
@@ -57,7 +56,7 @@ describe('LocationService shared refresh flow', () => {
     upsertOnboardingDataMock.mockResolvedValue({ error: null });
   });
 
-  it('prefers the shared cache before reading the Supabase mirror', async () => {
+  it('prefers the shared cache before reading the Cloud SQL mirror', async () => {
     const service = new LocationService();
     vi.spyOn(service, 'readSharedLocationCache').mockResolvedValue(cachedRecord);
 

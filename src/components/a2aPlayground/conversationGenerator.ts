@@ -19,18 +19,7 @@ import type {
   ExportedKycProfile,
   A2ARiskBand,
 } from '../../types/a2aPlayground';
-
-// Supabase config - MUST be set via environment variables
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Validate required environment variables
-if (!SUPABASE_URL) {
-  console.error('[A2A Playground] VITE_SUPABASE_URL environment variable is required');
-}
-if (!SUPABASE_ANON_KEY) {
-  console.error('[A2A Playground] VITE_SUPABASE_ANON_KEY environment variable is required');
-}
+import appConfig from '../../resources/config/config';
 
 // A2A Protocol Message Type - Extended for Agentic Negotiation
 interface A2AProtocolMessage {
@@ -249,32 +238,36 @@ async function callA2AProtocolApi(
   error?: string;
 }> {
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/kyc-agent-a2a-protocol/sendMessage`, {
+    const client = appConfig.gcpBackendClient;
+    if (!client) throw new Error('GCP backend is unavailable');
+    const { data, error, status } = await client.functions.invoke<{
+      success: boolean;
+      task_id: string;
+      status: string;
+      conversation?: A2AProtocolMessage[];
+      migration_link?: string;
+      error?: string;
+    }>('kyc-agent-a2a-protocol', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
+      subpath: ['sendMessage'],
+      body: {
         subject: config.user.fullName,
         phoneCountryCode: config.user.phoneCountryCode,
         phoneNumber: config.user.phoneNumber,
         email: config.user.email,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+    if (error || !data) {
       return {
         success: false,
         taskId: '',
         status: 'ERROR',
         conversation: [],
-        error: errorData.error || `API error: ${response.status}`,
+        error: error?.message || `API error: ${status ?? 0}`,
       };
     }
 
-    const data = await response.json();
     return {
       success: data.success,
       taskId: data.task_id,

@@ -1,7 +1,7 @@
 import config from '../../resources/config/config';
 
 /**
- * MFA Service for Supabase TOTP Authentication
+ * MFA Service for GcpBackend TOTP Authentication
  * Provides complete Multi-Factor Authentication functionality
  */
 
@@ -11,9 +11,9 @@ import config from '../../resources/config/config';
  */
 export const enrollMFA = async () => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.enroll({
+        const { data, error } = await config.gcpBackendClient.auth.mfa.enroll({
             factorType: 'totp',
             friendlyName: 'Authenticator App',
         });
@@ -38,9 +38,9 @@ export const enrollMFA = async () => {
  */
 export const verifyMFAEnrollment = async (factorId: string, code: string) => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.challenge({
+        const { data, error } = await config.gcpBackendClient.auth.mfa.challenge({
             factorId,
         });
 
@@ -51,7 +51,7 @@ export const verifyMFAEnrollment = async (factorId: string, code: string) => {
 
         const challengeId = data.id;
 
-        const { data: verifyData, error: verifyError } = await config.supabaseClient.auth.mfa.verify({
+        const { data: verifyData, error: verifyError } = await config.gcpBackendClient.auth.mfa.verify({
             factorId,
             challengeId,
             code,
@@ -76,9 +76,9 @@ export const verifyMFAEnrollment = async (factorId: string, code: string) => {
  */
 export const challengeMFA = async (factorId: string) => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.challenge({
+        const { data, error } = await config.gcpBackendClient.auth.mfa.challenge({
             factorId,
         });
 
@@ -103,9 +103,9 @@ export const challengeMFA = async (factorId: string) => {
  */
 export const verifyMFAChallenge = async (factorId: string, challengeId: string, code: string) => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.verify({
+        const { data, error } = await config.gcpBackendClient.auth.mfa.verify({
             factorId,
             challengeId,
             code,
@@ -130,9 +130,9 @@ export const verifyMFAChallenge = async (factorId: string, challengeId: string, 
  */
 export const unenrollMFA = async (factorId: string) => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.unenroll({
+        const { data, error } = await config.gcpBackendClient.auth.mfa.unenroll({
             factorId,
         });
 
@@ -154,9 +154,9 @@ export const unenrollMFA = async (factorId: string) => {
  */
 export const getMFAFactors = async () => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.listFactors();
+        const { data, error } = await config.gcpBackendClient.auth.mfa.listFactors();
 
         if (error) {
             console.error('Get MFA factors error:', error);
@@ -176,9 +176,9 @@ export const getMFAFactors = async () => {
  */
 export const getAssuranceLevel = async () => {
     try {
-        if (!config.supabaseClient) throw new Error("Supabase client not initialized");
+        if (!config.gcpBackendClient) throw new Error("GcpBackend client not initialized");
 
-        const { data, error } = await config.supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+        const { data, error } = await config.gcpBackendClient.auth.mfa.getAuthenticatorAssuranceLevel();
 
         if (error) {
             console.error('Get assurance level error:', error);

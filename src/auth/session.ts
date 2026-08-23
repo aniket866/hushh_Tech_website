@@ -1,4 +1,4 @@
-import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import type { Session, GcpBackendClient, User } from "@/services/gcpBackend/types";
 import {
   resolveOAuthHost,
   type OAuthHostResolution,
@@ -74,8 +74,8 @@ export function clearLegacyAuthStorage() {
   });
 }
 
-function getSupabaseAuthStorageKey(
-  client: SupabaseClient | undefined = config.supabaseClient
+function getGcpBackendAuthStorageKey(
+  client: GcpBackendClient | undefined = config.gcpBackendClient
 ) {
   const authStorageKey = (client?.auth as unknown as { storageKey?: unknown })
     ?.storageKey;
@@ -84,21 +84,21 @@ function getSupabaseAuthStorageKey(
   }
 
   try {
-    const projectRef = new URL(config.SUPABASE_URL).hostname.split(".")[0];
+    const projectRef = new URL(config.GCP_API_BASE_URL).hostname.split(".")[0];
     return projectRef ? `sb-${projectRef}-auth-token` : null;
   } catch {
     return null;
   }
 }
 
-export function clearPersistedSupabaseAuthSession(
-  client: SupabaseClient | undefined = config.supabaseClient
+export function clearPersistedGcpBackendAuthSession(
+  client: GcpBackendClient | undefined = config.gcpBackendClient
 ) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const baseKey = getSupabaseAuthStorageKey(client);
+  const baseKey = getGcpBackendAuthStorageKey(client);
   if (!baseKey) {
     return;
   }
@@ -149,7 +149,7 @@ function getOAuthHostResolution(): OAuthHostResolution {
 
 export async function startUnifiedOAuth(
   provider: OAuthProvider,
-  client: SupabaseClient | undefined = config.supabaseClient
+  client: GcpBackendClient | undefined = config.gcpBackendClient
 ): Promise<OAuthStartResult> {
   try {
     const hostResolution = getOAuthHostResolution();
@@ -169,7 +169,7 @@ export async function startUnifiedOAuth(
         provider,
         reason: "missing_client",
         message:
-          "Authentication is not configured for this build. Missing Supabase client configuration.",
+          "Authentication is not configured for this build. Missing GcpBackend client configuration.",
       };
     }
 
@@ -201,11 +201,12 @@ export async function startUnifiedOAuth(
       };
     }
 
+    // Firebase owns the browser navigation when signInWithRedirect resolves.
+    // A null URL therefore means the redirect was accepted, not rejected.
     return {
-      ok: false,
+      ok: true,
       provider,
-      reason: "missing_authorize_url",
-      message: `Unable to start ${provider} sign-in. No authorization URL was returned.`,
+      redirectTo: hostResolution.callbackUrl,
     };
   } catch (error) {
     const message =
@@ -241,7 +242,7 @@ export function getAuthInvalidationReason(error?: {
 const VALIDATE_SESSION_TIMEOUT_MS = 5000;
 
 export async function validateSessionCandidate(
-  client: SupabaseClient | undefined,
+  client: GcpBackendClient | undefined,
   session: Session | null
 ): Promise<AuthSessionSnapshot> {
   if (!client || !session?.access_token || !session.user?.id) {
@@ -317,11 +318,11 @@ export async function validateSessionCandidate(
 /**
  * Soft revalidation — reads session from localStorage only, no network call.
  * Used for focus/visibility events where we just need to confirm the session
- * still exists locally. Supabase's autoRefreshToken handles token renewal
+ * still exists locally. GcpBackend's autoRefreshToken handles token renewal
  * automatically in the background.
  */
 export async function getLocalSession(
-  client: SupabaseClient | undefined = config.supabaseClient
+  client: GcpBackendClient | undefined = config.gcpBackendClient
 ): Promise<AuthSessionSnapshot> {
   if (!client) {
     return { status: "anonymous", session: null, user: null };
@@ -364,7 +365,7 @@ export async function getLocalSession(
  * a server-side getUser() call. Used for initial boot and auth state changes.
  */
 export async function getValidatedSession(
-  client: SupabaseClient | undefined = config.supabaseClient
+  client: GcpBackendClient | undefined = config.gcpBackendClient
 ): Promise<AuthSessionSnapshot> {
   if (!client) {
     return {
@@ -402,7 +403,7 @@ export async function getValidatedSession(
 }
 
 export async function getAuthenticatedSession(
-  client: SupabaseClient | undefined = config.supabaseClient,
+  client: GcpBackendClient | undefined = config.gcpBackendClient,
   errorMessage = "User not logged in. Please sign in again."
 ): Promise<Session> {
   const snapshot = await getValidatedSession(client);
@@ -414,17 +415,17 @@ export async function getAuthenticatedSession(
   return snapshot.session;
 }
 
-export async function clearSupabaseSession(
-  client: SupabaseClient | undefined = config.supabaseClient,
+export async function clearGcpBackendSession(
+  client: GcpBackendClient | undefined = config.gcpBackendClient,
   options: { storageOnly?: boolean } = {}
 ) {
   if (!client) {
-    clearPersistedSupabaseAuthSession(client);
+    clearPersistedGcpBackendAuthSession(client);
     return;
   }
 
   if (options.storageOnly) {
-    clearPersistedSupabaseAuthSession(client);
+    clearPersistedGcpBackendAuthSession(client);
     return;
   }
 
@@ -433,7 +434,7 @@ export async function clearSupabaseSession(
   } catch (error) {
     console.warn("[AuthSession] Local sign-out fallback failed:", error);
   } finally {
-    clearPersistedSupabaseAuthSession(client);
+    clearPersistedGcpBackendAuthSession(client);
   }
 }
 

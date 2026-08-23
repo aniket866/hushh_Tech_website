@@ -35,7 +35,8 @@ const createResponse = () => {
 
 describe("delete-account API route", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    createDeleteAccountAdminClientFromEnvMock.mockReset();
+    executeDeleteAccountMock.mockReset();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -51,11 +52,10 @@ describe("delete-account API route", () => {
   });
 
   it("passes the auth header through to the delete-account service", async () => {
-    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
     createDeleteAccountAdminClientFromEnvMock.mockReturnValue({
       adminClient: { marker: "admin" },
       auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
     });
     executeDeleteAccountMock.mockResolvedValue({
       status: 200,
@@ -75,6 +75,7 @@ describe("delete-account API route", () => {
       adminClient: { marker: "admin" },
       authHeader: "Bearer live-token",
       auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({
@@ -84,13 +85,39 @@ describe("delete-account API route", () => {
     });
   });
 
-  it("delegates to the Supabase function when local service-role env is missing", async () => {
-    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "anon-key");
-    const fetchMock = vi.fn().mockResolvedValue({
-      status: 200,
-      text: () => Promise.resolve(JSON.stringify({ success: true })),
+  it("fails closed when the GCP admin client cannot be configured", async () => {
+    createDeleteAccountAdminClientFromEnvMock.mockImplementation(() => {
+      throw new Error("GCP server actor is not configured");
     });
+
+    const res = createResponse();
+    await deleteAccountHandler(
+      {
+        method: "POST",
+        headers: { authorization: "Bearer user-token" },
+      },
+      res
+    );
+
+    expect(createDeleteAccountAdminClientFromEnvMock).toHaveBeenCalledTimes(1);
+    expect(executeDeleteAccountMock).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({
+      success: false,
+      error: "Server configuration error",
+      details: "GCP server actor is not configured",
+    });
+  });
+
+  it("fails closed without invoking a legacy function when GCS storage is disabled", async () => {
+    const disabledError = Object.assign(
+      new Error("Delete-account storage is disabled until the GCP copy is reconciled."),
+      { code: "GCP_DELETE_ACCOUNT_STORAGE_DISABLED" }
+    );
+    createDeleteAccountAdminClientFromEnvMock.mockImplementation(() => {
+      throw disabledError;
+    });
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const res = createResponse();
@@ -102,28 +129,27 @@ describe("delete-account API route", () => {
       res
     );
 
-    expect(createDeleteAccountAdminClientFromEnvMock).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://example.supabase.co/functions/v1/delete-user-account",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer user-token",
-          apikey: "anon-key",
-        },
-      }
-    );
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ success: true });
+    expect(createDeleteAccountAdminClientFromEnvMock).toHaveBeenCalledOnce();
+    expect(executeDeleteAccountMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      success: false,
+      error: "Account deletion is temporarily unavailable",
+      details: "GCP_DELETE_ACCOUNT_STORAGE_DISABLED",
+    });
   });
 
-  it("fails closed when neither local env nor Supabase function env is configured", async () => {
-    vi.stubEnv("SUPABASE_URL", "");
-    vi.stubEnv("VITE_SUPABASE_URL", "");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
-    vi.stubEnv("SUPABASE_ANON_KEY", "");
-    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "");
+  it("preserves an authentication denial from the GCP deletion service", async () => {
+    createDeleteAccountAdminClientFromEnvMock.mockReturnValue({
+      adminClient: { marker: "admin" },
+      auditSecret: "audit-secret",
+      storageAdapter: { marker: "gcs-storage" },
+    });
+    executeDeleteAccountMock.mockResolvedValue({
+      status: 401,
+      body: { success: false, error: "Unauthorized" },
+    });
 
     const res = createResponse();
     await deleteAccountHandler(
@@ -134,11 +160,7 @@ describe("delete-account API route", () => {
       res
     );
 
-    expect(res.statusCode).toBe(500);
-    expect(res.body).toEqual({
-      success: false,
-      error: "Server configuration error",
-      details: "Supabase URL is missing",
-    });
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ success: false, error: "Unauthorized" });
   });
 });

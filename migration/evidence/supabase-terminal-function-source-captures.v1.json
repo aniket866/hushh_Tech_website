@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "evidence_id": "hushh-tech-supabase-terminal-function-source-captures",
+  "source": {
+    "project_ref": "ibsisfnjxeowvdtvgzff",
+    "tool": "supabase_cli",
+    "tool_version": "2.115.0",
+    "source_write_mode": "READ_ONLY_NO_DEPLOYMENT",
+    "capture_protocol": "LIST_BEFORE_DOWNLOAD_USE_API_LIST_AFTER"
+  },
+  "canonicalization": {
+    "record_encoding": "uint32be_field_count_then_uint64be_length_prefixed_utf8_fields_v2",
+    "bundle_digest_algorithm": "sha256_length_prefixed_utf8_bundle_file_records_v2"
+  },
+  "entries": [
+    {
+      "slug": "hushh-location-geocode",
+      "capture_started_at_utc": "2026-08-22T02:06:40.000Z",
+      "capture_completed_at_utc": "2026-08-22T02:06:46.000Z",
+      "metadata_before": {
+        "function_id": "b61e87bc-11e1-4d7e-ae37-197b7783c078",
+        "status": "ACTIVE",
+        "version": 6152,
+        "verify_jwt": true,
+        "import_map": true,
+        "provider_bundle_digest": null,
+        "updated_at_epoch_ms": 1771837750126
+      },
+      "metadata_after": {
+        "function_id": "b61e87bc-11e1-4d7e-ae37-197b7783c078",
+        "status": "ACTIVE",
+        "version": 6152,
+        "verify_jwt": true,
+        "import_map": true,
+        "provider_bundle_digest": null,
+        "updated_at_epoch_ms": 1771837750126
+      },
+      "bundle": {
+        "canonical_digest": "8f4286a07dccc7f2832d4f0419e835f23e1cdde1369d180088ff2ba9309fbc61",
+        "file_count": 3,
+        "total_bytes": 9645,
+        "files": [
+          {
+            "canonical_path": "supabase/functions/hushh-location-geocode/__dependencies__/_shared/cors.ts",
+            "repository_path": "supabase/functions/_shared/cors.ts",
+            "sha256": "0f76808710e7d12afdc071908b073e033260af2ff4bcda4018c93b2b8af7ec0e",
+            "bytes": 205
+          },
+          {
+            "canonical_path": "supabase/functions/hushh-location-geocode/deno.json",
+            "repository_path": "supabase/functions/hushh-location-geocode/deno.json",
+            "sha256": "6c014ab8f805902e87da43f59fcbe850b976431504d651963265194c13d39674",
+            "bytes": 78
+          },
+          {
+            "canonical_path": "supabase/functions/hushh-location-geocode/index.ts",
+            "repository_path": "supabase/functions/hushh-location-geocode/index.ts",
+            "sha256": "499a6dd0f528045f5285ebe794a2d0c798c83ee31dccb4533682530f8d4f1573",
+            "bytes": 9362
+          }
+        ]
+      }
+    },
+    {
+      "slug": "nda-admin-fetch",
+      "capture_started_at_utc": "2026-08-22T02:49:03.000Z",
+      "capture_completed_at_utc": "2026-08-22T02:49:10.000Z",
+      "metadata_before": {
+        "function_id": "57a9c1e5-404b-47a3-a86f-1ffd0c7a3267",
+        "status": "ACTIVE",
+        "version": 6337,
+        "verify_jwt": true,
+        "import_map": true,
+        "provider_bundle_digest": "2cecf4e6b64ea2278d30bdf9734341bc10dd0ae3ff6175b2040fe41407c9c2a8",
+        "updated_at_epoch_ms": 1779989104498
+      },
+      "metadata_after": {
+        "function_id": "57a9c1e5-404b-47a3-a86f-1ffd0c7a3267",
+        "status": "ACTIVE",
+        "version": 6337,
+        "verify_jwt": true,
+        "import_map": true,
+        "provider_bundle_digest": "2cecf4e6b64ea2278d30bdf9734341bc10dd0ae3ff6175b2040fe41407c9c2a8",
+        "updated_at_epoch_ms": 1779989104498
+      },
+      "bundle": {
+        "canonical_digest": "c0efaca3fcea7e30fcb1898ba90c96306fea754598217a2281691bc5e9ef896f",
+        "file_count": 2,
+        "total_bytes": 3825,
+        "files": [
+          {
+            "canonical_path": "supabase/functions/nda-admin-fetch/deno.json",
+            "repository_path": "supabase/functions/nda-admin-fetch/deno.json",
+            "sha256": "03adb359916315a9fb246f80f84d718ffc037d1379e8176bd129ff8d0b945ac3",
+            "bytes": 71
+          },
+          {
+            "canonical_path": "supabase/functions/nda-admin-fetch/index.ts",
+            "repository_path": "supabase/functions/nda-admin-fetch/index.ts",
+            "sha256": "c91a2588f4cb403a1999c9bc87ee5188b00327d34d7d8de909527f911d2b306e",
+            "bytes": 3754
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+const SAFE_CODES = new Set([
+  "ACTIVATION_CONTRACT_MISMATCH",
+  "ATTESTATION_ABORTED",
+  "CATALOG_CHECK_FAILED",
+  "CATALOG_BOUNDS_EXCEEDED",
+  "CATALOG_RESULT_INVALID",
+  "CONNECTOR_CONTRACT_INVALID",
+  "EVIDENCE_INVALID",
+  "EXECUTION_GATE_FALSE",
+  "FORBIDDEN_CREDENTIAL_ENV",
+  "HARD_PROCESS_DEADLINE_EXCEEDED",
+  "IMAGE_DIGEST_REQUIRED",
+  "QUERY_CONTRACT_DRIFT",
+  "RUNTIME_CONNECTION_FAILED",
+  "SOURCE_CONTRACT_DRIFT",
+  "TARGET_BOUNDARY_VIOLATION",
+  "WORKER_EXIT_FAILED",
+  "WORKER_DEADLINE_EXCEEDED",
+  "WORKER_OUTPUT_INVALID",
+  "EXTERNAL_CONTEXT_INVALID",
+]);
+
+export class AttestorError extends Error {
+  constructor(code) {
+    super(code);
+    this.name = "AttestorError";
+    this.code = SAFE_CODES.has(code) ? code : "RUNTIME_CONNECTION_FAILED";
+  }
+}
+
+export function safeErrorCode(error) {
+  return error instanceof AttestorError && SAFE_CODES.has(error.code)
+    ? error.code
+    : "RUNTIME_CONNECTION_FAILED";
+}

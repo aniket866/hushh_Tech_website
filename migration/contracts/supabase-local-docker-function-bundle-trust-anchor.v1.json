@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provisioning_status": "UNPROVISIONED",
+  "project_ref": "ibsisfnjxeowvdtvgzff",
+  "tool": "supabase_cli_metadata_plus_direct_management_api_body",
+  "tool_version": "2.115.0",
+  "bundle_transport": "DIRECT_MANAGEMENT_API_RAW_ESZIP_GET_LOCAL_DOCKER_UNBUNDLE_NO_CLI_FALLBACK",
+  "raw_body_surface": "GET /v1/projects/{ref}/functions/{slug}/body ACCEPT_APPLICATION_OCTET_STREAM",
+  "collector_closure_digest_sha256": null,
+  "docker_image": null,
+  "docker_image_id": null,
+  "docker_image_os": null,
+  "docker_image_architecture": null,
+  "docker_context_class": "ABSOLUTE_LOCAL_UNIX_SOCKET",
+  "docker_context_endpoint_sha256": null,
+  "docker_server_version": null,
+  "provider_metadata_digest_sha256": null,
+  "raw_body_attempts_digest_sha256": null,
+  "recovered_source_tree_digest_sha256": null,
+  "raw_archive_to_recovered_tree_digest_sha256": null
+}

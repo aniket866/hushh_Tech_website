@@ -1,7 +1,7 @@
 /**
  * Plaid Link diagnostics — fire-and-forget client logger that ships
  * every notable financial-link / Plaid Link event to the
- * `plaid-diagnostics-log` Supabase edge function.
+ * `plaid-diagnostics-log` GcpBackend edge function.
  *
  * Drop-in policy:
  * - Calls are non-blocking. We never await responses on the hot path.
@@ -116,14 +116,14 @@ const capturePageState = (extras: Record<string, unknown> = {}): Record<string, 
 };
 
 const getFunctionsUrl = (): string | null => {
-  if (!config.SUPABASE_URL) return null;
-  return `${config.SUPABASE_URL}/functions/v1`;
+  if (!config.GCP_API_BASE_URL) return null;
+  return `${config.GCP_API_BASE_URL}/functions/v1`;
 };
 
 const getAuthHeader = async (): Promise<Record<string, string>> => {
   try {
-    if (!config.supabaseClient) return {};
-    const session = await getAuthenticatedSession(config.supabaseClient);
+    if (!config.gcpBackendClient) return {};
+    const session = await getAuthenticatedSession(config.gcpBackendClient);
     if (session?.access_token) {
       return { Authorization: `Bearer ${session.access_token}` };
     }

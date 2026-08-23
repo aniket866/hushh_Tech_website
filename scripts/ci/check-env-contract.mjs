@@ -116,6 +116,53 @@ for (const workflowFile of contract.policyWorkflowFiles) {
   }
 }
 
+const uatWorkflow = fs.readFileSync(
+  path.join(root, ".github", "workflows", "deploy-uat.yml"),
+  "utf8"
+);
+const productionWorkflow = fs.readFileSync(
+  path.join(root, ".github", "workflows", "deploy-prod.yml"),
+  "utf8"
+);
+
+for (const [name, secretName] of Object.entries(contract.uatOnlyRuntimeSecrets ?? {})) {
+  if (!uatWorkflow.includes(`${name}=${secretName}:latest`)) {
+    errors.push(`deploy-uat.yml must bind ${name} to ${secretName}:latest.`);
+  }
+  if (productionWorkflow.includes(`${name}=`) || productionWorkflow.includes(secretName)) {
+    errors.push(`deploy-prod.yml must not bind UAT-only Research credential ${name}.`);
+  }
+}
+
+for (const [name, expectedValue] of Object.entries(contract.uatResearchRuntimeValues ?? {})) {
+  if (!uatWorkflow.includes(`${name}: ${expectedValue}`)) {
+    errors.push(`deploy-uat.yml must pin ${name} to ${expectedValue}.`);
+  }
+  const runtimeBinding = name + "=${" + name + "}";
+  if (!uatWorkflow.includes(runtimeBinding)) {
+    errors.push(`deploy-uat.yml must propagate ${name} into the Cloud Run runtime env.`);
+  }
+}
+
+for (const name of contract.productionForbiddenRuntimeVars ?? []) {
+  if (productionWorkflow.includes(`${name}=`) && name !== "HUSHH_RESEARCH_CLIENT_ENABLED") {
+    errors.push(`deploy-prod.yml must not set UAT-only Research runtime variable ${name}.`);
+  }
+}
+
+if (!productionWorkflow.includes('HUSHH_RESEARCH_CLIENT_ENABLED: "false"')) {
+  errors.push("deploy-prod.yml must hard-disable the Research client at workflow scope.");
+}
+if (!productionWorkflow.includes("HUSHH_RESEARCH_CLIENT_ENABLED=false")) {
+  errors.push("deploy-prod.yml must hard-disable the Research client in Cloud Run runtime env.");
+}
+if (
+  !productionWorkflow.includes("Refuse drifted Research bindings in production") ||
+  !productionWorkflow.includes('startswith("HUSHH_RESEARCH_")')
+) {
+  errors.push("deploy-prod.yml must fail closed when Research production bindings drift.");
+}
+
 fs.writeFileSync(
   reportPath,
   JSON.stringify(

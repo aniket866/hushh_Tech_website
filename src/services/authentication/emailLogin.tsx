@@ -1,16 +1,16 @@
 import resources from "../../resources/resources";
 
 export default async function emailLogin(email: string, password: string) {
-  const supabase = resources.config.supabaseClient;
+  const gcpBackend = resources.config.gcpBackendClient;
   
   try {
-    if (!supabase) {
-      console.error("Supabase client is not initialized");
+    if (!gcpBackend) {
+      console.error("GcpBackend client is not initialized");
       return "error";
     }
 
     // Attempt to sign in with email and password
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await gcpBackend.auth.signInWithPassword({
       email: email,
       password: password,
     });
@@ -20,7 +20,7 @@ export default async function emailLogin(email: string, password: string) {
     }
 
     // Check if user's email is confirmed
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await gcpBackend.auth.getUser();
     
     // If email is not confirmed, return error message
     if (userData?.user && !userData.user.email_confirmed_at) {

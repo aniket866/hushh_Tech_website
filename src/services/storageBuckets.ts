@@ -1,7 +1,6 @@
 
 // src/services/storageBuckets.ts
 export const STORAGE_BUCKETS = {
-    IMAGES: 'https://spmxyqxjqxcyywkapong.supabase.co/storage/v1/object/public',
-    VIDEOS: 'https://spmxyqxjqxcyywkapong.supabase.co/storage/v1/object/public',
+    IMAGES: '/api/gcp/storage/alohafundsreport-images',
+    VIDEOS: '/api/gcp/storage/alohafundsreport-videos',
   }
-  

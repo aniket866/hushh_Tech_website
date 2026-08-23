@@ -22,9 +22,9 @@ RUN node --input-type=module -e "\
   import path from 'node:path';\
   const assetsDir = path.join(process.cwd(), 'dist', 'assets');\
   const jsFiles = fs.readdirSync(assetsDir).filter((file) => file.endsWith('.js'));\
-  const hasAuthConfig = jsFiles.some((file) => /https:\\/\\/[a-z0-9-]+\\.supabase\\.co/.test(fs.readFileSync(path.join(assetsDir, file), 'utf8')));\
+  const hasAuthConfig = jsFiles.some((file) => /identitytoolkit\\.googleapis\\.com/.test(fs.readFileSync(path.join(assetsDir, file), 'utf8')));\
   if (!hasAuthConfig) {\
-    console.error('Prebuilt dist/ is missing compiled Supabase auth config. Rebuild with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from GCP Secret Manager before deploying.');\
+    console.error('Prebuilt dist/ is missing compiled Firebase auth config. Rebuild with VITE_FIREBASE_AUTH_DOMAIN and VITE_FIREBASE_API_KEY from GCP Secret Manager before deploying.');\
     process.exit(1);\
   }\
 "
@@ -32,6 +32,11 @@ RUN node --input-type=module -e "\
 # Copy server and API routes
 COPY server.js ./
 COPY api/ api/
+COPY scripts/ci/check-no-hybrid-runtime.mjs scripts/ci/no-hybrid-runtime-policy.json scripts/ci/
+
+# Re-scan exactly what the runtime image can serve. This is intentionally
+# independent from GitHub so direct Cloud Build and local image builds fail closed.
+RUN node scripts/ci/check-no-hybrid-runtime.mjs --artifact-only --require-dist
 
 ENV PORT=8080
 ENV NODE_ENV=production

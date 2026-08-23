@@ -1,6 +1,6 @@
 /**
  * Message Entity
- * Pure business object with NO dependencies on React or Supabase
+ * Pure business object with NO dependencies on React or GcpBackend
  */
 export type MessageRole = 'user' | 'assistant';
 

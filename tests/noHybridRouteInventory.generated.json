@@ -1,0 +1,2149 @@
+{
+  "schema_version": 1,
+  "target_project": "hushh-tech-uat",
+  "browsers": [
+    "chromium",
+    "webkit"
+  ],
+  "personas": [
+    {
+      "id": "anonymous",
+      "authority": "none"
+    },
+    {
+      "id": "firebase-user-a",
+      "authority": "hushh-tech-uat"
+    },
+    {
+      "id": "firebase-user-b",
+      "authority": "hushh-tech-uat"
+    },
+    {
+      "id": "firebase-admin",
+      "authority": "hushh-tech-uat",
+      "claim": "fund_admin"
+    }
+  ],
+  "client": [
+    {
+      "pattern": "*",
+      "sample": "/__no_hybrid_not_found_fixture__",
+      "terminal": "/__no_hybrid_not_found_fixture__",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/",
+      "sample": "/",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/a2a-playground",
+      "sample": "/a2a-playground",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/about/leadership",
+      "sample": "/about/leadership",
+      "terminal": "/about/leadership",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/about/philosophy",
+      "sample": "/about/philosophy",
+      "terminal": "/about/philosophy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/ai-powered-berkshire",
+      "sample": "/ai-powered-berkshire",
+      "terminal": "/ai-powered-berkshire",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/auth/callback",
+      "sample": "/auth/callback",
+      "terminal": "/auth/callback",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/auth/hushh-research/callback",
+      "sample": "/auth/hushh-research/callback",
+      "terminal": "/auth/hushh-research/callback",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/auth/hushh-research/start",
+      "sample": "/auth/hushh-research/start",
+      "terminal": "/auth/hushh-research/start",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/benefits",
+      "sample": "/benefits",
+      "terminal": "/benefits",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/california-privacy-policy",
+      "sample": "/california-privacy-policy",
+      "terminal": "/california-privacy-policy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/career",
+      "sample": "/career",
+      "terminal": "/career",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/career-privacy-policy",
+      "sample": "/career-privacy-policy",
+      "terminal": "/career-privacy-policy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/career/:jobId",
+      "sample": "/career/quantitative-research-scientist",
+      "terminal": "/career/quantitative-research-scientist",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/pages/career/index.tsx",
+      "render": {
+        "selector": "#root > *",
+        "text": "Quantitative Research Scientist"
+      }
+    },
+    {
+      "pattern": "/career/*",
+      "sample": "/career/__no_hybrid_wildcard_fixture__",
+      "terminal": "/career/__no_hybrid_wildcard_fixture__",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/careers",
+      "sample": "/careers",
+      "terminal": "/careers",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/careers/*",
+      "sample": "/careers/__no_hybrid_wildcard_fixture__",
+      "terminal": "/careers/__no_hybrid_wildcard_fixture__",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/carrer-privacy-policy",
+      "sample": "/carrer-privacy-policy",
+      "terminal": "/carrer-privacy-policy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/community",
+      "sample": "/community",
+      "terminal": "/community",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/community/*",
+      "sample": "/community/__no_hybrid_wildcard_fixture__",
+      "terminal": "/community/__no_hybrid_wildcard_fixture__",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/contact",
+      "sample": "/contact",
+      "terminal": "/contact",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/Contact",
+      "sample": "/Contact",
+      "terminal": "/Contact",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/delete-account",
+      "sample": "/delete-account",
+      "terminal": "/delete-account",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/deployments",
+      "sample": "/deployments",
+      "terminal": "/deployments",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/developer-docs",
+      "sample": "/developer-docs",
+      "terminal": "/developer-docs",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/disclosures",
+      "sample": "/disclosures",
+      "terminal": "/disclosures",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/discover-fund-a",
+      "sample": "/discover-fund-a",
+      "terminal": "/discover-fund-a",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/document-viewer",
+      "sample": "/document-viewer",
+      "terminal": "/document-viewer",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/eu-uk-jobs-privacy-policy",
+      "sample": "/eu-uk-jobs-privacy-policy",
+      "terminal": "/eu-uk-jobs-privacy-policy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/faq",
+      "sample": "/faq",
+      "terminal": "/faq",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/fund-admin",
+      "sample": "/fund-admin",
+      "terminal": "/fund-admin",
+      "access": "firebase-admin",
+      "wrappers": [
+        "FundAdminRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/fund-admin/:userId",
+      "sample": "/fund-admin/fixture-user-a",
+      "terminal": "/fund-admin/fixture-user-a",
+      "access": "firebase-admin",
+      "wrappers": [
+        "FundAdminRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/fund-admin/analytics",
+      "sample": "/fund-admin/analytics",
+      "terminal": "/fund-admin/analytics",
+      "access": "firebase-admin",
+      "wrappers": [
+        "FundAdminRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-ai",
+      "sample": "/hushh-ai",
+      "terminal": "/hushh-ai",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-ai/login",
+      "sample": "/hushh-ai/login",
+      "terminal": "/hushh-ai/login",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-ai/signup",
+      "sample": "/hushh-ai/signup",
+      "terminal": "/hushh-ai/signup",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-user-profile",
+      "sample": "/hushh-user-profile",
+      "terminal": "/hushh-user-profile",
+      "access": "firebase-user",
+      "wrappers": [
+        "InvestorAccessRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-user-profile/privacy",
+      "sample": "/hushh-user-profile/privacy",
+      "terminal": "/hushh-user-profile/privacy",
+      "access": "firebase-user",
+      "wrappers": [
+        "InvestorAccessRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushh-user-profile/view",
+      "sample": "/hushh-user-profile/view",
+      "terminal": "/hushh-user-profile/view",
+      "access": "firebase-user",
+      "wrappers": [
+        "InvestorAccessRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *",
+        "text": "Verified Investor"
+      }
+    },
+    {
+      "pattern": "/hushhid-hero-demo",
+      "sample": "/hushhid-hero-demo",
+      "terminal": "/hushhid-hero-demo",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/hushhid/:id",
+      "sample": "/hushhid/fixture-id",
+      "terminal": "/hushhid/fixture-id",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/investor-guide",
+      "sample": "/investor-guide",
+      "terminal": "/investor-guide",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/investor-profile",
+      "sample": "/investor-profile",
+      "terminal": "/investor-profile",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/investor/:slug",
+      "sample": "/investor/fixture-slug",
+      "terminal": "/investor/fixture-slug",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kai",
+      "sample": "/kai",
+      "terminal": "/kai",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kai-india",
+      "sample": "/kai-india",
+      "terminal": "/kai-india",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kyc",
+      "sample": "/kyc",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kyc-demo",
+      "sample": "/kyc-demo",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kyc-flow",
+      "sample": "/kyc-flow",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kyc-form",
+      "sample": "/kyc-form",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/kyc-verification",
+      "sample": "/kyc-verification",
+      "terminal": "/",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/Login",
+      "sample": "/Login",
+      "terminal": "/Login",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/metric",
+      "sample": "/metric",
+      "terminal": "/metrics",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/metrics",
+      "sample": "/metrics",
+      "terminal": "/metrics",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/my-documents",
+      "sample": "/my-documents",
+      "terminal": "/my-documents",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/nda-admin",
+      "sample": "/nda-admin",
+      "terminal": "/nda-admin",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/nda-form",
+      "sample": "/nda-form",
+      "terminal": "/nda-form",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/access-denied",
+      "sample": "/onboarding/access-denied",
+      "terminal": "/onboarding/access-denied",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/financial-link",
+      "sample": "/onboarding/financial-link",
+      "terminal": "/onboarding/financial-link",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/fund-payment/:token",
+      "sample": "/onboarding/fund-payment/invalid-fixture-token",
+      "terminal": "/onboarding/fund-payment/invalid-fixture-token",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/invite/:token",
+      "sample": "/onboarding/invite/invalid-fixture-token",
+      "terminal": "/onboarding/invite/invalid-fixture-token",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/meet-ceo",
+      "sample": "/onboarding/meet-ceo",
+      "terminal": "/onboarding/meet-ceo",
+      "access": "firebase-user",
+      "wrappers": [
+        "InvestorAccessRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-1",
+      "sample": "/onboarding/step-1",
+      "terminal": "/onboarding/step-1",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-2",
+      "sample": "/onboarding/step-2",
+      "terminal": "/onboarding/step-2",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-3",
+      "sample": "/onboarding/step-3",
+      "terminal": "/onboarding/step-3",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-4",
+      "sample": "/onboarding/step-4",
+      "terminal": "/onboarding/step-4",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-5",
+      "sample": "/onboarding/step-5",
+      "terminal": "/onboarding/step-5",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-6",
+      "sample": "/onboarding/step-6",
+      "terminal": "/onboarding/step-6",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-7",
+      "sample": "/onboarding/step-7",
+      "terminal": "/login",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-8",
+      "sample": "/onboarding/step-8",
+      "terminal": "/login",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/step-9",
+      "sample": "/onboarding/step-9",
+      "terminal": "/login",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/verify",
+      "sample": "/onboarding/verify",
+      "terminal": "/onboarding/verify",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/onboarding/verify-complete",
+      "sample": "/onboarding/verify-complete",
+      "terminal": "/onboarding/verify-complete",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/philosophy",
+      "sample": "/philosophy",
+      "terminal": "/philosophy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/privacy",
+      "sample": "/privacy",
+      "terminal": "/privacy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/privacy-policy",
+      "sample": "/privacy-policy",
+      "terminal": "/privacy-policy",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/profile",
+      "sample": "/profile",
+      "terminal": "/profile",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/profile/:id",
+      "sample": "/profile/fixture-id",
+      "terminal": "/profile/fixture-id",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *",
+        "text": "Verified Investor"
+      }
+    },
+    {
+      "pattern": "/receipt-generator",
+      "sample": "/receipt-generator",
+      "terminal": "/receipt-generator",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/reports/:id",
+      "sample": "/reports/fixture-id",
+      "terminal": "/reports/fixture-id",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/risk-disclosures",
+      "sample": "/risk-disclosures",
+      "terminal": "/risk-disclosures",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/sell-the-wall",
+      "sample": "/sell-the-wall",
+      "terminal": "/sell-the-wall",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/services/business",
+      "sample": "/services/business",
+      "terminal": "/services/business",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/services/consumers",
+      "sample": "/services/consumers",
+      "terminal": "/services/consumers",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/sign-nda",
+      "sample": "/sign-nda",
+      "terminal": "/sign-nda",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/signed-out",
+      "sample": "/signed-out",
+      "terminal": "/signed-out",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/Signup",
+      "sample": "/Signup",
+      "terminal": "/Signup",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/studio",
+      "sample": "/studio",
+      "terminal": "/studio",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/support",
+      "sample": "/support",
+      "terminal": "/support",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/terms",
+      "sample": "/terms",
+      "terminal": "/terms",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/terms-of-service",
+      "sample": "/terms-of-service",
+      "terminal": "/terms-of-service",
+      "access": "anonymous",
+      "wrappers": [],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/user-profile",
+      "sample": "/user-profile",
+      "terminal": "/user-profile",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/user-registration",
+      "sample": "/user-registration",
+      "terminal": "/hushh-user-profile",
+      "access": "firebase-user",
+      "wrappers": [
+        "ProtectedRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    },
+    {
+      "pattern": "/your-profile",
+      "sample": "/your-profile",
+      "terminal": "/your-profile",
+      "access": "firebase-user",
+      "wrappers": [
+        "AuthRequiredRoute"
+      ],
+      "source_owner": "src/App.tsx",
+      "render": {
+        "selector": "#root > *"
+      }
+    }
+  ],
+  "server": [
+    {
+      "pattern": "*",
+      "sample": "/__no_hybrid_not_found_fixture__",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "pattern": "/.well-known",
+      "sample": "/.well-known",
+      "methods": [
+        "USE"
+      ]
+    },
+    {
+      "pattern": "/api/analytics/collect",
+      "sample": "/api/analytics/collect",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/analytics/realtime",
+      "sample": "/api/analytics/realtime",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/career-application",
+      "sample": "/api/career-application",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/community/assets/*",
+      "sample": "/api/community/assets/__no_hybrid_wildcard_fixture__",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/community/posts",
+      "sample": "/api/community/posts",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/community/posts/*",
+      "sample": "/api/community/posts/__no_hybrid_wildcard_fixture__",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/contact-notification",
+      "sample": "/api/contact-notification",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/delete-account",
+      "sample": "/api/delete-account",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/deployments",
+      "sample": "/api/deployments",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/enrich-preferences",
+      "sample": "/api/enrich-preferences",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/gcp/data",
+      "sample": "/api/gcp/data",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "pattern": "/api/gcp/storage",
+      "sample": "/api/gcp/storage",
+      "methods": [
+        "DELETE",
+        "POST"
+      ]
+    },
+    {
+      "pattern": "/api/gcp/storage/*",
+      "sample": "/api/gcp/storage/__no_hybrid_wildcard_fixture__",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "pattern": "/api/gemini-chat",
+      "sample": "/api/gemini-chat",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/gemini-ephemeral-token",
+      "sample": "/api/gemini-ephemeral-token",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/generate-investor-profile",
+      "sample": "/api/generate-investor-profile",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/generate-profile-intelligence",
+      "sample": "/api/generate-profile-intelligence",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/google-wallet-pass",
+      "sample": "/api/google-wallet-pass",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/hushh-research/*",
+      "sample": "/api/hushh-research/__no_hybrid_wildcard_fixture__",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/hushh-research/config",
+      "sample": "/api/hushh-research/config",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/metrics/send-report",
+      "sample": "/api/metrics/send-report",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/metrics/summary",
+      "sample": "/api/metrics/summary",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/public-investor-profile",
+      "sample": "/api/public-investor-profile",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/release",
+      "sample": "/api/release",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "pattern": "/api/send-email-notification",
+      "sample": "/api/send-email-notification",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/stock-quotes",
+      "sample": "/api/stock-quotes",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/wallet-pass",
+      "sample": "/api/wallet-pass",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/assets",
+      "sample": "/assets",
+      "methods": [
+        "USE"
+      ]
+    },
+    {
+      "pattern": "/functions/v1",
+      "sample": "/functions/v1",
+      "methods": [
+        "USE"
+      ]
+    },
+    {
+      "pattern": "/functions/v1/*",
+      "sample": "/functions/v1/__no_hybrid_wildcard_fixture__",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/metric",
+      "sample": "/metric",
+      "methods": [
+        "GET"
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "slug": "activate-agent",
+      "route": "/functions/v1/activate-agent",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "agent-onboard-notify",
+      "route": "/functions/v1/agent-onboard-notify",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "asset-report-create",
+      "route": "/functions/v1/asset-report-create",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "asset-report-get",
+      "route": "/functions/v1/asset-report-get",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "bank-income",
+      "route": "/functions/v1/bank-income",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "bot_event",
+      "route": "/functions/v1/bot_event",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "bot_start",
+      "route": "/functions/v1/bot_start",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "ceo-calendar-booking",
+      "route": "/functions/v1/ceo-calendar-booking",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "chat-check-access",
+      "route": "/functions/v1/chat-check-access",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "chat-create-checkout",
+      "route": "/functions/v1/chat-create-checkout",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "chat-verify-payment",
+      "route": "/functions/v1/chat-verify-payment",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "claude-code-gen",
+      "route": "/functions/v1/claude-code-gen",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "coins-credit-notification",
+      "route": "/functions/v1/coins-credit-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "coins-deduction-notification",
+      "route": "/functions/v1/coins-deduction-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "create-link-token",
+      "route": "/functions/v1/create-link-token",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "create-verification-session",
+      "route": "/functions/v1/create-verification-session",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "delete-user-account",
+      "route": "/functions/v1/delete-user-account",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "exchange-public-token",
+      "route": "/functions/v1/exchange-public-token",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-coupon-redeem",
+      "route": "/functions/v1/fund-coupon-redeem",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-analytics",
+      "route": "/functions/v1/fund-payment-admin-analytics",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-crm",
+      "route": "/functions/v1/fund-payment-admin-crm",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-detail",
+      "route": "/functions/v1/fund-payment-admin-detail",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-kyc-review",
+      "route": "/functions/v1/fund-payment-admin-kyc-review",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-kyc-screen",
+      "route": "/functions/v1/fund-payment-admin-kyc-screen",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-list",
+      "route": "/functions/v1/fund-payment-admin-list",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-overview",
+      "route": "/functions/v1/fund-payment-admin-overview",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-overview-list",
+      "route": "/functions/v1/fund-payment-admin-overview-list",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-overview-metrics",
+      "route": "/functions/v1/fund-payment-admin-overview-metrics",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-remind",
+      "route": "/functions/v1/fund-payment-admin-remind",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-resend",
+      "route": "/functions/v1/fund-payment-admin-resend",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-admin-verify",
+      "route": "/functions/v1/fund-payment-admin-verify",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-checkout",
+      "route": "/functions/v1/fund-payment-checkout",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-request-create",
+      "route": "/functions/v1/fund-payment-request-create",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-status",
+      "route": "/functions/v1/fund-payment-status",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-payment-token-status",
+      "route": "/functions/v1/fund-payment-token-status",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-stripe-webhook",
+      "route": "/functions/v1/fund-stripe-webhook",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "fund-transfer-sandbox-start",
+      "route": "/functions/v1/fund-transfer-sandbox-start",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "gemini-voice-token",
+      "route": "/functions/v1/gemini-voice-token",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "generate-investor-profile",
+      "route": "/functions/v1/generate-investor-profile",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "get-auth-numbers",
+      "route": "/functions/v1/get-auth-numbers",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "get-locations",
+      "route": "/functions/v1/get-locations",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "get-secrets",
+      "route": "/functions/v1/get-secrets",
+      "auth": "none_feature_retired",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "RETIRE_WITH_410"
+    },
+    {
+      "slug": "github-devops-notify",
+      "route": "/functions/v1/github-devops-notify",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "hushh-address-inference",
+      "route": "/functions/v1/hushh-address-inference",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "hushh-ai-chat",
+      "route": "/functions/v1/hushh-ai-chat",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "hushh-dob-inference",
+      "route": "/functions/v1/hushh-dob-inference",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "hushh-location-geocode",
+      "route": "/functions/v1/hushh-location-geocode",
+      "auth": "firebase_bearer",
+      "state": "PORTED_AND_VERIFIED",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "hushh-profile-search",
+      "route": "/functions/v1/hushh-profile-search",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "identity-verification-webhook",
+      "route": "/functions/v1/identity-verification-webhook",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "investments-transactions",
+      "route": "/functions/v1/investments-transactions",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "investor-agent-mcp",
+      "route": "/functions/v1/investor-agent-mcp",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "investor-chat",
+      "route": "/functions/v1/investor-chat",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "investor-og-image",
+      "route": "/functions/v1/investor-og-image",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "ios-build-tracker",
+      "route": "/functions/v1/ios-build-tracker",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "kyc-agent-a2a",
+      "route": "/functions/v1/kyc-agent-a2a",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "kyc-agent-a2a-protocol",
+      "route": "/functions/v1/kyc-agent-a2a-protocol",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "kyc-agent-agentic",
+      "route": "/functions/v1/kyc-agent-agentic",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "kyc-orchestrator",
+      "route": "/functions/v1/kyc-orchestrator",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "lead_create",
+      "route": "/functions/v1/lead_create",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "liabilities",
+      "route": "/functions/v1/liabilities",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "mcp-agent-card",
+      "route": "/functions/v1/mcp-agent-card",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "nda-admin-fetch",
+      "route": "/functions/v1/nda-admin-fetch",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "nda-signed-notification",
+      "route": "/functions/v1/nda-signed-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "nws-score-notification",
+      "route": "/functions/v1/nws-score-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-create-checkout",
+      "route": "/functions/v1/onboarding-create-checkout",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-funding-name-match",
+      "route": "/functions/v1/onboarding-funding-name-match",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-complete",
+      "route": "/functions/v1/onboarding-invite-complete",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-create",
+      "route": "/functions/v1/onboarding-invite-create",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-link-token",
+      "route": "/functions/v1/onboarding-invite-link-token",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-load",
+      "route": "/functions/v1/onboarding-invite-load",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-plaid-exchange",
+      "route": "/functions/v1/onboarding-invite-plaid-exchange",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-resend",
+      "route": "/functions/v1/onboarding-invite-resend",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-revoke",
+      "route": "/functions/v1/onboarding-invite-revoke",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-invite-save",
+      "route": "/functions/v1/onboarding-invite-save",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-proof-of-funds",
+      "route": "/functions/v1/onboarding-proof-of-funds",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-submit-application",
+      "route": "/functions/v1/onboarding-submit-application",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "onboarding-verify-payment",
+      "route": "/functions/v1/onboarding-verify-payment",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-data-sync",
+      "route": "/functions/v1/plaid-data-sync",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-data-sync-product",
+      "route": "/functions/v1/plaid-data-sync-product",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-data-sync-start",
+      "route": "/functions/v1/plaid-data-sync-start",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-data-webhook",
+      "route": "/functions/v1/plaid-data-webhook",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-diagnostics-log",
+      "route": "/functions/v1/plaid-diagnostics-log",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-income-link-token",
+      "route": "/functions/v1/plaid-income-link-token",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-transfer-sandbox-simulate",
+      "route": "/functions/v1/plaid-transfer-sandbox-simulate",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-transfer-webhook",
+      "route": "/functions/v1/plaid-transfer-webhook",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "plaid-unlink-item",
+      "route": "/functions/v1/plaid-unlink-item",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "portfolio-deploy",
+      "route": "/functions/v1/portfolio-deploy",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "portfolio-generate",
+      "route": "/functions/v1/portfolio-generate",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "portfolio-photo-enhance",
+      "route": "/functions/v1/portfolio-photo-enhance",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "portfolio-slug-check",
+      "route": "/functions/v1/portfolio-slug-check",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "public-signup-metrics",
+      "route": "/functions/v1/public-signup-metrics",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "sandbox-create-test-item",
+      "route": "/functions/v1/sandbox-create-test-item",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "send-email-notification",
+      "route": "/functions/v1/send-email-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "send-kyc-email",
+      "route": "/functions/v1/send-kyc-email",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "shadow-investigator",
+      "route": "/functions/v1/shadow-investigator",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "signal-decision-report",
+      "route": "/functions/v1/signal-decision-report",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "signal-evaluate",
+      "route": "/functions/v1/signal-evaluate",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "signal-return-report",
+      "route": "/functions/v1/signal-return-report",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-analyze",
+      "route": "/functions/v1/site-analyze",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-edit",
+      "route": "/functions/v1/site-edit",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-extract",
+      "route": "/functions/v1/site-extract",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-generate",
+      "route": "/functions/v1/site-generate",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-orchestrator",
+      "route": "/functions/v1/site-orchestrator",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "site-publish",
+      "route": "/functions/v1/site-publish",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "stock-quotes",
+      "route": "/functions/v1/stock-quotes",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "stripe-identity-session",
+      "route": "/functions/v1/stripe-identity-session",
+      "auth": "firebase_bearer_recent_auth",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "stripe-identity-webhook",
+      "route": "/functions/v1/stripe-identity-webhook",
+      "auth": "provider_signature_raw_body",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "ticket_create",
+      "route": "/functions/v1/ticket_create",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "transactions-sync",
+      "route": "/functions/v1/transactions-sync",
+      "auth": "firebase_bearer_recent_auth_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "vault-access-notification",
+      "route": "/functions/v1/vault-access-notification",
+      "auth": "firebase_bearer_or_google_service_identity",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "veo-generate-video",
+      "route": "/functions/v1/veo-generate-video",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    },
+    {
+      "slug": "voice-agent-turn",
+      "route": "/functions/v1/voice-agent-turn",
+      "auth": "firebase_bearer",
+      "state": "INVENTORY_FROZEN",
+      "disposition": "PORT_TO_GCP"
+    }
+  ],
+  "counts": {
+    "client": 94,
+    "client_anonymous": 69,
+    "client_user": 22,
+    "client_admin": 3,
+    "server": 33,
+    "functions": 112,
+    "functions_ported": 1,
+    "functions_retired": 1,
+    "functions_blocked": 110
+  },
+  "sha256": "4bb6a04723218e6c7e7bf80f90917f071e141120b7514ff5ea4aa9716cbdd6c0"
+}

@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "hushh-tech-storage-isolated-cutover-uat-v1",
+  "contractState": "UAT_ISOLATION_PROVISIONING_ALLOWED_COPY_DISABLED",
+  "environment": "uat",
+  "project": "hushh-tech-uat",
+  "projectNumber": "175298245599",
+  "organization": "369781862791",
+  "location": "US-CENTRAL1",
+  "storageClass": "STANDARD",
+  "uniformBucketLevelAccess": true,
+  "publicAccessPrevention": "enforced",
+  "versioningEnabled": true,
+  "retentionPeriodSeconds": 604800,
+  "retentionPolicyLocked": false,
+  "softDeleteRetentionSeconds": 604800,
+  "isolationTagKey": "369781862791/storage-isolation",
+  "isolationTagKeyResource": "tagKeys/281475718825896",
+  "denyPolicyId": "hushh-tech-storage-cutover-v1",
+  "denyPolicyDisplayName": "Hushh Tech UAT isolated storage cutover v1",
+  "inspectorRole": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverInspector",
+  "inspectorPrincipal": "serviceAccount:hushh-tech-audit-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "inspectorPermissions": [
+    "iam.denypolicies.get",
+    "storage.buckets.get",
+    "storage.buckets.getIamPolicy",
+    "storage.buckets.listTagBindings"
+  ],
+  "migrationWriterRole": "projects/hushh-tech-uat/roles/hushhTechStorageCutoverWriter",
+  "migrationWriterPrincipal": "serviceAccount:hushh-tech-migration-uat@hushh-tech-uat.iam.gserviceaccount.com",
+  "migrationWriterPermissions": [
+    "storage.objects.create",
+    "storage.objects.get",
+    "storage.objects.list"
+  ],
+  "auditObjectRole": "roles/storage.objectViewer",
+  "prohibitedPreCopyBucketPrincipals": [
+    "serviceAccount:hushh-tech-content-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-financial-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-rollback-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-webhooks-uat@hushh-tech-uat.iam.gserviceaccount.com",
+    "serviceAccount:hushh-tech-worker-uat@hushh-tech-uat.iam.gserviceaccount.com"
+  ],
+  "deniedPermissions": [
+    "storage.googleapis.com/bucketOperations.cancel",
+    "storage.googleapis.com/buckets.createTagBinding",
+    "storage.googleapis.com/buckets.delete",
+    "storage.googleapis.com/buckets.deleteTagBinding",
+    "storage.googleapis.com/buckets.enableObjectRetention",
+    "storage.googleapis.com/buckets.relocate",
+    "storage.googleapis.com/buckets.restore",
+    "storage.googleapis.com/buckets.setIamPolicy",
+    "storage.googleapis.com/buckets.setIpFilter",
+    "storage.googleapis.com/buckets.update",
+    "storage.googleapis.com/folders.create",
+    "storage.googleapis.com/folders.delete",
+    "storage.googleapis.com/folders.get",
+    "storage.googleapis.com/folders.list",
+    "storage.googleapis.com/folders.rename",
+    "storage.googleapis.com/intelligenceConfigs.update",
+    "storage.googleapis.com/managedFolders.create",
+    "storage.googleapis.com/managedFolders.delete",
+    "storage.googleapis.com/managedFolders.get",
+    "storage.googleapis.com/managedFolders.getIamPolicy",
+    "storage.googleapis.com/managedFolders.list",
+    "storage.googleapis.com/managedFolders.setIamPolicy",
+    "storage.googleapis.com/multipartUploads.abort",
+    "storage.googleapis.com/multipartUploads.create",
+    "storage.googleapis.com/multipartUploads.list",
+    "storage.googleapis.com/multipartUploads.listParts",
+    "storage.googleapis.com/objects.create",
+    "storage.googleapis.com/objects.createContext",
+    "storage.googleapis.com/objects.delete",
+    "storage.googleapis.com/objects.deleteContext",
+    "storage.googleapis.com/objects.get",
+    "storage.googleapis.com/objects.getIamPolicy",
+    "storage.googleapis.com/objects.list",
+    "storage.googleapis.com/objects.move",
+    "storage.googleapis.com/objects.overrideUnlockedRetention",
+    "storage.googleapis.com/objects.restore",
+    "storage.googleapis.com/objects.setIamPolicy",
+    "storage.googleapis.com/objects.setRetention",
+    "storage.googleapis.com/objects.update",
+    "storage.googleapis.com/objects.updateContext"
+  ],
+  "deniedPrincipals": [
+    "principalSet://goog/public:all"
+  ],
+  "buckets": [
+    {
+      "sourceBucket": "assets",
+      "previousTargetBucket": "hushh-tech-assets-legal-uat",
+      "targetBucket": "hushh-tech-cutover-v1-assets-legal-uat",
+      "tagValueShortName": "cutover-assets-legal",
+      "tagValueResource": "tagValues/281481430530521"
+    },
+    {
+      "sourceBucket": "community-uploads",
+      "previousTargetBucket": "hushh-tech-community-content-uat",
+      "targetBucket": "hushh-tech-cutover-v1-community-content-uat",
+      "tagValueShortName": "cutover-community",
+      "tagValueResource": "tagValues/281479180988532"
+    },
+    {
+      "sourceBucket": "hushh-agent-profile-images",
+      "previousTargetBucket": "hushh-tech-profile-images-uat",
+      "targetBucket": "hushh-tech-cutover-v1-profile-images-uat",
+      "tagValueShortName": "cutover-profiles",
+      "tagValueResource": "tagValues/281478947620546"
+    },
+    {
+      "sourceBucket": "hushh-ai-media",
+      "previousTargetBucket": "hushh-tech-ai-media-uat",
+      "targetBucket": "hushh-tech-cutover-v1-ai-media-uat",
+      "tagValueShortName": "cutover-ai-media",
+      "tagValueResource": "tagValues/281476445421410"
+    },
+    {
+      "sourceBucket": "hushh-gamma-pdf",
+      "previousTargetBucket": "hushh-tech-reports-uat",
+      "targetBucket": "hushh-tech-cutover-v1-reports-uat",
+      "tagValueShortName": "cutover-reports",
+      "tagValueResource": "tagValues/281483320182154"
+    },
+    {
+      "sourceBucket": "wa-evidence",
+      "previousTargetBucket": "hushh-tech-wa-evidence-uat",
+      "targetBucket": "hushh-tech-cutover-v1-wa-evidence-uat",
+      "tagValueShortName": "cutover-wa-evidence",
+      "tagValueResource": "tagValues/281484883914223"
+    }
+  ],
+  "executionPolicy": {
+    "bucketProvisioningAllowed": true,
+    "sourceMutationAllowed": false,
+    "existingTargetMutationAllowed": false,
+    "unrelatedObjectMutationAllowed": false,
+    "objectCopyAllowed": false,
+    "objectOverwriteAllowed": false,
+    "objectDeleteAllowed": false,
+    "productionMutationAllowed": false,
+    "runtimeRoutingAllowed": false
+  }
+}

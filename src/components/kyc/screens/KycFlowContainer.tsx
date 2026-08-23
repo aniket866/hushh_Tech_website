@@ -64,7 +64,7 @@ const getEnvVar = (key: string, fallback: string): string => {
 };
 
 const KYC_API_BASE = getEnvVar('VITE_KYC_API_BASE', 
-  'https://hkdlmkpqwbjnmcwlxczv.supabase.co/functions/v1/kyc-agent-a2a');
+  '/functions/v1/kyc-agent-a2a');
 const KYC_ENV = getEnvVar('VITE_KYC_ENV', 'production');
 const DEMO_MODE = getEnvVar('VITE_KYC_DEMO_MODE', 'false') === 'true';
 
@@ -84,11 +84,11 @@ const initialState: KycFlowState = {
 };
 
 // =====================================================
-// API Service - Real Supabase Integration
+// API Service - Real GcpBackend Integration
 // =====================================================
 
 /**
- * Calls the Supabase KYC Agent A2A edge function using JSON-RPC 2.0 protocol
+ * Calls the GcpBackend KYC Agent A2A edge function using JSON-RPC 2.0 protocol
  * NO MORE HARDCODED DATA - All results come from real database
  */
 async function callKycCheckApi(request: KycCheckRequest): Promise<KycCheckResponse> {
@@ -115,13 +115,13 @@ async function callKycCheckApi(request: KycCheckRequest): Promise<KycCheckRespon
       id: `kyc-check-${Date.now()}`,
     };
 
-    console.log('[KYC API] Calling Supabase edge function:', {
+    console.log('[KYC API] Calling GcpBackend edge function:', {
       endpoint: `${KYC_API_BASE}/a2a/rpc`,
       method: 'CheckKYCStatus',
       relyingParty: request.relyingPartyId,
     });
 
-    // Call the REAL Supabase edge function
+    // Call the REAL GcpBackend edge function
     const response = await fetch(`${KYC_API_BASE}/a2a/rpc`, {
       method: 'POST',
       headers: {

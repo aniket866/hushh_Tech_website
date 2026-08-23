@@ -63,7 +63,7 @@ function buildMetadata(): ProductUsageMetadata {
 
 /**
  * Track product usage for the authenticated user
- * Uses Supabase RPC function for upsert with access_count increment
+ * Uses GcpBackend RPC function for upsert with access_count increment
  * 
  * @param productName - The product identifier (e.g., 'hushh-ai', 'kyc', 'investor-profile')
  * @param additionalMetadata - Optional additional metadata to store
@@ -74,14 +74,14 @@ export async function trackProductUsage(
   additionalMetadata?: Partial<ProductUsageMetadata>
 ): Promise<ProductUsageRecord | null> {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      console.warn('[ProductUsage] Supabase client not initialized');
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      console.warn('[ProductUsage] GcpBackend client not initialized');
       return null;
     }
 
     // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await gcpBackend.auth.getUser();
     
     if (userError || !user) {
       // User not authenticated - skip tracking silently
@@ -96,7 +96,7 @@ export async function trackProductUsage(
     };
 
     // Call the RPC function to upsert product usage
-    const { data, error } = await supabase.rpc('track_product_usage', {
+    const { data, error } = await gcpBackend.rpc('track_product_usage', {
       p_user_id: user.id,
       p_product_name: productName,
       p_metadata: metadata,
@@ -120,19 +120,19 @@ export async function trackProductUsage(
  */
 export async function getUserProductUsage(): Promise<ProductUsageRecord[]> {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      console.warn('[ProductUsage] Supabase client not initialized');
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      console.warn('[ProductUsage] GcpBackend client not initialized');
       return [];
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await gcpBackend.auth.getUser();
     
     if (userError || !user) {
       return [];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await gcpBackend
       .from('user_product_usage')
       .select('*')
       .eq('user_id', user.id)
@@ -155,18 +155,18 @@ export async function getUserProductUsage(): Promise<ProductUsageRecord[]> {
  */
 export async function getProductUsage(productName: string): Promise<ProductUsageRecord | null> {
   try {
-    const supabase = config.supabaseClient;
-    if (!supabase) {
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
       return null;
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await gcpBackend.auth.getUser();
     
     if (userError || !user) {
       return null;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await gcpBackend
       .from('user_product_usage')
       .select('*')
       .eq('user_id', user.id)

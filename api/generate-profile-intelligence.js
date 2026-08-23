@@ -1,11 +1,11 @@
 /**
  * Server-side Profile Intelligence wrapper for the Cloud Run web runtime.
- * Validates the Supabase session, calls the RIA Intelligence OSINT profile API,
+ * Validates the GcpBackend session, calls the RIA Intelligence OSINT profile API,
  * and returns the formatted profile display model.
  */
 
 import { formatProfileIntelligenceReport } from "./shared/profileIntelligenceFormatter.js";
-import { createSupabaseServerClient } from "./shared/supabaseServerClient.js";
+import { createGcpServerClient } from "./shared/gcpServerClient.js";
 
 const DEFAULT_PROFILE_INTELLIGENCE_API_BASE_URL =
   "https://hushh-ria-intelligence-api-53407187172.us-central1.run.app";
@@ -43,17 +43,17 @@ function getBearerToken(req) {
   return raw.startsWith("Bearer ") ? raw.slice("Bearer ".length).trim() : "";
 }
 
-function getSupabaseConfig(env = process.env) {
-  const supabaseUrl = trimValue(env.SUPABASE_URL) || trimValue(env.VITE_SUPABASE_URL);
-  const serviceRoleKey = trimValue(env.SUPABASE_SERVICE_ROLE_KEY);
+function getGcpBackendConfig(env = process.env) {
+  const gcpBackendUrl = trimValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME) || trimValue(env.CLOUD_SQL_INSTANCE_CONNECTION_NAME);
+  const serviceRoleKey = trimValue(env.GCP_SERVER_ACTOR_UID);
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!gcpBackendUrl || !serviceRoleKey) {
     const error = new Error("Profile authentication is not configured on server");
     error.statusCode = 503;
     throw error;
   }
 
-  return { supabaseUrl, serviceRoleKey };
+  return { gcpBackendUrl, serviceRoleKey };
 }
 
 async function authenticateRequest(req, env = process.env) {
@@ -64,8 +64,8 @@ async function authenticateRequest(req, env = process.env) {
     throw error;
   }
 
-  const { supabaseUrl, serviceRoleKey } = getSupabaseConfig(env);
-  const client = createSupabaseServerClient(supabaseUrl, serviceRoleKey);
+  const { gcpBackendUrl, serviceRoleKey } = getGcpBackendConfig(env);
+  const client = createGcpServerClient(gcpBackendUrl, serviceRoleKey);
   const { data, error } = await client.auth.getUser(token);
 
   if (error || !data?.user) {

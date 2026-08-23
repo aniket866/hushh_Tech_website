@@ -58,7 +58,7 @@ export function useVerifyIdentityLogic() {
       return;
     }
 
-    if (!config.supabaseClient) {
+    if (!config.gcpBackendClient) {
       toast({
         title: 'Error',
         description: 'Configuration error',
@@ -77,7 +77,7 @@ export function useVerifyIdentityLogic() {
 
     const loadUserData = async () => {
       try {
-        const { data: onboarding } = await config.supabaseClient
+        const { data: onboarding } = await config.gcpBackendClient
           .from('onboarding_data')
           .select('*')
           .eq('user_id', user.id)
@@ -100,7 +100,7 @@ export function useVerifyIdentityLogic() {
         }
 
         // Check existing verification status
-        const { data: verification } = await config.supabaseClient
+        const { data: verification } = await config.gcpBackendClient
           .from('identity_verifications')
           .select('*')
           .eq('user_id', user.id)
@@ -189,7 +189,7 @@ export function useVerifyIdentityLogic() {
 
       // Call edge function to create verification session
       const response = await fetch(
-        `${config.SUPABASE_URL}/functions/v1/create-verification-session`,
+        `${config.GCP_API_BASE_URL}/functions/v1/create-verification-session`,
         {
           method: 'POST',
           headers: {

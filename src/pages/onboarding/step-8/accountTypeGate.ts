@@ -37,18 +37,18 @@ export function useReviewAccountTypeGate(): ReviewAccountTypeGate {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!config.supabaseClient) {
+    if (!config.gcpBackendClient) {
       setLoading(false);
       return;
     }
-    const { data: { user } } = await config.supabaseClient.auth.getUser();
+    const { data: { user } } = await config.gcpBackendClient.auth.getUser();
     if (!user) {
       setLoading(false);
       return;
     }
     const [{ data: row }, { data: parties }] = await Promise.all([
-      config.supabaseClient.from('onboarding_data').select(SELECT_COLUMNS).eq('user_id', user.id).maybeSingle(),
-      config.supabaseClient.from('onboarding_parties').select('party_role, status, is_required').eq('primary_user_id', user.id),
+      config.gcpBackendClient.from('onboarding_data').select(SELECT_COLUMNS).eq('user_id', user.id).maybeSingle(),
+      config.gcpBackendClient.from('onboarding_parties').select('party_role, status, is_required').eq('primary_user_id', user.id),
     ]);
 
     const validTypes: UIAccountType[] = ['individual', 'joint', 'retirement', 'trust'];

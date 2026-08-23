@@ -2,7 +2,7 @@
 // Works with Gmail SMTP (Node.js compatible)
 
 import nodemailer from 'nodemailer';
-import { createSupabaseServerClient } from './shared/supabaseServerClient.js';
+import { createGcpServerClient } from './shared/gcpServerClient.js';
 
 // CORS headers
 const corsHeaders = {
@@ -11,20 +11,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-function createSupabaseAdminClient() {
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+function createGcpBackendAdminClient() {
+  const gcpBackendUrl = process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME?.trim();
+  const serviceRoleKey = process.env.GCP_SERVER_ACTOR_UID?.trim();
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Supabase server environment variables are missing');
+  if (!gcpBackendUrl || !serviceRoleKey) {
+    throw new Error('GcpBackend server environment variables are missing');
   }
 
-  return createSupabaseServerClient(supabaseUrl, serviceRoleKey);
+  return createGcpServerClient(gcpBackendUrl, serviceRoleKey);
 }
 
 async function resolvePublicProfileOwner(slug) {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
+  const gcpBackend = createGcpBackendAdminClient();
+  const { data, error } = await gcpBackend
     .from('investor_profiles')
     .select('email, name')
     .eq('slug', slug)

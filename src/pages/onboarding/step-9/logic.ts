@@ -286,13 +286,13 @@ export const useStep13Logic = (): Step13Logic => {
       return;
     }
 
-    if (!config.supabaseClient) {
+    if (!config.gcpBackendClient) {
       if (!options.silent) setPageLoading(false);
       return;
     }
 
     try {
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) {
         navigate("/login");
         return;
@@ -303,7 +303,7 @@ export const useStep13Logic = (): Step13Logic => {
          session, pre-check the box so we never re-prompt. Separate query +
          swallowed errors so a pending migration never breaks the main load. */
       try {
-        const { data: ackRow } = await config.supabaseClient
+        const { data: ackRow } = await config.gcpBackendClient
           .from("onboarding_data")
           .select("subscription_agreement_ack_at")
           .eq("user_id", user.id)
@@ -316,7 +316,7 @@ export const useStep13Logic = (): Step13Logic => {
         // Columns may not exist yet (migration pending) — ignore.
       }
 
-      const { data: onboarding } = await config.supabaseClient
+      const { data: onboarding } = await config.gcpBackendClient
         .from("onboarding_data")
         .select(`
           class_a_units, class_b_units, class_c_units,

@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import type { Session, GcpBackendClient } from "@/services/gcpBackend/types";
 import { useAuthSession } from "../auth/AuthSessionProvider";
 import config from "../resources/config/config";
 import {
@@ -27,6 +27,12 @@ import {
   getOnboardingDisplayMeta,
 } from "../services/onboarding/flow";
 import { fetchResolvedOnboardingProgress } from "../services/onboarding/progress";
+import {
+  hasHushhResearchProfileMetadata,
+  readHushhResearchCompatibilityIfActive,
+} from "../services/hushhResearch/compatibility";
+import { isHushhResearchAuthMode } from "../services/hushhResearch/firebaseAuth";
+import { HUSHH_RESEARCH_SOURCE } from "../services/hushhResearch/contracts";
 import {
   ACCESS_DENIED_ROUTE,
   MEET_CEO_ROUTE,
@@ -44,7 +50,12 @@ export interface InvestorJourneyCta {
   /** True while the underlying state is still being fetched. */
   loading: boolean;
   /** The derived investor-access state (for callers that branch UI on this). */
-  state: InvestorAccessState | "unauthenticated" | "loading";
+  state:
+    | InvestorAccessState
+    | "unauthenticated"
+    | "loading"
+    | "research_ready"
+    | "research_unavailable";
   /** True when the user has cleared the Stripe payment gate. */
   isInvestor: boolean;
   /**
@@ -65,7 +76,14 @@ export interface InvestorJourneyResult {
   primaryCTA: InvestorJourneyCta;
 }
 
-type JourneyState = "loading" | "unauthenticated" | InvestorAccessState;
+type JourneyState =
+  | "loading"
+  | "unauthenticated"
+  | "research_ready"
+  | "research_unavailable"
+  | InvestorAccessState;
+
+const RESEARCH_PROFILE_ROUTE = "/profile" as const;
 
 interface InvestorProfileStatusRecord {
   id?: string | number | null;
@@ -173,9 +191,14 @@ function isMissingProfileStatusColumnError(error: unknown): boolean {
 }
 
 async function fetchInvestorProfileBuiltStatus(
-  client: SupabaseClient,
+  client: GcpBackendClient,
   userId: string,
 ): Promise<boolean> {
+  const researchProfile = await readHushhResearchCompatibilityIfActive("profile");
+  if (researchProfile.mode === "research") {
+    return hasHushhResearchProfileMetadata(researchProfile.response.payload);
+  }
+
   if (typeof client.from !== "function") return false;
 
   const selections = [
@@ -207,6 +230,29 @@ async function fetchInvestorProfileBuiltStatus(
   }
 }
 
+async function resolveHushhResearchJourneyState(): Promise<
+  "research_ready" | "research_unavailable"
+> {
+  const [profile, onboarding] = await Promise.all([
+    readHushhResearchCompatibilityIfActive("profile", {
+      researchBoundary: true,
+    }),
+    readHushhResearchCompatibilityIfActive("onboarding", {
+      researchBoundary: true,
+    }),
+  ]);
+  if (profile.mode !== "research" || onboarding.mode !== "research") {
+    return "research_unavailable";
+  }
+
+  // Onboarding metadata is intentionally not translated into Fund, Plaid,
+  // payment, or KYC actions for the Research cohort. Only safe profile
+  // metadata can produce an actionable CTA.
+  return hasHushhResearchProfileMetadata(profile.response.payload)
+    ? "research_ready"
+    : "research_unavailable";
+}
+
 /**
  * Canonical label + action map. PM decisions (PD-1, PD-6) live here so
  * every surface stays consistent.
@@ -226,6 +272,18 @@ function ctaForState(
   switch (state) {
     case "loading":
       return { ...base, text: "Loading...", action: () => {} };
+    case "research_ready":
+      return {
+        ...base,
+        text: "View your profile",
+        action: () => navigate(RESEARCH_PROFILE_ROUTE),
+      };
+    case "research_unavailable":
+      return {
+        ...base,
+        text: "Profile unavailable",
+        action: () => {},
+      };
     case "unauthenticated":
       return {
         ...base,
@@ -310,6 +368,9 @@ export function useInvestorJourneyCta(
   const { enabled = true } = options;
   const navigate = useNavigate();
   const { session, status } = useAuthSession();
+  const isResearchSession =
+    isHushhResearchAuthMode() ||
+    session?.user?.app_metadata?.auth_source === HUSHH_RESEARCH_SOURCE;
 
   const [state, setState] = useState<JourneyState>("loading");
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -322,6 +383,23 @@ export function useInvestorJourneyCta(
 
     const resolve = async () => {
       if (status === "booting") return;
+      if (isResearchSession) {
+        try {
+          const researchState = await resolveHushhResearchJourneyState();
+          if (!cancelled) {
+            setState(researchState);
+            setCurrentStep(1);
+            setProfileBuilt(researchState === "research_ready");
+          }
+        } catch {
+          if (!cancelled) {
+            setState("research_unavailable");
+            setCurrentStep(1);
+            setProfileBuilt(false);
+          }
+        }
+        return;
+      }
       if (!session?.user?.id) {
         if (!cancelled) {
           setState("unauthenticated");
@@ -330,7 +408,7 @@ export function useInvestorJourneyCta(
         }
         return;
       }
-      if (!config.supabaseClient) {
+      if (!config.gcpBackendClient) {
         if (!cancelled) {
           setState("unauthenticated");
           setProfileBuilt(false);
@@ -339,8 +417,8 @@ export function useInvestorJourneyCta(
       }
       try {
         const [onboarding, hasProfileBuilt] = await Promise.all([
-          fetchResolvedOnboardingProgress(config.supabaseClient, session.user.id),
-          fetchInvestorProfileBuiltStatus(config.supabaseClient, session.user.id),
+          fetchResolvedOnboardingProgress(config.gcpBackendClient, session.user.id),
+          fetchInvestorProfileBuiltStatus(config.gcpBackendClient, session.user.id),
         ]);
         if (cancelled) return;
         const derived = getInvestorAccessState(onboarding);
@@ -361,7 +439,7 @@ export function useInvestorJourneyCta(
     return () => {
       cancelled = true;
     };
-  }, [enabled, session?.user?.id, status]);
+  }, [enabled, isResearchSession, session?.user?.id, status]);
 
   const navigateMemo = useCallback((to: string) => navigate(to), [navigate]);
 
@@ -389,4 +467,6 @@ export const __testing__ = {
   INVESTOR_PROFILE_STATUS_FALLBACK_COLUMNS,
   INVESTOR_PROFILE_STATUS_CORE_COLUMNS,
   isMissingProfileStatusColumnError,
+  fetchInvestorProfileBuiltStatus,
+  resolveHushhResearchJourneyState,
 };

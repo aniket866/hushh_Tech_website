@@ -219,10 +219,10 @@ export interface PlaidFinancialContext {
  * Returns null if user has no Plaid data linked.
  */
 export async function enrichWithPlaidData(userId: string): Promise<PlaidFinancialContext | null> {
-  if (!config.supabaseClient) return null;
+  if (!config.gcpBackendClient) return null;
 
   try {
-    const { data: fin } = await config.supabaseClient
+    const { data: fin } = await config.gcpBackendClient
       .from("user_financial_data")
       .select("balances, investments, identity_data, identity_match, identity_match_scores, institution_name")
       .eq("user_id", userId)

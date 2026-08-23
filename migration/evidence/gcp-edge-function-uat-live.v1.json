@@ -1,0 +1,301 @@
+{
+  "schema_version": 2,
+  "evidence_id": "hushh-tech-edge-function-uat-live",
+  "target": {
+    "project_id": "hushh-tech-uat",
+    "region": "us-central1"
+  },
+  "capture": {
+    "observed_at_utc": "2026-08-22T04:49:19.406865Z",
+    "source_write_mode": "GCP_UAT_ONLY_NO_SUPABASE_IO_NO_PUBLIC_TRAFFIC",
+    "smoke_execution": "hushh-tech-edge-gateway-smoke-uat-b6krt",
+    "pass_log_insert_id": "6a892a49000bc98715e38808",
+    "cleanup_log_insert_id": "6a892a4a0000b142bfc04b5d"
+  },
+  "builds": {
+    "service": {
+      "build_id": "fa9d7524-e570-4866-8595-4b8511933de4",
+      "build_status": "SUCCESS",
+      "source_commit": "340656ebc6b69ece1e52b3eb5c5f95890f93ddcf",
+      "source_tree": "8c201788067242d2ba3daacd67ec451b715c7a63",
+      "source_subtree": "de2e6654bd4b054037221edcab7c229140e9a1ab",
+      "source_scope": "cloud-run/hushh-tech-app-services",
+      "source_file_count": 27,
+      "source_file_set_sha256": "0ffa9c59c2c1f5b21eacb805233f206ec6d500965aae6d07b1e23ea1916f6796",
+      "source_archive_bucket": "hushh-tech-uat_cloudbuild",
+      "source_archive_object": "source/1787373144.345858-9d4f082bda5b4cfc85bde1dcf3803970.tgz",
+      "source_archive_generation": "1787373145772638",
+      "source_archive_sha256": "da192d06439aa24dd60752fb7472c3d2d54e4a8ec3aa4a8484eb13f30102921e",
+      "image_digest": "sha256:5c5c903297563b901f58a73a38d82ec62a29e39153ec34794848ea5c260b3154",
+      "image_tag": "us-central1-docker.pkg.dev/hushh-tech-uat/cloud-run-source-deploy/hushh-tech-app-services:edge-340656eb"
+    },
+    "gateway_smoke": {
+      "build_id": "a7369616-a6b0-42a1-8931-538b8aae84cd",
+      "build_status": "SUCCESS",
+      "source_commit": "b997f7c6ce852e18eb135cc4f0d494f4049bb6e5",
+      "source_tree": "d261e4882fdfbd152312513e2431a6cfb9df7d7a",
+      "source_subtree": null,
+      "source_scope": ".",
+      "source_file_count": 49,
+      "source_file_set_sha256": "fb98ca6c028f4549c121eac36b7d7ac1bf568163f7e4e6bd13a040abc57a161a",
+      "source_archive_bucket": "hushh-tech-uat_cloudbuild",
+      "source_archive_object": "source/1787373900.918049-96a02feefdde413fa956f38199b94eb1.tgz",
+      "source_archive_generation": "1787373902821834",
+      "source_archive_sha256": "1e4fa33c02baf90810455cecdd14b6de2d0187c7abe123b0f8fb5177bf1b6d09",
+      "image_digest": "sha256:90a588e9c43e0a399645d2f27fc3d709319340f31d956a4db4ecd2d06cf46f61",
+      "image_tag": "us-central1-docker.pkg.dev/hushh-tech-uat/cloud-run-source-deploy/hushh-tech-edge-gateway-smoke:gateway-b997f7c6"
+    }
+  },
+  "cleanup": {
+    "smoke_job_exists": false,
+    "smoke_router_exists": false,
+    "smoke_nat_exists": false,
+    "temporary_iam_binding_active": false,
+    "temporary_iam_role_active": false,
+    "temporary_iam_role_soft_deleted": true,
+    "synthetic_firebase_users_retained": 0,
+    "smoke_image_exists": false,
+    "smoke_source_archive_exists": false
+  },
+  "entries": [
+    {
+      "slug": "get-secrets",
+      "contract_digest": "96b1d13067d22fd7bf2754b9d57bcfec0e6ec80aaf08c1a10d9ad7699cab0871",
+      "source_capture_digest": null,
+      "registry_state": "RETIRED",
+      "build_ref": "service",
+      "runtime": {
+        "project_id": "hushh-tech-uat",
+        "region": "us-central1",
+        "service": "hushh-tech-identity-api",
+        "revision": "hushh-tech-identity-api-retired-340656eb",
+        "service_account": "hushh-tech-identity-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+        "image_digest": "sha256:5c5c903297563b901f58a73a38d82ec62a29e39153ec34794848ea5c260b3154",
+        "ingress": "internal",
+        "traffic": [
+          {
+            "revision": "hushh-tech-identity-api-retired-340656eb",
+            "percent": 100
+          }
+        ],
+        "labels": {
+          "default_off": "true",
+          "environment": "uat",
+          "migration": "edge-functions"
+        },
+        "direct_vpc": {
+          "network": "default",
+          "subnet": "default",
+          "egress": "private-ranges-only"
+        },
+        "autoscaling": {
+          "min_instances": 0,
+          "max_instances": 20
+        },
+        "invoker_members": [
+          "serviceAccount:hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "environment": {
+          "allowed_google_callers": "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
+          "firebase_project_id": "hushh-tech-uat",
+          "public_stock_quotes_enabled": "false",
+          "service_owner": "identity-api",
+          "service_audience": "https://hushh-tech-identity-api-175298245599.us-central1.run.app"
+        },
+        "external_unauthenticated": {
+          "path": "/readyz",
+          "status_code": 404,
+          "content_type": "text/html; charset=UTF-8"
+        }
+      },
+      "proof": {
+        "gateway_build_ref": "gateway_smoke",
+        "smoke_execution": "hushh-tech-edge-gateway-smoke-uat-b6krt",
+        "retirement_overlay": true,
+        "gateway_status": 410,
+        "direct_status": 410,
+        "response_code": "FEATURE_RETIRED",
+        "response_content_type": "application/json; charset=utf-8"
+      },
+      "evidence_digest": "925446de95fe07d7d32bf5d2ba97a6dfe97524fb1121b9b693db16149efd57e8"
+    },
+    {
+      "slug": "hushh-location-geocode",
+      "contract_digest": "db1bc19f5e8b34fa5ac889c031b1f43ad058452d204241af6c4a7c4343d49d81",
+      "source_capture_digest": "9433692e247d7eac1d778e1e62e42920f80d21e41e6b4077a6db8d22e98f3f12",
+      "registry_state": "PORTED_AND_VERIFIED",
+      "build_ref": "service",
+      "runtime": {
+        "project_id": "hushh-tech-uat",
+        "region": "us-central1",
+        "service": "hushh-tech-investor-api",
+        "revision": "hushh-tech-investor-api-geocode-340656eb",
+        "service_account": "hushh-tech-investor-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+        "image_digest": "sha256:5c5c903297563b901f58a73a38d82ec62a29e39153ec34794848ea5c260b3154",
+        "ingress": "internal",
+        "traffic": [
+          {
+            "revision": "hushh-tech-investor-api-geocode-340656eb",
+            "percent": 100
+          }
+        ],
+        "labels": {
+          "default_off": "true",
+          "environment": "uat",
+          "migration": "edge-functions"
+        },
+        "direct_vpc": {
+          "network": "default",
+          "subnet": "default",
+          "egress": "private-ranges-only"
+        },
+        "autoscaling": {
+          "min_instances": 0,
+          "max_instances": 20
+        },
+        "invoker_members": [
+          "serviceAccount:hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "environment": {
+          "allowed_google_callers": "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
+          "firebase_project_id": "hushh-tech-uat",
+          "public_stock_quotes_enabled": "false",
+          "service_owner": "investor-api",
+          "service_audience": "https://hushh-tech-investor-api-175298245599.us-central1.run.app"
+        },
+        "external_unauthenticated": {
+          "path": "/readyz",
+          "status_code": 404,
+          "content_type": "text/html; charset=UTF-8"
+        }
+      },
+      "proof": {
+        "gateway_build_ref": "gateway_smoke",
+        "smoke_execution": "hushh-tech-edge-gateway-smoke-uat-b6krt",
+        "same_origin_route": "/functions/v1/hushh-location-geocode",
+        "same_origin_unauthenticated_status": 401,
+        "same_origin_success_status": 200,
+        "compatibility_source": "gcp",
+        "cache_control": "private, no-store",
+        "investor_readiness_status": 200,
+        "investor_readiness_body_status": "ready",
+        "gateway_nda_frozen_status": 503,
+        "direct_nda_frozen_status": 503,
+        "gateway_retired_status": 410,
+        "direct_retired_status": 410,
+        "firebase_authority_project_id": "hushh-tech-uat",
+        "preexisting_firebase_user_count": 369,
+        "preexisting_fund_admin_boolean_count": 0
+      },
+      "evidence_digest": "d66d211d69bb9ae8fa3cc8c41ab3b70a9c315893df4cc7c87ba5e7c3b75caaa1"
+    },
+    {
+      "slug": "nda-admin-fetch",
+      "contract_digest": "ceb05383e1fa4025624063ab5e4a416572adfc45f3d5450551b2e484dde514c3",
+      "source_capture_digest": "502021ff89f6ca46dc25b23b55ed26bce129b74bfb7a717777c9e47619cd2cfc",
+      "registry_state": "INVENTORY_FROZEN",
+      "build_ref": "service",
+      "runtime": {
+        "project_id": "hushh-tech-uat",
+        "region": "us-central1",
+        "service": "hushh-tech-engagement-api",
+        "revision": "hushh-tech-engagement-api-nda-frozen-340656eb",
+        "service_account": "hushh-tech-engagement-api-uat@hushh-tech-uat.iam.gserviceaccount.com",
+        "image_digest": "sha256:5c5c903297563b901f58a73a38d82ec62a29e39153ec34794848ea5c260b3154",
+        "ingress": "internal",
+        "traffic": [
+          {
+            "revision": "hushh-tech-engagement-api-nda-frozen-340656eb",
+            "percent": 100
+          }
+        ],
+        "labels": {
+          "default_off": "true",
+          "environment": "uat",
+          "migration": "edge-functions"
+        },
+        "direct_vpc": {
+          "network": "default",
+          "subnet": "default",
+          "egress": "private-ranges-only"
+        },
+        "autoscaling": {
+          "min_instances": 0,
+          "max_instances": 20
+        },
+        "invoker_members": [
+          "serviceAccount:hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com"
+        ],
+        "environment": {
+          "allowed_google_callers": "hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
+          "firebase_project_id": "hushh-tech-uat",
+          "public_stock_quotes_enabled": "false",
+          "service_owner": "engagement-api-worker",
+          "service_audience": "https://hushh-tech-engagement-api-175298245599.us-central1.run.app"
+        },
+        "external_unauthenticated": {
+          "path": "/readyz",
+          "status_code": 404,
+          "content_type": "text/html; charset=UTF-8"
+        }
+      },
+      "proof": {
+        "gateway_build_ref": "gateway_smoke",
+        "smoke_execution": "hushh-tech-edge-gateway-smoke-uat-b6krt",
+        "gateway_status": 503,
+        "direct_status": 503,
+        "response_code": "FUNCTION_NOT_MIGRATED",
+        "database": {
+          "instance": "hushh-tech-app-pg-uat",
+          "database": "hushh_tech_app",
+          "role": "hushh-tech-engagement-api-uat@hushh-tech-uat.iam",
+          "table": "public.nda_signatures",
+          "select_columns": [
+            "id",
+            "nda_version",
+            "pdf_url",
+            "signed_at",
+            "user_id"
+          ],
+          "table_wide_select": false,
+          "dml": false,
+          "elevated_privileges": false,
+          "security_definer_routine_count": 0,
+          "procedure_count": 0,
+          "owned_schema_count": 0,
+          "owned_table_count": 0,
+          "owned_sequence_count": 0,
+          "owned_routine_count": 0,
+          "rls_enabled": true,
+          "rls_forced": true,
+          "rls_policy": "nda_signatures_engagement_api_select",
+          "rls_qual": "current_setting('app.firebase_fund_admin',true)='true'",
+          "schema_verifier_execution": "hushh-tech-schema-data-verifier-uat-f5pkm",
+          "schema_verifier_evidence_sha256": "44a7b19ec9969f089da702fa73d7b3f6762f27ce6d1cc49c4d14355ef7cf5261",
+          "runtime_verifier_execution": "hushh-tech-schema-data-verifier-uat-8wctw"
+        },
+        "pii_projection": {
+          "response_fields": [
+            "highlighted",
+            "nda_version",
+            "pdf_available",
+            "record_id",
+            "signed_at"
+          ],
+          "raw_pii_fields": [],
+          "projected_field_count": 5
+        },
+        "real_admin": {
+          "firebase_user_count": 369,
+          "boolean_fund_admin_claim_count": 0,
+          "string_fund_admin_claim_count": 0,
+          "real_admin_terminal_success_count": 0,
+          "synthetic_admin_users_retained": 0,
+          "status": "BLOCKED_REAL_ADMIN_FIREBASE_CLAIM_ABSENT"
+        }
+      },
+      "evidence_digest": "452d5b1db58bb096f546e1e5dd1b8a7eaab60ce7f1008988841252e09de39d5a"
+    }
+  ],
+  "evidence_digest": "c6348271dd25ec569c040acb82ffb93e17cc7f90f3f9bec7bb0335a95c0db7a3"
+}

@@ -21,7 +21,7 @@ vi.mock("../src/auth/AuthSessionProvider", () => ({
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    supabaseClient: {},
+    gcpBackendClient: {},
   },
 }));
 

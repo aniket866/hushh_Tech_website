@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "contract_id": "hushh-tech-supabase-native-cutover-v1",
+  "tracking_issue": 1950,
+  "firebase_authority": "hushh-pda",
+  "runtime_owner": "hushh-labs/hushh_Tech_website",
+  "overall_state": "BLOCKED",
+  "live_attestation_executor": "NOT_IMPLEMENTED_BLOCKING",
+  "legacy_source_removal": {
+    "pull_request": 665,
+    "merge_commit": "5edbad18e51d1935729190e79ac3cc8c4e228217",
+    "last_source_commit": "e1eaf82ea166d476bd71426e03ade129cb902ffb",
+    "removed_at": "2026-04-01T11:57:46Z",
+    "current_repository_mode": "WEB_ONLY"
+  },
+  "separate_native_product": {
+    "repository": "hushh-labs/hushh-research",
+    "ios_bundle_id": "com.hushh.app",
+    "relationship": "SEPARATE_PRODUCT_NOT_A_REPLACEMENT_BUILD",
+    "supabase_source_reference_count": 0
+  },
+  "required_for_supabase_deletion": {
+    "same_legacy_identity": true,
+    "firebase_only_auth": true,
+    "gcp_only_runtime": true,
+    "store_rollout_percent": 100,
+    "legacy_supabase_network_requests": 0,
+    "minimum_version_http_status": 426,
+    "minimum_version_error_code": "CLIENT_UPGRADE_REQUIRED",
+    "minimum_version_enforcement": "SERVER_AND_CLIENT",
+    "minimum_version_fail_closed": true
+  },
+  "clients": [
+    {
+      "platform": "ios",
+      "legacy_identifier": "ai.hushh.app",
+      "store_record_id": "6498471189",
+      "last_supabase_capable_build": null,
+      "last_supabase_capable_build_state": "NOT_CAPTURED_BLOCKING",
+      "last_tracked_project_build": 11,
+      "last_tracked_info_plist_build": 5,
+      "last_tracked_version": "1.0",
+      "replacement": {
+        "source_state": "NOT_IMPLEMENTED_BLOCKING",
+        "identifier": "ai.hushh.app",
+        "minimum_supported_build": null,
+        "store_state": "NOT_SHIPPED_BLOCKING",
+        "store_rollout_percent": 0,
+        "artifact_sha256": null,
+        "store_evidence_sha256": null,
+        "minimum_version_gate_proof_sha256": null,
+        "forced_upgrade_e2e_proof_sha256": null,
+        "network_trace_sha256": null,
+        "supabase_network_requests": null
+      }
+    },
+    {
+      "platform": "android",
+      "legacy_identifier": "ai.hushh.app",
+      "store_record_id": "ai.hushh.app",
+      "last_supabase_capable_build": 11,
+      "last_supabase_capable_build_state": "SOURCE_ONLY_BLOCKING",
+      "last_tracked_project_build": 11,
+      "last_tracked_version": "1.0.8",
+      "replacement": {
+        "source_state": "NOT_IMPLEMENTED_BLOCKING",
+        "identifier": "ai.hushh.app",
+        "minimum_supported_build": null,
+        "store_state": "NOT_SHIPPED_BLOCKING",
+        "store_rollout_percent": 0,
+        "artifact_sha256": null,
+        "store_evidence_sha256": null,
+        "minimum_version_gate_proof_sha256": null,
+        "forced_upgrade_e2e_proof_sha256": null,
+        "network_trace_sha256": null,
+        "supabase_network_requests": null
+      }
+    }
+  ],
+  "blockers": [
+    "IOS_GCP_ONLY_REPLACEMENT_NOT_SHIPPED",
+    "ANDROID_GCP_ONLY_REPLACEMENT_NOT_SHIPPED",
+    "IOS_LAST_SUPABASE_BUILD_NOT_STORE_ATTESTED",
+    "ANDROID_LAST_SUPABASE_BUILD_NOT_STORE_ATTESTED",
+    "LIVE_NATIVE_STORE_AND_NETWORK_ATTESTATION_EXECUTOR_REQUIRED",
+    "IOS_MINIMUM_VERSION_GATE_NOT_PROVEN",
+    "ANDROID_MINIMUM_VERSION_GATE_NOT_PROVEN"
+  ]
+}

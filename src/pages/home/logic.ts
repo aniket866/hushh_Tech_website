@@ -7,7 +7,7 @@
  */
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Session } from "@supabase/supabase-js";
+import { Session } from "@/services/gcpBackend/types";
 import { useInvestorJourneyCta } from "../../hooks/useInvestorJourneyCta";
 
 /* ─── Types ─── */

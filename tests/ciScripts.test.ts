@@ -147,17 +147,34 @@ describe("CI workflow scripts", () => {
   });
 
   it("keeps Cloud Run runtime dependencies aligned with server API imports", () => {
-    const supabaseHelper = fs.readFileSync(
-      path.join(repoRoot, "api/shared/supabaseServerClient.js"),
+    const gcpDataRuntime = fs.readFileSync(
+      path.join(repoRoot, "api/shared/gcpDataRuntime.js"),
+      "utf8"
+    );
+    const gcpServerClient = fs.readFileSync(
+      path.join(repoRoot, "api/shared/gcpServerClient.js"),
       "utf8"
     );
     const runtimePackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package-server.json"), "utf8")
     );
+    const rootPackage = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
+    );
 
-    if (supabaseHelper.includes('from "ws"')) {
-      expect(runtimePackage.dependencies).toHaveProperty("ws");
-    }
+    expect(gcpDataRuntime).toContain('from "@google-cloud/cloud-sql-connector"');
+    expect(gcpDataRuntime).toContain('from "firebase-admin/app"');
+    expect(gcpDataRuntime).toContain('from "pg"');
+    expect(gcpDataRuntime).toContain('from "@google-cloud/storage"');
+    expect(gcpServerClient).toContain("storageRuntime().bucket(bucket)");
+    expect(runtimePackage.dependencies).toHaveProperty("@google-cloud/cloud-sql-connector");
+    expect(runtimePackage.dependencies).toHaveProperty("@google-cloud/storage");
+    expect(runtimePackage.dependencies).toHaveProperty("firebase-admin");
+    expect(runtimePackage.dependencies).toHaveProperty("pg");
+    expect(runtimePackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
+    expect(rootPackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
+    expect(runtimePackage.overrides).toEqual({ uuid: "11.1.1" });
+    expect(rootPackage.overrides).toEqual({ uuid: "11.1.1" });
 
     const investorProfileRoute = fs.readFileSync(
       path.join(repoRoot, "api/generate-investor-profile.js"),
@@ -167,6 +184,85 @@ describe("CI workflow scripts", () => {
     if (investorProfileRoute.includes('from "@google/genai"')) {
       expect(runtimePackage.dependencies).toHaveProperty("@google/genai");
     }
+  });
+
+  it("runs the fail-closed GCP service package in PR and merge-queue CI", () => {
+    const prWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/ci.yml"),
+      "utf8"
+    );
+    const queueWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/queue-validation.yml"),
+      "utf8"
+    );
+    const orchestrator = fs.readFileSync(
+      path.join(repoRoot, "scripts/ci/orchestrate.sh"),
+      "utf8"
+    );
+    const governance = fs.readFileSync(
+      path.join(repoRoot, "docs/reference/operations/ci-governance.md"),
+      "utf8"
+    );
+
+    for (const workflow of [prWorkflow, queueWorkflow]) {
+      expect(workflow).toContain('SERVICE_NODE_VERSION: "22.23.2"');
+      expect(workflow).toContain("gcp-service-foundation:");
+      expect(workflow).toContain("name: GCP Service Foundation");
+      expect(workflow).toContain(
+        "cache-dependency-path: cloud-run/hushh-tech-app-services/package-lock.json"
+      );
+      expect(workflow).toContain("run: bash scripts/ci/orchestrate.sh service");
+      expect(workflow).toContain("needs.gcp-service-foundation.result");
+    }
+
+    expect(orchestrator).toContain("cd cloud-run/hushh-tech-app-services");
+    expect(orchestrator).toContain("npm ci --ignore-scripts");
+    expect(orchestrator).toContain("npm run check");
+    expect(orchestrator).toContain("npm audit --omit=dev");
+    expect(governance).toContain("9. `GCP Service Foundation`");
+  });
+
+  it("runs the network-off Cloud SQL attestor on its exact Node runtime", () => {
+    const prWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/ci.yml"),
+      "utf8"
+    );
+    const queueWorkflow = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/queue-validation.yml"),
+      "utf8"
+    );
+    const rootPackage = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
+    );
+    const governance = fs.readFileSync(
+      path.join(repoRoot, "docs/reference/operations/ci-governance.md"),
+      "utf8"
+    );
+
+    expect(rootPackage.scripts["gcp:migration:check-cloudsql-attestor"]).toBe(
+      "npm --prefix cloud-run/hushh-tech-cloudsql-attestor run check"
+    );
+    for (const workflow of [prWorkflow, queueWorkflow]) {
+      expect(workflow).toContain('ATTESTOR_NODE_VERSION: "22.22.0"');
+      expect(workflow).toContain("gcp-cloudsql-attestor:");
+      expect(workflow).toContain("name: GCP Cloud SQL Attestor");
+      expect(workflow).toContain(
+        "cache-dependency-path: cloud-run/hushh-tech-cloudsql-attestor/package-lock.json"
+      );
+      expect(workflow).toContain(
+        "run: npm --prefix cloud-run/hushh-tech-cloudsql-attestor ci"
+      );
+      expect(workflow).toContain("run: npm run gcp:migration:check-cloudsql-attestor");
+      expect(workflow).toContain("needs.gcp-cloudsql-attestor.result");
+    }
+    expect(governance).toContain("10. `GCP Cloud SQL Attestor`");
+  });
+
+  it("registers each Hushh Research compatibility route once", () => {
+    const runtime = fs.readFileSync(path.join(repoRoot, "server.js"), "utf8");
+
+    expect(runtime.match(/app\.all\('\/api\/hushh-research\/config'/g)).toHaveLength(1);
+    expect(runtime.match(/app\.all\('\/api\/hushh-research\/\*'/g)).toHaveLength(1);
   });
 
   it("accepts a conventional PR title and complete template metadata", () => {

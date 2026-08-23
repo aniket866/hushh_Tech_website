@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "provisioning_state": "UNPROVISIONED",
+  "algorithm": "Ed25519",
+  "key_id": "github-devops-notify-independent-reviewer-v1",
+  "public_key_spki_der_base64url": null,
+  "public_key_sha256": null,
+  "reviewer_identity": "UNPROVISIONED"
+}

@@ -36,7 +36,7 @@ const DISPLAY_STEP_BY_ROUTE: Record<CanonicalOnboardingRoute, number> = {
 };
 
 /**
- * Maps raw Supabase `current_step` values to canonical routes.
+ * Maps raw GcpBackend `current_step` values to canonical routes.
  * Multiple raw values can map to the same route (for backward compat).
  *
  * After combining old step-3 (country) + old step-6 (address) into new step-3:

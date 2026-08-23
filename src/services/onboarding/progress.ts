@@ -1,10 +1,15 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { GcpBackendClient } from "@/services/gcpBackend/types";
 
 import {
   normalizeFinancialLinkStatus,
   resolveFinancialLinkStatus,
   type FinancialLinkStatus,
 } from "./flow";
+import {
+  readHushhResearchCompatibilityIfActive,
+  type CompatibilityRequestOptions,
+  type HushhResearchOnboardingPayload,
+} from "../hushhResearch/compatibility";
 
 interface PostgrestErrorLike {
   code?: string;
@@ -27,12 +32,52 @@ const isMissingFinancialLinkStatusColumn = (error: PostgrestErrorLike | null | u
 const isMissingFundStatusColumn = (error: PostgrestErrorLike | null | undefined) =>
   error?.code === "PGRST204" &&
   typeof error.message === "string" &&
-  (error.message.includes("fund_payment_status") ||
-    error.message.includes("fund_investor_verification_status"));
+    (error.message.includes("fund_payment_status") ||
+      error.message.includes("fund_investor_verification_status"));
 
-export async function fetchOnboardingProgress(
-  client: SupabaseClient,
-  userId: string
+const TERMINAL_ONBOARDING_STEP = 13;
+
+export function translateHushhResearchOnboardingProgress(
+  payload: HushhResearchOnboardingPayload,
+): OnboardingProgressRecord {
+  const isCompleted = payload.status === "complete";
+  const currentStep = isCompleted
+    ? TERMINAL_ONBOARDING_STEP
+    : Math.min(
+        TERMINAL_ONBOARDING_STEP,
+        Math.max(1, payload.completed_steps.length + 1),
+      );
+
+  return {
+    current_step: currentStep,
+    is_completed: isCompleted,
+    // Plaid is outside the Research cohort. Marking this skipped preserves the
+    // existing wizard contract without claiming a financial connection.
+    financial_link_status: "skipped",
+    // Payments and investor verification remain legacy-only and cannot be
+    // inferred from Research access-state metadata.
+    fund_payment_status: null,
+    fund_investor_verification_status: null,
+  };
+}
+
+async function readResearchOnboardingProgress(
+  options: Pick<CompatibilityRequestOptions, "researchBoundary"> = {},
+): Promise<
+  OnboardingProgressRecord | "legacy"
+> {
+  const result = await readHushhResearchCompatibilityIfActive(
+    "onboarding",
+    options,
+  );
+  return result.mode === "research"
+    ? translateHushhResearchOnboardingProgress(result.response.payload)
+    : "legacy";
+}
+
+async function fetchLegacyOnboardingProgress(
+  client: GcpBackendClient,
+  userId: string,
 ): Promise<OnboardingProgressRecord | null> {
   const primaryQuery = await client
     .from("onboarding_data")
@@ -98,11 +143,35 @@ export async function fetchOnboardingProgress(
   };
 }
 
-export async function fetchResolvedOnboardingProgress(
-  client: SupabaseClient,
-  userId: string
+export async function fetchOnboardingProgress(
+  client: GcpBackendClient | undefined,
+  userId: string,
+  options: Pick<CompatibilityRequestOptions, "researchBoundary"> = {},
 ): Promise<OnboardingProgressRecord | null> {
-  const onboardingProgress = await fetchOnboardingProgress(client, userId);
+  const researchProgress = await readResearchOnboardingProgress(options);
+  if (researchProgress !== "legacy") {
+    return researchProgress;
+  }
+  if (!client) {
+    throw new Error("GcpBackend client is unavailable outside Research mode.");
+  }
+  return fetchLegacyOnboardingProgress(client, userId);
+}
+
+export async function fetchResolvedOnboardingProgress(
+  client: GcpBackendClient | undefined,
+  userId: string,
+  options: Pick<CompatibilityRequestOptions, "researchBoundary"> = {},
+): Promise<OnboardingProgressRecord | null> {
+  const researchProgress = await readResearchOnboardingProgress(options);
+  if (researchProgress !== "legacy") {
+    return researchProgress;
+  }
+  if (!client) {
+    throw new Error("GcpBackend client is unavailable outside Research mode.");
+  }
+
+  const onboardingProgress = await fetchLegacyOnboardingProgress(client, userId);
   const { data: financialData, error } = await client
     .from("user_financial_data")
     .select("status")

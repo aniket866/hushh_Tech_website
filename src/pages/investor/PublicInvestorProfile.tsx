@@ -215,7 +215,7 @@ const PublicInvestorProfilePage: React.FC = () => {
   };
 
   // Get OG image URL
-  const ogImageUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/investor-og-image?slug=${slug}`;
+  const ogImageUrl = `${import.meta.env.VITE_GCP_API_BASE_URL}/functions/v1/investor-og-image?slug=${slug}`;
 
   // Get confidence chip styling
   const getConfidenceChip = (confidence: number) => {

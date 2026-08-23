@@ -1,19 +1,23 @@
 {
   "clientRequired": [
-    "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY",
-    "VITE_SUPABASE_REDIRECT_URL",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_APP_ID",
+    "VITE_GCP_AUTH_REDIRECT_URL",
     "VITE_PLAID_REDIRECT_URI"
   ],
   "clientOptional": [
+    "VITE_GCP_API_BASE_URL",
+    "VITE_FIREBASE_STORAGE_BUCKET",
     "VITE_NDA_GENERATION_URL",
     "VITE_PLAID_ENV",
     "VITE_PLAID_LINK_MODE",
     "VITE_PLAID_DISABLE_LOCAL_SANDBOX_DIRECT",
     "VITE_ALLOW_LOCAL_PLAID_LINK",
     "VITE_GUEST_MODE_ACCESS_TOKEN",
-    "VITE_MARKET_SUPABASE_URL",
-    "VITE_MARKET_SUPABASE_KEY",
+    "VITE_MARKET_GCS_PUBLIC_BASE_URL",
+    "VITE_MARKET_GCS_SIGNED_URL_PATH",
     "VITE_GEMINI_API_KEY",
     "VITE_GEMINI_API_KEY_FALLBACK_1",
     "VITE_GEMINI_API_KEY_FALLBACK_2",
@@ -41,7 +45,22 @@
     "GOOGLE_CLOUD_PROJECT",
     "GOOGLE_CLOUD_LOCATION",
     "GCP_PROJECT_ID",
+    "GCP_DELETE_ACCOUNT_STORAGE_ENABLED",
+    "GCP_DELETE_ACCOUNT_STORAGE_PROJECT",
+    "GCP_DELETE_ACCOUNT_STORAGE_ENVIRONMENT",
+    "GCP_DELETE_ACCOUNT_STORAGE_MANIFEST_DIGEST",
+    "GCP_DELETE_ACCOUNT_STORAGE_ACTIVATION_DIGEST",
+    "GCP_DELETE_ACCOUNT_STORAGE_BINDING_DIGEST",
     "OPENAI_API_KEY",
+    "HUSHH_TECH_PUBLIC_STOCK_QUOTES_ENABLED",
+    "HUSHH_TECH_INVESTOR_API_URL",
+    "HUSHH_TECH_PUBLIC_RATE_LIMIT_SALT",
+    "PUBLIC_STOCK_QUOTES_GATEWAY_RATE_LIMIT",
+    "PUBLIC_STOCK_QUOTES_GATEWAY_TIMEOUT_MS",
+    "PUBLIC_STOCK_QUOTES_RATE_LIMIT",
+    "PUBLIC_STOCK_QUOTES_PROVIDER_REQUESTS_PER_MINUTE",
+    "FINNHUB_QUOTE_TIMEOUT_MS",
+    "FINNHUB_API_KEY",
     "PLAID_CLIENT_ID",
     "PLAID_SECRET",
     "PLAID_ENV",
@@ -54,10 +73,30 @@
     "STRIPE_FUND_WEBHOOK_ALLOW_UNSIGNED",
     "HUSHH_FUND_ADMIN_TOKEN",
     "HUSHH_FUND_TRANSFER_ENABLED",
+    "HUSHH_RESEARCH_CLIENT_ENABLED",
+    "HUSHH_RESEARCH_API_BASE_URL",
+    "HUSHH_RESEARCH_WEB_BASE_URL",
+    "HUSHH_RESEARCH_AUDIENCE",
+    "HUSHH_RESEARCH_REDIRECT_URI",
+    "HUSHH_RESEARCH_FIREBASE_PROJECT_ID",
+    "HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN",
+    "HUSHH_RESEARCH_FIREBASE_API_KEY",
+    "HUSHH_RESEARCH_FIREBASE_APP_ID",
+    "HUSHH_RESEARCH_DEVELOPER_APP_ID",
+    "HUSHH_RESEARCH_DEVELOPER_TOKEN",
+    "HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY",
+    "HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST",
     "GOOGLE_SERVICE_ACCOUNT_EMAIL",
     "GOOGLE_PRIVATE_KEY",
     "GMAIL_SENDER_EMAIL",
-    "SUPABASE_SERVICE_ROLE_KEY",
+    "GCP_SERVER_ACTOR_UID",
+    "GCP_DATA_RUNTIME_ENABLED",
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME",
+    "CLOUD_SQL_DATABASE",
+    "CLOUD_SQL_IAM_USER",
+    "FIREBASE_PROJECT_ID",
+    "GCP_STORAGE_BUCKET_PREFIX",
+    "DELETE_ACCOUNT_AUDIT_SECRET",
     "GMAIL_USER",
     "GMAIL_APP_PASSWORD",
     "GOOGLE_WALLET_ISSUER_ID",
@@ -114,8 +153,13 @@
     "GEMINI_API_KEY",
     "PROFILE_INTELLIGENCE_API_BASE_URL",
     "PROFILE_INTELLIGENCE_TIMEOUT_MS",
-    "SUPABASE_URL",
-    "SUPABASE_SERVICE_ROLE_KEY"
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME",
+    "CLOUD_SQL_DATABASE",
+    "CLOUD_SQL_IAM_USER",
+    "FIREBASE_PROJECT_ID",
+    "GCP_STORAGE_BUCKET_PREFIX",
+    "GCP_DATA_RUNTIME_ENABLED",
+    "GCP_SERVER_ACTOR_UID"
   ],
   "forbiddenProductionBrowserSecrets": [
     "VITE_OPENAI_API_KEY",
@@ -125,27 +169,47 @@
     "VITE_GEMINI_API_KEY_FALLBACK_3"
   ],
   "unsafeBooleanFlags": {
-    "VITE_ALLOW_INSECURE_BROWSER_LLM": "false"
+    "VITE_ALLOW_INSECURE_BROWSER_LLM": "false",
+    "HUSHH_RESEARCH_CLIENT_ENABLED": "false"
   },
+  "uatOnlyRuntimeSecrets": {
+    "HUSHH_RESEARCH_DEVELOPER_TOKEN": "hushh-tech-uat-research-developer-token",
+    "HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY": "hushh-tech-uat-research-x25519-private-key",
+    "HUSHH_RESEARCH_FIREBASE_API_KEY": "hushh-tech-uat-research-firebase-api-key",
+    "HUSHH_RESEARCH_FIREBASE_APP_ID": "hushh-tech-uat-research-firebase-app-id"
+  },
+  "uatResearchRuntimeValues": {
+    "HUSHH_RESEARCH_API_BASE_URL": "https://api.uat.hushh.ai",
+    "HUSHH_RESEARCH_WEB_BASE_URL": "https://uat.one.hushh.ai",
+    "HUSHH_RESEARCH_AUDIENCE": "hushh-tech-uat",
+    "HUSHH_RESEARCH_REDIRECT_URI": "https://uat.hushhtech.com/auth/hushh-research/callback",
+    "HUSHH_RESEARCH_FIREBASE_PROJECT_ID": "hushh-pda",
+    "HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN": "hushh-pda.firebaseapp.com",
+    "HUSHH_RESEARCH_DEVELOPER_APP_ID": "app_hushh-technologies_cd1895ef"
+  },
+  "productionForbiddenRuntimeVars": [
+    "HUSHH_RESEARCH_API_BASE_URL",
+    "HUSHH_RESEARCH_WEB_BASE_URL",
+    "HUSHH_RESEARCH_AUDIENCE",
+    "HUSHH_RESEARCH_REDIRECT_URI",
+    "HUSHH_RESEARCH_FIREBASE_PROJECT_ID",
+    "HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN",
+    "HUSHH_RESEARCH_FIREBASE_API_KEY",
+    "HUSHH_RESEARCH_FIREBASE_APP_ID",
+    "HUSHH_RESEARCH_DEVELOPER_APP_ID",
+    "HUSHH_RESEARCH_DEVELOPER_TOKEN",
+    "HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY",
+    "HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST"
+  ],
   "criticalServerRouteVars": {
-    "SUPABASE_URL": [
-      "api/generate-investor-profile.js",
-      "api/generate-profile-intelligence.js",
-      "api/public-investor-profile.js",
-      "api/delete-account-service.js",
-      "api/send-email-notification.js",
-      "api/metrics/service.js",
-      "api/analytics/collect.js"
-    ],
-    "SUPABASE_SERVICE_ROLE_KEY": [
-      "api/generate-investor-profile.js",
-      "api/generate-profile-intelligence.js",
-      "api/public-investor-profile.js",
-      "api/delete-account-service.js",
-      "api/send-email-notification.js",
-      "api/metrics/service.js",
-      "api/analytics/collect.js"
-    ],
+    "CLOUD_SQL_INSTANCE_CONNECTION_NAME": ["api/shared/gcpDataRuntime.js"],
+    "CLOUD_SQL_DATABASE": ["api/shared/gcpDataRuntime.js"],
+    "CLOUD_SQL_IAM_USER": ["api/shared/gcpDataRuntime.js"],
+    "FIREBASE_PROJECT_ID": ["api/shared/gcpDataRuntime.js"],
+    "GCP_STORAGE_BUCKET_PREFIX": ["api/shared/gcpDataRuntime.js"],
+    "GCP_DATA_RUNTIME_ENABLED": ["api/shared/gcpDataRuntime.js"],
+    "GCP_SERVER_ACTOR_UID": ["api/shared/gcpServerClient.js"],
+    "DELETE_ACCOUNT_AUDIT_SECRET": ["api/delete-account-service.js"],
     "ANALYTICS_HASH_SALT": [
       "api/analytics/collect.js"
     ],
@@ -176,6 +240,24 @@
     ],
     "PROFILE_INTELLIGENCE_TIMEOUT_MS": [
       "api/generate-profile-intelligence.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ENABLED": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_PROJECT": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ENVIRONMENT": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_MANIFEST_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_ACTIVATION_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
+    ],
+    "GCP_DELETE_ACCOUNT_STORAGE_BINDING_DIGEST": [
+      "api/shared/gcp-delete-account-storage.js"
     ],
     "OPENAI_API_KEY": [
       "api/enrich-preferences.js"

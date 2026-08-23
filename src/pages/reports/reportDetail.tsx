@@ -14,6 +14,9 @@ import {
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ReportDetail from '../../components/ReportDetail';
 import { getReportById, Report } from '../../services/reportService';
+import { useAuthSession } from '../../auth/AuthSessionProvider';
+import { HUSHH_RESEARCH_SOURCE } from '../../services/hushhResearch/contracts';
+import { isHushhResearchAuthMode } from '../../services/hushhResearch/firebaseAuth';
 
 const ReportDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +24,10 @@ const ReportDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { session } = useAuthSession();
+  const isResearchBoundary =
+    isHushhResearchAuthMode() ||
+    session?.user?.app_metadata?.auth_source === HUSHH_RESEARCH_SOURCE;
 
   const renderRecoveryActions = () => (
     <HStack spacing={3} mt={4} justifyContent="center" flexWrap="wrap">
@@ -51,7 +58,9 @@ const ReportDetailPage: React.FC = () => {
       
       try {
         console.log('Fetching report with ID:', id);
-        const reportData = await getReportById(id);
+        const reportData = await getReportById(id, {
+          researchBoundary: isResearchBoundary,
+        });
         
         if (reportData) {
           console.log('Fetched report:', reportData);
@@ -69,7 +78,7 @@ const ReportDetailPage: React.FC = () => {
     };
 
     fetchReport();
-  }, [id]);
+  }, [id, isResearchBoundary]);
 
   // Render content based on state
   const renderContent = () => {
@@ -151,4 +160,4 @@ const ReportDetailPage: React.FC = () => {
   );
 };
 
-export default ReportDetailPage; 
+export default ReportDetailPage;

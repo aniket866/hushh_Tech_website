@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../src/resources/resources", () => ({
   default: {
     config: {
-      supabaseClient: null,
+      gcpBackendClient: null,
     },
   },
 }));
@@ -16,7 +16,7 @@ describe("fetchPublicInvestorProfileBySlug", () => {
 
   beforeEach(() => {
     rpcMock.mockReset();
-    (resources.config as any).supabaseClient = {
+    (resources.config as any).gcpBackendClient = {
       rpc: rpcMock,
     };
   });

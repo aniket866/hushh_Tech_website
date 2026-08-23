@@ -1,390 +1,321 @@
-/**
- * NDA Admin Page
- * 
- * Simple password-protected admin page to view all NDA signed agreements.
- * Password: 123456
- * Design: Simple black/white table with no colors.
- * 
- * Uses Supabase Edge Function to bypass RLS and fetch all NDA records.
- */
+import React, { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import config from '../../resources/config/config';
+import { useAuthSession } from "../../auth/AuthSessionProvider";
 
 interface NDARecord {
-  user_id: string;
-  full_name: string;
-  email: string;
-  nda_signed_at: string;
-  nda_version: string;
-  nda_signer_ip: string;
-  nda_signer_name: string;
-  nda_pdf_url: string | null;
+  record_id: string;
+  signed_at: string;
+  nda_version: string | null;
+  pdf_available: boolean;
+  highlighted?: boolean;
 }
 
-const ADMIN_PASSWORD = '123456';
-const NDA_ADMIN_FETCH_URL = `${config.SUPABASE_URL}/functions/v1/nda-admin-fetch`;
+interface NDAAdminResponse {
+  success?: boolean;
+  records?: NDARecord[];
+}
+
+const NDA_ADMIN_FETCH_URL = "/functions/v1/nda-admin-fetch";
+const USER_REFERENCE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 const NDAAdminPage: React.FC = () => {
+  const { status, session, user, signOut } = useAuthSession();
   const [searchParams] = useSearchParams();
-  const highlightUserId = searchParams.get('highlight');
-  
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const requestedHighlight = searchParams.get("highlight")?.trim() ?? "";
+  const highlightUserId = USER_REFERENCE_PATTERN.test(requestedHighlight)
+    ? requestedHighlight
+    : null;
+  const accessToken = session?.access_token ?? null;
+  // This is only an early user-interface gate. The GCP service verifies the
+  // signed Firebase custom claim again before reading any NDA record.
+  const hasFundAdminClaim = user?.app_metadata?.fund_admin === true;
+
   const [ndaRecords, setNdaRecords] = useState<NDARecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if already authenticated in session
-  useEffect(() => {
-    const auth = sessionStorage.getItem('nda_admin_auth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
+  const fetchNDARecords = useCallback(async () => {
+    if (!accessToken || !hasFundAdminClaim) return;
 
-  // Fetch NDA records when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchNDARecords();
-    }
-  }, [isAuthenticated]);
-
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('nda_admin_auth', 'true');
-      setPasswordError('');
-    } else {
-      setPasswordError('Incorrect password');
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleLogin();
-    }
-  };
-
-  const fetchNDARecords = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      if (!config.SUPABASE_ANON_KEY) {
-        throw new Error('VITE_SUPABASE_ANON_KEY is not configured');
-      }
-
-      // Call the edge function with password for authentication
       const response = await fetch(NDA_ADMIN_FETCH_URL, {
-        method: 'POST',
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          password: ADMIN_PASSWORD,
-          highlightUserId: highlightUserId || undefined,
+          ...(highlightUserId ? { highlightUserId } : {}),
         }),
       });
+      const data = (await response
+        .json()
+        .catch(() => null)) as NDAAdminResponse | null;
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+      if (!response.ok || data?.success !== true) {
+        if (response.status === 401) throw new Error("Sign in again.");
+        if (response.status === 403) throw new Error("Access denied.");
+        throw new Error("Records unavailable.");
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch NDA records');
-      }
-
-      setNdaRecords(data.records || []);
-    } catch (err) {
-      console.error('Error fetching NDA records:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch NDA records');
+      setNdaRecords(Array.isArray(data.records) ? data.records : []);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Records unavailable.",
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [accessToken, hasFundAdminClaim, highlightUserId]);
+
+  useEffect(() => {
+    if (status === "authenticated" && accessToken && hasFundAdminClaim) {
+      void fetchNDARecords();
+    }
+  }, [accessToken, fetchNDARecords, hasFundAdminClaim, status]);
 
   const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "N/A";
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  // Password login screen
-  if (!isAuthenticated) {
+  if (status === "booting" || isLoading) {
     return (
       <div style={styles.container}>
-        <div style={styles.loginBox}>
+        <p style={styles.loading}>Loading records…</p>
+      </div>
+    );
+  }
+
+  if (status !== "authenticated" || !accessToken) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.messageBox}>
           <h1 style={styles.title}>NDA Admin</h1>
-          <p style={styles.subtitle}>Enter password to access NDA records</p>
-          
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Password"
-            style={styles.input}
-            autoFocus
-          />
-          
-          {passwordError && (
-            <p style={styles.error}>{passwordError}</p>
-          )}
-          
-          <button onClick={handleLogin} style={styles.button}>
-            Login
+          <p style={styles.subtitle}>Sign in required.</p>
+          <a href="/login?redirect=%2Fnda-admin" style={styles.linkButton}>
+            Sign in
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasFundAdminClaim) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.messageBox}>
+          <h1 style={styles.title}>NDA Admin</h1>
+          <p style={styles.error}>Access denied.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.messageBox}>
+          <p style={styles.error}>{error}</p>
+          <button onClick={() => void fetchNDARecords()} style={styles.button}>
+            Retry
           </button>
         </div>
       </div>
     );
   }
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div style={styles.container}>
-        <p style={styles.loading}>Loading NDA records...</p>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div style={styles.container}>
-        <p style={styles.error}>Error: {error}</p>
-        <button onClick={fetchNDARecords} style={styles.button}>
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  // Main admin table
   return (
     <div style={styles.container}>
-      <h1 style={styles.pageTitle}>NDA Agreements Signed</h1>
-      <p style={styles.recordCount}>Total: {ndaRecords.length} records</p>
-      
+      <h1 style={styles.pageTitle}>Signed NDAs</h1>
+      <p style={styles.recordCount}>Total: {ndaRecords.length}</p>
+
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Signed At</th>
+              <th style={styles.th}>Record</th>
+              <th style={styles.th}>Signed</th>
               <th style={styles.th}>Version</th>
-              <th style={styles.th}>IP Address</th>
               <th style={styles.th}>PDF</th>
-              <th style={styles.th}>User ID</th>
             </tr>
           </thead>
           <tbody>
             {ndaRecords.length === 0 ? (
               <tr>
-                <td colSpan={7} style={styles.noData}>No NDA records found</td>
+                <td colSpan={4} style={styles.noData}>
+                  No records found
+                </td>
               </tr>
             ) : (
               ndaRecords.map((record) => (
-                <tr 
-                  key={record.user_id}
+                <tr
+                  key={record.record_id}
                   style={{
                     ...styles.tr,
-                    backgroundColor: highlightUserId === record.user_id ? '#ffffcc' : 'white',
+                    backgroundColor: record.highlighted ? "#ffffcc" : "white",
                   }}
                 >
-                  <td style={styles.td}>{record.nda_signer_name || record.full_name || 'N/A'}</td>
-                  <td style={styles.td}>{record.email || 'N/A'}</td>
-                  <td style={styles.td}>{formatDate(record.nda_signed_at)}</td>
-                  <td style={styles.td}>{record.nda_version || 'v1.0'}</td>
-                  <td style={styles.td}>{record.nda_signer_ip || 'N/A'}</td>
+                  <td style={styles.tdMono}>{record.record_id}</td>
+                  <td style={styles.td}>{formatDate(record.signed_at)}</td>
+                  <td style={styles.td}>{record.nda_version || "v1.0"}</td>
                   <td style={styles.td}>
-                    {record.nda_pdf_url ? (
-                      <a 
-                        href={record.nda_pdf_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={styles.pdfLink}
-                      >
-                        📄 View PDF
-                      </a>
-                    ) : (
-                      <span style={styles.noPdf}>No PDF</span>
-                    )}
+                    {record.pdf_available ? "Available" : "Not available"}
                   </td>
-                  <td style={styles.tdMono}>{record.user_id}</td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
-      
-      <button 
-        onClick={() => {
-          sessionStorage.removeItem('nda_admin_auth');
-          setIsAuthenticated(false);
-        }} 
-        style={styles.logoutButton}
-      >
-        Logout
+
+      <button onClick={() => void signOut()} style={styles.logoutButton}>
+        Sign out
       </button>
     </div>
   );
 };
 
-// Simple inline styles - black/white only
 const styles: { [key: string]: React.CSSProperties } = {
   container: {
-    minHeight: '100vh',
-    backgroundColor: 'white',
-    padding: '40px 20px',
+    minHeight: "100vh",
+    backgroundColor: "white",
+    padding: "40px 20px",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
-  loginBox: {
-    maxWidth: '400px',
-    margin: '100px auto',
-    textAlign: 'center',
+  messageBox: {
+    maxWidth: "400px",
+    margin: "100px auto",
+    textAlign: "center",
   },
   title: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: 'black',
-    marginBottom: '8px',
+    fontSize: "24px",
+    fontWeight: "bold",
+    color: "black",
+    marginBottom: "8px",
   },
   subtitle: {
-    fontSize: '14px',
-    color: 'black',
-    marginBottom: '24px',
-  },
-  input: {
-    width: '100%',
-    padding: '12px 16px',
-    fontSize: '16px',
-    border: '1px solid black',
-    borderRadius: '4px',
-    marginBottom: '16px',
-    boxSizing: 'border-box',
+    fontSize: "14px",
+    color: "black",
+    marginBottom: "24px",
   },
   button: {
-    width: '100%',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    backgroundColor: 'black',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
+    width: "100%",
+    padding: "12px 24px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    backgroundColor: "black",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+  },
+  linkButton: {
+    display: "block",
+    padding: "12px 24px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    backgroundColor: "black",
+    color: "white",
+    borderRadius: "4px",
+    textDecoration: "none",
   },
   error: {
-    color: 'black',
-    fontSize: '14px',
-    marginBottom: '16px',
-    fontWeight: 'bold',
+    color: "black",
+    fontSize: "14px",
+    marginBottom: "16px",
+    fontWeight: "bold",
   },
   loading: {
-    textAlign: 'center',
-    fontSize: '16px',
-    color: 'black',
-    marginTop: '100px',
+    textAlign: "center",
+    fontSize: "16px",
+    color: "black",
+    marginTop: "100px",
   },
   pageTitle: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    color: 'black',
-    textAlign: 'center',
-    marginBottom: '8px',
+    fontSize: "28px",
+    fontWeight: "bold",
+    color: "black",
+    textAlign: "center",
+    marginBottom: "8px",
   },
   recordCount: {
-    fontSize: '14px',
-    color: 'black',
-    textAlign: 'center',
-    marginBottom: '24px',
+    fontSize: "14px",
+    color: "black",
+    textAlign: "center",
+    marginBottom: "24px",
   },
   tableWrapper: {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    width: '100%',
-    maxWidth: '1200px',
-    margin: '0 auto',
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+    width: "100%",
+    maxWidth: "1200px",
+    margin: "0 auto",
   },
   table: {
-    width: '100%',
-    minWidth: '860px',
-    borderCollapse: 'collapse',
-    border: '1px solid black',
+    width: "100%",
+    minWidth: "860px",
+    borderCollapse: "collapse",
+    border: "1px solid black",
   },
   th: {
-    backgroundColor: 'black',
-    color: 'white',
-    padding: '12px 8px',
-    textAlign: 'left',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    borderBottom: '1px solid black',
+    backgroundColor: "black",
+    color: "white",
+    padding: "12px 8px",
+    textAlign: "left",
+    fontSize: "14px",
+    fontWeight: "bold",
+    borderBottom: "1px solid black",
   },
-  tr: {
-    borderBottom: '1px solid black',
-  },
+  tr: { borderBottom: "1px solid black" },
   td: {
-    padding: '10px 8px',
-    fontSize: '14px',
-    color: 'black',
-    borderBottom: '1px solid black',
-    borderRight: '1px solid black',
+    padding: "10px 8px",
+    fontSize: "14px",
+    color: "black",
+    borderBottom: "1px solid black",
+    borderRight: "1px solid black",
   },
   tdMono: {
-    padding: '10px 8px',
-    fontSize: '12px',
-    color: 'black',
-    fontFamily: 'monospace',
-    borderBottom: '1px solid black',
+    padding: "10px 8px",
+    fontSize: "12px",
+    color: "black",
+    fontFamily: "monospace",
+    borderBottom: "1px solid black",
+    borderRight: "1px solid black",
   },
   noData: {
-    padding: '40px',
-    textAlign: 'center',
-    color: 'black',
-    fontSize: '14px',
+    padding: "40px",
+    textAlign: "center",
+    color: "black",
+    fontSize: "14px",
   },
   logoutButton: {
-    display: 'block',
-    margin: '24px auto',
-    padding: '10px 20px',
-    fontSize: '14px',
-    backgroundColor: 'white',
-    color: 'black',
-    border: '1px solid black',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  pdfLink: {
-    color: 'black',
-    textDecoration: 'underline',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontSize: '13px',
-  },
-  noPdf: {
-    color: '#999',
-    fontSize: '12px',
-    fontStyle: 'italic',
+    display: "block",
+    margin: "24px auto",
+    padding: "10px 20px",
+    fontSize: "14px",
+    backgroundColor: "white",
+    color: "black",
+    border: "1px solid black",
+    borderRadius: "4px",
+    cursor: "pointer",
   },
 };
 

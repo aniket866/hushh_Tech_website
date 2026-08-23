@@ -17,8 +17,8 @@ const fromMock = vi.fn((table: string) => {
   throw new Error(`Unexpected table ${table}`);
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({
+vi.mock("../api/shared/gcpServerClient.js", () => ({
+  createGcpServerClient: vi.fn(() => ({
     auth: { getUser },
     from: fromMock,
   })),
@@ -89,8 +89,8 @@ const validBody = {
 
 describe("analytics collect route", () => {
   beforeEach(() => {
-    process.env.SUPABASE_URL = "https://ibsisfnjxeowvdtvgzff.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME = "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat";
+    process.env.GCP_SERVER_ACTOR_UID = "server-actor";
     process.env.ANALYTICS_HASH_SALT = "test-salt";
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
     sessionSingle.mockResolvedValue({ data: { id: "session-row-1" }, error: null });
@@ -99,8 +99,8 @@ describe("analytics collect route", () => {
   });
 
   afterEach(() => {
-    delete process.env.SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME;
+    delete process.env.GCP_SERVER_ACTOR_UID;
     delete process.env.ANALYTICS_HASH_SALT;
     vi.clearAllMocks();
     vi.resetModules();

@@ -30,7 +30,7 @@ export interface SelectOption {
 }
 
 // Must stay in sync with the CHECK constraints in
-// supabase/migrations/20260617120000_add_onboarding_account_type_columns.sql
+// gcpBackend/migrations/20260617120000_add_onboarding_account_type_columns.sql
 export const RETIREMENT_ACCOUNT_TYPES: SelectOption[] = [
   { value: 'traditional_ira', label: 'Traditional IRA' },
   { value: 'roth_ira', label: 'Roth IRA' },
@@ -184,11 +184,11 @@ export function useStep3AccountTypeSections(
   useEffect(() => {
     if (accountTypeOverride) setAccountType(accountTypeOverride);
     const load = async () => {
-      if (!config.supabaseClient) return;
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      if (!config.gcpBackendClient) return;
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const { data } = await config.supabaseClient
+      const { data } = await config.gcpBackendClient
         .from('onboarding_data')
         .select(ACCOUNT_TYPE_COLUMN_SELECT)
         .eq('user_id', user.id)
@@ -242,7 +242,7 @@ export function useStep3AccountTypeSections(
       setShowErrors(true);
       return { error: { message: 'Account-type section incomplete' } };
     }
-    if (!userId || !config.supabaseClient) {
+    if (!userId || !config.gcpBackendClient) {
       // Dev preview / unauthenticated: nothing to persist, let the flow continue.
       return { error: null };
     }

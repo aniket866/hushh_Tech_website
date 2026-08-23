@@ -321,7 +321,7 @@ export function calculateNWS(input: NWSInput): NWSResult {
 }
 
 /**
- * Calculate NWS from raw Supabase user_financial_data row.
+ * Calculate NWS from raw GcpBackend user_financial_data row.
  * Convenience wrapper that extracts the right fields.
  */
 export function calculateNWSFromDB(financialRow: any): NWSResult {

@@ -1,6 +1,6 @@
 /**
  * Hushh Intelligence Service
- * Handles all Supabase operations for Intelligence product
+ * Handles all GcpBackend operations for Intelligence product
  */
 
 import config from '../../resources/config/config';
@@ -12,23 +12,23 @@ import type {
   HUSHH_LIMITS,
 } from '../core/types';
 
-const supabase = config.supabaseClient;
+const gcpBackend = config.gcpBackendClient;
 
 // ============================================
 // User Operations
 // ============================================
 
 /**
- * Get or create Intelligence user from Supabase auth user
+ * Get or create Intelligence user from GcpBackend auth user
  */
 export async function getOrCreateIntelligenceUser(): Promise<HushhUser | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { user: authUser } } = await gcpBackend.auth.getUser();
   if (!authUser) return null;
 
   // Check if user exists in intelligence_users
-  const { data: existingUser, error: fetchError } = await supabase
+  const { data: existingUser, error: fetchError } = await gcpBackend
     .from('intelligence_users')
     .select('*')
     .eq('supabase_user_id', authUser.id)
@@ -36,7 +36,7 @@ export async function getOrCreateIntelligenceUser(): Promise<HushhUser | null> {
 
   if (existingUser && !fetchError) {
     // Update last login
-    await supabase
+    await gcpBackend
       .from('intelligence_users')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', existingUser.id);
@@ -45,7 +45,7 @@ export async function getOrCreateIntelligenceUser(): Promise<HushhUser | null> {
   }
 
   // Create new intelligence user
-  const { data: newUser, error: createError } = await supabase
+  const { data: newUser, error: createError } = await gcpBackend
     .from('intelligence_users')
     .insert({
       supabase_user_id: authUser.id,
@@ -62,7 +62,7 @@ export async function getOrCreateIntelligenceUser(): Promise<HushhUser | null> {
   }
 
   // Create media limits record
-  await supabase
+  await gcpBackend
     .from('intelligence_media_limits')
     .insert({ user_id: newUser.id });
 
@@ -73,12 +73,12 @@ export async function getOrCreateIntelligenceUser(): Promise<HushhUser | null> {
  * Get current Intelligence user
  */
 export async function getCurrentIntelligenceUser(): Promise<HushhUser | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { user: authUser } } = await gcpBackend.auth.getUser();
   if (!authUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_users')
     .select('*')
     .eq('supabase_user_id', authUser.id)
@@ -96,12 +96,12 @@ export async function getCurrentIntelligenceUser(): Promise<HushhUser | null> {
  * Get all conversations for current user
  */
 export async function getConversations(): Promise<HushhConversation[]> {
-  if (!supabase) return [];
+  if (!gcpBackend) return [];
 
   const user = await getCurrentIntelligenceUser();
   if (!user) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_conversations')
     .select('*')
     .eq('user_id', user.id)
@@ -115,12 +115,12 @@ export async function getConversations(): Promise<HushhConversation[]> {
  * Create a new conversation
  */
 export async function createConversation(title?: string): Promise<HushhConversation | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
   const user = await getCurrentIntelligenceUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_conversations')
     .insert({
       user_id: user.id,
@@ -135,7 +135,7 @@ export async function createConversation(title?: string): Promise<HushhConversat
   }
 
   // Increment conversation count
-  await supabase
+  await gcpBackend
     .from('intelligence_users')
     .update({ total_conversations: user.totalConversations + 1 })
     .eq('id', user.id);
@@ -150,9 +150,9 @@ export async function updateConversationTitle(
   conversationId: string,
   title: string
 ): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from('intelligence_conversations')
     .update({ title })
     .eq('id', conversationId);
@@ -164,9 +164,9 @@ export async function updateConversationTitle(
  * Delete a conversation
  */
 export async function deleteConversation(conversationId: string): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from('intelligence_conversations')
     .delete()
     .eq('id', conversationId);
@@ -182,9 +182,9 @@ export async function deleteConversation(conversationId: string): Promise<boolea
  * Get messages for a conversation
  */
 export async function getMessages(conversationId: string): Promise<HushhMessage[]> {
-  if (!supabase) return [];
+  if (!gcpBackend) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_messages')
     .select('*')
     .eq('conversation_id', conversationId)
@@ -203,9 +203,9 @@ export async function addMessage(
   content: string,
   mediaUrls?: string[]
 ): Promise<HushhMessage | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_messages')
     .insert({
       conversation_id: conversationId,
@@ -232,12 +232,12 @@ export async function addMessage(
  * Get current media limits for user
  */
 export async function getMediaLimits(): Promise<MediaLimits | null> {
-  if (!supabase) return null;
+  if (!gcpBackend) return null;
 
   const user = await getCurrentIntelligenceUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await gcpBackend
     .from('intelligence_media_limits')
     .select('*')
     .eq('user_id', user.id)
@@ -245,7 +245,7 @@ export async function getMediaLimits(): Promise<MediaLimits | null> {
 
   if (error || !data) {
     // Create limits if not exists
-    const { data: newLimits } = await supabase
+    const { data: newLimits } = await gcpBackend
       .from('intelligence_media_limits')
       .insert({ user_id: user.id })
       .select()
@@ -273,13 +273,13 @@ export async function canUploadMedia(): Promise<boolean> {
  * Increment upload count after successful upload
  */
 export async function incrementUploadCount(): Promise<boolean> {
-  if (!supabase) return false;
+  if (!gcpBackend) return false;
 
   const user = await getCurrentIntelligenceUser();
   if (!user) return false;
 
   // Use RPC for atomic increment
-  const { error: rpcError } = await supabase.rpc('increment_intelligence_uploads', {
+  const { error: rpcError } = await gcpBackend.rpc('increment_intelligence_uploads', {
     p_user_id: user.id,
   });
 
@@ -382,11 +382,11 @@ function mapDbMediaLimits(db: DbMediaLimits): MediaLimits {
 export function onAuthStateChange(
   callback: (isAuthenticated: boolean) => void
 ): () => void {
-  if (!supabase) {
+  if (!gcpBackend) {
     return () => {};
   }
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  const { data: { subscription } } = gcpBackend.auth.onAuthStateChange(
     (_event, session) => {
       callback(!!session);
     }

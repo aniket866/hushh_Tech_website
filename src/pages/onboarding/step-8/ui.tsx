@@ -188,19 +188,19 @@ export default function OnboardingReviewStep() {
         return;
       }
 
-      if (!config.supabaseClient) {
+      if (!config.gcpBackendClient) {
         setError('Configuration error');
         setLoading(false);
         return;
       }
 
-      const { data: { user } } = await config.supabaseClient.auth.getUser();
+      const { data: { user } } = await config.gcpBackendClient.auth.getUser();
       if (!user) {
         navigate('/login', { replace: true });
         return;
       }
 
-      const { data, error: fetchError } = await config.supabaseClient
+      const { data, error: fetchError } = await config.gcpBackendClient
         .from('onboarding_data')
         .select(`
           legal_first_name, legal_last_name, date_of_birth,

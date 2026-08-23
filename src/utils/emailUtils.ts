@@ -13,7 +13,7 @@ export const isPrivateRelayEmail = (email?: string | null): boolean =>
   !!email?.toLowerCase().includes('@privaterelay.appleid.com');
 
 /**
- * Get the best available email for a Supabase user.
+ * Get the best available email for a GcpBackend user.
  * Priority: user_metadata.real_email > user.email
  */
 export const getEffectiveEmail = (user: {

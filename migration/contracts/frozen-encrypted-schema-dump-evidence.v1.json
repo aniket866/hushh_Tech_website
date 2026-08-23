@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "database": "postgres",
+  "scope": "SCHEMA_ONLY_PUBLIC",
+  "contents": "HASHES_COUNTS_GENERATIONS_AND_CONTROL_STATE_ONLY",
+  "dump": {
+    "plaintextSha256": "330de0785b3d8c109b538f9ffb75886c255e14bdbcfb8ecffa02e94ddaa7c570",
+    "compressedPlaintextSha256": "8f9a5bf29e5cfbf58f71dcf2510f16bb9abff835f76017f8475050daaf4bb4b2",
+    "compressedPlaintextBytes": 25886,
+    "bytes": 210601,
+    "lines": 6203,
+    "tables": 70,
+    "functions": 24,
+    "policies": 118,
+    "triggers": 24,
+    "explicitIndexes": 121,
+    "copyOrInsertStatements": 0,
+    "containsData": false
+  },
+  "encryption": {
+    "type": "CLOUD_KMS",
+    "keyVersion": "projects/hushh-tech-uat/locations/us-central1/keyRings/hushh-tech-cutover-uat/cryptoKeys/migration-archive/cryptoKeyVersions/1",
+    "keyVersionState": "ENABLED",
+    "algorithm": "GOOGLE_SYMMETRIC_ENCRYPTION",
+    "protectionLevel": "SOFTWARE",
+    "ciphertextSha256": "da99ca16a8cee1646814f05087db9487555180ae653770b298467ddd63c606d7",
+    "ciphertextBytes": 25971,
+    "roundTripVerified": true
+  },
+  "storage": {
+    "projectId": "hushh-tech-uat",
+    "bucket": "hushh-tech-migration-evidence-uat",
+    "object": "schema/2026-08-21/hushh-tech-public-schema.sql.gz.kms",
+    "generation": "1787322787490900",
+    "manifestObject": "schema/2026-08-21/hushh-tech-public-schema.dump.manifest.v1.json",
+    "manifestGeneration": "1787322790837124",
+    "manifestSha256": "eb923e8dd35abd11de7b35bc57234e76c5e8415012e701e20f9e9ce9965286ad",
+    "uniformBucketLevelAccess": true,
+    "publicAccessPrevention": "enforced",
+    "versioning": true,
+    "softDeleteSeconds": 604800
+  },
+  "temporaryLoginRole": {
+    "roleName": "cli_login_postgres",
+    "enabledAt": "2026-08-21T14:31:54.410362Z",
+    "revokedAt": "2026-08-21T14:32:05.139879Z",
+    "finalCanLogin": false,
+    "finalValidUntil": "1970-01-01T00:00:00Z"
+  },
+  "postCaptureVerification": {
+    "cliControlPlaneValidityRefreshObserved": true,
+    "loginRemainedDisabled": true,
+    "finalCleanupCanLogin": false,
+    "finalCleanupValidUntil": "1970-01-01T00:00:00Z",
+    "exactCleanupTimestampCaptured": false
+  },
+  "secretScan": {
+    "engine": "gitleaks",
+    "findingCount": 0
+  },
+  "repositoryStorage": {
+    "plaintextDump": "FORBIDDEN",
+    "compressedPlaintext": "FORBIDDEN",
+    "ciphertext": "FORBIDDEN",
+    "sanitizedEvidenceOnly": true
+  }
+}

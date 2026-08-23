@@ -2,15 +2,15 @@
  * Hushh AI Dependency Injection Container
  * Wires together all layers of the application
  */
-import { SupabaseClient } from '@supabase/supabase-js';
+import { GcpBackendClient } from '@/services/gcpBackend/types';
 import config from '../../resources/config/config';
 
 // Data Sources
 import {
-  SupabaseChatDataSource,
-  SupabaseMessageDataSource,
-  SupabaseUserDataSource,
-  SupabaseMediaDataSource,
+  GcpBackendChatDataSource,
+  GcpBackendMessageDataSource,
+  GcpBackendUserDataSource,
+  GcpBackendMediaDataSource,
   VertexAIDataSource,
 } from '../data/datasources';
 import { CalendarAPIDataSource } from '../data/datasources/CalendarAPIDataSource';
@@ -40,14 +40,14 @@ import {
 export class HushhAIContainer {
   private static instance: HushhAIContainer;
 
-  // Supabase client
-  private supabase: SupabaseClient;
+  // GcpBackend client
+  private gcpBackend: GcpBackendClient;
 
   // Data Sources
-  private chatDataSource: SupabaseChatDataSource;
-  private messageDataSource: SupabaseMessageDataSource;
-  private userDataSource: SupabaseUserDataSource;
-  private mediaDataSource: SupabaseMediaDataSource;
+  private chatDataSource: GcpBackendChatDataSource;
+  private messageDataSource: GcpBackendMessageDataSource;
+  private userDataSource: GcpBackendUserDataSource;
+  private mediaDataSource: GcpBackendMediaDataSource;
   private aiDataSource: VertexAIDataSource;
   private calendarDataSource: CalendarAPIDataSource;
 
@@ -70,17 +70,17 @@ export class HushhAIContainer {
   public handleCalendarRequestUseCase: HandleCalendarRequestUseCase;
 
   private constructor() {
-    // Initialize Supabase client
-    this.supabase = config.supabaseClient;
+    // Initialize GcpBackend client
+    this.gcpBackend = config.gcpBackendClient;
 
     // Initialize Data Sources
-    this.chatDataSource = new SupabaseChatDataSource(this.supabase);
-    this.messageDataSource = new SupabaseMessageDataSource(this.supabase);
-    this.userDataSource = new SupabaseUserDataSource(this.supabase);
-    this.mediaDataSource = new SupabaseMediaDataSource(this.supabase);
+    this.chatDataSource = new GcpBackendChatDataSource(this.gcpBackend);
+    this.messageDataSource = new GcpBackendMessageDataSource(this.gcpBackend);
+    this.userDataSource = new GcpBackendUserDataSource(this.gcpBackend);
+    this.mediaDataSource = new GcpBackendMediaDataSource(this.gcpBackend);
     this.aiDataSource = new VertexAIDataSource(
-      config.SUPABASE_URL,
-      config.SUPABASE_ANON_KEY
+      config.GCP_API_BASE_URL,
+      config.FIREBASE_API_KEY
     );
     this.calendarDataSource = new CalendarAPIDataSource();
 

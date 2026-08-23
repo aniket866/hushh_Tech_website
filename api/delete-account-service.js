@@ -1,4 +1,6 @@
 import { createHmac } from "crypto";
+import { createGcpDeleteAccountStorageAdapterFromEnv } from "./shared/gcp-delete-account-storage.js";
+import { createGcpServerClient } from "./shared/gcpServerClient.js";
 
 export const DELETE_ACCOUNT_DELETED_SCOPES = [
   "storage.hushh_ai_media",
@@ -22,7 +24,6 @@ const DEFAULT_DELETE_ACCOUNT_RESULT_DETAILS = {
 
 const AUDIT_KEY_PREFIX = "deleted_account_payment_audit:";
 const DELETE_ACCOUNT_HASH_NAMESPACE = "delete-account-payment-audit";
-const SIGNED_NDA_MARKER = "/storage/v1/object/public/assets/";
 const MISSING_RELATION_CODES = new Set(["42P01", "PGRST202", "PGRST205"]);
 
 const buildDeleteAccountSuccessPayload = (details = {}) => ({
@@ -100,228 +101,30 @@ const resolveUserValidationMessage = (error) => {
 
 const dedupeDeleteAccountPaths = (values) => uniqueValues(values.map((value) => value?.trim?.()));
 
-const buildSignedNdaAssetPathFromUrl = (urlValue) => {
+const buildSignedNdaAssetPathFromUrl = (urlValue, expectedUserId = null) => {
   if (!urlValue) return null;
 
   try {
     const url = new URL(urlValue);
-    const markerIndex = url.pathname.indexOf(SIGNED_NDA_MARKER);
-
-    if (markerIndex === -1) {
-      return null;
+    const segments = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+    const signedNdaIndex = segments.indexOf("signed-ndas");
+    if (signedNdaIndex === -1 || signedNdaIndex !== segments.length - 2) return null;
+    const assetPath = segments.slice(signedNdaIndex).join("/");
+    if (!assetPath.startsWith("signed-ndas/")) return null;
+    if (expectedUserId !== null) {
+      const userId = String(expectedUserId);
+      if (!/^[A-Za-z0-9-]{1,128}$/.test(userId)) return null;
+      const fileName = segments.at(-1);
+      if (!fileName?.startsWith(`nda_${userId}_`)) return null;
     }
-
-    const assetPath = decodeURIComponent(
-      url.pathname.slice(markerIndex + SIGNED_NDA_MARKER.length)
-    );
-
-    return assetPath.startsWith("signed-ndas/") ? assetPath : null;
+    return assetPath;
   } catch {
     return null;
   }
 };
-
-const createServiceHeaders = (serviceRoleKey, extraHeaders = {}) => ({
-  apikey: serviceRoleKey,
-  Authorization: `Bearer ${serviceRoleKey}`,
-  ...extraHeaders,
-});
-
-const createUserHeaders = (serviceRoleKey, userJwt, extraHeaders = {}) => ({
-  apikey: serviceRoleKey,
-  Authorization: `Bearer ${userJwt}`,
-  ...extraHeaders,
-});
-
-const formatFilterValue = (value) => {
-  const text = `${value}`;
-  if (/^[A-Za-z0-9._:-]+$/.test(text)) {
-    return text;
-  }
-
-  return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-};
-
-const buildRestUrl = (supabaseUrl, path, query = {}) => {
-  const url = new URL(path, supabaseUrl);
-
-  for (const [key, value] of Object.entries(query)) {
-    if (value === null || value === undefined || value === "") continue;
-    url.searchParams.set(key, value);
-  }
-
-  return url.toString();
-};
-
-async function parseSupabaseResponse(response) {
-  const text = await response.text();
-  let payload = null;
-
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = text;
-    }
-  }
-
-  if (response.ok) {
-    return {
-      data: payload,
-      error: null,
-    };
-  }
-
-  const errorBody =
-    payload && typeof payload === "object"
-      ? payload
-      : {
-          message:
-            typeof payload === "string" && payload.length > 0
-              ? payload
-              : response.statusText || "Supabase request failed",
-        };
-
-  return {
-    data: null,
-    error: {
-      status: response.status,
-      code: errorBody.code,
-      message: errorBody.message || errorBody.error || response.statusText,
-      details: errorBody.details,
-      hint: errorBody.hint,
-    },
-  };
-}
-
-function createRestAdminClient(supabaseUrl, serviceRoleKey) {
-  async function requestJson(method, path, { query, body, headers } = {}) {
-    const response = await fetch(buildRestUrl(supabaseUrl, path, query), {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-
-    return parseSupabaseResponse(response);
-  }
-
-  return {
-    auth: {
-      async getUser(jwt) {
-        const { data, error } = await requestJson("GET", "/auth/v1/user", {
-          headers: createUserHeaders(serviceRoleKey, jwt),
-        });
-
-        return {
-          data: { user: data },
-          error,
-        };
-      },
-      admin: {
-        async deleteUser(userId) {
-          return requestJson("DELETE", `/auth/v1/admin/users/${userId}`, {
-            headers: createServiceHeaders(serviceRoleKey),
-          });
-        },
-      },
-    },
-    from(table) {
-      const encodedTable = encodeURIComponent(table);
-
-      return {
-        select(columns) {
-          return {
-            eq(column, value) {
-              return requestJson("GET", `/rest/v1/${encodedTable}`, {
-                query: {
-                  select: columns,
-                  [column]: `eq.${formatFilterValue(value)}`,
-                },
-                headers: createServiceHeaders(serviceRoleKey),
-              });
-            },
-            in(column, values) {
-              return requestJson("GET", `/rest/v1/${encodedTable}`, {
-                query: {
-                  select: columns,
-                  [column]: `in.(${uniqueValues(values).map(formatFilterValue).join(",")})`,
-                },
-                headers: createServiceHeaders(serviceRoleKey),
-              });
-            },
-          };
-        },
-        delete() {
-          return {
-            eq(column, value) {
-              return requestJson("DELETE", `/rest/v1/${encodedTable}`, {
-                query: {
-                  [column]: `eq.${formatFilterValue(value)}`,
-                },
-                headers: createServiceHeaders(serviceRoleKey, {
-                  Prefer: "return=minimal",
-                }),
-              });
-            },
-            in(column, values) {
-              return requestJson("DELETE", `/rest/v1/${encodedTable}`, {
-                query: {
-                  [column]: `in.(${uniqueValues(values).map(formatFilterValue).join(",")})`,
-                },
-                headers: createServiceHeaders(serviceRoleKey, {
-                  Prefer: "return=minimal",
-                }),
-              });
-            },
-          };
-        },
-        upsert(payload, options = {}) {
-          return requestJson("POST", `/rest/v1/${encodedTable}`, {
-            query: {
-              on_conflict: options.onConflict,
-            },
-            body: payload,
-            headers: createServiceHeaders(serviceRoleKey, {
-              "Content-Type": "application/json",
-              Prefer: "resolution=merge-duplicates,return=minimal",
-            }),
-          });
-        },
-      };
-    },
-    storage: {
-      from(bucket) {
-        const encodedBucket = encodeURIComponent(bucket);
-
-        return {
-          list(path = "", options = {}) {
-            return requestJson("POST", `/storage/v1/object/list/${encodedBucket}`, {
-              body: {
-                prefix: path,
-                limit: options.limit,
-                offset: options.offset,
-                sortBy: options.sortBy,
-              },
-              headers: createServiceHeaders(serviceRoleKey, {
-                "Content-Type": "application/json",
-              }),
-            });
-          },
-          remove(paths) {
-            return requestJson("DELETE", `/storage/v1/object/${encodedBucket}`, {
-              body: {
-                prefixes: uniqueValues(paths),
-              },
-              headers: createServiceHeaders(serviceRoleKey, {
-                "Content-Type": "application/json",
-              }),
-            });
-          },
-        };
-      },
-    },
-  };
-}
 
 const mapColumnValues = (rows, column) =>
   uniqueValues(
@@ -397,64 +200,26 @@ async function deleteIn(adminClient, table, column, values) {
   }
 }
 
-async function listStorageFiles(adminClient, bucket, prefix) {
-  const files = [];
-
-  async function walk(path) {
-    const { data, error } = await adminClient.storage.from(bucket).list(path, {
-      limit: 1000,
-      offset: 0,
-      sortBy: { column: "name", order: "asc" },
-    });
-
-    if (error) {
-      const message = `${getErrorMessage(error)}`.toLowerCase();
-      if (message.includes("not found") || message.includes("no such bucket")) {
-        return;
-      }
-
-      throw new Error(`Failed to list storage objects in ${bucket}: ${getErrorMessage(error)}`);
-    }
-
-    for (const entry of toArray(data)) {
-      if (!entry?.name) continue;
-
-      const childPath = path ? `${path}/${entry.name}` : entry.name;
-      if (entry.id || entry.metadata) {
-        files.push(childPath);
-        continue;
-      }
-
-      await walk(childPath);
-    }
-  }
-
-  await walk(prefix);
-  return files;
+async function listStorageFiles(storageAdapter, bucket, prefix) {
+  const objects = await storageAdapter.listSourcePrefix(bucket, prefix);
+  return dedupeDeleteAccountPaths(objects.map((object) => object.sourceObjectKey));
 }
 
-async function deleteBucketPaths(adminClient, bucket, paths) {
+async function deleteBucketPaths(storageAdapter, bucket, paths) {
   const filePaths = dedupeDeleteAccountPaths(paths);
 
   if (filePaths.length === 0) {
     return 0;
   }
 
-  for (const chunk of chunkArray(filePaths, 100)) {
-    const { error } = await adminClient.storage.from(bucket).remove(chunk);
-    if (error) {
-      throw new Error(
-        `Failed to delete storage objects from ${bucket}: ${getErrorMessage(error)}`
-      );
-    }
-  }
-
-  return filePaths.length;
+  return storageAdapter.deleteSourcePaths(bucket, filePaths, {
+    reason: "account-deletion",
+  });
 }
 
-async function deleteHushhAiMedia(adminClient, userId) {
-  const files = await listStorageFiles(adminClient, "hushh-ai-media", userId);
-  return deleteBucketPaths(adminClient, "hushh-ai-media", files);
+async function deleteHushhAiMedia(storageAdapter, userId) {
+  const files = await listStorageFiles(storageAdapter, "hushh-ai-media", userId);
+  return deleteBucketPaths(storageAdapter, "hushh-ai-media", files);
 }
 
 function buildFormerUserIdHash(userId, auditSecret) {
@@ -583,7 +348,7 @@ async function collectDeleteContext(adminClient, userId) {
     leadIds,
     ndaAssetPaths: dedupeDeleteAccountPaths(
       [...mapColumnValues(ndaSignatureRows, "pdf_url"), ...mapColumnValues(onboardingRows, "nda_pdf_url")].map(
-        buildSignedNdaAssetPathFromUrl
+        (url) => buildSignedNdaAssetPathFromUrl(url, userId)
       )
     ),
     plaidAccountIds: mapColumnValues(plaidAccountRows, "plaid_account_id"),
@@ -741,17 +506,13 @@ async function purgeUserData(adminClient, userId, context) {
 }
 
 export function createDeleteAccountAdminClientFromEnv() {
-  const supabaseUrl =
-    process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase server environment variables are missing");
-  }
+  const auditSecret = process.env.DELETE_ACCOUNT_AUDIT_SECRET?.trim();
+  if (!auditSecret) throw new Error("Delete-account audit secret is missing");
 
   return {
-    adminClient: createRestAdminClient(supabaseUrl, serviceRoleKey),
-    auditSecret: serviceRoleKey,
+    adminClient: createGcpServerClient(),
+    auditSecret,
+    storageAdapter: createGcpDeleteAccountStorageAdapterFromEnv(),
   };
 }
 
@@ -759,6 +520,7 @@ export async function executeDeleteAccount({
   adminClient,
   authHeader,
   auditSecret,
+  storageAdapter,
 }) {
   if (!authHeader) {
     return buildErrorResult(401, "Missing authorization header");
@@ -788,9 +550,12 @@ export async function executeDeleteAccount({
 
   try {
     const context = await collectDeleteContext(adminClient, user.id);
-    const hushhAiMediaObjectsDeleted = await deleteHushhAiMedia(adminClient, user.id);
+    if (!storageAdapter) {
+      throw new Error("GCP delete-account storage adapter is missing");
+    }
+    const hushhAiMediaObjectsDeleted = await deleteHushhAiMedia(storageAdapter, user.id);
     const ndaAssetObjectsDeleted = await deleteBucketPaths(
-      adminClient,
+      storageAdapter,
       "assets",
       context.ndaAssetPaths
     );

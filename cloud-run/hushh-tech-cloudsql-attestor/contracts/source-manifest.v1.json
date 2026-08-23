@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": ".dockerignore",
+      "sha256": "b66eb289e490be25ad732fce0c40418b459b57c1c2b7d9a766e01d5356f197f9"
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "4ce2e4a9aaaf1df3c92c3b102f1e95318ddb44551d5a77ff5dbfd0e96dabf3a1"
+    },
+    {
+      "path": "contracts/attestation-evidence.schema.json",
+      "sha256": "02c0540c8605aaa4355813d9e733760514bf83f4c6101c85ed58f360a5286e06"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "2f1d68a4c0e4bb42dd089df0445f5079a36e8323b7f486cef5faaadbbb81e0ee"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e6e86b893eb553a4ec87dc29b221039872d7ed646e5ffa05f5a60aa9f2616245"
+    },
+    {
+      "path": "sql/catalog-bounds.v1.sql",
+      "sha256": "93db0e2e9986315c8011352c070c9fda6d89ca851b28cecc744e4d0d2feb57dc"
+    },
+    {
+      "path": "sql/catalog-attestation.v1.sql",
+      "sha256": "57c292ef92b4398396cad948a5a0ac8cb66490252ad28d9b3330627c822c10d4"
+    },
+    {
+      "path": "src/canonical.js",
+      "sha256": "19221e836950d58d9527ce9553e234f0f1954e6728bc40f33f83a42d7a02d8df"
+    },
+    {
+      "path": "src/cli.js",
+      "sha256": "0b00dde8b9fd612ab8e2ded0270874cd76adee4c4e45f195088dcb719d49ebae"
+    },
+    {
+      "path": "src/config.js",
+      "sha256": "c5ffcca41d0682f99681f9fb9bafe149ffd84cdf5382b3994a58f77711f52758"
+    },
+    {
+      "path": "src/constants.js",
+      "sha256": "779baac86d4b9e5061e831df8dc3e3d22ee7f56432d859439294920b81a27223"
+    },
+    {
+      "path": "src/contracts.js",
+      "sha256": "2b2b988fec3625b075c6017b46f452c39ee978d14e70c676bd50d8491b4760ad"
+    },
+    {
+      "path": "src/errors.js",
+      "sha256": "c3092718d0e37b4b3b794cff02b495285028f4f383d72f0f14d1e3739da657a6"
+    },
+    {
+      "path": "src/evidence.js",
+      "sha256": "e5e05add503406484c304662b1231d82bfa8d49d7fec92a65254444cee4714cd"
+    },
+    {
+      "path": "src/query-contract.js",
+      "sha256": "32974bc3646f19d7a3a403ed878d97b120eac368dd017e6601fb0bba4519a9c9"
+    },
+    {
+      "path": "src/runner.js",
+      "sha256": "777d6b743a4f5c12778fa49a1ed4a670420baeb0ae96a42d7bef52043d408635"
+    },
+    {
+      "path": "src/supervisor.js",
+      "sha256": "f7c8206c74783cfeb03908f69aa6b27ee5f2c3c61bbd815f9bb28864f7b3fa1c"
+    },
+    {
+      "path": "src/verifier.js",
+      "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
+    }
+  ],
+  "sourceSha256": "d6f0bc2f8229b6f3973310d2a9d80e50ad9b642b48f6bf789561e369f19ae694"
+}

@@ -9,6 +9,14 @@ import React, {
 } from "react";
 import config from "../resources/config/config";
 import {
+  isHushhResearchCallbackRoute,
+} from "../services/hushhResearch/contracts";
+import {
+  clearHushhResearchLocalSession,
+  getHushhResearchSessionState,
+  isHushhResearchAuthMode,
+} from "../services/hushhResearch/firebaseAuth";
+import {
   type AuthSessionReason,
   type AuthSessionSnapshot,
   type AuthSessionStatus,
@@ -17,13 +25,16 @@ import {
   AUTH_EVENT_STORAGE_KEY,
   broadcastAuthEvent,
   clearLegacyAuthStorage,
-  clearSupabaseSession,
+  clearGcpBackendSession,
   getLocalSession,
   getValidatedSession,
   parseAuthBroadcastEvent,
   startUnifiedOAuth,
-  validateSessionCandidate,
 } from "./session";
+import {
+  clearNoHybridBrowserFixture,
+  resolveNoHybridBrowserFixture,
+} from "./noHybridBrowserFixture";
 
 interface AuthSessionContextValue extends AuthSessionSnapshot {
   startOAuth: (provider: OAuthProvider) => Promise<OAuthStartResult>;
@@ -50,10 +61,19 @@ const INITIAL_SNAPSHOT: AuthSessionSnapshot = {
 export const AuthSessionProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const supabase = config.supabaseClient;
+  const gcpBackend = config.gcpBackendClient;
+  const noHybridBrowserFixture = useMemo(
+    () => resolveNoHybridBrowserFixture(),
+    [],
+  );
+  const fixtureSignedOutRef = useRef(false);
   const [snapshot, setSnapshot] =
-    useState<AuthSessionSnapshot>(INITIAL_SNAPSHOT);
+    useState<AuthSessionSnapshot>(
+      () => noHybridBrowserFixture || INITIAL_SNAPSHOT,
+    );
   const pendingSignedOutStateRef = useRef<PendingSignedOutState | null>(null);
+  const researchModeRef = useRef(isHushhResearchAuthMode());
+  const sessionGenerationRef = useRef(0);
 
   const applySnapshot = useCallback((nextSnapshot: AuthSessionSnapshot) => {
     setSnapshot((currentSnapshot) => {
@@ -97,11 +117,36 @@ export const AuthSessionProvider: React.FC<{
       broadcast = false,
       options: { storageOnly?: boolean } = {}
     ) => {
+      const generation = ++sessionGenerationRef.current;
       pendingSignedOutStateRef.current = { status, reason };
       clearLegacyAuthStorage();
-      await clearSupabaseSession(supabase, options);
-      applyClearedState(status, reason);
-      if (broadcast) {
+      if (noHybridBrowserFixture) {
+        fixtureSignedOutRef.current = true;
+        clearNoHybridBrowserFixture();
+        applyClearedState(status, reason);
+        if (broadcast) broadcastAuthEvent(reason);
+        return {
+          status,
+          session: null,
+          user: null,
+          reason,
+        } satisfies AuthSessionSnapshot;
+      }
+      const isResearchSession =
+        researchModeRef.current || isHushhResearchAuthMode();
+      if (isResearchSession) {
+        researchModeRef.current = true;
+        clearHushhResearchLocalSession({
+          preserveMode: true,
+        });
+        await clearGcpBackendSession(gcpBackend, { storageOnly: true });
+      } else {
+        await clearGcpBackendSession(gcpBackend, options);
+      }
+      if (generation === sessionGenerationRef.current) {
+        applyClearedState(status, reason);
+      }
+      if (broadcast && generation === sessionGenerationRef.current) {
         broadcastAuthEvent(reason);
       }
       return {
@@ -111,11 +156,68 @@ export const AuthSessionProvider: React.FC<{
         reason,
       } satisfies AuthSessionSnapshot;
     },
-    [applyClearedState, supabase]
+    [applyClearedState, gcpBackend, noHybridBrowserFixture]
   );
 
   const revalidateSession = useCallback(async () => {
-    const nextSnapshot = await getValidatedSession(supabase);
+    if (noHybridBrowserFixture) {
+      const nextSnapshot: AuthSessionSnapshot = fixtureSignedOutRef.current
+        ? { status: "anonymous", session: null, user: null, reason: "signed_out" }
+        : noHybridBrowserFixture;
+      applySnapshot(nextSnapshot);
+      return nextSnapshot;
+    }
+
+    const generation = sessionGenerationRef.current;
+    const staleSnapshot = (): AuthSessionSnapshot => {
+      const pendingState = pendingSignedOutStateRef.current;
+      return {
+        status: pendingState?.status || "anonymous",
+        session: null,
+        user: null,
+        reason: pendingState?.reason,
+      };
+    };
+
+    if (researchModeRef.current || isHushhResearchAuthMode()) {
+      researchModeRef.current = true;
+      const researchState = await getHushhResearchSessionState();
+      if (generation !== sessionGenerationRef.current) {
+        return staleSnapshot();
+      }
+
+      if (researchState.status === "authenticated") {
+        await clearGcpBackendSession(gcpBackend, { storageOnly: true });
+        if (generation !== sessionGenerationRef.current) {
+          return staleSnapshot();
+        }
+        const nextSnapshot: AuthSessionSnapshot = {
+          status: "authenticated",
+          session: researchState.session,
+          user: researchState.user,
+        };
+        applySnapshot(nextSnapshot);
+        return nextSnapshot;
+      }
+
+      const nextSnapshot: AuthSessionSnapshot = {
+        status:
+          researchState.status === "invalidated" ? "invalidated" : "anonymous",
+        session: null,
+        user: null,
+        reason:
+          researchState.status === "invalidated"
+            ? researchState.reason
+            : undefined,
+      };
+      applySnapshot(nextSnapshot);
+      return nextSnapshot;
+    }
+
+    const nextSnapshot = await getValidatedSession(gcpBackend);
+    if (generation !== sessionGenerationRef.current) {
+      return staleSnapshot();
+    }
 
     if (nextSnapshot.status === "invalidated") {
       return clearLocalSession(
@@ -126,32 +228,97 @@ export const AuthSessionProvider: React.FC<{
 
     applySnapshot(nextSnapshot);
     return nextSnapshot;
-  }, [applySnapshot, clearLocalSession, supabase]);
+  }, [applySnapshot, clearLocalSession, gcpBackend, noHybridBrowserFixture]);
 
   // Boot: Instantly resolve from localStorage (no network call).
   // This eliminates the 'booting' state almost immediately.
   // onAuthStateChange below handles INITIAL_SESSION for the definitive state.
   useEffect(() => {
     const bootFromLocalStorage = async () => {
-      const localSnapshot = await getLocalSession(supabase);
+      if (noHybridBrowserFixture) {
+        if (!fixtureSignedOutRef.current) {
+          applySnapshot(noHybridBrowserFixture);
+        }
+        return;
+      }
+      if (researchModeRef.current) {
+        if (isHushhResearchCallbackRoute(window.location.pathname)) {
+          applySnapshot({ status: "anonymous", session: null, user: null });
+          return;
+        }
+
+        await revalidateSession();
+        return;
+      }
+
+      const localSnapshot = await getLocalSession(gcpBackend);
       applySnapshot(localSnapshot);
     };
     void bootFromLocalStorage();
-  }, [applySnapshot, supabase]);
+  }, [applySnapshot, revalidateSession, gcpBackend, noHybridBrowserFixture]);
 
   useEffect(() => {
-    if (!supabase) {
-      applySnapshot({
-        status: "anonymous",
-        session: null,
-        user: null,
-      });
+    if (noHybridBrowserFixture) {
+      return;
+    }
+
+    if (researchModeRef.current) {
+      const handleResearchRevalidation = () => {
+        void revalidateSession();
+      };
+      const handleResearchVisibility = () => {
+        if (document.visibilityState === "visible") {
+          handleResearchRevalidation();
+        }
+      };
+      const handleResearchStorage = (storageEvent: StorageEvent) => {
+        if (
+          storageEvent.key !== AUTH_EVENT_STORAGE_KEY ||
+          !storageEvent.newValue
+        ) {
+          return;
+        }
+
+        const payload = parseAuthBroadcastEvent(storageEvent.newValue);
+        if (!payload) {
+          return;
+        }
+
+        const nextStatus =
+          payload.reason === "signed_out" ? "anonymous" : "invalidated";
+        void clearLocalSession(nextStatus, payload.reason, false, {
+          storageOnly: true,
+        });
+      };
+
+      window.addEventListener("focus", handleResearchRevalidation);
+      window.addEventListener("storage", handleResearchStorage);
+      document.addEventListener(
+        "visibilitychange",
+        handleResearchVisibility
+      );
+
+      return () => {
+        window.removeEventListener("focus", handleResearchRevalidation);
+        window.removeEventListener("storage", handleResearchStorage);
+        document.removeEventListener(
+          "visibilitychange",
+          handleResearchVisibility
+        );
+      };
+    }
+
+    if (!gcpBackend) {
       return;
     }
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    } = gcpBackend.auth.onAuthStateChange(async (event, nextSession) => {
+      if (researchModeRef.current) {
+        return;
+      }
+
       if (event === "SIGNED_OUT" || !nextSession) {
         const pendingState = pendingSignedOutStateRef.current;
         pendingSignedOutStateRef.current = null;
@@ -165,8 +332,8 @@ export const AuthSessionProvider: React.FC<{
         return;
       }
 
-      // Trust the session provided by Supabase events directly.
-      // Supabase has already validated the token before firing the event.
+      // Trust the session provided by GcpBackend events directly.
+      // GcpBackend has already validated the token before firing the event.
       // This eliminates redundant getUser() network calls on every
       // INITIAL_SESSION, SIGNED_IN, and TOKEN_REFRESHED event.
       if (nextSession.user?.id && nextSession.access_token) {
@@ -186,9 +353,15 @@ export const AuthSessionProvider: React.FC<{
 
     // Soft revalidation for focus/visibility — only reads localStorage,
     // no server-side getUser() call. This prevents session drops when
-    // switching tabs. Supabase's autoRefreshToken handles token renewal.
+    // switching tabs. GcpBackend's autoRefreshToken handles token renewal.
     const handleSoftRevalidation = async () => {
-      const localSnapshot = await getLocalSession(supabase);
+      if (researchModeRef.current || isHushhResearchAuthMode()) {
+        researchModeRef.current = true;
+        await revalidateSession();
+        return;
+      }
+
+      const localSnapshot = await getLocalSession(gcpBackend);
 
       if (localSnapshot.status === "invalidated") {
         await clearLocalSession(
@@ -244,17 +417,53 @@ export const AuthSessionProvider: React.FC<{
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [applySnapshot, clearLocalSession, supabase]);
+  }, [applySnapshot, clearLocalSession, revalidateSession, gcpBackend, noHybridBrowserFixture]);
 
   const startOAuth = useCallback(
-    async (provider: OAuthProvider) => startUnifiedOAuth(provider, supabase),
-    [supabase]
+    async (provider: OAuthProvider) => {
+      if (researchModeRef.current || isHushhResearchAuthMode()) {
+        researchModeRef.current = true;
+        return {
+          ok: false,
+          provider,
+          reason: "provider_error",
+          message: "Use your Research sign-in link.",
+        } satisfies OAuthStartResult;
+      }
+
+      return startUnifiedOAuth(provider, gcpBackend);
+    },
+    [gcpBackend]
   );
 
   const signOut = useCallback(async () => {
+    const generation = ++sessionGenerationRef.current;
     clearLegacyAuthStorage();
 
-    if (!supabase) {
+    if (noHybridBrowserFixture) {
+      fixtureSignedOutRef.current = true;
+      clearNoHybridBrowserFixture();
+      applyClearedState("anonymous", "signed_out");
+      broadcastAuthEvent("signed_out");
+      return;
+    }
+
+    if (researchModeRef.current || isHushhResearchAuthMode()) {
+      researchModeRef.current = true;
+      pendingSignedOutStateRef.current = {
+        status: "anonymous",
+        reason: "signed_out",
+      };
+      clearHushhResearchLocalSession({ preserveMode: true });
+      await clearGcpBackendSession(gcpBackend, { storageOnly: true });
+      if (generation === sessionGenerationRef.current) {
+        applyClearedState("anonymous", "signed_out");
+        broadcastAuthEvent("signed_out");
+      }
+      return;
+    }
+
+    if (!gcpBackend) {
       applyClearedState("anonymous", "signed_out");
       return;
     }
@@ -265,15 +474,17 @@ export const AuthSessionProvider: React.FC<{
     };
 
     try {
-      await supabase.auth.signOut();
+      await gcpBackend.auth.signOut();
     } catch (error) {
       console.error("[AuthSession] Sign-out failed, clearing locally:", error);
-      await clearSupabaseSession(supabase);
+      await clearGcpBackendSession(gcpBackend);
     }
 
-    applyClearedState("anonymous", "signed_out");
-    broadcastAuthEvent("signed_out");
-  }, [applyClearedState, supabase]);
+    if (generation === sessionGenerationRef.current) {
+      applyClearedState("anonymous", "signed_out");
+      broadcastAuthEvent("signed_out");
+    }
+  }, [applyClearedState, gcpBackend, noHybridBrowserFixture]);
 
   const handleAccountDeleted = useCallback(async () => {
     await clearLocalSession("invalidated", "deleted", true, {
@@ -299,6 +510,7 @@ export const AuthSessionProvider: React.FC<{
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- provider and hook intentionally share one context module
 export function useAuthSession() {
   const context = useContext(AuthSessionContext);
 
@@ -309,4 +521,12 @@ export function useAuthSession() {
   }
 
   return context;
+}
+
+// Isolated presentation tests and embeddable headers may render without the
+// app provider. Security-sensitive callers can still consume the Research
+// identity hint when the provider is present without weakening useAuthSession.
+// eslint-disable-next-line react-refresh/only-export-components -- provider and hooks intentionally share one context module
+export function useOptionalAuthSession() {
+  return useContext(AuthSessionContext);
 }

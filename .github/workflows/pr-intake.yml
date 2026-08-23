@@ -45,5 +45,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_LANE_NAME: "Hushh Signalkeeper"
           SEMANTIC_GUARD_NAME: "Semantic PR Guard"
-          PR_VALIDATION_CHECKS: "DCO, Secret Scan, Env Contract Check, Reviewer Context & Compliance, PR Hygiene, Web Validation, Lint, Security Audit, Sensitive NDA Gate, CI Status Gate"
+          PR_VALIDATION_CHECKS: "DCO, Secret Scan, Env Contract Check, Supabase Retirement Contract, No-Hybrid Runtime Gate, Reviewer Context & Compliance, PR Hygiene, Web Validation, Lint, Security Audit, Sensitive NDA Gate, CI Status Gate"
         run: node scripts/ci/publish-signalkeeper-preflight.mjs

@@ -1,0 +1,4333 @@
+{
+  "version": 1,
+  "sourceProjectRef": "ibsisfnjxeowvdtvgzff",
+  "capturedAt": "2026-08-20T20:14:47.801539Z",
+  "contents": "SANITIZED_CONTRACTS_ONLY",
+  "policies": [
+    {
+      "schemaname": "public",
+      "tablename": "agent_profiles",
+      "policyname": "Anyone can view active agents",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(profile_status = 'active'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "agent_reviews",
+      "policyname": "Anyone can read reviews",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "agent_reviews",
+      "policyname": "Users can create reviews",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "app_config",
+      "policyname": "Anyone can read app_config",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "blocked_agents",
+      "policyname": "Users block agents",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "blocked_agents",
+      "policyname": "Users own blocked list",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "blocked_agents",
+      "policyname": "Users unblock agents",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ceo_meeting_payments",
+      "policyname": "Service role full access on ceo_meeting_payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ceo_meeting_payments",
+      "policyname": "Users can insert own meeting payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ceo_meeting_payments",
+      "policyname": "Users can update own meeting payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ceo_meeting_payments",
+      "policyname": "Users can view own meeting payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "community_registrations",
+      "policyname": "Anyone can register",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "community_registrations",
+      "policyname": "Users can read own registrations",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "((auth.uid() = user_id) OR (user_id IS NULL))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "consents",
+      "policyname": "Service inserts consents",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "consents",
+      "policyname": "Users read own consents",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "consumer_profiles",
+      "policyname": "Users read own consumer profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "consumer_profiles",
+      "policyname": "Users update own consumer profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "consumer_profiles",
+      "policyname": "Users upsert own consumer profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "conversations",
+      "policyname": "Users can view own conversations",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = consumer_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "delete_requests",
+      "policyname": "Users can view own delete requests",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "devices",
+      "policyname": "Users can manage own devices",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_admin_access_log",
+      "policyname": "Service role full access fund_admin_access_log",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_investment_plans",
+      "policyname": "Service role full access fund plans",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_investment_plans",
+      "policyname": "Users can view own fund plans",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_investor_notes",
+      "policyname": "Service role full access fund_investor_notes",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_investor_tags",
+      "policyname": "Service role full access fund_investor_tags",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_payment_notifications",
+      "policyname": "Service role full access fund payment notifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_payment_notifications",
+      "policyname": "Users can view own fund payment notifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_payment_reviews",
+      "policyname": "Service role full access fund payment reviews",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_payment_reviews",
+      "policyname": "Users can view own fund payment reviews",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_recurring_transfers",
+      "policyname": "Service role full access recurring fund transfers",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_recurring_transfers",
+      "policyname": "Users can view own recurring fund transfers",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_events",
+      "policyname": "Service role full access fund Stripe events",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_payment_requests",
+      "policyname": "Service role full access fund payment requests",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_payment_requests",
+      "policyname": "Users can view own fund payment requests",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_payments",
+      "policyname": "Service role full access fund Stripe payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_payments",
+      "policyname": "Users can view own fund Stripe payments",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_subscriptions",
+      "policyname": "Service role full access fund Stripe subscriptions",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_stripe_subscriptions",
+      "policyname": "Users can view own fund Stripe subscriptions",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_transfers",
+      "policyname": "Service role full access fund transfers",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "fund_transfers",
+      "policyname": "Users can view own fund transfers",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "identity_verifications",
+      "policyname": "Service role full access on identity_verifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "identity_verifications",
+      "policyname": "Users can insert own verifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "identity_verifications",
+      "policyname": "Users can update own verifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "identity_verifications",
+      "policyname": "Users can view own verifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Public profiles are viewable by anyone",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(is_public = true)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Service role full access on investor_profiles",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Users can delete own investor profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Users can insert own investor profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Users can update own investor profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "investor_profiles",
+      "policyname": "Users can view own investor profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "kirkland_agents",
+      "policyname": "Anon users can read kirkland agents",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "kirkland_agents",
+      "policyname": "Authenticated users can read kirkland agents",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "kyc_profiles",
+      "policyname": "Allow all for service role",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "lead_events",
+      "policyname": "Users view own lead events",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM lead_requests lr\n  WHERE ((lr.id = lead_events.lead_id) AND (lr.user_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "lead_requests",
+      "policyname": "Users create leads",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "lead_requests",
+      "policyname": "Users own lead requests",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "lead_requests",
+      "policyname": "Users update own leads",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "messages",
+      "policyname": "Users can insert messages in own conversations",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM conversations c\n  WHERE ((c.id = messages.conversation_id) AND (c.consumer_id = auth.uid()))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "messages",
+      "policyname": "Users can view messages in own conversations",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM conversations c\n  WHERE ((c.id = messages.conversation_id) AND (c.consumer_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Service role has full access to NDA",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Users can insert own NDA signature",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Users can insert their own NDA",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Users can update own NDA signature",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Users can view own NDA signature",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "nda_signatures",
+      "policyname": "Users can view their own NDA",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "notifications",
+      "policyname": "Users view own notifications",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_data",
+      "policyname": "Users can delete their own onboarding data",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_data",
+      "policyname": "Users can insert their own onboarding data",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_data",
+      "policyname": "Users can update their own onboarding data",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_data",
+      "policyname": "Users can view their own onboarding data",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_invites",
+      "policyname": "Primary investor can view own onboarding invites",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = primary_user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_invites",
+      "policyname": "Service role full access onboarding invites",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_parties",
+      "policyname": "Primary investor can view own onboarding parties",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = primary_user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "onboarding_parties",
+      "policyname": "Service role full access onboarding parties",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "otp_codes",
+      "policyname": "Service role full access on otp_codes",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_accounts",
+      "policyname": "Service role full access Plaid accounts",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_accounts",
+      "policyname": "service_role_all_plaid_accounts",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_data_events",
+      "policyname": "Service role full access Plaid data events",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_items",
+      "policyname": "Service role full access Plaid items",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_items",
+      "policyname": "service_role_all_plaid_items",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_link_diagnostics",
+      "policyname": "Service role full access Plaid diagnostics",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_link_diagnostics",
+      "policyname": "Users read own Plaid diagnostics",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(user_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_product_sync_statuses",
+      "policyname": "Service role full access Plaid product sync statuses",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_product_sync_statuses",
+      "policyname": "Users can view own Plaid product sync statuses",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_statement_metadata",
+      "policyname": "Service role full access Plaid statement metadata",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_statement_metadata",
+      "policyname": "Users can view own Plaid statement metadata",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_sync_cursors",
+      "policyname": "Service role full access Plaid sync cursors",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_sync_cursors",
+      "policyname": "service_role_all_plaid_sync_cursors",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_transactions",
+      "policyname": "Service role full access Plaid transactions",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_transactions",
+      "policyname": "service_role_all_plaid_transactions",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_transfer_accounts",
+      "policyname": "Service role full access Plaid transfer accounts",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_transfer_accounts",
+      "policyname": "Users can view own Plaid transfer accounts",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "plaid_transfer_events",
+      "policyname": "Service role full access Plaid transfer events",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "site_analytics_events",
+      "policyname": "Service role can manage site analytics events",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "site_analytics_sessions",
+      "policyname": "Service role can manage site analytics sessions",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "swipe_actions",
+      "policyname": "Users create swipe actions",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "swipe_actions",
+      "policyname": "Users own swipe actions",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "transfer_email_notifications",
+      "policyname": "Service role full access transfer emails",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "transfer_email_notifications",
+      "policyname": "Users can view own transfer emails",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_agent_selections",
+      "policyname": "Users manage own selections",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_enriched_profiles",
+      "policyname": "Service role full access on user_enriched_profiles",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_enriched_profiles",
+      "policyname": "Users can insert own enriched profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_enriched_profiles",
+      "policyname": "Users can update own enriched profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_enriched_profiles",
+      "policyname": "Users can view own enriched profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_financial_data",
+      "policyname": "Service role full access on financial data",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_financial_data",
+      "policyname": "Users can insert their own financial data",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_financial_data",
+      "policyname": "Users can update their own financial data",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_financial_data",
+      "policyname": "Users can view their own financial data",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_product_usage",
+      "policyname": "Service role full access on user_product_usage",
+      "permissive": "PERMISSIVE",
+      "roles": "{service_role}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_product_usage",
+      "policyname": "Users can insert own product usage",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_product_usage",
+      "policyname": "Users can update own product usage",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "user_product_usage",
+      "policyname": "Users can view own product usage",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "users",
+      "policyname": "Users can insert own profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "users",
+      "policyname": "Users can update own profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = id)",
+      "with_check": "(auth.uid() = id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "users",
+      "policyname": "Users can view own profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "users",
+      "policyname": "Users read own profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "users",
+      "policyname": "Users update own profile",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = id)",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Hushh Agents users can delete own profile images",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "((bucket_id = 'hushh-agent-profile-images'::text) AND (lower((storage.foldername(name))[1]) = (auth.uid())::text))",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Hushh Agents users can update own profile images",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "((bucket_id = 'hushh-agent-profile-images'::text) AND (lower((storage.foldername(name))[1]) = (auth.uid())::text))",
+      "with_check": "((bucket_id = 'hushh-agent-profile-images'::text) AND (lower((storage.foldername(name))[1]) = (auth.uid())::text))"
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Hushh Agents users can upload own profile images",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'hushh-agent-profile-images'::text) AND (lower((storage.foldername(name))[1]) = (auth.uid())::text))"
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Public can read media",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(bucket_id = 'hushh-ai-media'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Public can view Hushh Agents profile images",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(bucket_id = 'hushh-agent-profile-images'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Public community uploads",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(bucket_id = 'community-uploads'::text)"
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Public read community uploads",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(bucket_id = 'community-uploads'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Users can read own files",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "((bucket_id = 'hushh-ai-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "Users can upload to own folder",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'hushh-ai-media'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))"
+    },
+    {
+      "schemaname": "storage",
+      "tablename": "objects",
+      "policyname": "wa-evidence service role only",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "ALL",
+      "qual": "((bucket_id = 'wa-evidence'::text) AND (auth.role() = 'service_role'::text))",
+      "with_check": "((bucket_id = 'wa-evidence'::text) AND (auth.role() = 'service_role'::text))"
+    }
+  ],
+  "functions": [
+    {
+      "function_name": "array_to_halfvec",
+      "identity_arguments": "double precision[], integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_halfvec",
+      "identity_arguments": "integer[], integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_halfvec",
+      "identity_arguments": "numeric[], integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_halfvec",
+      "identity_arguments": "real[], integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_sparsevec",
+      "identity_arguments": "double precision[], integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_sparsevec",
+      "identity_arguments": "integer[], integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_sparsevec",
+      "identity_arguments": "numeric[], integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_sparsevec",
+      "identity_arguments": "real[], integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_vector",
+      "identity_arguments": "double precision[], integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_vector",
+      "identity_arguments": "integer[], integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_vector",
+      "identity_arguments": "numeric[], integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "array_to_vector",
+      "identity_arguments": "real[], integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "avg",
+      "identity_arguments": "halfvec",
+      "result_type": "halfvec",
+      "prokind": "a",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "avg",
+      "identity_arguments": "vector",
+      "result_type": "vector",
+      "prokind": "a",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "batch_agent_selections",
+      "identity_arguments": "p_user_id uuid, p_selections jsonb",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "binary_quantize",
+      "identity_arguments": "halfvec",
+      "result_type": "bit",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "binary_quantize",
+      "identity_arguments": "vector",
+      "result_type": "bit",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "check_user_nda_status",
+      "identity_arguments": "p_user_id uuid",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "claim_wa_job",
+      "identity_arguments": "p_types text[]",
+      "result_type": "wa_jobs",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "cosine_distance",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "cosine_distance",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "cosine_distance",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "delete_rows_by_text_array_if_exists",
+      "identity_arguments": "p_table_name text, p_column_name text, p_values text[]",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "delete_rows_by_text_if_exists",
+      "identity_arguments": "p_table_name text, p_column_name text, p_value text",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "delete_rows_by_uuid_array_if_exists",
+      "identity_arguments": "p_table_name text, p_column_name text, p_values uuid[]",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "delete_rows_by_uuid_if_exists",
+      "identity_arguments": "p_table_name text, p_column_name text, p_value uuid",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "generate_investor_slug",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "get_metrics_summary",
+      "identity_arguments": "window_days integer",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "get_nda_metadata_v2",
+      "identity_arguments": "p_current_gmt text, p_ip text",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "s"
+    },
+    {
+      "function_name": "get_public_investor_profile",
+      "identity_arguments": "p_slug text",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "halfvec",
+      "identity_arguments": "halfvec, integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_accum",
+      "identity_arguments": "double precision[], halfvec",
+      "result_type": "double precision[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_add",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_avg",
+      "identity_arguments": "double precision[]",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_cmp",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_combine",
+      "identity_arguments": "double precision[], double precision[]",
+      "result_type": "double precision[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_concat",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_eq",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_ge",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_gt",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_in",
+      "identity_arguments": "cstring, oid, integer",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_l2_squared_distance",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_le",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_lt",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_mul",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_ne",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_negative_inner_product",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_out",
+      "identity_arguments": "halfvec",
+      "result_type": "cstring",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_recv",
+      "identity_arguments": "internal, oid, integer",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_send",
+      "identity_arguments": "halfvec",
+      "result_type": "bytea",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_spherical_distance",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_sub",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_to_float4",
+      "identity_arguments": "halfvec, integer, boolean",
+      "result_type": "real[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_to_sparsevec",
+      "identity_arguments": "halfvec, integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_to_vector",
+      "identity_arguments": "halfvec, integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "halfvec_typmod_in",
+      "identity_arguments": "cstring[]",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "hamming_distance",
+      "identity_arguments": "bit, bit",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "handle_new_user",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hnsw_bit_support",
+      "identity_arguments": "internal",
+      "result_type": "internal",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hnsw_halfvec_support",
+      "identity_arguments": "internal",
+      "result_type": "internal",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hnsw_sparsevec_support",
+      "identity_arguments": "internal",
+      "result_type": "internal",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hnswhandler",
+      "identity_arguments": "internal",
+      "result_type": "index_am_handler",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hushh_agents_delete_user_account",
+      "identity_arguments": "",
+      "result_type": "void",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hushh_agents_set_updated_at",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hushh_agents_sync_conversation_preview",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "hushh_agents_sync_match_from_swipe",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "inner_product",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "inner_product",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "inner_product",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "is_public_profile_field_visible",
+      "identity_arguments": "p_privacy_settings jsonb, p_section text, p_field text",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "ivfflat_bit_support",
+      "identity_arguments": "internal",
+      "result_type": "internal",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "ivfflat_halfvec_support",
+      "identity_arguments": "internal",
+      "result_type": "internal",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "ivfflathandler",
+      "identity_arguments": "internal",
+      "result_type": "index_am_handler",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "jaccard_distance",
+      "identity_arguments": "bit, bit",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l1_distance",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l1_distance",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l1_distance",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_distance",
+      "identity_arguments": "halfvec, halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_distance",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_distance",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_norm",
+      "identity_arguments": "halfvec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_norm",
+      "identity_arguments": "sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_normalize",
+      "identity_arguments": "halfvec",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_normalize",
+      "identity_arguments": "sparsevec",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "l2_normalize",
+      "identity_arguments": "vector",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "mask_public_email",
+      "identity_arguments": "p_email text",
+      "result_type": "text",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "purge_user_account",
+      "identity_arguments": "p_user_id uuid",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "set_current_timestamp_updated_at",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "sign_global_nda",
+      "identity_arguments": "p_signer_name text, p_nda_version text, p_pdf_url text, p_signer_ip text, p_documents_acknowledged jsonb, p_consent_version text",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "sparsevec",
+      "identity_arguments": "sparsevec, integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_cmp",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_eq",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_ge",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_gt",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_in",
+      "identity_arguments": "cstring, oid, integer",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_l2_squared_distance",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_le",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_lt",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_ne",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_negative_inner_product",
+      "identity_arguments": "sparsevec, sparsevec",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_out",
+      "identity_arguments": "sparsevec",
+      "result_type": "cstring",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_recv",
+      "identity_arguments": "internal, oid, integer",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_send",
+      "identity_arguments": "sparsevec",
+      "result_type": "bytea",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_to_halfvec",
+      "identity_arguments": "sparsevec, integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_to_vector",
+      "identity_arguments": "sparsevec, integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sparsevec_typmod_in",
+      "identity_arguments": "cstring[]",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "subvector",
+      "identity_arguments": "halfvec, integer, integer",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "subvector",
+      "identity_arguments": "vector, integer, integer",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sum",
+      "identity_arguments": "halfvec",
+      "result_type": "halfvec",
+      "prokind": "a",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "sum",
+      "identity_arguments": "vector",
+      "result_type": "vector",
+      "prokind": "a",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "track_product_usage",
+      "identity_arguments": "p_product_name text, p_metadata jsonb",
+      "result_type": "jsonb",
+      "prokind": "f",
+      "security_definer": true,
+      "volatility": "v"
+    },
+    {
+      "function_name": "update_onboarding_data_timestamp",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    },
+    {
+      "function_name": "vector",
+      "identity_arguments": "vector, integer, boolean",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_accum",
+      "identity_arguments": "double precision[], vector",
+      "result_type": "double precision[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_add",
+      "identity_arguments": "vector, vector",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_avg",
+      "identity_arguments": "double precision[]",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_cmp",
+      "identity_arguments": "vector, vector",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_combine",
+      "identity_arguments": "double precision[], double precision[]",
+      "result_type": "double precision[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_concat",
+      "identity_arguments": "vector, vector",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_dims",
+      "identity_arguments": "halfvec",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_dims",
+      "identity_arguments": "vector",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_eq",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_ge",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_gt",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_in",
+      "identity_arguments": "cstring, oid, integer",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_l2_squared_distance",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_le",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_lt",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_mul",
+      "identity_arguments": "vector, vector",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_ne",
+      "identity_arguments": "vector, vector",
+      "result_type": "boolean",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_negative_inner_product",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_norm",
+      "identity_arguments": "vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_out",
+      "identity_arguments": "vector",
+      "result_type": "cstring",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_recv",
+      "identity_arguments": "internal, oid, integer",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_send",
+      "identity_arguments": "vector",
+      "result_type": "bytea",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_spherical_distance",
+      "identity_arguments": "vector, vector",
+      "result_type": "double precision",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_sub",
+      "identity_arguments": "vector, vector",
+      "result_type": "vector",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_to_float4",
+      "identity_arguments": "vector, integer, boolean",
+      "result_type": "real[]",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_to_halfvec",
+      "identity_arguments": "vector, integer, boolean",
+      "result_type": "halfvec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_to_sparsevec",
+      "identity_arguments": "vector, integer, boolean",
+      "result_type": "sparsevec",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "vector_typmod_in",
+      "identity_arguments": "cstring[]",
+      "result_type": "integer",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "i"
+    },
+    {
+      "function_name": "wa_set_updated_at",
+      "identity_arguments": "",
+      "result_type": "trigger",
+      "prokind": "f",
+      "security_definer": false,
+      "volatility": "v"
+    }
+  ],
+  "defaultExpressionHashes": [
+    {
+      "table": "agent_profiles",
+      "column": "about",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "agency_disclosure",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "communication_modes",
+      "defaultExpressionHash": "4c1a24a48a3d737fe61917aed32058fec7620431a9287732dad0a6682d225d22"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "is_online",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "languages",
+      "defaultExpressionHash": "e509f1998d803c62e90f375ca2e675f06b4e4de2f717ed62d69c26e6277e66f4"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "licenses",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "lines_of_authority",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "profile_status",
+      "defaultExpressionHash": "bc587d16fe04f2dc435392330ab3f1d862259110e3f739541615410e35793930"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "quotes_completed",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "rating",
+      "defaultExpressionHash": "8aed642bf5118b9d3c859bd4be35ecac75b6e873cce34e7b6f554b06f75550d7"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "response_time",
+      "defaultExpressionHash": "7a2ffa25a190e3c8e0b248ce2ad4d7d07edda3511a53cbaf05f55fa75090693b"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "review_count",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "service_radius",
+      "defaultExpressionHash": "5d3354041b3628ed9a59dd5cfc5a47ceeaddc9b64bfda72284e01cbeb36903f9"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "specialties",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "states_served",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "verified",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "agent_profiles",
+      "column": "years_experience",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "agent_reviews",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "agent_reviews",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "agent_reviews",
+      "column": "text",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "analytics_events",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "analytics_events",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "analytics_events",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "app_config",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "app_config",
+      "column": "value",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "blocked_agents",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "blocked_agents",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "blog_drafts",
+      "column": "access_level",
+      "defaultExpressionHash": "0b4ac1ebbadfc0d2db23779bdca17258d472f093a3d4fb9d8ff73ba170bc94db"
+    },
+    {
+      "table": "blog_drafts",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "blog_drafts",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "blog_drafts",
+      "column": "status",
+      "defaultExpressionHash": "4317ec0899f515e9ed6e4b75fb3f96500b74a17c56778200027802c05692b301"
+    },
+    {
+      "table": "blog_drafts",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "amount_cents",
+      "defaultExpressionHash": "ad57366865126e55649ecb23ae1d48887544976efea46a48eb5d85a6eeb4d306"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "calendly_booked",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "hushh_coins_awarded",
+      "defaultExpressionHash": "6ce318969619d1c360b6144be09e3d3a22674897c7cbfe995716ed8b7ff7c4cf"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "payment_method",
+      "defaultExpressionHash": "12ac699e53abaa19a61714b0051c69cfe5eedf017ad61a6531c16e7a39eba630"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "payment_status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "ceo_meeting_payments",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "community_registrations",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "community_registrations",
+      "column": "events",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "community_registrations",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "community_registrations",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "consents",
+      "column": "accepted_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "consents",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "consents",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "consents",
+      "column": "policy_version",
+      "defaultExpressionHash": "2a45257f391ee4b9a39dc800b7f7a8f51f93255330048fa996774d3eb612c42e"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "allow_analytics",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "email_enabled",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "goal_timeline",
+      "defaultExpressionHash": "79c4a0e7a888c630a42e1dc92f350bb2143461ef3677e6b91329db982cae7de2"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "has_pets",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "has_vehicles",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "household_size",
+      "defaultExpressionHash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "insurance_goals",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "owns_home",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "push_enabled",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "service_mode",
+      "defaultExpressionHash": "ad0d738ed68badcba041af1ecb45916f59620d83cef9b9b13bd94dbb9b3204b0"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "service_radius",
+      "defaultExpressionHash": "b7a56873cd771f2c446d369b649430b65a756ba278ff97ec81bb6f55b2e73569"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "share_location",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "share_profile",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "sms_enabled",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "consumer_profiles",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "content_items",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "content_items",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "content_items",
+      "column": "is_cluster_primary",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "content_versions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "content_versions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "conversations",
+      "column": "contact_revealed",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "conversations",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "conversations",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "conversations",
+      "column": "status",
+      "defaultExpressionHash": "bc587d16fe04f2dc435392330ab3f1d862259110e3f739541615410e35793930"
+    },
+    {
+      "table": "conversations",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "delete_requests",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "delete_requests",
+      "column": "requested_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "delete_requests",
+      "column": "scheduled_at",
+      "defaultExpressionHash": "4007b835ca6df155f51afa5512633babc79be18839fb158d7beb3af9e726707b"
+    },
+    {
+      "table": "delete_requests",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "deleted_account_payment_audits",
+      "column": "deleted_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "deleted_account_payment_audits",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "devices",
+      "column": "active",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "devices",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "devices",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "devices",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_admin_access_log",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_admin_access_log",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_admin_access_log",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "class_a_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "class_b_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "class_c_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "investor_verification_status",
+      "defaultExpressionHash": "b23894f73864a2f6ca5037dd055c94a84476eb5d9b18baacbee453949d3f2300"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "paid_amount",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "recurring_enabled",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "risk_flags",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "selected_fund",
+      "defaultExpressionHash": "acb2cdbafa9afb6c1ccb81c842554486c5c3679e24be3bb67821fcd71e1ab810"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "status",
+      "defaultExpressionHash": "465e7ba2b7715e69c0e0b45f365d8767283687aef1e384664e15d3b028e2e1db"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "stripe_payment_status",
+      "defaultExpressionHash": "b23894f73864a2f6ca5037dd055c94a84476eb5d9b18baacbee453949d3f2300"
+    },
+    {
+      "table": "fund_investment_plans",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_investor_notes",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_investor_notes",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_investor_notes",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_investor_tags",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_investor_tags",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_payment_notifications",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_payment_notifications",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_payment_notifications",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "fund_payment_reviews",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_payment_reviews",
+      "column": "flags",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "fund_payment_reviews",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_payment_reviews",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_recurring_transfers",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_recurring_transfers",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_recurring_transfers",
+      "column": "status",
+      "defaultExpressionHash": "fe185eb7dfd50a6faad9cb4f4edf1a2f7b9ac664baaa4bf869a41a2157be7987"
+    },
+    {
+      "table": "fund_recurring_transfers",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_events",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_events",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_stripe_events",
+      "column": "processed_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_events",
+      "column": "processing_status",
+      "defaultExpressionHash": "9691ca6aeb08410a23c1b7335d532176bfd233bab436b1586149a2e95b6e1790"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "class_a_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "class_b_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "class_c_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "currency",
+      "defaultExpressionHash": "43f9a60bf3baaa3a921a71de88b4b6a8aff47a38acccd30b11c2d4fb2da1f0ce"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "recurring_selected",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "risk_flags",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "selected_fund",
+      "defaultExpressionHash": "acb2cdbafa9afb6c1ccb81c842554486c5c3679e24be3bb67821fcd71e1ab810"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "status",
+      "defaultExpressionHash": "bfedcf35acabae83b210d3a1bc74f05e465ea25c8063189d7ca28d44bd52d14c"
+    },
+    {
+      "table": "fund_stripe_payment_requests",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "currency",
+      "defaultExpressionHash": "43f9a60bf3baaa3a921a71de88b4b6a8aff47a38acccd30b11c2d4fb2da1f0ce"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "payment_kind",
+      "defaultExpressionHash": "55713535cd2a13b03ef5c9e5d3a828f6466acb8beee7fa43c63de58b2a71e8a5"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "fund_stripe_payments",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_subscriptions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_stripe_subscriptions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_stripe_subscriptions",
+      "column": "status",
+      "defaultExpressionHash": "742c674b1e601d2b6bd19db69307628e6520c167d3209b82c72d6656a35ad3dd"
+    },
+    {
+      "table": "fund_stripe_subscriptions",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "ach_class",
+      "defaultExpressionHash": "29218a29bca755c5adf653571d1eedd24b38384779b43a407cb0017890c68056"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "network",
+      "defaultExpressionHash": "1cd2e22017244ba613b0001bedb9e349b140019c3fac04f5e2992c89d820d601"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "sandbox_mode",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "status",
+      "defaultExpressionHash": "fe185eb7dfd50a6faad9cb4f4edf1a2f7b9ac664baaa4bf869a41a2157be7987"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "transfer_type",
+      "defaultExpressionHash": "d5fa398f33acb00331d9fb9c0074ba34ad6dd17221ff6621c6d13707f5aef912"
+    },
+    {
+      "table": "fund_transfers",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "document_verified",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "initiated_from",
+      "defaultExpressionHash": "9fff22c6a01a3894c1ae6690889995d0c75e6c1471f6ef29891556477c7d382f"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "selfie_verified",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "identity_verifications",
+      "column": "verification_type",
+      "defaultExpressionHash": "887ad4a4e26a233793dfaa48dcda9054cfff73be222a169ffeb5dd3e24b37483"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "age",
+      "defaultExpressionHash": "624b60c58c9d8bfb6ff1886c2fd605d2adeb6ea4da576068201b6c6958ce93f4"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "derived_context",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "email",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "is_ai_prefilled",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "is_public",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "name",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "phone_country_code",
+      "defaultExpressionHash": "bdf5b6bb6ed7bd6d5469ae8a33b53c30f3c71efb138cb0e56bd411da8bf4459c"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "phone_number",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "research_confidence",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "research_status",
+      "defaultExpressionHash": "d32b62a41fb73fbd940a68f557b57e122538092b6c5584fbceceda4272359675"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "investor_profiles",
+      "column": "user_confirmed",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "categories",
+      "defaultExpressionHash": "de9b902a0abb75d50771c319ee6d6a50d3963e3d28ce30e76b96e3c382b0c4ab"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "country",
+      "defaultExpressionHash": "f7461bc5febd20c0e21bbab34add3421455add7f21d556488cd8aa37d9d7cb44"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "is_closed",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "photos",
+      "defaultExpressionHash": "90e44285a29b2421299ed8d3cc92403f43c3a370d8e7804b9a0d00cd78827641"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "review_count",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "services",
+      "defaultExpressionHash": "90e44285a29b2421299ed8d3cc92403f43c3a370d8e7804b9a0d00cd78827641"
+    },
+    {
+      "table": "kirkland_agents",
+      "column": "status",
+      "defaultExpressionHash": "bc587d16fe04f2dc435392330ab3f1d862259110e3f739541615410e35793930"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "city",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "country",
+      "defaultExpressionHash": "f7461bc5febd20c0e21bbab34add3421455add7f21d556488cd8aa37d9d7cb44"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "kyc_status",
+      "defaultExpressionHash": "4a2d19146ddc8d9f892efe39763a38f2c736544d10c67c2e484522c4161bd53e"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "payment_completed",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "phone",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "plaid_account_count",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "plaid_connected",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "plaid_total_balance",
+      "defaultExpressionHash": "8aed642bf5118b9d3c859bd4be35ecac75b6e873cce34e7b6f554b06f75550d7"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "selected_tickets_json",
+      "defaultExpressionHash": "b31654538091179c7b26812fa008dd43bfd167d1cb189992156766e40f2f212b"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "state",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "street",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "kyc_profiles",
+      "column": "zip_code",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "lead_events",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "lead_events",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "lead_requests",
+      "column": "callback_time",
+      "defaultExpressionHash": "78e2ca93e7ad7d9bfa2f4e6e2ac56b155f6834156d7887b240f8b19136f11634"
+    },
+    {
+      "table": "lead_requests",
+      "column": "contact_reveal",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "lead_requests",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "lead_requests",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "lead_requests",
+      "column": "preferred_channel",
+      "defaultExpressionHash": "9af16e4074ea78e814501aa1220efa968c7d709d13a9412378aad85bff55083e"
+    },
+    {
+      "table": "lead_requests",
+      "column": "status",
+      "defaultExpressionHash": "8688cf8f43f94f36e640f011e3f7facf33a00ae3eea09264de8097f28106e1b9"
+    },
+    {
+      "table": "lead_requests",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "lead_requests",
+      "column": "urgency",
+      "defaultExpressionHash": "2b100278358f060ef716be0df8c31b362a945e392cc84a5b5b7e830a29b03ba4"
+    },
+    {
+      "table": "lead_requests",
+      "column": "want_multiple_agents",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "messages",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "messages",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "documents_acknowledged",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "nda_version",
+      "defaultExpressionHash": "ed1ef17823140c132b4efd8cbfa6e7e4903384a0a09189f4674f8399eead21d2"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "signed_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "signer_ip",
+      "defaultExpressionHash": "389ce56a0daa1ad8d7c11dc170390ac80156c631a29a363cef450641dc3adf74"
+    },
+    {
+      "table": "nda_signatures",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "notifications",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "notifications",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "notifications",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "notifications",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "address_phone_country_code",
+      "defaultExpressionHash": "bdf5b6bb6ed7bd6d5469ae8a33b53c30f3c71efb138cb0e56bd411da8bf4459c"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "ai_prefilled",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "application_status",
+      "defaultExpressionHash": "cc6dab0d12ded9ef8340db8e5e1155ef08f1795f376cc54b307c686d7bbceec5"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "class_a_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "class_b_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "class_c_units",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "completed_steps",
+      "defaultExpressionHash": "75a4ee1a45fe5251653c0b8ce76d3f1438d5bb4b57ec8958d279009e5e85b718"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "current_step",
+      "defaultExpressionHash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "financial_link_status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "fund_investor_verification_status",
+      "defaultExpressionHash": "b23894f73864a2f6ca5037dd055c94a84476eb5d9b18baacbee453949d3f2300"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "fund_payment_status",
+      "defaultExpressionHash": "b23894f73864a2f6ca5037dd055c94a84476eb5d9b18baacbee453949d3f2300"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "is_completed",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "manual_review_route",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "nda_version",
+      "defaultExpressionHash": "ed1ef17823140c132b4efd8cbfa6e7e4903384a0a09189f4674f8399eead21d2"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "phone_country_code",
+      "defaultExpressionHash": "bdf5b6bb6ed7bd6d5469ae8a33b53c30f3c71efb138cb0e56bd411da8bf4459c"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "plaid_transfer_setup_status",
+      "defaultExpressionHash": "b23894f73864a2f6ca5037dd055c94a84476eb5d9b18baacbee453949d3f2300"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "privacy_accepted",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "recurring_investment_enabled",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "selected_fund",
+      "defaultExpressionHash": "acb2cdbafa9afb6c1ccb81c842554486c5c3679e24be3bb67821fcd71e1ab810"
+    },
+    {
+      "table": "onboarding_data",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "onboarding_invites",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "onboarding_invites",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "onboarding_invites",
+      "column": "status",
+      "defaultExpressionHash": "510411d11b100e7b51fa3683d9b2b528103c02cb7ebd791a5714e4964885bd2e"
+    },
+    {
+      "table": "onboarding_invites",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "is_required",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "profile",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "status",
+      "defaultExpressionHash": "fd25a2e50c5eddf38f9532056ec830345239abc33c66e0e62023f598672e8fec"
+    },
+    {
+      "table": "onboarding_parties",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "otp_codes",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "otp_codes",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "otp_codes",
+      "column": "used",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "plaid_accounts",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_accounts",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_accounts",
+      "column": "iso_currency_code",
+      "defaultExpressionHash": "eef207195426eaeb5f464f66b76a29a5cf954abb73bc79062bfdd67031d2cfc4"
+    },
+    {
+      "table": "plaid_accounts",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_data_events",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_data_events",
+      "column": "processed_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_items",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_items",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_items",
+      "column": "products_requested",
+      "defaultExpressionHash": "3fad7390b7bffb3cf2f50703d5e74be1cd9c8738608b6702cfea68f9d98e02bb"
+    },
+    {
+      "table": "plaid_items",
+      "column": "status",
+      "defaultExpressionHash": "bc587d16fe04f2dc435392330ab3f1d862259110e3f739541615410e35793930"
+    },
+    {
+      "table": "plaid_items",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "browser_context",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "error_details",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "page_state",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "plaid_link_diagnostics",
+      "column": "plaid_metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "attempts",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "available",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "plaid_product_sync_statuses",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_statement_metadata",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_statement_metadata",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_statement_metadata",
+      "column": "status",
+      "defaultExpressionHash": "c9e98ffa7e8f5c2cc728ceeb60ea8b703bbac0c83cc7e656e6d6c3fc67a137cd"
+    },
+    {
+      "table": "plaid_statement_metadata",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_sync_cursors",
+      "column": "cursor",
+      "defaultExpressionHash": "676219f025870b893c0df8670464cfdae5f5cc073c6c44841e35f1805c6b81ce"
+    },
+    {
+      "table": "plaid_sync_cursors",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_sync_cursors",
+      "column": "last_synced_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_sync_cursors",
+      "column": "product",
+      "defaultExpressionHash": "e8762d1e8e0f1f564de29055292691d39cb96fbab3c9e441f0187bb23da5ca98"
+    },
+    {
+      "table": "plaid_sync_cursors",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_transactions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_transactions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_transactions",
+      "column": "iso_currency_code",
+      "defaultExpressionHash": "eef207195426eaeb5f464f66b76a29a5cf954abb73bc79062bfdd67031d2cfc4"
+    },
+    {
+      "table": "plaid_transactions",
+      "column": "pending",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "is_default",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "iso_currency_code",
+      "defaultExpressionHash": "eef207195426eaeb5f464f66b76a29a5cf954abb73bc79062bfdd67031d2cfc4"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "status",
+      "defaultExpressionHash": "bc587d16fe04f2dc435392330ab3f1d862259110e3f739541615410e35793930"
+    },
+    {
+      "table": "plaid_transfer_accounts",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "plaid_transfer_events",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "plaid_transfer_events",
+      "column": "processed_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_events",
+      "column": "context",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "site_analytics_events",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_events",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "site_analytics_events",
+      "column": "occurred_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_events",
+      "column": "properties",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "device",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "last_seen_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "started_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "site_analytics_sessions",
+      "column": "utm",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "swipe_actions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "swipe_actions",
+      "column": "id",
+      "defaultExpressionHash": "eedb0fbbd997db1c382fa8e9b050cc77dfa576f733b1fbd28f2d9f46a24e43f6"
+    },
+    {
+      "table": "transfer_email_notifications",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "transfer_email_notifications",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "transfer_email_notifications",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "user_agent_selections",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_agent_selections",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "confidence_score",
+      "defaultExpressionHash": "8aed642bf5118b9d3c859bd4be35ecac75b6e873cce34e7b6f554b06f75550d7"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "enrichment_source",
+      "defaultExpressionHash": "5e15d4ab91e945cdcbb828375f21be9e3cf71d57875b96c8ecd7b3026c71546b"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "status",
+      "defaultExpressionHash": "9844d119d1d2e8d2794b776ed53ee7a6353b401127671f6d2a20831d96b35d09"
+    },
+    {
+      "table": "user_enriched_profiles",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "asset_report_days_requested",
+      "defaultExpressionHash": "39fa9ec190eee7b6f4dff1100d6343e10918d044c75eac8f9e9a2596173f80c9"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "asset_report_status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "available_products",
+      "defaultExpressionHash": "bc4a8edb4fcb6071164327c22abee5f554f16c3137e76a70278d23c6f38a40f1"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "signal_prepared",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "user_financial_data",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "last_used_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "user_product_usage",
+      "column": "usage_count",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "users",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "users",
+      "column": "metadata",
+      "defaultExpressionHash": "8001f2ba79d7ee0ed7c18f82705408c75c1e6f9ac6859477febdad7f5599c099"
+    },
+    {
+      "table": "users",
+      "column": "onboarding_step",
+      "defaultExpressionHash": "9ab982df9af168d29632a89e3c98d8dc9da01a5996f64eb1d60904195f7a29ba"
+    },
+    {
+      "table": "users",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_classifications",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_classifications",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_extractions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_extractions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_extractions",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "wa_groups",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_groups",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_groups",
+      "column": "is_monitored",
+      "defaultExpressionHash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    },
+    {
+      "table": "wa_groups",
+      "column": "relevance_prior",
+      "defaultExpressionHash": "973b372a514f91db8219fef585cdf81b09196afd7948f5fb1e29c2016dd995a0"
+    },
+    {
+      "table": "wa_groups",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "max_retries",
+      "defaultExpressionHash": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "retry_count",
+      "defaultExpressionHash": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "wa_jobs",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_links",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_links",
+      "column": "fetch_status",
+      "defaultExpressionHash": "a89df8d14a00b7bd2ead7e86414dcd5232bff306786856171b38584e153bb73f"
+    },
+    {
+      "table": "wa_links",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_media",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_media",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_media",
+      "column": "media_status",
+      "defaultExpressionHash": "c9e98ffa7e8f5c2cc728ceeb60ea8b703bbac0c83cc7e656e6d6c3fc67a137cd"
+    },
+    {
+      "table": "wa_messages",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_messages",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_messages",
+      "column": "is_forwarded",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "wa_messages",
+      "column": "source",
+      "defaultExpressionHash": "a5b64bac282aa5f8111d9da5550583679ca128885d6eaf2d2a8355bd2ccf7184"
+    },
+    {
+      "table": "wa_review_actions",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_review_actions",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_sender_identities",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_sender_identities",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_sender_identities",
+      "column": "is_verified",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "wa_senders",
+      "column": "created_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    },
+    {
+      "table": "wa_senders",
+      "column": "id",
+      "defaultExpressionHash": "eea9a3e7c2abe43835e2a6fdf92a7d1e6f145ad6dfbfd243fc5d395e5b390a33"
+    },
+    {
+      "table": "wa_senders",
+      "column": "is_priority",
+      "defaultExpressionHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+    },
+    {
+      "table": "wa_senders",
+      "column": "priority_weight",
+      "defaultExpressionHash": "221764976efe04132774d96b0253cc31434c5261737469324f222621baf34b20"
+    },
+    {
+      "table": "wa_senders",
+      "column": "updated_at",
+      "defaultExpressionHash": "28a4dae0461e17af56e979c2095abfbe0bfc45fe9ca8abf3144338a518a1bb8f"
+    }
+  ]
+}

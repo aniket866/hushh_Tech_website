@@ -19,15 +19,28 @@ import { checkNDAStatus } from '../services/nda/ndaService';
 import { useAuthSession } from '../auth/AuthSessionProvider';
 import {
   buildLoginRedirectPath,
+  canHushhResearchAccessRoute,
   canGuestAccessRoute,
   isAuthenticatedAccountRoute,
   isGuestAuthRoute,
   isPublicSharedProfileRoute,
 } from '../auth/routePolicy';
 import { isLocalOnboardingPreview } from '../services/onboarding/flow';
+import {
+  getHushhResearchCompatibilityMode,
+  HushhResearchCompatibilityError,
+} from '../services/hushhResearch/compatibility';
+import { HUSHH_RESEARCH_SOURCE } from '../services/hushhResearch/contracts';
+import { isHushhResearchAuthMode } from '../services/hushhResearch/firebaseAuth';
 
 interface GlobalNDAGateProps {
   children: ReactNode;
+}
+
+function canResearchSessionAccessWithoutLegacyNda(
+  pathname: string,
+): boolean {
+  return canHushhResearchAccessRoute(pathname);
 }
 
 const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
@@ -36,6 +49,11 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
   const { session, status } = useAuthSession();
   const [isChecking, setIsChecking] = useState(true);
   const [hasSignedNDA, setHasSignedNDA] = useState<boolean | null>(null);
+  const isResearchModeActive = isHushhResearchAuthMode();
+  const isResearchSessionHint =
+    session?.user?.app_metadata?.auth_source === HUSHH_RESEARCH_SOURCE;
+  const isResearchBoundaryActive =
+    isResearchModeActive || isResearchSessionHint;
 
   // Fallback timeout — if isChecking stays true for >8 seconds,
   // auto-resolve to prevent infinite "Verifying access..." spinner.
@@ -46,6 +64,17 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
   useEffect(() => {
     if (isChecking) {
       bootTimeoutRef.current = setTimeout(() => {
+        if (isResearchBoundaryActive) {
+          // Research sessions never receive optimistic NDA access. If the
+          // refreshed session check stalls, settle on the public surface only.
+          setHasSignedNDA(false);
+          setIsChecking(false);
+          if (!canResearchSessionAccessWithoutLegacyNda(location.pathname)) {
+            navigate('/', { replace: true });
+          }
+          return;
+        }
+
         console.warn(
           '[GlobalNDAGate] Boot timeout reached (8s). Forcing access check to resolve.'
         );
@@ -65,7 +94,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
         bootTimeoutRef.current = null;
       }
     };
-  }, [isChecking, location.pathname]);
+  }, [isChecking, isResearchBoundaryActive, location.pathname, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +102,21 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
     const checkNDA = async () => {
       const pathname = location.pathname;
       const isDevOnboardingPreview = isLocalOnboardingPreview(pathname, location.search);
+
+      // Research mode is a separate identity and product-data boundary. It
+      // can render only explicitly public/Research-auth routes and must never
+      // mount the legacy OAuth callback or consult the legacy NDA backend.
+      if (isResearchBoundaryActive) {
+        const canAccess = canResearchSessionAccessWithoutLegacyNda(pathname);
+        if (!cancelled) {
+          setIsChecking(false);
+          setHasSignedNDA(canAccess);
+          if (!canAccess) {
+            navigate('/', { replace: true });
+          }
+        }
+        return;
+      }
 
       if (isDevOnboardingPreview) {
         if (!cancelled) {
@@ -134,6 +178,35 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
       if (!cancelled) {
         setIsChecking(true);
         setHasSignedNDA(null);
+      }
+
+      // Resolve the refreshed Research session before consulting the legacy
+      // NDA backend. LINK_REQUIRED and invalidated Research sessions are also
+      // handled here so they cannot fall through to GcpBackend.
+      try {
+        const compatibilityMode = await getHushhResearchCompatibilityMode();
+        if (compatibilityMode === 'research') {
+          if (!cancelled) {
+            setHasSignedNDA(false);
+            setIsChecking(false);
+            if (!canResearchSessionAccessWithoutLegacyNda(pathname)) {
+              navigate('/', { replace: true });
+            }
+          }
+          return;
+        }
+      } catch (error) {
+        if (error instanceof HushhResearchCompatibilityError) {
+          if (!cancelled) {
+            setHasSignedNDA(false);
+            setIsChecking(false);
+            if (!canResearchSessionAccessWithoutLegacyNda(pathname)) {
+              navigate('/', { replace: true });
+            }
+          }
+          return;
+        }
+        throw error;
       }
 
       // USER IS AUTHENTICATED - Check NDA status (with 5s timeout)
@@ -199,7 +272,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [location.hash, location.pathname, location.search, navigate, session?.user?.id, status]);
+  }, [isResearchBoundaryActive, location.hash, location.pathname, location.search, navigate, session?.user?.id, status]);
 
   // Show loading state while checking - Apple-style black/white design
   if (isChecking) {
@@ -233,13 +306,15 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
 
   // Security Check: Only render children if access is explicitly allowed
   // or it's a public/guest-accessible route.
-  const canAccess =
-    hasSignedNDA ||
-    isLocalOnboardingPreview(location.pathname, location.search) ||
-    canGuestAccessRoute(location.pathname) ||
+  const canAccessWithoutNda = canGuestAccessRoute(location.pathname) ||
     isPublicSharedProfileRoute(location.pathname);
+  const canAccess = isResearchBoundaryActive
+    ? canResearchSessionAccessWithoutLegacyNda(location.pathname)
+    : hasSignedNDA ||
+      isLocalOnboardingPreview(location.pathname, location.search) ||
+      canAccessWithoutNda;
   
-  if (!canAccess && status === 'authenticated') {
+  if (!canAccess && (status === 'authenticated' || isResearchBoundaryActive)) {
     return null; // Fallback while navigation to /sign-nda completes
   }
 

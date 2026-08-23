@@ -23,7 +23,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../src/resources/config/config", () => ({
   default: {
-    supabaseClient: {
+    gcpBackendClient: {
       auth: {
         refreshSession: (...args: unknown[]) => refreshSessionMock(...args),
       },

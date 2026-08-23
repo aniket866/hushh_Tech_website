@@ -52,12 +52,12 @@ const OnboardingBankReviewChip: React.FC<OnboardingBankReviewChipProps> = ({
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!session?.user?.id || !config.supabaseClient) {
+      if (!session?.user?.id || !config.gcpBackendClient) {
         if (!cancelled) setShouldRender(false);
         return;
       }
       try {
-        const { data } = await config.supabaseClient
+        const { data } = await config.gcpBackendClient
           .from("onboarding_data")
           .select("financial_link_status, fund_payment_status")
           .eq("user_id", session.user.id)

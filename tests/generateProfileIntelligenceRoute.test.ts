@@ -6,8 +6,8 @@ const createClient = vi.fn(() => ({
 }));
 const fetchMock = vi.fn();
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient,
+vi.mock("../api/shared/gcpServerClient.js", () => ({
+  createGcpServerClient: createClient,
 }));
 
 const createResponse = () => {
@@ -75,8 +75,8 @@ const importHandler = async () => {
 
 describe("generate profile intelligence route", () => {
   beforeEach(() => {
-    process.env.SUPABASE_URL = "https://ibsisfnjxeowvdtvgzff.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME = "hushh-tech-uat:us-central1:hushh-tech-app-pg-uat";
+    process.env.GCP_SERVER_ACTOR_UID = "test-server-actor";
     process.env.PROFILE_INTELLIGENCE_API_BASE_URL = "https://profile-intelligence.example";
     process.env.PROFILE_INTELLIGENCE_TIMEOUT_MS = "1000";
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
@@ -109,8 +109,8 @@ describe("generate profile intelligence route", () => {
   });
 
   afterEach(() => {
-    delete process.env.SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.CLOUD_SQL_INSTANCE_CONNECTION_NAME;
+    delete process.env.GCP_SERVER_ACTOR_UID;
     delete process.env.PROFILE_INTELLIGENCE_API_BASE_URL;
     delete process.env.PROFILE_INTELLIGENCE_TIMEOUT_MS;
     delete process.env.PROFILE_INTELLIGENCE_DISABLED;

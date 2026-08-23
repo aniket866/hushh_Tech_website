@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "hushh-tech-storage-seven-bucket-activation-v1",
+  "contractState": "UAT_CREATE_ONLY_ACTIVATED",
+  "environment": "uat",
+  "project": "hushh-tech-uat",
+  "contractFileDigestSha256": "41659b1401897fb81345a84351d94512cfb2658305abb47017121947b522508f",
+  "executionPolicy": {
+    "createOnly": true,
+    "ifGenerationMatch": 0,
+    "sourceMutationAllowed": false,
+    "targetOverwriteAllowed": false,
+    "targetDeleteAllowed": false,
+    "productionMutationAllowed": false,
+    "runtimeRoutingAllowed": false,
+    "executionActivated": true
+  },
+  "activationDigestSha256": "2a5413ee962ee78b96f6ca3d40b5604d9628b10d620925b15e2ab273f57ce345"
+}

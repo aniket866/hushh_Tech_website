@@ -181,14 +181,14 @@ async function loadPublicUsersFallback(
   windowDays: number,
   sourceError: string
 ): Promise<SummaryPayload | null> {
-  const supabase = getMetricsClient();
+  const gcpBackend = getMetricsClient();
   const window = buildWindow(windowDays, DEFAULT_REPORT_TIMEZONE);
 
-  if (!supabase || !window.startDate || !window.endDate) {
+  if (!gcpBackend || !window.startDate || !window.endDate) {
     return null;
   }
 
-  const response = await supabase
+  const response = await gcpBackend
     .from("users")
     .select("id, created_at, onboarding_step")
     .gte("created_at", `${window.startDate}T00:00:00.000Z`);
@@ -235,7 +235,7 @@ async function loadPublicUsersFallback(
     timezone: DEFAULT_REPORT_TIMEZONE,
     window,
     businessFunnel: {
-      source: "website-supabase-public-users-fallback",
+      source: "website-gcpBackend-public-users-fallback",
       overview: {
         signups: 0,
         persistedUsers: totalPersistedUsers,
@@ -273,7 +273,7 @@ async function loadPublicUsersFallback(
         "Traffic metrics require the server summary API. The current fallback is showing public.users only.",
     },
     legacy: {
-      source: "legacy-hushh-api-supabase",
+      source: "legacy-hushh-api-gcpBackend",
       available: false,
       overview: {
         usersCreated: 0,

@@ -191,17 +191,17 @@ const hasDisplayableFinancialData = (
 // Database Restore — Most Stable
 // =====================================================
 
-/** Load completed financial data from Supabase database */
+/** Load completed financial data from GcpBackend database */
 const loadFromDatabase = async (userId: string): Promise<PlaidLinkState | null> => {
   try {
     const config = (await import('../../resources/config/config')).default;
-    const supabase = config.supabaseClient;
-    if (!supabase) {
-      console.warn('[Plaid] Database restore skipped: Supabase client not available');
+    const gcpBackend = config.gcpBackendClient;
+    if (!gcpBackend) {
+      console.warn('[Plaid] Database restore skipped: GcpBackend client not available');
       return null;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await gcpBackend
       .from('user_financial_data')
       .select('*')
       .eq('user_id', userId)

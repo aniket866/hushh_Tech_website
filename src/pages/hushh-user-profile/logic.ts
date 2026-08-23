@@ -336,8 +336,8 @@ export const useHushhUserProfileLogic = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const supabase = resources.config.supabaseClient;
-        if (!supabase) {
+        const gcpBackend = resources.config.gcpBackendClient;
+        if (!gcpBackend) {
           setNwsLoading(false);
           return;
         }
@@ -370,7 +370,7 @@ export const useHushhUserProfileLogic = () => {
         }));
 
         // Load existing investor profile
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile } = await gcpBackend
           .from("investor_profiles")
           .select("*")
           .eq("user_id", user.id)
@@ -409,7 +409,7 @@ export const useHushhUserProfileLogic = () => {
         }
 
         // Load onboarding data
-        const { data: onboardingData } = await supabase
+        const { data: onboardingData } = await gcpBackend
           .from("onboarding_data")
           .select("*")
           .eq("user_id", user.id)
@@ -457,7 +457,7 @@ export const useHushhUserProfileLogic = () => {
             const userName = onboardingName || user.email?.split('@')[0] || 'Investor';
             const userAge = typeof calculatedAge === 'number' ? calculatedAge : 30;
             
-            const { data: newProfile } = await supabase
+            const { data: newProfile } = await gcpBackend
               .from("investor_profiles")
               .upsert({
                 user_id: user.id,
@@ -482,7 +482,7 @@ export const useHushhUserProfileLogic = () => {
         }
         // Load NWS score from user_financial_data (pure math, no API)
         try {
-          const { data: financialData } = await supabase
+          const { data: financialData } = await gcpBackend
             .from('user_financial_data')
             .select('*')
             .eq('user_id', user.id)
@@ -495,7 +495,7 @@ export const useHushhUserProfileLogic = () => {
 
             // Persist NWS score if not already saved
             if (!financialData.nws_score || financialData.nws_score !== nws.score) {
-              supabase.from('user_financial_data').update({
+              gcpBackend.from('user_financial_data').update({
                 nws_score: nws.score,
                 nws_breakdown: nws.breakdown,
                 nws_grade: nws.grade,
@@ -506,7 +506,7 @@ export const useHushhUserProfileLogic = () => {
 
               // Send NWS score email notification (fire-and-forget)
               if (nws.score > 0 && session?.access_token) {
-                fetch(`${resources.config.SUPABASE_URL}/functions/v1/nws-score-notification`, {
+                fetch(`${resources.config.GCP_API_BASE_URL}/functions/v1/nws-score-notification`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
                   body: JSON.stringify({
@@ -567,15 +567,15 @@ export const useHushhUserProfileLogic = () => {
     };
   };
 
-  // Helper: save partial profile data to Supabase (called by each API independently)
+  // Helper: save partial profile data to GcpBackend (called by each API independently)
   const saveToSupabase = async (
     partialPayload: Record<string, unknown>
   ) => {
     if (!userId) return;
-    const supabase = resources.config.supabaseClient;
-    if (!supabase) return;
+    const gcpBackend = resources.config.gcpBackendClient;
+    if (!gcpBackend) return;
     try {
-      const { data } = await supabase
+      const { data } = await gcpBackend
         .from("investor_profiles")
         .upsert({
           user_id: userId,
@@ -594,7 +594,7 @@ export const useHushhUserProfileLogic = () => {
         .maybeSingle();
       if (data?.slug) setProfileSlug(data.slug);
     } catch (err) {
-      console.warn("[Profile] Supabase save failed:", err);
+      console.warn("[Profile] GcpBackend save failed:", err);
     }
   };
 
@@ -667,7 +667,7 @@ export const useHushhUserProfileLogic = () => {
         setInvestorProfile(result.profile);
         setInvestorStatus('done');
         toast({ title: "Investor profile ready ✓", status: "success", duration: 3000 });
-        // Save to Supabase (non-blocking)
+        // Save to GcpBackend (non-blocking)
         saveToSupabase({ investor_profile: result.profile });
       } else {
         setInvestorStatus('error');
@@ -744,7 +744,7 @@ export const useHushhUserProfileLogic = () => {
   };
 
   /**
-   * handleSaveChanges — saves manual form edits + AI profile edits to Supabase
+   * handleSaveChanges — saves manual form edits + AI profile edits to GcpBackend
    * No AI generation calls. Just a simple upsert of editable fields.
    * Also persists AI profile field edits if user modified them.
    * Only enabled when isDirty === true (user has edited something).
@@ -765,8 +765,8 @@ export const useHushhUserProfileLogic = () => {
       }
     }
 
-    const supabase = resources.config.supabaseClient;
-    if (!supabase) return;
+    const gcpBackend = resources.config.gcpBackendClient;
+    if (!gcpBackend) return;
 
     setIsSaving(true);
     try {

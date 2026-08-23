@@ -316,7 +316,7 @@ const SignNDAPage: React.FC = () => {
     if (!validateForm()) return;
     if (isSubmitting) return;
 
-    if (!config.supabaseClient || !userId) {
+    if (!config.gcpBackendClient || !userId) {
       toast({
         title: 'session expired',
         description: 'please log in again.',

@@ -122,7 +122,7 @@ const EMPTY_COUNTS: Record<FundAdminTab, number> = {
   all: 0,
 };
 
-const functionUrl = (name: string) => `${config.SUPABASE_URL}/functions/v1/${name}`;
+const functionUrl = (name: string) => `${config.GCP_API_BASE_URL}/functions/v1/${name}`;
 
 function dedupeWarnings(warnings: SourceWarning[]): SourceWarning[] {
   const seen = new Set<string>();

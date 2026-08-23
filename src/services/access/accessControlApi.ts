@@ -1,9 +1,8 @@
 import axios from "axios";
-import config from "../../resources/config/config";
 import {
   getNdaGenerationUrl,
-  getSupabaseBaseUrl,
-  getSupabaseRpcUrl,
+  getGcpBackendBaseUrl,
+  getGcpBackendRpcUrl,
 } from "../runtime/mainWeb";
 
 export type AccessStatus = string;
@@ -23,7 +22,6 @@ interface RequestFileAccessParams {
 
 function getAuthenticatedHeaders(accessToken: string) {
   return {
-    apikey: config.SUPABASE_ANON_KEY,
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
@@ -34,7 +32,7 @@ async function postRpc<T>(
   accessToken: string,
   body: Record<string, unknown> = {}
 ): Promise<T> {
-  const response = await axios.post<T>(getSupabaseRpcUrl(rpcName), body, {
+  const response = await axios.post<T>(getGcpBackendRpcUrl(rpcName), body, {
     headers: getAuthenticatedHeaders(accessToken),
   });
   return response.data;
@@ -42,7 +40,7 @@ async function postRpc<T>(
 
 export async function checkAccessStatus(accessToken: string): Promise<AccessStatus> {
   const response = await axios.get<Array<{ signed_at: string | null }>>(
-    `${getSupabaseBaseUrl()}/rest/v1/nda_signatures`,
+    `${getGcpBackendBaseUrl()}/rest/v1/nda_signatures`,
     {
       headers: getAuthenticatedHeaders(accessToken),
       params: {

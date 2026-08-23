@@ -12,15 +12,15 @@ export default async function savePreferencesToSupabase(
   seed?: PreferenceSeedInput
 ): Promise<SavePreferencesResult> {
   if (!userId) {
-    return { success: false, error: "Missing user id for Supabase upsert" };
+    return { success: false, error: "Missing user id for GcpBackend upsert" };
   }
 
-  const supabase = resources.config.supabaseClient;
-  if (!supabase) {
-    return { success: false, error: "Supabase client is not initialized" };
+  const gcpBackend = resources.config.gcpBackendClient;
+  if (!gcpBackend) {
+    return { success: false, error: "GcpBackend client is not initialized" };
   }
 
-  const { error } = await supabase
+  const { error } = await gcpBackend
     .from("members")
     .upsert(
       {
@@ -39,7 +39,7 @@ export default async function savePreferencesToSupabase(
     );
 
   if (error) {
-    console.error("Failed to save preferences to Supabase:", error);
+    console.error("Failed to save preferences to GcpBackend:", error);
     return { success: false, error: error.message };
   }
 

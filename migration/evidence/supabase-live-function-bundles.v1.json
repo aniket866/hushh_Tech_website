@@ -1,0 +1,1799 @@
+{
+  "schema_version": 1,
+  "evidence_id": "hushh-tech-supabase-live-function-bundles",
+  "manifest_binding": {
+    "manifest_id": "hushh-tech-no-hybrid-supabase-retirement",
+    "manifest_schema_version": 1,
+    "source_project_ref": "ibsisfnjxeowvdtvgzff"
+  },
+  "capture": {
+    "tool": "supabase_cli",
+    "tool_version": "2.115.0",
+    "method": "functions_download_current_bundle_extractor_read_only",
+    "source_write_mode": "READ_ONLY_NO_DEPLOYMENT"
+  },
+  "sanitization": {
+    "recovered_source_content_committed": false,
+    "stdout_or_stderr_committed": false,
+    "secret_or_token_values_committed": false,
+    "temporary_absolute_paths_committed": false,
+    "public_evidence": "per_slug_content_tree_digest_file_count_and_byte_count_only"
+  },
+  "expected_counts": {
+    "active_functions": 112,
+    "extracted_bundles": 96,
+    "store_not_found": 16,
+    "extracted_files": 445,
+    "extracted_bytes": 2677504
+  },
+  "canonical_source_tree": {
+    "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+    "digest": "a976749fa43425152fddb2649ba6442500e412627a004f6ff60ca2892b9011a2"
+  },
+  "evidence_digest": {
+    "digest_algorithm": "sha256_of_canonical_function_bundle_evidence_lines_v1",
+    "digest": "182de37b13bfb9201cbe94f1c850e995f15bcdf92d38e08f73449b5cf119ea7b"
+  },
+  "entries": [
+    {
+      "slug": "activate-agent",
+      "function_id": "d8137003-a488-48eb-b09e-890e53531f8e",
+      "version": 5492,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "cd1e324ba63e3bb77d3c66fce77ebed362a32a4fd26ddb8f681b831bef0ede3d",
+        "file_count": 2,
+        "total_bytes": 3631
+      }
+    },
+    {
+      "slug": "agent-onboard-notify",
+      "function_id": "d3544429-bb12-41a1-a22d-14112bceeb3c",
+      "version": 5492,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "670e1b6fce93d9fa00b6d6c67da84a194c1c13ced21e50d169be6f02c4b2ad3e",
+        "file_count": 2,
+        "total_bytes": 4282
+      }
+    },
+    {
+      "slug": "asset-report-create",
+      "function_id": "2b397582-3adb-4a1e-aaf3-d99bfc4a57a8",
+      "version": 5685,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "63003c8430159912633397fbb63ac635359817b5f9cc46c11cfbd293b48b26cd",
+        "file_count": 4,
+        "total_bytes": 4622
+      }
+    },
+    {
+      "slug": "asset-report-get",
+      "function_id": "8e3b3832-1af6-4c56-90b0-6d60b1713737",
+      "version": 5681,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "0671ae391d69f75abe07aee964ae6a5a56ab0359e8c3418e98d61a1e59b3ad48",
+        "file_count": 4,
+        "total_bytes": 4049
+      }
+    },
+    {
+      "slug": "bank-income",
+      "function_id": "8cecc3c4-1549-4674-8e22-9b5082ecee29",
+      "version": 5492,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "5e2bb49dbdf7f73ef3458aac942e3803d6af8300321dd8756f4e43497c10f12e",
+        "file_count": 3,
+        "total_bytes": 3306
+      }
+    },
+    {
+      "slug": "bot_event",
+      "function_id": "c69fb9be-d645-41b8-b94f-4f938937858d",
+      "version": 5845,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "6c7272e9538a966b66b89cdd70cf9d3302bb88fb3775c53618aa8c07af3a0f33",
+        "file_count": 1,
+        "total_bytes": 31489
+      }
+    },
+    {
+      "slug": "bot_start",
+      "function_id": "42bdc158-3157-4394-9850-5092ea072729",
+      "version": 5845,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a380a307140643e3a2f99965858bf0b233de47f9527d83fc462be589d6f3af07",
+        "file_count": 1,
+        "total_bytes": 3771
+      }
+    },
+    {
+      "slug": "ceo-calendar-booking",
+      "function_id": "84e3138e-abbf-4554-b93b-a19de756d6de",
+      "version": 6054,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "7a85a5422103d9631920483d4ea901b4a787cfb25013504da4f2f64bcdd6ab2e",
+        "file_count": 2,
+        "total_bytes": 11698
+      }
+    },
+    {
+      "slug": "chat-check-access",
+      "function_id": "d51fc19a-8a22-42c1-b807-e75c02fb558f",
+      "version": 6166,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "ff6cf77cea51c1bdee54ae6803454cc2a4a133e43211e4110d9552554d54362f",
+        "file_count": 2,
+        "total_bytes": 5694
+      }
+    },
+    {
+      "slug": "chat-create-checkout",
+      "function_id": "59d75a30-37c1-42c0-bbbc-8b05914ead02",
+      "version": 6169,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "61ee9bc1b91c0512674c4a816e338bec2eb3b8962c8380674cf243162e9c4c39",
+        "file_count": 2,
+        "total_bytes": 3452
+      }
+    },
+    {
+      "slug": "chat-verify-payment",
+      "function_id": "365540bf-21f2-4d0a-a3fd-e262690de000",
+      "version": 6170,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "c5146dc34d53108e40bc1cda1dadaac713f9020dc948f7a3c0c7b82c4b2bbfa8",
+        "file_count": 2,
+        "total_bytes": 3639
+      }
+    },
+    {
+      "slug": "claude-code-gen",
+      "function_id": "bf3686e7-3cd9-4d5d-ac4a-2a23adc8c161",
+      "version": 5495,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e3439025f430edd571b9c598393424eab23e1afbbdb82fd03a38eac4eb12e7b4",
+        "file_count": 2,
+        "total_bytes": 8016
+      }
+    },
+    {
+      "slug": "coins-credit-notification",
+      "function_id": "2794f5bb-724f-4bb0-a8cc-7ddbdaf48f96",
+      "version": 5510,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "10456dbbaff7ed3d0672a7db997fe38c849e17c8614cbc14d5d9171f3c011489",
+        "file_count": 6,
+        "total_bytes": 75324
+      }
+    },
+    {
+      "slug": "coins-deduction-notification",
+      "function_id": "c932996a-d681-4c1b-b296-c006150c29d3",
+      "version": 5511,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "128628eee6bbc5de18bccb04a58a1618a7c1319981f5ddc7e1c6cf6e115a0d5f",
+        "file_count": 6,
+        "total_bytes": 75264
+      }
+    },
+    {
+      "slug": "create-link-token",
+      "function_id": "cf10c7ad-6d17-41d6-9a31-f62db2d13cc3",
+      "version": 5752,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "4eb85c4879783511486a829a4757e8d4ce20d49459344f510219f9f7df7288cb",
+        "file_count": 5,
+        "total_bytes": 14049
+      }
+    },
+    {
+      "slug": "create-verification-session",
+      "function_id": "b5f6d633-133b-4f54-a18b-3023d15faf30",
+      "version": 5569,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a66a0d4bcb9a406e4201fd0e0cd86215607ccc71082fb288dbc29b5b56f8affa",
+        "file_count": 2,
+        "total_bytes": 4484
+      }
+    },
+    {
+      "slug": "delete-user-account",
+      "function_id": "9245e883-603a-40c5-9b38-fb01656d9d41",
+      "version": 6291,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e317d7e8636da611afba5ce976a10240a5e35610580fa28e352da52eaea4a974",
+        "file_count": 5,
+        "total_bytes": 8980
+      }
+    },
+    {
+      "slug": "exchange-public-token",
+      "function_id": "2a3a9ec9-cc41-4ff1-ab05-2ddd20b3d1ab",
+      "version": 5728,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "c620434adad9507a0b2457fa7e4f2f8d8e2c91b2bdefc4a77b1d2e1bd7c7bb44",
+        "file_count": 6,
+        "total_bytes": 17636
+      }
+    },
+    {
+      "slug": "fund-coupon-redeem",
+      "function_id": "9df94ee2-a0eb-4ae7-bb72-934148d0b377",
+      "version": 3180,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e9ef59d3ad38c1b827ebb2ccb98b86af789a918b157da18a4f77a7fd26137050",
+        "file_count": 9,
+        "total_bytes": 105274
+      }
+    },
+    {
+      "slug": "fund-payment-admin-analytics",
+      "function_id": "7c9f2147-a928-4bd0-ba4c-0e21ff7fa77a",
+      "version": 3792,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "7ada3e7796eec8feac041fd0963cda36731a12aa7bed2b6a1fd4786d3c26a0ff",
+        "file_count": 5,
+        "total_bytes": 28847
+      }
+    },
+    {
+      "slug": "fund-payment-admin-crm",
+      "function_id": "fc2240be-7a56-4973-835a-09dabd966363",
+      "version": 3802,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "eabc333113eec22484dfa38f5617151667ebb5a0b330376ba5c268eec5960ed3",
+        "file_count": 6,
+        "total_bytes": 22970
+      }
+    },
+    {
+      "slug": "fund-payment-admin-detail",
+      "function_id": "ae00cf13-7dca-4c5b-8806-8092d2e48f75",
+      "version": 3858,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "502b4c4c2545b7c1a1ac428e5379ab924526f8437b3acd7dc7fcec4430918e99",
+        "file_count": 7,
+        "total_bytes": 39021
+      }
+    },
+    {
+      "slug": "fund-payment-admin-kyc-review",
+      "function_id": "b0ec8ab3-286e-4377-aefa-46e6f5f1f8dc",
+      "version": 3802,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "b899913c2c56f26591e4d1d5beda6eb67caf0caaed17901653ad6c5c3fee62b7",
+        "file_count": 9,
+        "total_bytes": 33490
+      }
+    },
+    {
+      "slug": "fund-payment-admin-kyc-screen",
+      "function_id": "b929fa86-e495-42db-98d0-0d4f4a60c189",
+      "version": 3802,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "921bec5fed369f3d6e0b79e1986a79e6946417c03f947845fc5ba7a35a5b51d3",
+        "file_count": 9,
+        "total_bytes": 33999
+      }
+    },
+    {
+      "slug": "fund-payment-admin-list",
+      "function_id": "ed05bb00-651d-4e85-bd4f-c6cebf2b43ee",
+      "version": 3976,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "c9cadf3b475a0b7d2d36e0a5412be954b1c6beec96eb3ae85e76b414c78df453",
+        "file_count": 5,
+        "total_bytes": 22476
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview",
+      "function_id": "c319b177-0ba5-4467-8159-68745a96345b",
+      "version": 3856,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "9e5f0e22d862b834b4b60e75d81c956bbcc315a0d64ddb90c97f6e6d86a3aa1c",
+        "file_count": 6,
+        "total_bytes": 35029
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview-list",
+      "function_id": "157ac2c1-934d-44ac-8aa7-7f0d9fd50247",
+      "version": 3802,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "2231507d0722365d80bfe9a31e03c16ca21aa170305eb0d723a4f68a893ea191",
+        "file_count": 8,
+        "total_bytes": 40180
+      }
+    },
+    {
+      "slug": "fund-payment-admin-overview-metrics",
+      "function_id": "7c0189f0-50ac-4bfd-a8bd-834b5e8b8ac3",
+      "version": 3802,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "d84c9c7485d46c6336e2176c2c2bb67abfa4be8226cab21432fb7434a912263f",
+        "file_count": 8,
+        "total_bytes": 37539
+      }
+    },
+    {
+      "slug": "fund-payment-admin-remind",
+      "function_id": "cd7ddfc8-a1e0-4df6-85ee-e1fbfbcfd190",
+      "version": 3804,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "ffe23843d9b7a52dec839da73d813f415d8ec31a9e3d12feb645395a7e2560ae",
+        "file_count": 10,
+        "total_bytes": 92323
+      }
+    },
+    {
+      "slug": "fund-payment-admin-resend",
+      "function_id": "c19980d1-d3aa-449c-aaa3-5d22de67020b",
+      "version": 3804,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "fca3b7f8073387e0e029289652e2fe7beb0c3cfa11c7d7dbf5404525e7fbb11e",
+        "file_count": 10,
+        "total_bytes": 96306
+      }
+    },
+    {
+      "slug": "fund-payment-admin-verify",
+      "function_id": "63c4b3c2-1dec-4684-b2b2-fa9fd8f91bec",
+      "version": 4092,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "78eacccec722276a9b7359fe37b86de17346f89a9d7186f90878965637bb027c",
+        "file_count": 10,
+        "total_bytes": 101544
+      }
+    },
+    {
+      "slug": "fund-payment-checkout",
+      "function_id": "5e02d042-945b-4daa-b0b4-9d55fcb865ef",
+      "version": 4088,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "9a183f09d024a7921daf63f4bd427cb4fa2a52fb87f072dc10916b12b38a0060",
+        "file_count": 5,
+        "total_bytes": 22637
+      }
+    },
+    {
+      "slug": "fund-payment-request-create",
+      "function_id": "cce8f22e-d4dc-46ae-820c-c26f51088656",
+      "version": 4092,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "822ef3e9bde8efa162a55cf9a48bd0b55703987bbca4c519655b6b71f6c68ab4",
+        "file_count": 9,
+        "total_bytes": 104783
+      }
+    },
+    {
+      "slug": "fund-payment-status",
+      "function_id": "09f29e73-a406-4886-9cf9-712e4a79fcb2",
+      "version": 4087,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a75cd31776e9be0395e78d6027d0bc9de3ee28aba36fce9a1831cd8f2eb9640b",
+        "file_count": 5,
+        "total_bytes": 17857
+      }
+    },
+    {
+      "slug": "fund-payment-token-status",
+      "function_id": "a23f2c01-8215-489d-961b-49259b499b13",
+      "version": 4031,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "2ded5329c46db7549ae364963ec9f77d21d2b16647b812aa593c479bd9771cc9",
+        "file_count": 5,
+        "total_bytes": 17783
+      }
+    },
+    {
+      "slug": "fund-stripe-webhook",
+      "function_id": "657cb164-3567-4f41-a285-3040ef13c769",
+      "version": 4095,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8523ddd8baec94dad2eea81e73f6f9b1bbd68624ebe229d7a019a42f1100f469",
+        "file_count": 9,
+        "total_bytes": 111177
+      }
+    },
+    {
+      "slug": "fund-transfer-sandbox-start",
+      "function_id": "a4f0ff3b-896d-46bd-bf26-39520b769d13",
+      "version": 4129,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "addfc3cb7b1d8fd8f4d3c7f0c33bf9df1f6f392f0606735df0c94aaff7b545c4",
+        "file_count": 7,
+        "total_bytes": 41592
+      }
+    },
+    {
+      "slug": "gemini-voice-token",
+      "function_id": "29bcc361-69d5-4777-aba2-813a5f4799b9",
+      "version": 5494,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e333b555f46f2d5f7301ff0b1785e86f0b90d18a827fa45a71a137a1ae77e0cc",
+        "file_count": 2,
+        "total_bytes": 3395
+      }
+    },
+    {
+      "slug": "generate-investor-profile",
+      "function_id": "bcc9c2f5-1705-4a55-8166-3c9a852bcfc4",
+      "version": 6178,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "95aced3b568be992cc1256dea864479cbc231ea02320dcde28725020d43b6782",
+        "file_count": 2,
+        "total_bytes": 9061
+      }
+    },
+    {
+      "slug": "get-auth-numbers",
+      "function_id": "a26c29ca-1d90-45f7-86e4-3c6a90cf9fcb",
+      "version": 5506,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "366426a2f80c1db8735af968decc7de7a9b222d10941f08ebad30c035f6279fe",
+        "file_count": 6,
+        "total_bytes": 13687
+      }
+    },
+    {
+      "slug": "get-locations",
+      "function_id": "b31a7ad3-53f6-42f0-a98a-f61ef8f9b987",
+      "version": 5580,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a35323c8b25bf851c6e77837e490d849dbfca8a043d37dc32304df51dfbd5b7e",
+        "file_count": 2,
+        "total_bytes": 3081
+      }
+    },
+    {
+      "slug": "get-secrets",
+      "function_id": "f1d291a3-393c-4791-aa56-a25730d4e1f6",
+      "version": 20,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "RETIRE_WITH_410",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "github-devops-notify",
+      "function_id": "9d5b0e1a-d76d-4dcd-a3a2-14afb19d09b4",
+      "version": 6164,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "22dfc0e48fb522846d37b41db0320e79d7fb2f3af40be8eb30b651eec6d4c0ec",
+        "file_count": 3,
+        "total_bytes": 17280
+      }
+    },
+    {
+      "slug": "hushh-address-inference",
+      "function_id": "187dc3ad-591d-4ebb-9ca8-771a57b5e65b",
+      "version": 6091,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e4a53a10cf128b783afb92326b5fc33cb156dd0ead7002bbbc45fe9055e66d20",
+        "file_count": 3,
+        "total_bytes": 21440
+      }
+    },
+    {
+      "slug": "hushh-ai-chat",
+      "function_id": "478ec6e2-2fbb-421d-b2fc-e0ed1047daca",
+      "version": 6130,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "48d281ccf7deb47a934fefe8631c15c1e8e0ef393a374a10d66a9fe869c2bd96",
+        "file_count": 3,
+        "total_bytes": 30162
+      }
+    },
+    {
+      "slug": "hushh-dob-inference",
+      "function_id": "90c56386-84b7-4832-b83e-d6fd562b238f",
+      "version": 6105,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8f4711f9475d67d8f4fe49ddefd968614a64815c4aac1472f9a805559e231068",
+        "file_count": 3,
+        "total_bytes": 18688
+      }
+    },
+    {
+      "slug": "hushh-location-geocode",
+      "function_id": "b61e87bc-11e1-4d7e-ae37-197b7783c078",
+      "version": 6092,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "7f408b67193781383b2ca67c01e99501b9ab9da041ac8afb843382a45bd4ac8f",
+        "file_count": 3,
+        "total_bytes": 8942
+      }
+    },
+    {
+      "slug": "hushh-profile-search",
+      "function_id": "672b359b-50cd-43c4-8617-6f6dd87f6199",
+      "version": 6119,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "702d2c588eb7e3292bced707964dc8f20aaa55ff16bdfa0d8d86f5b76832f5bc",
+        "file_count": 4,
+        "total_bytes": 78025
+      }
+    },
+    {
+      "slug": "identity-verification-webhook",
+      "function_id": "0b976014-6cc7-4654-a562-dae9744bac33",
+      "version": 6158,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "6d2cedce62e2729caffdf1364acdc35bcea3b9f1649b52177a2bc52f321ed339",
+        "file_count": 2,
+        "total_bytes": 7318
+      }
+    },
+    {
+      "slug": "investments-transactions",
+      "function_id": "7b2946d0-e314-4460-859d-2cf03c0c32aa",
+      "version": 5682,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "128ac12a341b960dd39485b05fa63faf42f9c0187957ee78d82348265f147286",
+        "file_count": 3,
+        "total_bytes": 2978
+      }
+    },
+    {
+      "slug": "investor-agent-mcp",
+      "function_id": "ab924c88-1269-4a67-8a94-1bb76bee6eae",
+      "version": 6170,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "7112a6dd44bf397e53e020b661e9d8d28ccf3df582f0579fbb27b100cf7d4f17",
+        "file_count": 4,
+        "total_bytes": 35337
+      }
+    },
+    {
+      "slug": "investor-chat",
+      "function_id": "ce9bb50a-29b6-41e4-a267-2ceda720f39d",
+      "version": 6177,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "f2cea72210fe8c5349c648756ccb0e292f4f2023a7f664b92db567788f50b9b0",
+        "file_count": 2,
+        "total_bytes": 12319
+      }
+    },
+    {
+      "slug": "investor-og-image",
+      "function_id": "486a2bf5-3374-40f4-9a9c-b4f1d3ccd1a8",
+      "version": 6172,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "1e3859f2b81753e2de1ec20fb391b5befbbc3628222c1e4911f6f76d900248b3",
+        "file_count": 2,
+        "total_bytes": 5769
+      }
+    },
+    {
+      "slug": "ios-build-tracker",
+      "function_id": "a945f586-fa01-4cd9-a358-c062eae4e059",
+      "version": 5564,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "b1142f9a83719292069dfa0441951bf0e9e33c76c7d7304f9ca541a5fcb96e58",
+        "file_count": 2,
+        "total_bytes": 7007
+      }
+    },
+    {
+      "slug": "kyc-agent-a2a",
+      "function_id": "fba3785b-d893-4845-b567-e7fb682a5ac5",
+      "version": 6164,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "162321848a8345dd111d526c2e8a4c6bfb610b9c137fec79e9651f62cc803693",
+        "file_count": 2,
+        "total_bytes": 22133
+      }
+    },
+    {
+      "slug": "kyc-agent-a2a-protocol",
+      "function_id": "c25d15c5-1442-43ba-bbe0-3d4fe1a47bb5",
+      "version": 6163,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "fe30ab23db126820e37f9bdc2598657c9046213144d9b0f54f2a8b941d0cb49f",
+        "file_count": 2,
+        "total_bytes": 44000
+      }
+    },
+    {
+      "slug": "kyc-agent-agentic",
+      "function_id": "0a83823b-39fb-4fbd-abc7-6e0024353eaa",
+      "version": 6163,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "592401130458b647721d7cc7b63c0961860bcc57a03276f294c62d8abce3e5c3",
+        "file_count": 3,
+        "total_bytes": 32421
+      }
+    },
+    {
+      "slug": "kyc-orchestrator",
+      "function_id": "ca663922-ca7e-4c0f-b020-9932580c42b0",
+      "version": 76,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "lead_create",
+      "function_id": "24671149-9ff3-4742-a935-8198dc175d9f",
+      "version": 5845,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "4ba5638db6d48ba45ea2bad5f04245de1b7400c817ffea947eb056083b04354d",
+        "file_count": 1,
+        "total_bytes": 4413
+      }
+    },
+    {
+      "slug": "liabilities",
+      "function_id": "89f13ebd-4f77-4ba3-af8f-4692c7e08ccf",
+      "version": 5492,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "046a0a42ee55ea48d223007db75fc618e4477e2706de76ba77bb7ea9f41b816b",
+        "file_count": 3,
+        "total_bytes": 3518
+      }
+    },
+    {
+      "slug": "mcp-agent-card",
+      "function_id": "b1b1bc8b-a7d8-468b-be49-cae542228f2e",
+      "version": 5495,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "9ee970c5c5a73f63d91af7fa65ea1ab017734ba0a18d29ec4c54420679fcebda",
+        "file_count": 2,
+        "total_bytes": 4560
+      }
+    },
+    {
+      "slug": "nda-admin-fetch",
+      "function_id": "57a9c1e5-404b-47a3-a86f-1ffd0c7a3267",
+      "version": 6277,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "70965bac0ac036ef53cced2f5e50e33f1b55a7c5ec58c380b0a8695dc74c3372",
+        "file_count": 2,
+        "total_bytes": 3698
+      }
+    },
+    {
+      "slug": "nda-signed-notification",
+      "function_id": "2d961ec8-deed-4cdc-a00a-2d61560dd1a9",
+      "version": 6325,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "196611b1a53171ef9dbbd0d2783f7e165928aaab94af7bdc1baa772285641e68",
+        "file_count": 12,
+        "total_bytes": 286602
+      }
+    },
+    {
+      "slug": "nws-score-notification",
+      "function_id": "4925c7a1-8163-4493-ae59-89f57f9e4cf3",
+      "version": 5501,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e63697c07a0da1462a015bd6890b451882e46e6c98e9d94261ae4f9394c5c52a",
+        "file_count": 2,
+        "total_bytes": 13023
+      }
+    },
+    {
+      "slug": "onboarding-create-checkout",
+      "function_id": "066df8f1-281c-490c-8dfe-ffe64fd49072",
+      "version": 6128,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "3b1af139b50b274818028834b9360a57bc7bd2017170ef7bad01bbb153415442",
+        "file_count": 2,
+        "total_bytes": 5685
+      }
+    },
+    {
+      "slug": "onboarding-funding-name-match",
+      "function_id": "458116f3-1605-48e6-ac4f-4babbbbd56a6",
+      "version": 2928,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "223d57d3cec04360d326d78c88d94fcba4c11a883cb04d46c051765b93ffbc3f",
+        "file_count": 6,
+        "total_bytes": 23533
+      }
+    },
+    {
+      "slug": "onboarding-invite-complete",
+      "function_id": "86a83997-3934-4ad5-8455-d30df79d8671",
+      "version": 3071,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "fc785753c7d4c188c0ba11d5683218edb7d31154496e24844ccc245db01bf740",
+        "file_count": 7,
+        "total_bytes": 31549
+      }
+    },
+    {
+      "slug": "onboarding-invite-create",
+      "function_id": "7672baca-1e2c-4e96-8038-559af7a0d0c6",
+      "version": 3070,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "9e58c49c7fb9cef767def43ca15143b4f4ead54170607875aebb4587ca086e0e",
+        "file_count": 7,
+        "total_bytes": 29296
+      }
+    },
+    {
+      "slug": "onboarding-invite-link-token",
+      "function_id": "5f8004a9-8def-45d7-bc7b-6bd06ce81930",
+      "version": 2928,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8dfe8c7fafb3de396fa5ec8ed1b2cbc0ef30683c7bbd7429c683da8d88a9d588",
+        "file_count": 7,
+        "total_bytes": 26614
+      }
+    },
+    {
+      "slug": "onboarding-invite-load",
+      "function_id": "a9eaba79-b78d-4d10-8de1-bc067d7d7cde",
+      "version": 3071,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "596b101cae8a61ee73febbd57b3f702b89709c58d737a2e51c9e9e339d0b1359",
+        "file_count": 7,
+        "total_bytes": 30220
+      }
+    },
+    {
+      "slug": "onboarding-invite-plaid-exchange",
+      "function_id": "df84ff30-8085-4d78-9eef-91db375a771a",
+      "version": 2928,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8a47d2dd86d00b60700392f2add257953a4fa5168353ec501365bf8ad6d6157b",
+        "file_count": 8,
+        "total_bytes": 32074
+      }
+    },
+    {
+      "slug": "onboarding-invite-resend",
+      "function_id": "6165c97e-1721-45d0-9356-d25cf95e5e13",
+      "version": 3070,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "948ea5533ae27a2717fb2c8f75ed770e6a94af66a0ceee9b52eff20fdd8acf5a",
+        "file_count": 6,
+        "total_bytes": 24450
+      }
+    },
+    {
+      "slug": "onboarding-invite-revoke",
+      "function_id": "ee8c2951-d099-4512-bd9f-2f843d84e407",
+      "version": 3070,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "6e4ce7acfe90817cc1875a82a00d3f706f1e7b8c2a3a2ddf6447555e5daf3ca7",
+        "file_count": 5,
+        "total_bytes": 19943
+      }
+    },
+    {
+      "slug": "onboarding-invite-save",
+      "function_id": "9397d53e-890c-400f-936d-041b4b8b901f",
+      "version": 3071,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "84a097736ca3187c10189cc22da177286671e8b8e7e2422bbffaeb0ad74bfed5",
+        "file_count": 7,
+        "total_bytes": 30463
+      }
+    },
+    {
+      "slug": "onboarding-proof-of-funds",
+      "function_id": "7108be41-f77f-4eda-b812-c74b0d9d9a24",
+      "version": 3070,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "77c82b02ff8cace241cb24bca6fc973a2c536566c9a1958635e68cce33718678",
+        "file_count": 6,
+        "total_bytes": 21247
+      }
+    },
+    {
+      "slug": "onboarding-submit-application",
+      "function_id": "7ce03017-2040-460e-bb11-8183b3fb747a",
+      "version": 3070,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "e43a6ac6c7ff73fe5ee47fc40024c89089a636b934494eb09dbe73b9b7621593",
+        "file_count": 6,
+        "total_bytes": 25053
+      }
+    },
+    {
+      "slug": "onboarding-verify-payment",
+      "function_id": "27a34847-bdaf-4247-ac84-2041562731fd",
+      "version": 6159,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "07415a44eef1ff370aeaab62766643efd54a4969976bb4bc63ba790b5fe2cdfa",
+        "file_count": 2,
+        "total_bytes": 4517
+      }
+    },
+    {
+      "slug": "plaid-data-sync",
+      "function_id": "49440a23-3211-4d01-80af-dae2e5796a7a",
+      "version": 4130,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a07ddb246637b4492902405fbf370019343cb31c91692abc5dfeecdcc6027bed",
+        "file_count": 7,
+        "total_bytes": 37749
+      }
+    },
+    {
+      "slug": "plaid-data-sync-product",
+      "function_id": "acf9f44e-eb64-4799-81eb-4f980cd8c812",
+      "version": 4093,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "469d5fead9de3b37efb447b0dabd570512f766eefc8d43b852da63651803d7f8",
+        "file_count": 7,
+        "total_bytes": 36849
+      }
+    },
+    {
+      "slug": "plaid-data-sync-start",
+      "function_id": "be9f07d3-d9dd-4989-bb3d-98efd72751eb",
+      "version": 4093,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "4a1946fe433dffc1bc48ffd645bec12daea44521d972c56394f9bf1e00708dea",
+        "file_count": 7,
+        "total_bytes": 39897
+      }
+    },
+    {
+      "slug": "plaid-data-webhook",
+      "function_id": "78b486be-c2a4-4d80-b5a0-1dc59adc7967",
+      "version": 4094,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "d68b39fa8ef361c6d3583de3830c9537edf3d0950325261e1c4773ec0da6866b",
+        "file_count": 6,
+        "total_bytes": 34962
+      }
+    },
+    {
+      "slug": "plaid-diagnostics-log",
+      "function_id": "51dc3d49-0f7d-4ed3-b2fd-2e6eeb30e6e4",
+      "version": 4023,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "3f8f396ac92263a05a42baabcf2158a232165a56a529a10308be9bef2039685e",
+        "file_count": 3,
+        "total_bytes": 4666
+      }
+    },
+    {
+      "slug": "plaid-income-link-token",
+      "function_id": "cd7c9587-ca0f-465f-8c07-1da93d2e3d3a",
+      "version": 4093,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "c2d656140a5f42687ec5d579b83fc79807cf7ad4d15ec762f9f8f9f532c349f5",
+        "file_count": 6,
+        "total_bytes": 13382
+      }
+    },
+    {
+      "slug": "plaid-transfer-sandbox-simulate",
+      "function_id": "c35efa55-ac41-4000-9af1-7fcb170c3e06",
+      "version": 4128,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "ba81c4b3729da8b3f054def208f87fd67b93ae6e18044f517113978ba66d3e00",
+        "file_count": 5,
+        "total_bytes": 13293
+      }
+    },
+    {
+      "slug": "plaid-transfer-webhook",
+      "function_id": "d8e0c49a-e2d8-44da-bd04-83d4add54a0a",
+      "version": 4130,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "45ddb4a14f27473baf7f173d2f18d21c7a5c6ca72af0c3a3ad6c2774646d48ea",
+        "file_count": 5,
+        "total_bytes": 18700
+      }
+    },
+    {
+      "slug": "plaid-unlink-item",
+      "function_id": "39655d89-e1bf-44a3-9814-a1b0bb2fa31e",
+      "version": 4095,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "acce4493b08b28190a6103d141f6f81fee447dd1212c6c737145c4f25adcbc1a",
+        "file_count": 6,
+        "total_bytes": 16617
+      }
+    },
+    {
+      "slug": "portfolio-deploy",
+      "function_id": "bd044671-2276-4b31-896f-88bec0c5f336",
+      "version": 612,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "portfolio-generate",
+      "function_id": "0e5f90c5-da09-4bdf-928d-4653d202726a",
+      "version": 615,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "portfolio-photo-enhance",
+      "function_id": "424ac355-1158-4a0f-a1ee-aef17b3e41c8",
+      "version": 615,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "portfolio-slug-check",
+      "function_id": "81dcee04-fc46-4e5a-abdb-9c5ed63b27d2",
+      "version": 615,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "public-signup-metrics",
+      "function_id": "19875568-5651-4be7-ab1f-6695f69ea760",
+      "version": 5490,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "6cee97dee4e2bb21b2aab98f701082f13a0ed34880207449ac5d2d292daa145e",
+        "file_count": 3,
+        "total_bytes": 9310
+      }
+    },
+    {
+      "slug": "sandbox-create-test-item",
+      "function_id": "863ffcdd-2d35-47a3-ab90-77c357985c76",
+      "version": 5548,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "914429ca5c180f89b9724be5ac67302bb0ced49ea2cc59500c7d402b7855a8a0",
+        "file_count": 6,
+        "total_bytes": 22159
+      }
+    },
+    {
+      "slug": "send-email-notification",
+      "function_id": "288bd1c4-d52b-4517-ad5f-e4967dbf526b",
+      "version": 6166,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "0b82d9a7498a08c84ece497249fce818816b9c392c8dc3e619c9284b755e2cc4",
+        "file_count": 2,
+        "total_bytes": 7652
+      }
+    },
+    {
+      "slug": "send-kyc-email",
+      "function_id": "8c1b166b-d800-4b8d-9399-88fffbf911a3",
+      "version": 664,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "shadow-investigator",
+      "function_id": "3214d6b2-cb37-4d21-b0c9-27fd6f22112c",
+      "version": 6087,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "b3fe566fb77caea183d17c594ed356119e1a37a78ef7c5d3c69c61cbf1122c31",
+        "file_count": 5,
+        "total_bytes": 29457
+      }
+    },
+    {
+      "slug": "signal-decision-report",
+      "function_id": "4500c152-45c1-4688-bbec-6d21ce0308eb",
+      "version": 5684,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "71478c6c4fddb5fe7f80386aadf3fe2bfad315999b0d00c96eb4a12c554315ea",
+        "file_count": 4,
+        "total_bytes": 3663
+      }
+    },
+    {
+      "slug": "signal-evaluate",
+      "function_id": "363e2501-aab7-43ae-a905-2abd6b8f72e7",
+      "version": 5684,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8152af65ae110fa87501aa8a69d9b3ae3249f22b913ed33069ce9b92388b27ac",
+        "file_count": 4,
+        "total_bytes": 4121
+      }
+    },
+    {
+      "slug": "signal-return-report",
+      "function_id": "11f69350-a801-464b-8b8c-bf1bfbb321c6",
+      "version": 5684,
+      "verify_jwt": false,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "a759065bd3ab57e451269135992a3dae6ab0ea9884b160eaa945cda13cfeedf2",
+        "file_count": 4,
+        "total_bytes": 3305
+      }
+    },
+    {
+      "slug": "site-analyze",
+      "function_id": "21fdfb16-91e3-4cb4-af43-370fa83052f9",
+      "version": 610,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "site-edit",
+      "function_id": "d43b4e4b-9dc7-4a74-b5cf-896a05d4c231",
+      "version": 610,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "site-extract",
+      "function_id": "07ac20db-0c28-4062-9ef3-8ee43c2b56b1",
+      "version": 610,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "site-generate",
+      "function_id": "3b82f0e1-14ef-44fd-8268-82eadd3bbf62",
+      "version": 620,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "site-orchestrator",
+      "function_id": "859c9d8b-56d0-442f-806c-b7e6081f941d",
+      "version": 612,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "site-publish",
+      "function_id": "6a862c18-cb18-4a62-b870-6c73a16e1ce2",
+      "version": 618,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "stock-quotes",
+      "function_id": "4f2068d6-f07a-409d-8af4-ba12e5df9017",
+      "version": 6285,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "d54c9bcc4c8b642c9a16650e72878a9a70724dad7ce7d8f998e94e0241932683",
+        "file_count": 2,
+        "total_bytes": 4272
+      }
+    },
+    {
+      "slug": "stripe-identity-session",
+      "function_id": "d9c4fb1b-c0c5-48a4-a5eb-191c8ad5c35b",
+      "version": 665,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "stripe-identity-webhook",
+      "function_id": "bc79ede2-7b3e-42fc-9881-0ae85d631db1",
+      "version": 662,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    },
+    {
+      "slug": "ticket_create",
+      "function_id": "a448e353-d4ce-45c7-99de-1668ab89045f",
+      "version": 5845,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "dc36dce16d11baa7ffc4924c71fe17b84e1b322fb56dbf247ba6668dbf20e8e6",
+        "file_count": 1,
+        "total_bytes": 4154
+      }
+    },
+    {
+      "slug": "transactions-sync",
+      "function_id": "c797dc47-4903-4675-a718-8b3153815d63",
+      "version": 5492,
+      "verify_jwt": false,
+      "source_recovery_mode": "RECOVER_FROM_GIT_HISTORY",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "8be7adff1676a7508dfff2fcb8e7fbabe1db53150f806a76fe65660e70472054",
+        "file_count": 3,
+        "total_bytes": 4612
+      }
+    },
+    {
+      "slug": "vault-access-notification",
+      "function_id": "0527dbba-98bf-4b3c-8f5a-f46cc2f79a87",
+      "version": 5492,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "11946f1011304ecf16b9917c2ba57a099ef4877887e7f86f8bd91632c10ddba2",
+        "file_count": 6,
+        "total_bytes": 80015
+      }
+    },
+    {
+      "slug": "veo-generate-video",
+      "function_id": "b22e572e-5b93-4c3d-a033-66273bce3c16",
+      "version": 6107,
+      "verify_jwt": true,
+      "source_recovery_mode": "CHECKED_IN_SOURCE",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "EXTRACTED",
+      "bundle_evidence": {
+        "digest_algorithm": "sha256_of_sha256_double_space_relative_path_lines_lc_all_c_v1",
+        "canonical_digest": "eaf87021ff25219bdf513a129ca81cf1cea35def05f094242f29bf3ea67fa685",
+        "file_count": 3,
+        "total_bytes": 6955
+      }
+    },
+    {
+      "slug": "voice-agent-turn",
+      "function_id": "87a0417d-2aaf-4b94-a938-bfd064cd4f39",
+      "version": 654,
+      "verify_jwt": true,
+      "source_recovery_mode": "RECONSTRUCT_CONTRACT",
+      "final_disposition": "PORT_TO_GCP",
+      "migration_state": "INVENTORY_FROZEN",
+      "capture_status": "STORE_NOT_FOUND",
+      "store_lookup": {
+        "http_status": 404,
+        "provider_error_code": "UnknownError"
+      }
+    }
+  ]
+}
