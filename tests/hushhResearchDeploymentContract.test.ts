@@ -14,7 +14,7 @@ describe("Hushh Research UAT deployment contract", () => {
   const smoke = read(".github/workflows/main-post-merge-smoke.yml");
 
   it("pins UAT to the shared Research Firebase authority and exact callback", () => {
-    expect(uat).toContain("HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda");
+    expect(uat).toContain("HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda-uat");
     expect(uat).toContain("HUSHH_RESEARCH_API_BASE_URL: https://api.uat.hushh.ai");
     expect(uat).toContain("HUSHH_RESEARCH_WEB_BASE_URL: https://uat.one.hushh.ai");
     expect(uat).toContain("HUSHH_RESEARCH_AUDIENCE: hushh-tech-uat");

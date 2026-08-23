@@ -37,9 +37,13 @@ env:
   HUSHH_RESEARCH_WEB_BASE_URL: https://uat.one.hushh.ai
   HUSHH_RESEARCH_AUDIENCE: hushh-tech-uat
   HUSHH_RESEARCH_REDIRECT_URI: https://uat.hushhtech.com/auth/hushh-research/callback
-  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda
-  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda.firebaseapp.com
+  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda-uat
+  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda-uat.firebaseapp.com
   HUSHH_RESEARCH_DEVELOPER_APP_ID: app_hushh-technologies_cd1895ef
+  # Single source of truth: bound into the revision AND used to decide whether the
+  # sensitive NDA gate can assert its signed half. Flipping this one value flips
+  # both, so the gate becomes strict the moment the data runtime is switched on.
+  GCP_DATA_RUNTIME_ENABLED: "false"
   HUSHH_TECH_GCP_FUNCTIONS_ENABLED: "true"
   HUSHH_TECH_INVESTOR_API_URL: https://hushh-tech-investor-api-175298245599.us-central1.run.app
 
@@ -306,7 +310,7 @@ jobs:
             exit 1
           fi
           short_sha="${deploy_sha:0:8}"
-          runtime_env="^|^NODE_ENV=staging|DEPLOY_COMMIT_SHA=${deploy_sha}|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=false|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
+          runtime_env="^|^NODE_ENV=staging|DEPLOY_COMMIT_SHA=${deploy_sha}|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=${GCP_DATA_RUNTIME_ENABLED}|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
           runtime_secrets="GCP_SERVER_ACTOR_UID=hushh-tech-server-actor-uid:latest"
           runtime_secrets+=",DELETE_ACCOUNT_AUDIT_SECRET=hushh-tech-delete-account-audit-secret:latest"
           runtime_secrets+=",GEMINI_API_KEY=hushh-tech-gemini-api-key:latest"
@@ -334,6 +338,9 @@ jobs:
             --service-account=hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com \
             --tag="$build_tag" \
             --region=us-central1 \
+            --network=default \
+            --subnet=default \
+            --vpc-egress=private-ranges-only \
             --platform=managed \
             --allow-unauthenticated \
             --memory=512Mi \
@@ -346,6 +353,22 @@ jobs:
             --set-secrets="$runtime_secrets" \
             --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}" \
             --clear-base-image \
+            --quiet
+
+      # The rollback step below pins traffic with --to-revisions, which leaves the
+      # service in "pinned" mode permanently. Every later deploy then produces a
+      # revision that receives 0% of traffic, and "Verify exact UAT release
+      # identity" fails on a deploy that actually succeeded. Restoring
+      # route-to-latest is idempotent, is a no-op when the service is already in
+      # that mode, and self-heals the pin left by any earlier rollback.
+      - name: Route traffic to the newly deployed revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run services update-traffic hushh-tech-website \
+            --project=hushh-tech-uat \
+            --region=us-central1 \
+            --to-latest \
             --quiet
 
       - name: Verify exact UAT release identity
@@ -420,7 +443,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm --silent run verify:sensitive-nda-gate -- --target=uat --expected-min=1 2>&1 | tee /tmp/uat-sensitive-nda-gate.json
+          npm --silent run verify:sensitive-nda-gate -- \
+            --target=uat \
+            --expected-min=1 \
+            --expect-data-runtime="${GCP_DATA_RUNTIME_ENABLED}" \
+            2>&1 | tee /tmp/uat-sensitive-nda-gate.json
 
       - name: Verify Research client contract
         env:

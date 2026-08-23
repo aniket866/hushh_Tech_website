@@ -24,7 +24,7 @@ const ENABLED_CONFIG = {
   enabled: true,
   firebase: {
     apiKey: "public-firebase-api-key",
-    authDomain: "hushh-pda.firebaseapp.com",
+    authDomain: "hushh-pda-uat.firebaseapp.com",
     projectId: HUSHH_RESEARCH_PROJECT_ID,
     appId: "1:123:web:abc",
   },

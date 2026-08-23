@@ -129,8 +129,8 @@ function enabledEnv(connectorPrivateKey = "test-connector-private-key") {
     HUSHH_RESEARCH_AUDIENCE: "hushh-tech-uat",
     HUSHH_RESEARCH_REDIRECT_URI:
       "https://uat.hushhtech.com/auth/hushh-research/callback",
-    HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda",
-    HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: "hushh-pda.firebaseapp.com",
+    HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda-uat",
+    HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: "hushh-pda-uat.firebaseapp.com",
     HUSHH_RESEARCH_FIREBASE_API_KEY: "public-firebase-api-key",
     HUSHH_RESEARCH_FIREBASE_APP_ID: "1:123:web:abc",
     HUSHH_RESEARCH_DEVELOPER_APP_ID: APP_ID,
