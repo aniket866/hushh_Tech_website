@@ -18,6 +18,9 @@ const ROUTE_OWNER_PREFIXES = Object.freeze({
   "src/pages/career/index.tsx": "/career",
 });
 const TERMINAL_OVERRIDES = Object.freeze({
+  // Redirects written inside a page component rather than inline in its Route
+  // are invisible to staticNavigateTarget, which only reads the Route element.
+  "/sell-the-wall": "/community/general/sell-the-wall-featured",
   "/onboarding/step-7": "/login",
   "/onboarding/step-8": "/login",
   "/onboarding/step-9": "/login",

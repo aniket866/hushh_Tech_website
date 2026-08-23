@@ -966,7 +966,7 @@
     {
       "pattern": "/sell-the-wall",
       "sample": "/sell-the-wall",
-      "terminal": "/sell-the-wall",
+      "terminal": "/community/general/sell-the-wall-featured",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -2145,5 +2145,5 @@
     "functions_retired": 1,
     "functions_blocked": 110
   },
-  "sha256": "4bb6a04723218e6c7e7bf80f90917f071e141120b7514ff5ea4aa9716cbdd6c0"
+  "sha256": "6823815f641f31ba015c98c1781b33fe5072b9868b7dbf19d094b09faa570b7e"
 }
