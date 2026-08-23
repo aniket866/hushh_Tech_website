@@ -17,7 +17,13 @@ ios/
 supabase/
 tests/
 docs/
-scripts/
+scripts/*
+!scripts/ci/
+scripts/ci/*
+# The runtime-only Dockerfile runs the no-hybrid artifact gate inside the
+# image, so these two files must reach the build context.
+!scripts/ci/check-no-hybrid-runtime.mjs
+!scripts/ci/no-hybrid-runtime-policy.json
 files/
 hushh_api_reports/
 playstore-assets/
