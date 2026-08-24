@@ -43,7 +43,7 @@ env:
   # Single source of truth: bound into the revision AND used to decide whether the
   # sensitive NDA gate can assert its signed half. Flipping this one value flips
   # both, so the gate becomes strict the moment the data runtime is switched on.
-  GCP_DATA_RUNTIME_ENABLED: "false"
+  GCP_DATA_RUNTIME_ENABLED: "true"
   HUSHH_TECH_GCP_FUNCTIONS_ENABLED: "true"
   HUSHH_TECH_INVESTOR_API_URL: https://hushh-tech-investor-api-175298245599.us-central1.run.app
 
