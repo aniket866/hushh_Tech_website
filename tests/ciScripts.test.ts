@@ -163,6 +163,7 @@ describe("CI workflow scripts", () => {
     );
 
     expect(gcpDataRuntime).toContain('from "@google-cloud/cloud-sql-connector"');
+    expect(gcpDataRuntime).toContain('ipType: "PRIVATE"');
     expect(gcpDataRuntime).toContain('from "firebase-admin/app"');
     expect(gcpDataRuntime).toContain('from "pg"');
     expect(gcpDataRuntime).toContain('from "@google-cloud/storage"');

@@ -134,7 +134,7 @@ export function runtimeConfig(env = process.env) {
 async function databasePool(config) {
   if (pool) return pool;
   connector = new Connector();
-  const options = await connector.getOptions({ instanceConnectionName: config.instanceConnectionName, authType: "IAM" });
+  const options = await connector.getOptions({ instanceConnectionName: config.instanceConnectionName, authType: "IAM", ipType: "PRIVATE" });
   pool = new Pool({ ...options, database: config.database, user: config.user, max: 8, statement_timeout: 10_000, query_timeout: 12_000 });
   return pool;
 }
