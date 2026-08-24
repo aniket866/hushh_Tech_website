@@ -79,7 +79,7 @@ export async function verifyHushhResearchClient(
   const firebase = requireObject(config.firebase, "Firebase config");
   const launch = requireObject(config.launch, "Launch config");
   if (
-    firebase.projectId !== "hushh-pda-uat" ||
+    firebase.projectId !== "hushh-pda" ||
     typeof firebase.apiKey !== "string" ||
     !firebase.apiKey ||
     typeof firebase.appId !== "string" ||

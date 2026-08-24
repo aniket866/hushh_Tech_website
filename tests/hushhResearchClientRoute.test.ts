@@ -35,8 +35,8 @@ const enabledEnv = () => ({
   HUSHH_RESEARCH_AUDIENCE: "hushh-tech-uat",
   HUSHH_RESEARCH_REDIRECT_URI:
     "https://uat.hushhtech.com/auth/hushh-research/callback",
-  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda-uat",
-  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: "hushh-pda-uat.firebaseapp.com",
+  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: "hushh-pda",
+  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: "hushh-pda.firebaseapp.com",
   HUSHH_RESEARCH_FIREBASE_API_KEY: "public-firebase-api-key",
   HUSHH_RESEARCH_FIREBASE_APP_ID: "1:123:web:abc",
   HUSHH_RESEARCH_DEVELOPER_APP_ID: DEVELOPER_APP_ID,
@@ -149,8 +149,8 @@ describe("Hushh Research compatibility gateway", () => {
       enabled: true,
       firebase: {
         apiKey: "public-firebase-api-key",
-        authDomain: "hushh-pda-uat.firebaseapp.com",
-        projectId: "hushh-pda-uat",
+        authDomain: "hushh-pda.firebaseapp.com",
+        projectId: "hushh-pda",
         appId: "1:123:web:abc",
       },
       launch: {

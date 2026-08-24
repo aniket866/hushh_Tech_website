@@ -11,7 +11,7 @@ const config = {
   audience: "hushh-tech-uat",
   developerAppId: "app_hushh-technologies_cd1895ef",
   firebase: {
-    projectId: "hushh-pda-uat",
+    projectId: "hushh-pda",
     apiKey: "public-browser-api-key",
   },
 };
@@ -26,8 +26,8 @@ function token(
   const payload = Buffer.from(
     JSON.stringify({
       sub: UID,
-      aud: "hushh-pda-uat",
-      iss: "https://securetoken.google.com/hushh-pda-uat",
+      aud: "hushh-pda",
+      iss: "https://securetoken.google.com/hushh-pda",
       iat: NOW_SECONDS - 60,
       auth_time: NOW_SECONDS - 120,
       exp: NOW_SECONDS + 3600,

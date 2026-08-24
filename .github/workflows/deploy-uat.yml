@@ -37,8 +37,8 @@ env:
   HUSHH_RESEARCH_WEB_BASE_URL: https://uat.one.hushh.ai
   HUSHH_RESEARCH_AUDIENCE: hushh-tech-uat
   HUSHH_RESEARCH_REDIRECT_URI: https://uat.hushhtech.com/auth/hushh-research/callback
-  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda-uat
-  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda-uat.firebaseapp.com
+  HUSHH_RESEARCH_FIREBASE_PROJECT_ID: hushh-pda
+  HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN: hushh-pda.firebaseapp.com
   HUSHH_RESEARCH_DEVELOPER_APP_ID: app_hushh-technologies_cd1895ef
   # Single source of truth: bound into the revision AND used to decide whether the
   # sensitive NDA gate can assert its signed half. Flipping this one value flips

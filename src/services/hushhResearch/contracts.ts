@@ -1,6 +1,6 @@
 import type { Session, User } from "@/services/gcpBackend/types";
 
-export const HUSHH_RESEARCH_PROJECT_ID = "hushh-pda-uat" as const;
+export const HUSHH_RESEARCH_PROJECT_ID = "hushh-pda" as const;
 export const HUSHH_RESEARCH_SOURCE = "hushh-research" as const;
 export const HUSHH_RESEARCH_CALLBACK_PATH =
   "/auth/hushh-research/callback" as const;
