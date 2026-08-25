@@ -2,7 +2,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { google } from "googleapis";
 import { STATIC_COMMUNITY_POSTS } from "./staticPosts.generated.js";
-import { executeDataRequest, verifyFirebaseBearer } from "../shared/gcpDataRuntime.js";
+import { executeDataRequest, resolveLegacyUserUuid, verifyFirebaseBearer } from "../shared/gcpDataRuntime.js";
 
 const PROJECT_ID =
   process.env.GOOGLE_CLOUD_PROJECT ||
@@ -67,6 +67,15 @@ export const assertNdaAccess = async (req) => {
   } catch {
     throw new CommunityAccessError(401, "Invalid or expired session");
   }
+  let legacyUserId;
+  try {
+    legacyUserId = await resolveLegacyUserUuid(actor.uid);
+  } catch {
+    throw new CommunityAccessError(503, "NDA status could not be verified");
+  }
+  if (!legacyUserId) {
+    throw new CommunityAccessError(403, "Signed NDA required");
+  }
   let rows;
   try {
     ({ data: rows } = await executeDataRequest({
@@ -74,7 +83,7 @@ export const assertNdaAccess = async (req) => {
       table: "nda_signatures",
       operation: "select",
       columns: "signed_at",
-      filters: [{ operator: "eq", column: "user_id", value: actor.uid }],
+      filters: [{ operator: "eq", column: "user_id", value: legacyUserId }],
       limit: 1,
       cardinality: "many",
     }, actor.uid));

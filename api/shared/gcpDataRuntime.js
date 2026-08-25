@@ -265,6 +265,28 @@ export async function verifyFirebaseBearer(header, config = runtimeConfig()) {
   return decoded;
 }
 
+export async function resolveLegacyUserUuid(uid, dependencies = {}) {
+  const config = runtimeConfig();
+  if (typeof uid !== "string" || !uid || uid.length > 128) {
+    throw Object.assign(new Error("Firebase user is invalid."), { status: 401, code: "AUTH_INVALID" });
+  }
+  const activePool = dependencies.pool || await databasePool(config);
+  const client = await activePool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.firebase_uid', $1, true)", [uid]);
+    const result = await client.query("SELECT hushh_identity.current_legacy_user_uuid() AS legacy_user_uuid");
+    await client.query("COMMIT");
+    return result.rows?.[0]?.legacy_user_uuid || null;
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    throw error;
+  } finally {
+    try { await client.query("RESET app.firebase_uid"); } catch {}
+    client.release();
+  }
+}
+
 function resolveCardinality(request, rows) {
   if (request.cardinality === "single") {
     if (rows.length !== 1) throw Object.assign(new Error("Expected exactly one row."), { status: 406, code: "CARDINALITY_MISMATCH" });

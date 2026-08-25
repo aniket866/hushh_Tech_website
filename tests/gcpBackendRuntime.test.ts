@@ -6,6 +6,7 @@ import {
   compileTableQuery,
   executeDataRequest,
   RPC_NAMES,
+  resolveLegacyUserUuid,
   runtimeConfig,
   STORAGE_BUCKETS,
   TABLE_OPERATIONS,
@@ -119,6 +120,46 @@ describe("GCP backend runtime boundary", () => {
   it("requires a Firebase bearer before any data operation", async () => {
     process.env = { ...process.env, ...validEnv() };
     await expect(verifyFirebaseBearer("")).rejects.toMatchObject({ status: 401, code: "AUTH_REQUIRED" });
+  });
+
+  it("resolves Firebase users to migrated legacy UUIDs inside the runtime context", async () => {
+    process.env = { ...process.env, ...validEnv() };
+    const legacyUserId = "00000000-0000-4000-8000-000000000001";
+    const statements: Array<{ text: string; values?: unknown[] }> = [];
+    const client = {
+      async query(query: string | { text: string }, values?: unknown[]) {
+        const text = typeof query === "string" ? query : query.text;
+        statements.push({ text, values });
+        if (text.includes("current_legacy_user_uuid")) {
+          return { rows: [{ legacy_user_uuid: legacyUserId }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: null };
+      },
+      release() { statements.push({ text: "RELEASE" }); },
+    };
+    const fakePool = { async connect() { return client; } };
+
+    await expect(resolveLegacyUserUuid("firebase-user", { pool: fakePool })).resolves.toBe(legacyUserId);
+
+    expect(statements).toEqual([
+      { text: "BEGIN", values: undefined },
+      { text: "SELECT set_config('app.firebase_uid', $1, true)", values: ["firebase-user"] },
+      { text: "SELECT hushh_identity.current_legacy_user_uuid() AS legacy_user_uuid", values: undefined },
+      { text: "COMMIT", values: undefined },
+      { text: "RESET app.firebase_uid", values: undefined },
+      { text: "RELEASE" },
+    ]);
+  });
+
+  it("returns null when a Firebase user has no active legacy identity link", async () => {
+    process.env = { ...process.env, ...validEnv() };
+    const client = {
+      async query() { return { rows: [{ legacy_user_uuid: null }], rowCount: 1 }; },
+      release() {},
+    };
+    const fakePool = { async connect() { return client; } };
+
+    await expect(resolveLegacyUserUuid("firebase-user", { pool: fakePool })).resolves.toBeNull();
   });
 
   it.each([

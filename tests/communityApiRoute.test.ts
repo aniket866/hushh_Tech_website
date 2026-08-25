@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { verifyFirebaseBearerMock, executeDataRequestMock } = vi.hoisted(() => ({
+const { verifyFirebaseBearerMock, executeDataRequestMock, resolveLegacyUserUuidMock } = vi.hoisted(() => ({
   verifyFirebaseBearerMock: vi.fn(),
   executeDataRequestMock: vi.fn(),
+  resolveLegacyUserUuidMock: vi.fn(),
 }));
 
 vi.mock("../api/shared/gcpDataRuntime.js", () => ({
   verifyFirebaseBearer: verifyFirebaseBearerMock,
   executeDataRequest: executeDataRequestMock,
+  resolveLegacyUserUuid: resolveLegacyUserUuidMock,
 }));
 
 import postsHandler from "../api/community/posts.js";
@@ -140,6 +142,7 @@ describe("community API routes", () => {
 
   it("rejects authenticated users who have not signed the NDA", async () => {
     verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "unsigned-user" });
+    resolveLegacyUserUuidMock.mockResolvedValueOnce("00000000-0000-4000-8000-000000000001");
     executeDataRequestMock.mockResolvedValueOnce({ data: [] });
     const res = createRes();
 
@@ -154,10 +157,36 @@ describe("community API routes", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.payload).toEqual({ error: "Signed NDA required" });
+    expect(executeDataRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: [{ operator: "eq", column: "user_id", value: "00000000-0000-4000-8000-000000000001" }],
+      }),
+      "unsigned-user",
+    );
+  });
+
+  it("rejects authenticated users who have no migrated legacy identity link", async () => {
+    verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "unmapped-user" });
+    resolveLegacyUserUuidMock.mockResolvedValueOnce(null);
+    const res = createRes();
+
+    await postsHandler(
+      {
+        method: "GET",
+        query: { accessLevel: "NDA" },
+        headers: { authorization: "Bearer unmapped-token" },
+      } as any,
+      res,
+    );
+
+    expect(res.statusCode).toBe(403);
+    expect(res.payload).toEqual({ error: "Signed NDA required" });
+    expect(executeDataRequestMock).not.toHaveBeenCalled();
   });
 
   it("returns NDA summaries only after the bearer token has a signed NDA row", async () => {
     verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "signed-user" });
+    resolveLegacyUserUuidMock.mockResolvedValueOnce("00000000-0000-4000-8000-000000000002");
     executeDataRequestMock.mockResolvedValueOnce({
       data: [{ signed_at: "2026-06-05T00:00:00.000Z" }],
     });
@@ -181,6 +210,7 @@ describe("community API routes", () => {
 
   it("returns NDA post details only after the bearer token has a signed NDA row", async () => {
     verifyFirebaseBearerMock.mockResolvedValueOnce({ uid: "signed-user" });
+    resolveLegacyUserUuidMock.mockResolvedValueOnce("00000000-0000-4000-8000-000000000002");
     executeDataRequestMock.mockResolvedValueOnce({
       data: [{ signed_at: "2026-06-05T00:00:00.000Z" }],
     });
