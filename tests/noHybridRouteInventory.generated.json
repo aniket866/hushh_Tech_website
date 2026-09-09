@@ -1257,6 +1257,13 @@
       ]
     },
     {
+      "pattern": "/api/hushh-profile",
+      "sample": "/api/hushh-profile",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
       "pattern": "/api/hushh-research/*",
       "sample": "/api/hushh-research/__no_hybrid_wildcard_fixture__",
       "methods": [
@@ -1287,6 +1294,13 @@
     {
       "pattern": "/api/public-investor-profile",
       "sample": "/api/public-investor-profile",
+      "methods": [
+        "ALL"
+      ]
+    },
+    {
+      "pattern": "/api/public/hushh-profile/:hushhId",
+      "sample": "/api/public/hushh-profile/fixture-id",
       "methods": [
         "ALL"
       ]
@@ -2139,11 +2153,11 @@
     "client_anonymous": 69,
     "client_user": 22,
     "client_admin": 3,
-    "server": 33,
+    "server": 35,
     "functions": 112,
     "functions_ported": 1,
     "functions_retired": 1,
     "functions_blocked": 110
   },
-  "sha256": "206e0e29ae1015d38adb6dae763ac5bb776c40bc7364c98392817a65c9988585"
+  "sha256": "553d2370fe0e39a9f5824d455bb81d70a5a4784f0b595f71911380dd38aa716e"
 }

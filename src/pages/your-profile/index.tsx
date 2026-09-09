@@ -31,8 +31,8 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
-  const [userId, setUserId] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<UserPreferenceProfile | null>(null);
+  const [profileUnavailable, setProfileUnavailable] = useState(false);
 
   const formatList = (items?: string[]) => (items && items.length > 0 ? items.join(", ") : "unknown");
 
@@ -52,15 +52,21 @@ const ProfilePage = () => {
     }
   };
 
-  const loadPreferences = async (supabaseUserId: string) => {
+  const loadPreferences = async () => {
     try {
-      const dbPreferences = await services.preferences.fetchPreferences(supabaseUserId);
+      const dbPreferences = await services.preferences.fetchPreferences();
       if (dbPreferences) {
         setPreferences(dbPreferences);
+        setProfileUnavailable(false);
         localStorage.setItem("hushhUserPreferences", JSON.stringify(dbPreferences));
         return;
       }
     } catch (prefError) {
+      if (prefError && typeof prefError === "object" && "code" in prefError && prefError.code === "PROFILE_DATA_CONTRACT_NOT_READY") {
+        setPreferences(null);
+        setProfileUnavailable(true);
+        return;
+      }
       console.error("Error loading preferences from GcpBackend:", prefError);
     }
 
@@ -100,9 +106,7 @@ const ProfilePage = () => {
         
         console.log('✅ User email found:', user.email);
         setUserEmail(user.email);
-        setUserId(user.id);
-
-        await loadPreferences(user.id);
+        await loadPreferences();
         
         // Check if user exists in database using the API
         await checkUserInDatabase(user.email);
@@ -499,6 +503,12 @@ const ProfilePage = () => {
             </p>
           </div>
         </div>
+
+        {profileUnavailable && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+            <p className="text-sm text-gray-600">Profile data is temporarily unavailable.</p>
+          </div>
+        )}
 
         {preferences && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">

@@ -231,6 +231,19 @@ Each reference requires ownership and non-use proof before deletion. An
 unrelated Supabase project must never be deleted merely because its identifier
 appears in the repository.
 
+## Profile migration gate
+
+The legacy `public.members` profile/preferences dependency is now behind the
+dedicated authenticated `/api/hushh-profile` and public
+`/api/public/hushh-profile/:hushhId` boundaries. Active profile routes do not
+query `members`, Supabase, or the generic anonymous data API.
+
+Persistence intentionally remains gated. The repository does not claim that
+`public.hushh_profiles` exists or that legacy data has been migrated. The
+unresolved contract includes the live `members` schema, `members.id` semantics,
+Firebase identity mapping, public Hushh ID semantics, visibility rules, and the
+final Cloud SQL ownership contract.
+
 ## Blocking lanes
 
 `Supabase Retirement Contract` blocks pull-request validation and merge-queue

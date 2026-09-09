@@ -1,4 +1,4 @@
-import resources from "../../resources/resources";
+import { getOwnHushhProfile } from "./hushhProfileApi";
 import { PreferenceSeedInput, UserPreferenceProfile } from "../../types/preferences";
 
 export interface UserPreferencesRecord {
@@ -6,45 +6,23 @@ export interface UserPreferencesRecord {
   user_seed: PreferenceSeedInput | null;
 }
 
-export default async function fetchPreferences(
-  userId: string
-): Promise<UserPreferenceProfile | null> {
-  const record = await fetchPreferencesWithSeed(userId);
+export default async function fetchPreferences(): Promise<UserPreferenceProfile | null> {
+  const record = await fetchPreferencesWithSeed();
   return record?.preferences || null;
 }
 
-export async function fetchPreferencesWithSeed(
-  userId: string
-): Promise<UserPreferencesRecord | null> {
-  const gcpBackend = resources.config.gcpBackendClient;
-  if (!gcpBackend) {
-    console.error("GcpBackend client is not initialized");
-    return null;
-  }
+export async function fetchPreferencesWithSeed(): Promise<UserPreferencesRecord | null> {
+  const profile = await getOwnHushhProfile();
+  if (!profile?.profile) return null;
 
-  const { data, error } = await gcpBackend
-    .from("members")
-    .select(
-      "profile, name, email, age, phone_country_code, phone_number, organisation"
-    )
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to fetch preferences:", error);
-    return null;
-  }
-
-  if (!data?.profile) return null;
-
-  const preferences = data.profile as UserPreferenceProfile;
+  const preferences = profile.profile;
   const user_seed: PreferenceSeedInput = {
-    name: (data.name as string) || "",
-    email: (data.email as string) || "",
-    age: (data.age as number) || 0,
-    phone_country_code: (data.phone_country_code as string) || "",
-    phone_number: (data.phone_number as string) || "",
-    organisation: (data.organisation as string) || null,
+    name: profile.name || "",
+    email: profile.email || "",
+    age: profile.age || 0,
+    phone_country_code: profile.phone_country_code || "",
+    phone_number: profile.phone_number || "",
+    organisation: profile.organisation || null,
   };
 
   return {

@@ -78,21 +78,25 @@ function PublicHushhProfilePage() {
       }
 
       try {
-        const record = await services.preferences.fetchPreferencesWithSeed(id);
-        if (!record || !record.preferences) {
+        const profile = await services.preferences.getPublicHushhProfile(id);
+        if (!profile || !profile.profile) {
           setError("This Hushh ID could not be found.");
           setIsLoading(false);
           return;
         }
 
-        setPreferences(record.preferences);
+        setPreferences(profile.profile);
         setUser({
-          name: record.user_seed?.name || "Hushh User",
-          organisation: record.user_seed?.organisation || null,
+          name: profile.name || "Hushh User",
+          organisation: profile.organisation || null,
         });
       } catch (err) {
-        console.error("Failed to load public Hushh profile:", err);
-        setError("Unable to load this Hushh ID right now.");
+        if (err && typeof err === "object" && "code" in err && err.code === "PUBLIC_HUSHH_ID_CONTRACT_NOT_READY") {
+          setError("This public profile is temporarily unavailable.");
+        } else {
+          console.error("Failed to load public Hushh profile:", err);
+          setError("Unable to load this Hushh ID right now.");
+        }
       } finally {
         setIsLoading(false);
       }

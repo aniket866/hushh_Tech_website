@@ -22,7 +22,7 @@ describe("no-hybrid exhaustive route inventory", () => {
       client_anonymous: 69,
       client_user: 22,
       client_admin: 3,
-      server: 33,
+      server: 35,
       functions: 112,
       functions_ported: 1,
       functions_retired: 1,

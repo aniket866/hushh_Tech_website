@@ -1,46 +1,24 @@
-import resources from "../../resources/resources";
-import { PreferenceSeedInput, UserPreferenceProfile } from "../../types/preferences";
+import { updateOwnHushhProfile } from "./hushhProfileApi";
+import type { HushhProfileSeed } from "../../types/hushhProfile";
+import { UserPreferenceProfile } from "../../types/preferences";
 
 export interface SavePreferencesResult {
   success: boolean;
   error?: string;
 }
 
-export default async function savePreferencesToSupabase(
-  userId: string,
+export default async function savePreferences(
   preferences: UserPreferenceProfile,
-  seed?: PreferenceSeedInput
+  seed?: HushhProfileSeed
 ): Promise<SavePreferencesResult> {
-  if (!userId) {
-    return { success: false, error: "Missing user id for GcpBackend upsert" };
-  }
-
-  const gcpBackend = resources.config.gcpBackendClient;
-  if (!gcpBackend) {
-    return { success: false, error: "GcpBackend client is not initialized" };
-  }
-
-  const { error } = await gcpBackend
-    .from("members")
-    .upsert(
-      {
-        id: userId,
-        name: seed?.name || null,
-        email: seed?.email || null,
-        age: seed?.age || null,
-        phone_country_code: seed?.phone_country_code || null,
-        phone_number: seed?.phone_number || null,
-        organisation: seed?.organisation || null,
-        profile: preferences,
-        profile_source: "ai_seed",
-        updated_at: new Date().toISOString(),
-      },
-      // { onConflict: "id" }
-    );
-
-  if (error) {
-    console.error("Failed to save preferences to GcpBackend:", error);
-    return { success: false, error: error.message };
+  try {
+    await updateOwnHushhProfile({
+      profile: preferences,
+      ...(seed ? { name: seed.name || null, organisation: seed.organisation || null } : {}),
+    });
+  } catch (error) {
+    console.error("Failed to save Hushh profile:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Profile data is temporarily unavailable." };
   }
 
   return { success: true };
