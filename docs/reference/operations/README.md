@@ -7,12 +7,13 @@ This folder holds the lightweight operations references for the first-wave OSS c
 1. [OSS Contribution Triage](./oss-contribution-triage.md) for the maintainer decision flow and triage handoffs
 2. [PR Decision Rubric](./pr-decision-rubric.md) for the four outcome buckets and patch-and-merge boundary
 3. [CI Governance](./ci-governance.md) for which PR and deploy lanes are inputs versus merge authority
-4. [Qodo Context Engine Rollout](./qodo-context-engine-rollout.md) for the hushhtech-first indexing and RAG adoption plan
-5. [Skill Taxonomy](./skill-taxonomy.md) for the first-wave owner and spoke skill layout behind this flow
-6. [Supabase Retirement Contract](./supabase-retirement-contract.md) for the
+4. [Admin Merge And Release SOP](./admin-release-sop.md) for the exact-head merge queue, Admin bypass, UAT, production, and Firestore release state machine
+5. [Qodo Context Engine Rollout](./qodo-context-engine-rollout.md) for the hushhtech-first indexing and RAG adoption plan
+6. [Skill Taxonomy](./skill-taxonomy.md) for the first-wave owner and spoke skill layout behind this flow
+7. [Supabase Retirement Contract](./supabase-retirement-contract.md) for the
    frozen no-hybrid migration inventory and its blocking CI contract
-7. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
-8. [No-Hybrid Runtime Gate](./no-hybrid-runtime-gate.md) for the blocking source, artifact, native, workflow, and browser proof that the deployable product cannot reach Supabase
+8. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
+9. [No-Hybrid Runtime Gate](./no-hybrid-runtime-gate.md) for the blocking source, artifact, native, workflow, and browser proof that the deployable product cannot reach Supabase
 
 ## Canonical workflow and governance
 

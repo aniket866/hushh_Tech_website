@@ -2,12 +2,21 @@
 
 This document describes the current Hushhtech PR and deploy lanes that the OSS contribution triage skill should trust.
 
+The operator state machine for moving a reviewed change through the queue,
+`main`, UAT, production, and any GCP community-content sync is
+[Admin Merge And Release SOP](./admin-release-sop.md). This page records the
+individual gates; the SOP records their order and the evidence required at each
+authority transition.
+
 ## Protected branch authority
 
 - GitHub repository rulesets protect `main` and `develop`; classic branch protection is not authoritative for this repository.
-- `@ankitkumarsingh1702` (GitHub user id `94732725`) and `@Jhumma-hushh` (GitHub user id `262395004`) may bypass pull request review rules or merge protected-branch PRs.
+- The active `Protect main branch` ruleset is id `15210186`; its merge queue uses `HEADGREEN`, a five-minute minimum wait, and a maximum of two entries.
+- `@ankitkumarsingh1702` (GitHub user id `94732725`), `@Jhumma-hushh` (GitHub user id `262395004`), and `@kushaltrivedi5` (GitHub user id `40542375`) may bypass pull request review rules or merge protected-branch PRs.
+- The `Allowed Maintainers to Approve` team (id `17036409`) is also a ruleset pull-request bypass actor. It is the group path for approved maintainers, currently including `msainani` alongside the named maintainers.
+- The `deploy-uat` and `deploy-production` teams are the deployment-environment reviewer groups. `pipeline-editors` is the repository workflow-maintenance group. Membership and reviewer assignment are live GitHub state and must be checked before a release.
 - Other collaborators can push topic branches and open PRs, but cannot update protected refs or merge protected-branch PRs.
-- Ruleset drift is any live bypass actor other than those two approved users, any missing protected-ref update rule, or any non-approved admin route that can change the ruleset.
+- Ruleset drift is any live bypass actor outside the approved users/team, any missing protected-ref update rule, or any non-approved admin route that can change the ruleset.
 
 ## PR lanes
 
