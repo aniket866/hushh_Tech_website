@@ -118,13 +118,21 @@ const main = async () => {
   });
 
   // --- assets --------------------------------------------------------------------------------
-  await check("a public deck page serves", async () => {
+  await check("a public deck asset serves", async () => {
     const deck = posts.find((post) => post.sourceKind === "deck" && post.contentObject?.startsWith("decks/"))
       || posts.find((post) => post.sourceKind === "deck");
-    const slug = (deck?.slug || "").split("/").pop();
-    const response = await get(`/api/community/assets/decks/${slug}/pages/page-001.jpg`);
-    expect(response.status === 200, `HTTP ${response.status} for ${slug}`);
-    return `${slug} page-001 ${response.headers.get("content-type")}`;
+    expect(Boolean(deck?.cardsObject), "no public deck exposes a cardsObject");
+    const cardsResponse = await get(`/api/community/assets/${deck.cardsObject}`);
+    expect(cardsResponse.status === 200, `HTTP ${cardsResponse.status} for ${deck.cardsObject}`);
+    const cardsDocument = await cardsResponse.json();
+    const imagePath = cardsDocument.cards
+      ?.flatMap((card) => card.images || [])
+      .find((value) => value.startsWith("/api/community/assets/decks/"));
+    expect(Boolean(imagePath), `no mirrored public image found for ${deck.slug}`);
+    const imageUrl = new URL(imagePath, HOST);
+    const response = await get(`${imageUrl.pathname}${imageUrl.search}`);
+    expect(response.status === 200, `HTTP ${response.status} for ${imagePath}`);
+    return `${deck.slug} ${imagePath.split("/").pop()} ${response.headers.get("content-type")}`;
   });
 
   await check("a gated deck page is refused", async () => {
