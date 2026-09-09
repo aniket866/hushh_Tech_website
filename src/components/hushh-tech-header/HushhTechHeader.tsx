@@ -219,6 +219,14 @@ const HushhTechHeader: React.FC<HushhTechHeaderProps> = ({
       <header
         className={`fixed left-0 right-0 top-0 z-50 transition-transform duration-300 ${className}`}
         data-hushh-header
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.78) 75%, rgba(255,255,255,0.65) 100%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          boxShadow:
+            "0 1px 0 rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.03)",
+        }}
       >
         <div className="pointer-events-none px-3 pt-[max(env(safe-area-inset-top),0.85rem)] sm:px-5">
           <div className="pointer-events-auto flex items-center justify-between gap-3">

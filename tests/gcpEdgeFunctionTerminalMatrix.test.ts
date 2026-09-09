@@ -118,12 +118,21 @@ describe("GCP edge-function terminal matrix", () => {
         ),
       ).toThrow(/IMAGE_SOURCE_REPOSITORY_BINDING_NOT_REACHABLE/);
     } finally {
-      fs.rmSync(clone, {
-        recursive: true,
-        force: true,
-        maxRetries: 5,
-        retryDelay: 100,
-      });
+      try {
+        fs.rmSync(clone, {
+          recursive: true,
+          force: true,
+          maxRetries: 10,
+          retryDelay: 200,
+        });
+      } catch {
+        // Fallback if directory handles persist briefly in container environments
+        try {
+          fs.rmdirSync(clone, { recursive: true });
+        } catch {
+          // Ignore transient temporary directory cleanup error
+        }
+      }
     }
   });
 
