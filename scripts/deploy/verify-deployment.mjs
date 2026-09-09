@@ -132,7 +132,19 @@ const main = async () => {
     const imageUrl = new URL(imagePath, HOST);
     const response = await get(`${imageUrl.pathname}${imageUrl.search}`);
     expect(response.status === 200, `HTTP ${response.status} for ${imagePath}`);
-    return `${deck.slug} ${imagePath.split("/").pop()} ${response.headers.get("content-type")}`;
+
+    // A 200 is not enough. server.js sends `X-Content-Type-Options: nosniff` on every response,
+    // so an image served as application/octet-stream is refused by the browser and the deck
+    // renders with broken images — while curl, an uptime check and this very check all see a
+    // perfectly healthy 200. That is not hypothetical: 1296 objects reached the production bucket
+    // with no contentType at all (a GCS rewrite whose metadata body omits it drops it), and this
+    // check passed the whole time because it only printed the header instead of asserting it.
+    const contentType = response.headers.get("content-type") || "";
+    expect(
+      contentType.startsWith("image/"),
+      `${imagePath} served as "${contentType}" — nosniff means the browser will not render it`,
+    );
+    return `${deck.slug} ${imagePath.split("/").pop()} ${contentType}`;
   });
 
   await check("a gated deck page is refused", async () => {

@@ -45,6 +45,30 @@ the app comes up looking almost fine.
 
 That file is now inert and carries a comment pointing here. Do not resurrect it.
 
+## A Dockerfile COPY is not enough on its own
+
+`deploy-prod.yml` ships with `gcloud run deploy --source .`, which uploads a
+build context filtered by `.gcloudignore` and only then runs Docker. So a path
+the Dockerfile copies but `.gcloudignore` excludes fails **at deploy time inside
+Cloud Build**, not at review time.
+
+`.gcloudignore` excludes `*.md` wholesale, which silently swallowed
+`content/decks/text/` — the committed deck bodies the runtime falls back to.
+Re-including needs a negation (`!content/decks/text/**/*.md`), and a negation
+cannot rescue a file whose *parent directory* is excluded: narrow `dir/` to
+`dir/*` first, then negate.
+
+`scripts/ci/check-deploy-build-context.mjs` is the gate for this, and it
+**skips silently without gcloud** — so a green local run proves nothing. To check
+it without gcloud, lean on git, which implements the same ignore semantics:
+
+```bash
+mkdir /tmp/ctx && cd /tmp/ctx && git init -q .
+cp /path/to/repo/.gcloudignore .gitignore
+mkdir -p content/decks/text && touch content/decks/text/x.md
+git check-ignore -v content/decks/text/x.md   # no output means it survives
+```
+
 ## Other invariants
 
 - **The archive is `git archive`, and it refuses a dirty tree.** What deploys is

@@ -6,6 +6,30 @@ Community pages must render inside HushhTech without browser calls to Supabase r
 
 Some legacy presentation posts still embed Gamma in-place because the original charts/decks have not been exported into GCP yet. Do not replace those with summary text. The migration target is to export the actual deck/PDF/media assets into GCS and then serve them through `/api/community/assets/*`.
 
+## UAT and production are not configured alike
+
+Both set `COMMUNITY_CONTENT_BACKEND=gcp`, but only UAT has a Firestore database.
+`hushh-tech-prod` has no `(default)` database at all, so every Firestore read
+from production 404s, `listGcpPosts()` falls through, and the committed
+`STATIC_COMMUNITY_POSTS` snapshot **is** the production content system. There is
+nothing on prod for `sync-community-firestore.mjs` to sync, and pointing it at
+`--project hushh-tech-prod` fails with NOT_FOUND rather than doing something
+useful.
+
+One consequence worth knowing before reading a dashboard: the
+`community_static_fallback` log metric fires continuously on production. On UAT
+that signal means the content system is degraded. On production it is normal.
+
+Deck bodies and imagery live per-bucket and do not follow the container.
+`publish-deck-content.mjs` and `mirror-deck-images.mjs` both default to
+`hushh-tech-community-content-uat`, so publishing a deck for UAT leaves
+production without it. Until the same objects exist under
+`hushh-tech-community-content-prod`, the index lists the deck and the deck page
+renders "the reading view could not be loaded" — while the crawler-visible body
+keeps working, because that is built from the inlined `bodyMarkdown` rather than
+the bucket. The failure is therefore invisible to an uptime check and to a
+search engine, and visible only to a reader who clicks.
+
 `general/sell-the-wall-featured` is the first migrated deck in this model. Its source PDF is stored in both UAT and production GCS, and the rendered page images are served in-page from:
 
 ```text

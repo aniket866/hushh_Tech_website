@@ -88,12 +88,34 @@ likelihood:
    `content/decks/`, which `Dockerfile.gcp` carries into the runtime image, so
    this only strands gated decks — by design.
 
-## Firestore is authoritative, the repo is not
+## Firestore is authoritative on UAT. On production it does not exist.
 
-UAT and prod run `COMMUNITY_CONTENT_BACKEND=gcp`. `listGcpPosts()` returns the
-Firestore result whenever the collection is non-empty and only falls back to
-`STATIC_COMMUNITY_POSTS` when it is empty or errors. **Shipping a container with
-186 posts in it changes nothing on the index until Firestore knows about them.**
+Both environments set `COMMUNITY_CONTENT_BACKEND=gcp`, so it is tempting to
+assume they behave alike. **They do not, and the difference is easy to get
+wrong** — check the environment rather than reasoning from the env var:
+
+| | `hushh-tech-uat` | `hushh-tech-prod` |
+| --- | --- | --- |
+| Firestore `(default)` database | exists, ~135 docs | **does not exist — every read 404s** |
+| What the index actually serves | Firestore | the committed `STATIC_COMMUNITY_POSTS` |
+| `sync-community-firestore.mjs` | required after a publish | **nothing to sync; the script cannot run** |
+
+On UAT, `listGcpPosts()` returns the Firestore result whenever the collection is
+non-empty and only falls back to `STATIC_COMMUNITY_POSTS` when it is empty or
+errors, so **shipping a container with 186 posts in it changes nothing on the
+index until Firestore knows about them.** On production the Firestore call
+always throws, the fallback always runs, and the committed snapshot is the
+content system. That also means prod logs `community_static_fallback`
+continuously: on UAT that metric means "degraded", on prod it is the steady
+state.
+
+Deck bodies and imagery are a separate question from the index, and they are
+per-bucket. `publish-deck-content.mjs` and `mirror-deck-images.mjs` default to
+the UAT bucket, so a deck published for UAT is **not** present for prod until the
+same content is put in `hushh-tech-community-content-prod`. Miss that and the
+index lists every deck while each deck page renders "the reading view could not
+be loaded" — an outage that looks healthy from the outside, because the
+crawler-visible body comes from the inlined `bodyMarkdown` and still works.
 
 `sync-community-firestore.mjs` is a merge, never a replace: it inserts missing
 slugs in full, and updates existing ones through an explicit
@@ -103,6 +125,33 @@ never writes an empty body over a non-empty one.
 Firestore listing pages at 300 docs — `listAllDocuments()` follows
 `nextPageToken` up to 50 pages. It silently truncated at 100 for a while, which
 is why the index showed 90 posts when there were 130.
+
+## Copying deck assets between buckets
+
+Promoting decks to a new environment means moving the bucket objects too — the
+container carries none of them. Two things bite:
+
+**A GCS rewrite drops metadata you do not resend.** `POST .../rewriteTo/...`
+with a body of `{cacheControl}` sets *only* that, so `contentType` lands empty
+and every object is served `application/octet-stream`. `server.js` sends
+`X-Content-Type-Options: nosniff`, so those images do not render in a browser at
+all — while curl, uptime checks and a status-only test all see a healthy 200.
+Send `contentType` in the rewrite body, or patch it afterwards:
+
+```
+PATCH https://storage.googleapis.com/storage/v1/b/<bucket>/o/<urlencoded name>
+{"contentType": "image/jpeg"}
+```
+
+**Copy what is missing, never "sync the difference".** Environments legitimately
+diverge: after a `convert-gamma-export.mjs` re-run, the newer `cards.json` may
+live in prod while UAT still holds the older bytes. A size-difference sync would
+quietly roll production back. Filter on absence from the destination, and never
+delete.
+
+And remember `/pages/` as well as `/media/`: `media/` powers the reading view,
+`pages/` powers the Slides view, and copying only one leaves half of every deck
+working — which looks fine on the index and in a crawler fetch.
 
 ## Verify a publish landed
 

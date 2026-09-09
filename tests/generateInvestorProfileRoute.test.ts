@@ -7,9 +7,13 @@ const getUser = vi.fn();
 const createClient = vi.fn(() => ({
   auth: { getUser },
 }));
-const GoogleGenAI = vi.fn(() => ({
-  models: { generateContent },
-}));
+// `api/generate-investor-profile.js` does `new GoogleGenAI(...)`. An arrow function is not a
+// constructor, and vitest 4 invokes a mock implementation as one rather than quietly tolerating
+// it, so this has to be a real function. Under vitest 3 the same mock threw inside the route and
+// surfaced as a 502 only after the bump.
+const GoogleGenAI = vi.fn(function createGoogleGenAI() {
+  return { models: { generateContent } };
+});
 
 vi.mock("@google/genai", () => ({
   GoogleGenAI,

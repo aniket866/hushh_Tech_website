@@ -31,6 +31,12 @@ public/
 cloud-run/
 *.sql
 *.md
+# The committed public deck bodies are markdown, and the root Dockerfile copies
+# them so the community asset route can serve a deck when the content bucket is
+# unreachable. `*.md` above would otherwise strip them from the build context and
+# the COPY would fail inside Cloud Build. Only the public directory is
+# re-included; `content/decks/text-gated/` is gitignored and NDA-only.
+!content/decks/text/**/*.md
 *.yml
 *.yaml
 !Dockerfile

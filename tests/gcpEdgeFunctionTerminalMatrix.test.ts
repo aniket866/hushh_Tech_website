@@ -118,7 +118,12 @@ describe("GCP edge-function terminal matrix", () => {
         ),
       ).toThrow(/IMAGE_SOURCE_REPOSITORY_BINDING_NOT_REACHABLE/);
     } finally {
-      fs.rmSync(clone, { recursive: true, force: true });
+      fs.rmSync(clone, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 

@@ -82,7 +82,11 @@ describe("google wallet local route", () => {
       genericclass,
       genericobject,
     });
-    jwtFactory.mockImplementation(() => ({}));
+    // `api/google-wallet-pass.js` does `new google.auth.JWT(...)`, and an arrow function is not
+    // a constructor — vitest 4 calls the implementation with `new` instead of tolerating it.
+    jwtFactory.mockImplementation(function createJwt() {
+      return {};
+    });
 
     const { default: googleWalletPassHandler } = await import(
       "../api/google-wallet-pass.js"

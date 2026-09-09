@@ -34,6 +34,16 @@ COPY server.js ./
 COPY api/ api/
 COPY scripts/ci/check-no-hybrid-runtime.mjs scripts/ci/no-hybrid-runtime-policy.json scripts/ci/
 
+# The committed public deck bodies (~3 MB), so api/community/content-service.js can serve a deck
+# from disk when the content bucket is unreachable instead of rendering "the reading view could not
+# be loaded". Dockerfile.gcp already carries these; this image is what deploy-prod.yml builds, and
+# without them production had no fallback at all.
+#
+# Only the two public directories. `cards-gated/` and `text-gated/` are gitignored and must never
+# reach an image — a gated deck's text is served from its GCS prefix behind the NDA check.
+COPY content/decks/cards/ content/decks/cards/
+COPY content/decks/text/ content/decks/text/
+
 # Re-scan exactly what the runtime image can serve. This is intentionally
 # independent from GitHub so direct Cloud Build and local image builds fail closed.
 RUN node scripts/ci/check-no-hybrid-runtime.mjs --artifact-only --require-dist
