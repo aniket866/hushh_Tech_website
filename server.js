@@ -14,6 +14,7 @@ import compression from 'compression';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
+import { createFirebaseAuthProxy } from './api/shared/firebaseAuthProxy.js';
 import {
   createLegacyFunctionRawBodyParser,
   legacyFunctionParserError,
@@ -82,6 +83,10 @@ const loadApi = async (name) => {
 // ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
+
+// Firebase's managed helpers own their bytes/headers. Keep this UAT-only
+// boundary ahead of compression, application CSP, parsers and SPA fallback.
+app.use(createFirebaseAuthProxy());
 
 /*
  * Response compression.

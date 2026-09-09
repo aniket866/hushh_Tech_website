@@ -71,6 +71,33 @@ function backendError(error: unknown, status?: number): BackendError {
   return { name: "GcpBackendError", message: "GCP backend request failed.", status };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stageFirebaseCallbackUrl(redirectTo: unknown) {
+  if (typeof window === "undefined" || typeof redirectTo !== "string") {
+    return;
+  }
+
+  const target = new URL(redirectTo, window.location.origin);
+  if (
+    target.origin !== window.location.origin ||
+    target.pathname !== "/auth/callback"
+  ) {
+    throw new Error("Invalid OAuth callback URL.");
+  }
+
+  // Firebase's redirect API returns to the page that started the redirect;
+  // it does not accept Supabase's redirectTo option. Make the existing,
+  // sanitized callback URL the page Firebase returns to before leaving.
+  window.history.replaceState(
+    window.history.state,
+    document.title,
+    `${target.pathname}${target.search}${target.hash}`,
+  );
+}
+
 export function firebaseUserToSessionUser(
   value: FirebaseUser,
   claims: Readonly<Record<string, unknown>> = {},
@@ -251,10 +278,40 @@ function createAuthFacade(auth: Auth) {
       });
       return { data: { subscription: { unsubscribe } } };
     },
-    async signInWithOAuth({ provider }: { provider: "google" | "apple"; options?: Record<string, unknown> }) {
+    async signInWithOAuth({
+      provider,
+      options,
+    }: {
+      provider: "google" | "apple";
+      options?: Record<string, unknown>;
+    }) {
       try {
-        const authProvider = provider === "google" ? new GoogleAuthProvider() : new OAuthProvider("apple.com");
-        await signInWithRedirect(auth, authProvider);
+        stageFirebaseCallbackUrl(options?.redirectTo);
+
+        if (provider === "google") {
+          const authProvider = new GoogleAuthProvider();
+          if (isRecord(options?.queryParams)) {
+            const queryParams = Object.fromEntries(
+              Object.entries(options.queryParams).filter(
+                ([, value]) => typeof value === "string",
+              ),
+            ) as Record<string, string>;
+            if (Object.keys(queryParams).length > 0) {
+              authProvider.setCustomParameters(queryParams);
+            }
+          }
+          await signInWithRedirect(auth, authProvider);
+        } else {
+          const authProvider = new OAuthProvider("apple.com");
+          if (typeof options?.scopes === "string") {
+            options.scopes
+              .split(/\s+/)
+              .filter(Boolean)
+              .forEach((scope) => authProvider.addScope(scope));
+          }
+          await signInWithRedirect(auth, authProvider);
+        }
+
         return { data: { provider, url: null }, error: null };
       } catch (error) { return { data: null, error: backendError(error) }; }
     },
@@ -264,14 +321,13 @@ function createAuthFacade(auth: Auth) {
         return { data: { user: toUser(credential.user), session: await toSession(credential.user) }, error: null };
       } catch (error) { return { data: { user: null, session: null }, error: backendError(error) }; }
     },
-    async exchangeCodeForSession() {
+    async getRedirectResult() {
       try {
         const result = await getRedirectResult(auth);
         const session = await toSession(result?.user || auth.currentUser);
         return { data: { session, user: session?.user || null }, error: session ? null : { name: "AuthError", message: "No redirect session found." } };
       } catch (error) { return { data: { session: null, user: null }, error: backendError(error) }; }
     },
-    async setSession() { return { data: { session: null, user: null }, error: { name: "AuthError", message: "Raw session injection is disabled." } }; },
     async refreshSession() {
       const fixture = resolveNoHybridBrowserFixture();
       if (fixture) {

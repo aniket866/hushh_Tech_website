@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, Container, Heading, Text, Spinner, Button, Flex, Icon, Alert, AlertIcon } from '@chakra-ui/react';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -19,6 +19,7 @@ const AuthCallback: React.FC = () => {
   const { revalidateSession } = useAuthSession();
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const callbackHandledRef = useRef(false);
 
   // Get custom redirect from URL param (for Hushh AI and other modules)
   const redirectParam = searchParams.get('redirect');
@@ -50,7 +51,12 @@ const AuthCallback: React.FC = () => {
   };
 
   useEffect(() => {
-    const handleEmailVerification = async () => {
+    const handleFirebaseRedirect = async () => {
+      if (callbackHandledRef.current) {
+        return;
+      }
+      callbackHandledRef.current = true;
+
       try {
         const gcpBackend = config.gcpBackendClient;
         if (!gcpBackend) {
@@ -64,12 +70,12 @@ const AuthCallback: React.FC = () => {
         sessionStorage.removeItem('showWelcomeToast');
         sessionStorage.removeItem('showWelcomeToastUserId');
 
-        // Check for any type and error from the URL
-        const type = searchParams.get('type');
+        // Preserve provider error details if Firebase's redirect handler puts
+        // them in the URL. Normal Firebase errors are returned by
+        // gcpBackend.auth.getRedirectResult().
         const error = searchParams.get('error');
         const errorDescription = searchParams.get('error_description');
-        const code = searchParams.get('code');
-        console.info('[Hushh][AuthCallback] Callback hit', { type, hasCode: !!code, hasError: !!error, customRedirect });
+        console.info('[Hushh][AuthCallback] Callback hit', { hasError: !!error, customRedirect });
 
         // If there's an error, display it
         if (error) {
@@ -79,49 +85,18 @@ const AuthCallback: React.FC = () => {
           return;
         }
 
-        // Always exchange an OAuth code when present. A stale cached session must not
-        // block the new Apple/Google identity from becoming the active session.
-        if (code) {
-          const { error: exchangeError } = await gcpBackend.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            setVerificationStatus('error');
-            setErrorMessage(exchangeError.message);
-            console.error('[Hushh][AuthCallback] Code exchange failed', exchangeError);
-            return;
-          }
-          console.info('[Hushh][AuthCallback] Code exchange succeeded, session created');
-
-          // Clean the URL to avoid re-exchanging the same code on refresh
-          const cleanUrl = window.location.origin + window.location.pathname;
-          window.history.replaceState({}, document.title, cleanUrl);
+        const { error: redirectError } = await gcpBackend.auth.getRedirectResult();
+        if (redirectError) {
+          setVerificationStatus('error');
+          setErrorMessage(redirectError.message);
+          console.error('[Hushh][AuthCallback] Firebase redirect failed', redirectError);
+          return;
         }
 
-        // If it's a signup confirmation
-        if (type === 'signup') {
-          // Get the access token and refresh token from the URL
-          const accessToken = searchParams.get('access_token');
-          const refreshToken = searchParams.get('refresh_token');
-
-          if (!accessToken || !refreshToken) {
-            setVerificationStatus('error');
-            setErrorMessage('Missing authentication tokens');
-            console.error('[Hushh][AuthCallback] Missing tokens in signup callback');
-            return;
-          }
-
-          // Set the session with GcpBackend
-          const { error } = await gcpBackend.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-
-          if (error) {
-            setVerificationStatus('error');
-            setErrorMessage(error.message);
-            console.error('[Hushh][AuthCallback] setSession failed', error);
-            return;
-          }
-        }
+        // Firebase consumes the redirect result once. Remove callback state
+        // from the address bar after the result has been processed.
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
 
         const sessionSnapshot = await revalidateSession();
 
@@ -157,7 +132,7 @@ const AuthCallback: React.FC = () => {
       }
     };
 
-    handleEmailVerification();
+    handleFirebaseRedirect();
   }, [searchParams, navigate, revalidateSession]);
 
   const redirectToLogin = () => {
@@ -181,8 +156,8 @@ const AuthCallback: React.FC = () => {
         {verificationStatus === 'loading' && (
           <Flex direction="column" align="center" py={10}>
             <Spinner size="xl" color="#0AADBC" thickness="4px" speed="0.65s" mb={6} />
-            <Heading size="lg" mb={4}>Verifying your email...</Heading>
-            <Text color="gray.600">Please wait while we confirm your email address.</Text>
+            <Heading size="lg" mb={4}>Completing secure sign-in...</Heading>
+            <Text color="gray.600">Please wait while we finish your Apple or Google sign-in.</Text>
           </Flex>
         )}
 
@@ -191,7 +166,7 @@ const AuthCallback: React.FC = () => {
             <Icon as={CheckCircle} w={16} h={16} color="green.500" mb={6} />
             <Heading size="lg" mb={4}>Welcome to HushhTech!</Heading>
             <Text color="gray.600" mb={8}>
-              Your email has been successfully verified. You can now set up your profile and start exploring the community.
+              Your account is ready. You can now set up your profile and start exploring the community.
             </Text>
             <Flex gap={4}>
               <Button
@@ -215,10 +190,10 @@ const AuthCallback: React.FC = () => {
         {verificationStatus === 'error' && (
           <Flex direction="column" align="center" py={6}>
             <Icon as={AlertTriangle} w={16} h={16} color="red.500" mb={6} />
-            <Heading size="lg" mb={4}>Verification Failed</Heading>
+            <Heading size="lg" mb={4}>Sign-in Failed</Heading>
             <Alert status="error" mb={6}>
               <AlertIcon />
-              {errorMessage || 'There was an error verifying your email. Please try again.'}
+              {errorMessage || 'There was an error completing sign-in. Please try again.'}
             </Alert>
             <Flex gap={4}>
               <Button

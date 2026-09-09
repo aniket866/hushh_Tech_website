@@ -10,9 +10,7 @@ import theme from "../src/theme";
 
 const navigateMock = vi.fn();
 const revalidateSessionMock = vi.fn();
-const mockExchangeCodeForSession = vi.fn();
-const mockSetSession = vi.fn();
-const mockGetSession = vi.fn();
+const mockGetRedirectResult = vi.fn();
 const maybeSingleMock = vi.fn();
 const selectMock = vi.fn(() => ({
   eq: vi.fn(() => ({
@@ -37,10 +35,7 @@ vi.mock("../src/resources/config/config", () => ({
   default: {
     gcpBackendClient: {
       auth: {
-        exchangeCodeForSession: (...args: unknown[]) =>
-          mockExchangeCodeForSession(...args),
-        setSession: (...args: unknown[]) => mockSetSession(...args),
-        getSession: (...args: unknown[]) => mockGetSession(...args),
+        getRedirectResult: (...args: unknown[]) => mockGetRedirectResult(...args),
       },
       from: (...args: unknown[]) => fromMock(...args),
     },
@@ -75,15 +70,10 @@ describe("AuthCallback", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    mockGetSession.mockResolvedValue({
-      data: { session: { user: { id: "stale-user" } } },
-      error: null,
-    });
-    mockExchangeCodeForSession.mockResolvedValue({
+    mockGetRedirectResult.mockResolvedValue({
       data: { session: { access_token: "fresh-token" } },
       error: null,
     });
-    mockSetSession.mockResolvedValue({ error: null });
     revalidateSessionMock.mockResolvedValue({
       status: "authenticated",
       session: {
@@ -105,7 +95,7 @@ describe("AuthCallback", () => {
     vi.useRealTimers();
   });
 
-  it("always exchanges the returned OAuth code even if a stale session already exists", async () => {
+  it("resolves the Firebase redirect result before revalidating the session", async () => {
     const replaceStateSpy = vi.spyOn(window.history, "replaceState");
 
     await act(async () => {
@@ -116,7 +106,7 @@ describe("AuthCallback", () => {
           React.createElement(
             MemoryRouter,
             {
-              initialEntries: ["/auth/callback?code=fresh-code&redirect=%2Fdelete-account"],
+              initialEntries: ["/auth/callback?redirect=%2Fdelete-account"],
             },
             React.createElement(AuthCallback)
           )
@@ -125,7 +115,7 @@ describe("AuthCallback", () => {
     });
     await flush();
 
-    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("fresh-code");
+    expect(mockGetRedirectResult).toHaveBeenCalledOnce();
     expect(revalidateSessionMock).toHaveBeenCalled();
     expect(replaceStateSpy).toHaveBeenCalled();
 

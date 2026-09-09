@@ -28,7 +28,7 @@ env:
   SHARED_SECRETS_PROJECT: "53407187172"
   VITE_GCP_AUTH_REDIRECT_URL: https://uat.hushhtech.com/auth/callback
   VITE_PLAID_REDIRECT_URI: https://uat.hushhtech.com/onboarding/financial-link
-  VITE_FIREBASE_AUTH_DOMAIN: hushh-tech-uat.firebaseapp.com
+  VITE_FIREBASE_AUTH_DOMAIN: uat.hushhtech.com
   VITE_FIREBASE_API_KEY: ci-anon-key
   VITE_FIREBASE_PROJECT_ID: hushh-tech-uat
   VITE_FIREBASE_APP_ID: ci-app-id
@@ -169,7 +169,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          firebase_auth_domain="hushh-tech-uat.firebaseapp.com"
+          firebase_auth_domain="$VITE_FIREBASE_AUTH_DOMAIN"
           firebase_project_id="hushh-tech-uat"
           firebase_api_key="$(gcloud secrets versions access latest --project=hushh-tech-uat --secret=hushh-tech-firebase-web-api-key)"
           firebase_app_id="$(gcloud secrets versions access latest --project=hushh-tech-uat --secret=hushh-tech-firebase-web-app-id)"
@@ -271,6 +271,12 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if [ "$VITE_FIREBASE_AUTH_DOMAIN" != "uat.hushhtech.com" ] || \
+             [ "$VITE_FIREBASE_PROJECT_ID" != "hushh-tech-uat" ] || \
+             [ "$VITE_GCP_AUTH_REDIRECT_URL" != "https://uat.hushhtech.com/auth/callback" ]; then
+            echo "::error::UAT Firebase auth domain, project and application callback must match the reviewed UAT configuration."
             exit 1
           fi
           if [ "$VITE_ALLOW_INSECURE_BROWSER_LLM" != "false" ]; then
@@ -437,7 +443,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke OAuth startup on deployed host
-        run: node scripts/smoke-oauth-start.mjs "$SMOKE_BASE_URL" > /tmp/uat-oauth-smoke.json
+        run: node scripts/smoke-oauth-start.mjs "$SMOKE_BASE_URL" --uat-auth-domain > /tmp/uat-oauth-smoke.json
 
       - name: Verify sensitive NDA gate on deployed host
         shell: bash

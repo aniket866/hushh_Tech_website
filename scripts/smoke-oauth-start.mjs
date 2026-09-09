@@ -1,6 +1,13 @@
 import { chromium } from "@playwright/test";
+import {
+  assertUatOrigin,
+  createUatOAuthEvidence,
+  safeLocation,
+  verifyFirebaseHelper,
+} from "./shared/firebaseAuthSmoke.mjs";
 
 const baseUrl = process.argv[2];
+const uatAuthDomain = process.argv.includes("--uat-auth-domain");
 
 if (!baseUrl) {
   console.error("Usage: node scripts/smoke-oauth-start.mjs <base-url>");
@@ -8,6 +15,7 @@ if (!baseUrl) {
 }
 
 const loginUrl = new URL("/login", baseUrl).toString();
+const signupUrl = new URL("/signup", baseUrl).toString();
 const profileUrl = new URL("/profile", baseUrl).toString();
 const investorProfileUrl = new URL("/investor-profile", baseUrl).toString();
 const financialLinkUrl = new URL("/onboarding/financial-link", baseUrl).toString();
@@ -26,24 +34,29 @@ async function gotoPage(page, url) {
   await page.waitForLoadState("load", { timeout: 10000 }).catch(() => {});
 }
 
-async function verifyProviderRedirect(buttonName, expectedHosts) {
+async function verifyProviderRedirect(buttonName, expectedHosts, startUrl = loginUrl) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1400 } });
+  const provider = /apple/i.test(buttonName) ? "apple" : "google";
+  const evidence = uatAuthDomain ? createUatOAuthEvidence(provider) : null;
+  if (evidence) page.on("request", (request) => evidence.observe(request.url()));
 
   try {
-    await gotoPage(page, loginUrl);
+    await gotoPage(page, startUrl);
     const button = page.getByRole("button", { name: new RegExp(buttonName, "i") });
     await button.click({ timeout: 5000 });
 
     await page.waitForURL(
       (value) => {
         const current = new URL(value.toString());
-        return expectedHosts.some((host) => current.hostname.includes(host));
+        return uatAuthDomain
+          ? current.protocol === "https:" && current.hostname === (provider === "apple" ? "appleid.apple.com" : "accounts.google.com")
+          : expectedHosts.some((host) => current.hostname.includes(host));
       },
       { timeout: 15000 }
     );
 
-    return page.url();
+    return evidence ? evidence.verify() : safeLocation(page.url());
   } finally {
     await browser.close();
   }
@@ -71,7 +84,7 @@ async function verifyRedirect(startUrl, expectedPathname, expectedRedirect) {
       { timeout: 15000 }
     );
 
-    return page.url();
+    return safeLocation(page.url());
   } finally {
     await browser.close();
   }
@@ -94,45 +107,58 @@ async function verifyCanonicalizedAuthEntry(startUrl, expectedPathname, expected
       { timeout: 15000 }
     );
 
-    return page.url();
+    return safeLocation(page.url());
   } finally {
     await browser.close();
   }
 }
 
-const results = {
-  loginUrl,
-  apple: await verifyProviderRedirect("Continue with Apple", [
-    "firebaseapp.com",
-    "appleid.apple.com",
-  ]),
-  google: await verifyProviderRedirect("Continue with Google", [
-    "firebaseapp.com",
-    "google.com",
-    "accounts.google.com",
-  ]),
-  guestProfilePage: await verifyRedirect(profileUrl, "/profile"),
-  investorProfileAliasRedirect: await verifyRedirect(
-    investorProfileUrl,
-    "/login",
-    "/onboarding/financial-link"
-  ),
-  legacyLoginRedirectCanonicalization: await verifyCanonicalizedAuthEntry(
-    legacyLoginRedirectUrl,
-    "/login",
-    "/onboarding/financial-link"
-  ),
-  legacySignupRedirectCanonicalization: await verifyCanonicalizedAuthEntry(
-    legacySignupRedirectUrl,
-    "/signup",
-    "/onboarding/financial-link"
-  ),
-  guestFinancialLinkRedirect: await verifyRedirect(
-    financialLinkUrl,
-    "/login",
-    "/onboarding/financial-link"
-  ),
-  guestNdaPostRedirect: await verifyRedirect(ndaPostUrl, "/community"),
-};
+async function main() {
+  if (uatAuthDomain) assertUatOrigin(baseUrl);
+  const helper = uatAuthDomain ? await verifyFirebaseHelper(baseUrl) : undefined;
+  const results = {
+    login: safeLocation(loginUrl),
+    helper,
+    apple: await verifyProviderRedirect("Continue with Apple", [
+      "firebaseapp.com",
+      "appleid.apple.com",
+    ]),
+    google: await verifyProviderRedirect("Continue with Google", [
+      "firebaseapp.com",
+      "google.com",
+      "accounts.google.com",
+    ]),
+    appleSignup: uatAuthDomain ? await verifyProviderRedirect("Continue with Apple", [], signupUrl) : undefined,
+    googleSignup: uatAuthDomain ? await verifyProviderRedirect("Continue with Google", [], signupUrl) : undefined,
+    guestProfilePage: await verifyRedirect(profileUrl, "/profile"),
+    investorProfileAliasRedirect: await verifyRedirect(
+      investorProfileUrl,
+      "/login",
+      "/onboarding/financial-link"
+    ),
+    legacyLoginRedirectCanonicalization: await verifyCanonicalizedAuthEntry(
+      legacyLoginRedirectUrl,
+      "/login",
+      "/onboarding/financial-link"
+    ),
+    legacySignupRedirectCanonicalization: await verifyCanonicalizedAuthEntry(
+      legacySignupRedirectUrl,
+      "/signup",
+      "/onboarding/financial-link"
+    ),
+    guestFinancialLinkRedirect: await verifyRedirect(
+      financialLinkUrl,
+      "/login",
+      "/onboarding/financial-link"
+    ),
+    guestNdaPostRedirect: await verifyRedirect(ndaPostUrl, "/community"),
+  };
 
-console.log(JSON.stringify(results, null, 2));
+  console.log(JSON.stringify(results, null, 2));
+}
+
+main().catch(() => {
+  // Playwright exceptions include navigation URLs; never print the raw error.
+  console.error(JSON.stringify({ status: "failed", check: "oauth-startup", authenticated: false }));
+  process.exitCode = 1;
+});
