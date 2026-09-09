@@ -260,9 +260,12 @@ function createAuthFacade(auth: Auth) {
       const fixture = resolveNoHybridBrowserFixture();
       if (fixture) return { data: { user: fixture.user }, error: null };
       await auth.authStateReady();
-      return auth.currentUser
-        ? { data: { user: toUser(auth.currentUser) }, error: null }
-        : { data: { user: null }, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
+      try {
+        const session = await toSession(auth.currentUser);
+        return session
+          ? { data: { user: session.user }, error: null }
+          : { data: { user: null }, error: { name: "AuthError", message: "Sign in required.", status: 401 } };
+      } catch (error) { return { data: { user: null }, error: backendError(error) }; }
     },
     onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {
       const fixture = resolveNoHybridBrowserFixture();

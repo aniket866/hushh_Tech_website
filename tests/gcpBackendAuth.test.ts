@@ -38,7 +38,10 @@ vi.mock("firebase/auth", () => ({
   signOut: vi.fn(),
 }));
 
+vi.mock("../src/resources/config/config", () => ({ default: {} }));
+
 import { createGcpBackendClient } from "../src/services/gcpBackend/client";
+import { getValidatedSession, validateSessionCandidate } from "../src/auth/session";
 
 const clientConfig = {
   apiKey: "public-firebase-config-key",
@@ -50,6 +53,8 @@ const clientConfig = {
 describe("GCP Firebase auth adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    harness.getIdTokenResult.mockReset();
+    harness.getRedirectResult.mockReset();
     harness.currentUser = null;
     window.history.replaceState({}, "", "/login?redirect=%2Fprofile");
   });
@@ -134,6 +139,99 @@ describe("GCP Firebase auth adapter", () => {
           user: { id: "firebase-user", email: "uat@example.com" },
         },
       },
+    });
+  });
+
+  describe("post-redirect session revalidation", () => {
+    function restoredUser(providerId = "google.com") {
+      return {
+        uid: "restored-user",
+        email: "uat@example.test",
+        displayName: "UAT User",
+        providerData: [{ providerId, uid: "provider-user" }],
+        metadata: { creationTime: "2026-01-01T00:00:00.000Z" },
+        refreshToken: "test-refresh-token",
+        isAnonymous: false,
+      };
+    }
+
+    beforeEach(() => {
+      harness.getIdTokenResult.mockResolvedValue({
+        token: "test-id-token",
+        expirationTime: "2099-01-01T01:00:00.000Z",
+        issuedAtTime: "2099-01-01T00:00:00.000Z",
+        claims: { fund_admin: true, deployment_admin: false },
+      });
+    });
+
+    it.each([
+      ["google.com", "credential"],
+      ["google.com", "restored currentUser"],
+      ["apple.com", "credential"],
+      ["apple.com", "restored currentUser"],
+    ])("keeps %s authenticated after a %s redirect result", async (providerId, resultKind) => {
+      const user = restoredUser(providerId);
+      harness.currentUser = user;
+      harness.getRedirectResult.mockResolvedValueOnce(
+        resultKind === "credential" ? { user } : null,
+      );
+      const client = createGcpBackendClient(clientConfig);
+
+      // Use the real adapter and validator called by AuthCallback's
+      // revalidateSession(), not a mocked authenticated provider snapshot.
+      const redirect = await client.auth.getRedirectResult();
+      expect(redirect.error).toBeNull();
+      const snapshot = await getValidatedSession(client);
+
+      expect(snapshot.status).toBe("authenticated");
+      expect(snapshot.user).toEqual(redirect.data.user);
+      expect(snapshot.user?.app_metadata).toMatchObject({
+        fund_admin: true,
+        deployment_admin: false,
+      });
+    });
+
+    it("returns the same claims-aware user from getUser and getSession", async () => {
+      harness.currentUser = restoredUser();
+      const client = createGcpBackendClient(clientConfig);
+      const session = await client.auth.getSession();
+
+      await expect(client.auth.getUser()).resolves.toEqual({
+        data: { user: session.data.session.user },
+        error: null,
+      });
+    });
+
+    it("does not establish a session without a redirect or persisted user", async () => {
+      harness.getRedirectResult.mockResolvedValueOnce(null);
+      const client = createGcpBackendClient(clientConfig);
+
+      expect((await client.auth.getRedirectResult()).error).not.toBeNull();
+      expect(await client.auth.getUser()).toMatchObject({
+        data: { user: null }, error: { status: 401 },
+      });
+      expect((await getValidatedSession(client)).status).toBe("anonymous");
+      expect(harness.getIdTokenResult).not.toHaveBeenCalled();
+    });
+
+    it("still invalidates a different user during revalidation", async () => {
+      harness.currentUser = restoredUser();
+      const client = createGcpBackendClient(clientConfig);
+      const { data: { session } } = await client.auth.getSession();
+
+      const snapshot = await validateSessionCandidate(client, {
+        ...session, user: { ...session.user, id: "another-user" },
+      });
+      expect(snapshot.status).toBe("invalidated");
+    });
+
+    it("fails closed if token validation fails after the redirect", async () => {
+      harness.currentUser = restoredUser();
+      const client = createGcpBackendClient(clientConfig);
+      const { data: { session } } = await client.auth.getSession();
+      harness.getIdTokenResult.mockRejectedValueOnce(new Error("Token unavailable"));
+
+      expect((await validateSessionCandidate(client, session)).status).toBe("invalidated");
     });
   });
 });
