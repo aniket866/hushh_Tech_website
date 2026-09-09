@@ -110,6 +110,14 @@ app.use(compression({
 
 // Global security headers for Cloud Run. This file is the authoritative runtime config.
 app.use((_req, res, next) => {
+  // Firebase getRedirectResult() loads gapi.iframes through this script host.
+  // Keep the exception bound to the existing canonical UAT auth runtime;
+  // production and all other CSP directives remain unchanged.
+  const firebaseGapiSource = process.env.GOOGLE_CLOUD_PROJECT === 'hushh-tech-uat' &&
+    process.env.FIREBASE_PROJECT_ID === 'hushh-tech-uat' &&
+    _req.headers.host === 'uat.hushhtech.com'
+    ? ' https://apis.google.com'
+    : '';
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -118,7 +126,7 @@ app.use((_req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com https://*.plaid.com https://www.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com",
+      `script-src 'self'${firebaseGapiSource} 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com https://*.plaid.com https://www.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.plaid.com",
       "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com data:",
       "img-src 'self' data: blob: https: http:",

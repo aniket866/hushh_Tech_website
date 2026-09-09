@@ -103,7 +103,7 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "fca309c32fa72b65d4a44f3fe436e55845d240f658fed30057c282b3a5b1b53f",
+    "manifest_self_digest": "18abe4dad783283e77913faebe7a094caba5b0238dc20ad4c89940e2024bfa26",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
@@ -119,7 +119,7 @@
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
     "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "dd46d342221e323eba47ceb538d5fecb8168efa699cd787216a46287ee222fa3",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
-    "server.js": "2b96e79908548bf0dbe5ad5b86b3ae8f71520efebaaee2d0498bb37f85e5c112"
+    "server.js": "0188b3055565086ec651bcdbdaf85f1607d19b2085c67e76a1f34ba252bf8931"
   },
   "service_executable_closure": {
     "schema_version": 1,

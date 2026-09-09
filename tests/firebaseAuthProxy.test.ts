@@ -377,7 +377,7 @@ describe('runtime isolation', () => {
     expect(transport).not.toHaveBeenCalled();
   });
 
-  it('retains real app callback/SPA/API security and body behavior when enabled', async () => {
+  it('adds only the required UAT gapi script source while retaining real app route behavior', async () => {
     const port = await listen(createServer(realApp));
     for (const path of ['/auth/callback', '/login', '/api/release']) {
       vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'hushh-tech-prod');
@@ -391,11 +391,36 @@ describe('runtime isolation', () => {
         expect(after.status).toBe(200);
         expect(after.body.toString()).toContain('auth-proxy-test-shell');
       }
-      for (const header of ['content-security-policy', 'cache-control', 'x-frame-options', 'content-type']) {
+      for (const header of ['cache-control', 'x-frame-options', 'content-type', 'referrer-policy', 'permissions-policy', 'strict-transport-security']) {
         expect(after.headers[header], header).toBe(before.headers[header]);
       }
+      expect(before.headers['content-security-policy']).not.toContain('https://apis.google.com');
+      expect(after.headers['content-security-policy']).toBe(
+        String(before.headers['content-security-policy']).replace(
+          "script-src 'self'", "script-src 'self' https://apis.google.com",
+        ),
+      );
       expect(after.headers['content-security-policy']).toContain("frame-src 'self'");
     }
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cloud: undefined, firebase: PROJECT, host: HOST },
+    { cloud: PROJECT, firebase: undefined, host: HOST },
+    { cloud: 'hushh-tech-prod', firebase: 'hushh-tech-prod', host: HOST },
+    { cloud: PROJECT, firebase: 'hushh-pda', host: HOST },
+    { cloud: PROJECT, firebase: PROJECT, host: 'hushhtech.com' },
+    { cloud: PROJECT, firebase: PROJECT, host: 'other.example' },
+  ])('does not add the gapi CSP exception outside canonical UAT: %j', async ({ cloud, firebase, host }) => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', cloud);
+    vi.stubEnv('FIREBASE_PROJECT_ID', firebase);
+    const result = await call(await listen(createServer(realApp)), '/auth/callback', {
+      headers: { host, 'x-forwarded-host': HOST },
+    });
+    expect(result.status).toBe(200);
+    expect(result.headers['content-security-policy']).not.toContain('https://apis.google.com');
+    expect(result.headers['content-security-policy']).toContain("frame-src 'self'");
     expect(transport).not.toHaveBeenCalled();
   });
 });
