@@ -28,7 +28,7 @@ const TickerChip = ({
 
   return (
     <div
-      className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-[#FFFFFF] py-2 pl-2 pr-3"
+      className="flex h-7.5 shrink-0 items-center gap-1.5 rounded-full bg-[#FFFFFF] py-1 pl-1.5 pr-2.5"
       style={{
         boxShadow:
           "0 0 0 0.5px rgba(60,60,67,0.08), 0 1px 2px rgba(0,0,0,0.03)",
@@ -36,16 +36,16 @@ const TickerChip = ({
       }}
     >
       <div
-        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center overflow-hidden rounded-full text-[10.5px] font-medium text-[#1D1D1F]"
+        className="flex h-4.5 w-4.5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[9.5px] font-medium text-[#1D1D1F]"
         style={{ background: logoTint[index % logoTint.length] }}
       >
         {quote.logo ? (
           <img
             src={quote.logo}
             alt={`${quote.displaySymbol} logo`}
-            width="14"
-            height="14"
-            className="h-3.5 w-3.5 object-contain mix-blend-multiply"
+            width="12"
+            height="12"
+            className="h-3 w-3 object-contain mix-blend-multiply"
             loading="lazy"
             onError={(event) => {
               event.currentTarget.style.display = "none";
@@ -55,13 +55,13 @@ const TickerChip = ({
           quote.displaySymbol.charAt(0)
         )}
       </div>
-      <span className="text-[13.5px] font-medium leading-none tracking-[-0.01em] text-[#1D1D1F]">
+      <span className="text-[12px] font-medium leading-none tracking-[-0.01em] text-[#1D1D1F]">
         {quote.displaySymbol}
       </span>
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-0.5">
         {quote.isUp ? Icon.triUp(tint) : Icon.triDown(tint)}
         <span
-          className={`text-[12.5px] font-semibold tabular-nums tracking-[-0.01em] ${isLoading ? "animate-pulse" : ""}`}
+          className={`text-[11px] font-semibold tabular-nums tracking-[-0.01em] ${isLoading ? "animate-pulse" : ""}`}
           style={{ color: tint }}
         >
           {Math.abs(quote.percentChange).toFixed(1)}%
@@ -95,7 +95,7 @@ export default function HushhTechTicker() {
 
   return (
     <section
-      className="mt-1.5 overflow-hidden border-t border-[#1D1D1F]/[0.06] py-2 opacity-100"
+      className="mt-0.5 overflow-hidden border-t border-[#1D1D1F]/[0.06] py-1 opacity-100"
       data-hushh-ticker
       style={{
         background:
@@ -104,10 +104,10 @@ export default function HushhTechTicker() {
           "inset 0 1px 0 rgba(255,255,255,0.6)",
       }}
     >
-      <div className="mb-2 flex items-center justify-center gap-1.5">
+      <div className="mb-1 flex items-center justify-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-[#34C759]" />
         <span
-          className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#1D1D1F]/55"
+          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#1D1D1F]/55"
           style={{ fontFamily: appleFont }}
         >
           Markets Live

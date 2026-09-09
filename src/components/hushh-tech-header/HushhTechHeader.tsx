@@ -10,19 +10,19 @@ const BrandButton = ({ onClick }: { onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className="flex h-11 items-center gap-2 py-1 pl-1 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+    className="flex h-9 items-center gap-1.5 py-0.5 pl-1 pr-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
     aria-label="Go to Hushh Technologies home"
   >
-    <HushhMark size={36} />
+    <HushhMark size={28} />
     <span className="flex flex-col leading-none">
       <span
-        className="text-[16px] font-semibold tracking-[-0.015em] text-[#1D1D1F]"
+        className="text-[14px] font-semibold tracking-[-0.015em] text-[#1D1D1F]"
         style={{ fontFamily: appleFont }}
       >
         hushh
       </span>
       <span
-        className="mt-1 text-[9px] font-medium uppercase tracking-[0.12em] text-[#1D1D1F]/55"
+        className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.12em] text-[#1D1D1F]/55"
         style={{ fontFamily: appleFont }}
       >
         Technologies
@@ -40,10 +40,10 @@ const SearchButton = ({ onClick }: { onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+    className="flex h-9 w-9 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
     aria-label="Search HushhTech"
   >
-    {Icon.search("currentColor", 18)}
+    {Icon.search("currentColor", 16)}
   </button>
 );
 
@@ -108,7 +108,7 @@ const SiteSearchSheet = ({
 
   return (
     <div
-      className="fixed inset-0 z-[110] bg-[#000000]/25 px-3 pt-[max(env(safe-area-inset-top),0.85rem)] backdrop-blur-[8px] sm:px-5"
+      className="fixed inset-0 z-[110] bg-[#000000]/25 px-3 pt-[max(env(safe-area-inset-top),0.5rem)] backdrop-blur-[8px] sm:px-5"
       onClick={onClose}
       role="presentation"
     >
@@ -228,7 +228,7 @@ const HushhTechHeader: React.FC<HushhTechHeaderProps> = ({
             "0 1px 0 rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.03)",
         }}
       >
-        <div className="pointer-events-none px-3 pt-[max(env(safe-area-inset-top),0.85rem)] sm:px-5">
+        <div className="pointer-events-none px-3 pt-[max(env(safe-area-inset-top),0.35rem)] sm:px-5">
           <div className="pointer-events-auto flex items-center justify-between gap-3">
             <GlassPill>
               {hasRouter ? (
@@ -248,10 +248,10 @@ const HushhTechHeader: React.FC<HushhTechHeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(true)}
-                  className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+                  className="flex h-9 w-9 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
                   aria-label="Open menu"
                 >
-                  {Icon.menu("currentColor", 18)}
+                  {Icon.menu("currentColor", 16)}
                 </button>
               </GlassPill>
             </div>
@@ -261,7 +261,7 @@ const HushhTechHeader: React.FC<HushhTechHeaderProps> = ({
         {showTicker ? <HushhTechTicker /> : null}
       </header>
 
-      <div className={showTicker ? "h-[146px]" : "h-[72px]"} />
+      <div className={showTicker ? "h-[102px]" : "h-[48px]"} />
 
       <HushhTechNavDrawer
         isOpen={isDrawerOpen}
