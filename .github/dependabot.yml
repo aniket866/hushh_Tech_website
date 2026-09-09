@@ -1,0 +1,63 @@
+# Dependency update automation.
+#
+# Before this file existed the repository had no mechanism for picking up upstream
+# security patches, and `npm audit` drifted to 54 findings (2 critical, 18 high) —
+# past the budget in scripts/ci/security-budget.json, which held the Security Audit
+# gate red and blocked every PR.
+#
+# Note: the Cloud Run runtime installs from package-server.json (see Dockerfile.gcp),
+# which Dependabot cannot target directly. The "keeps Cloud Run runtime dependencies
+# aligned with server API imports" case in tests/ciScripts.test.ts fails closed when a
+# root bump leaves that manifest behind, so runtime drift surfaces in CI rather than
+# silently shipping to production.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      # Routine minor/patch drift lands as one reviewable PR.
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Majors are opened individually so each migration gets its own review.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: npm
+    directory: /cloud-run/hushh-tech-app-services
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(ci)"

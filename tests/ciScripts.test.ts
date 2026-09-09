@@ -174,8 +174,16 @@ describe("CI workflow scripts", () => {
     expect(runtimePackage.dependencies).toHaveProperty("pg");
     expect(runtimePackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
     expect(rootPackage.dependencies["@google-cloud/storage"]).toBe("^7.22.0");
-    expect(runtimePackage.overrides).toEqual({ uuid: "11.1.1" });
-    expect(rootPackage.overrides).toEqual({ uuid: "11.1.1" });
+    // Dockerfile.gcp installs the Cloud Run runtime from package-server.json, so any
+    // shared range or transitive pin that drifts from the root manifest ships a
+    // different dependency tree to production than the one CI audits.
+    expect(runtimePackage.overrides).toEqual(rootPackage.overrides);
+    expect(runtimePackage.overrides.uuid).toBe("11.1.1");
+    for (const [name, range] of Object.entries(runtimePackage.dependencies)) {
+      if (rootPackage.dependencies[name]) {
+        expect(`${name}@${range}`).toBe(`${name}@${rootPackage.dependencies[name]}`);
+      }
+    }
 
     const investorProfileRoute = fs.readFileSync(
       path.join(repoRoot, "api/generate-investor-profile.js"),

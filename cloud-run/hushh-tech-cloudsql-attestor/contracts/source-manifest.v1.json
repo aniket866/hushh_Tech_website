@@ -15,11 +15,11 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "2f1d68a4c0e4bb42dd089df0445f5079a36e8323b7f486cef5faaadbbb81e0ee"
+      "sha256": "024ed7c951a848104ad3e144311f0e318875342d982de6edf7c07b3216e118ed"
     },
     {
       "path": "package.json",
-      "sha256": "e6e86b893eb553a4ec87dc29b221039872d7ed646e5ffa05f5a60aa9f2616245"
+      "sha256": "a180ba43c40de7989ea2a21daf36fd24defe59290eaf6371ba111a35e20a45b3"
     },
     {
       "path": "sql/catalog-bounds.v1.sql",
@@ -74,5 +74,5 @@
       "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
     }
   ],
-  "sourceSha256": "d6f0bc2f8229b6f3973310d2a9d80e50ad9b642b48f6bf789561e369f19ae694"
+  "sourceSha256": "8242188d72b0f4e893d59600674eeab69dc3dde4825796de300634ac0f8a701e"
 }

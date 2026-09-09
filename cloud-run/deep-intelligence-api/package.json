@@ -18,5 +18,10 @@
     "node": ">=20.0.0"
   },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "overrides": {
+    "qs": "^6.16.0",
+    "body-parser": "^1.20.6",
+    "protobufjs": "^7.6.6"
+  }
 }

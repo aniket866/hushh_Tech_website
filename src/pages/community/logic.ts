@@ -8,6 +8,12 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@chakra-ui/react";
 import { getPosts, PostData } from "../../data/posts";
 import { formatShortDate, parseDate } from "../../utils/dateFormatter";
+// Same module the Cloud Run API uses, so client and server agree on both
+// ordering and which edition of a document is current.
+import {
+  comparePublishedAtDesc,
+  selectLatestVersions,
+} from "../../../api/community/postVersions.js";
 import { useAuthSession } from "../../auth/AuthSessionProvider";
 import {
   checkAccessStatus,
@@ -58,6 +64,16 @@ export interface UnifiedPost {
   slug: string;
   description?: string;
   category?: string;
+  /** Version identity; selection lives in api/community/postVersions.js. */
+  docFamily?: string;
+  docVersion?: number;
+  publishedAt?: string;
+  /** "deck" | "document" | "article" | "legacy" — what kind of thing a card is describing. */
+  sourceKind?: string;
+  accessLevel?: string;
+  /** Cards in a deck, and minutes to read, both precomputed at snapshot time. */
+  cardCount?: number;
+  readingMinutes?: number;
 }
 
 /* ── Helpers ── */
@@ -414,11 +430,18 @@ export const useCommunityListLogic = () => {
           id: post.slug,
           title: post.title,
           date: post.publishedAt,
+          publishedAt: post.publishedAt,
           slug: post.slug,
           description:
             post.description ||
             getPostDescription({ id: post.slug, title: post.title, date: post.publishedAt }),
           category: post.category,
+          docFamily: post.docFamily,
+          docVersion: post.docVersion,
+          sourceKind: post.sourceKind,
+          accessLevel: post.accessLevel,
+          cardCount: post.cardCount,
+          readingMinutes: post.readingMinutes,
         });
       });
 
@@ -427,19 +450,25 @@ export const useCommunityListLogic = () => {
         id: p.slug,
         title: p.title,
         date: p.publishedAt || p.date,
+        publishedAt: p.publishedAt || p.date,
         slug: p.slug,
         description:
           p.description ||
           getPostDescription({ id: p.slug, title: p.title, date: p.publishedAt || p.date }),
         category: p.category,
+        docFamily: p.docFamily,
+        docVersion: p.docVersion,
+        sourceKind: p.sourceKind,
+        accessLevel: p.accessLevel,
+        cardCount: p.cardCount,
+        readingMinutes: p.readingMinutes,
       });
     });
 
-    return Array.from(mergedBySlug.values()).sort((a, b) => {
-      const da = parseDate(a.date)?.getTime() || 0;
-      const db = parseDate(b.date)?.getTime() || 0;
-      return db - da;
-    });
+    // The slug Map above only collapses the same slug from two sources. Documents
+    // republished under a NEW slug need selectLatestVersions, and sorting through the
+    // shared comparator keeps this list in the same order the API returns.
+    return selectLatestVersions(Array.from(mergedBySlug.values())).sort(comparePublishedAtDesc);
   }, [localPosts, publicPosts]);
 
   const categoryVariants = useMemo(() => {

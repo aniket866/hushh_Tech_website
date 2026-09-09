@@ -24,7 +24,9 @@ const DEFAULT_TITLE = "HushhTech — The AI-powered Berkshire Hathaway";
 const DEFAULT_DESCRIPTION =
   "HushhTech combines AI and human expertise to invest in exceptional " +
   "businesses for long-term value creation — the AI-powered Berkshire Hathaway.";
-const DEFAULT_IMAGE = `${SITE_URL}/favicon.ico`;
+// A 1200x630 card. This was /favicon.ico, which no social platform or answer engine renders
+// as a preview, so every shared link came through without an image.
+const DEFAULT_IMAGE = `${SITE_URL}/og-default.png`;
 
 /** Site-wide Organization schema — rendered once via the root SeoHead. */
 export const ORGANIZATION_SCHEMA: Record<string, unknown> = {
@@ -57,7 +59,7 @@ export interface SeoHeadProps {
   title?: string;
   /** Meta + OG + Twitter description. */
   description?: string;
-  /** Canonical path, e.g. "/discover-fund-a". Defaults to "/". */
+  /** Canonical path, e.g. "/discover-fund-a". Defaults to the current route. */
   path?: string;
   /** Absolute image URL for OG / Twitter cards. */
   image?: string;
@@ -69,6 +71,23 @@ export interface SeoHeadProps {
   jsonLd?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
+/**
+ * The current pathname, without query string or hash — neither identifies a canonical document,
+ * and including them would fragment indexing.
+ *
+ * Read from `window.location` rather than `useLocation()` so SeoHead stays renderable outside a
+ * Router: several page tests mount a page directly, and a hook that throws there would make this
+ * component impossible to use without a wrapper. Crawlers get their canonical from the
+ * server-side head injection in api/seo/documentHead.js regardless; this is the in-app value,
+ * and it refreshes because the components rendering SeoHead re-render on navigation.
+ */
+function currentPath(): string {
+  if (typeof window === "undefined" || !window.location) return "/";
+  const pathname = window.location.pathname || "/";
+  if (pathname === "/") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
+}
+
 export default function SeoHead({
   title,
   description,
@@ -78,9 +97,14 @@ export default function SeoHead({
   noindex = false,
   jsonLd,
 }: SeoHeadProps) {
+  // The root <SeoHead> in App.tsx passes no path, and this used to fall back to "/". Every page
+  // that did not render its own SeoHead therefore told search engines it was a duplicate of the
+  // homepage — while the sitemap asked for it to be indexed. Roughly fifteen sitemap'd pages were
+  // self-canonicalising away. Default to the route actually being viewed instead.
+  const routePath = currentPath();
   const fullTitle = title ? `${title} — ${SITE_NAME}` : DEFAULT_TITLE;
   const desc = description ?? DEFAULT_DESCRIPTION;
-  const canonical = `${SITE_URL}${path ?? "/"}`;
+  const canonical = `${SITE_URL}${path ?? routePath}`;
   const ogImage = image ?? DEFAULT_IMAGE;
   const blocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 

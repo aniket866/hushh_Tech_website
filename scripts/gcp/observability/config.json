@@ -1,0 +1,112 @@
+{
+  "$comment": [
+    "Observability as data, so the same definitions apply to UAT and prod and a re-run is a diff",
+    "rather than a fresh click-through. apply-observability.mjs reads this and creates or updates",
+    "each object by displayName.",
+    "",
+    "The log-based metrics are the part that does not exist anywhere else. listGcpPosts() in",
+    "api/community/content-service.js falls back to the committed snapshot whenever Firestore",
+    "errors, and getCommunityPost() does the same for a detail read. Both log and carry on, which",
+    "is the right runtime behaviour and means a degraded content system is completely silent: the",
+    "site serves stale posts and nobody finds out until someone notices the newest article is old.",
+    "These turn those log lines into a signal.",
+    "",
+    "Thresholds are strict 'more than' values: Cloud Monitoring accepts only COMPARISON_LT and COMPARISON_GT for an alert condition, so there is no 'at least' form to express."
+  ],
+  "service": "hushh-tech-website",
+  "environments": {
+    "uat": {
+      "project": "hushh-tech-uat",
+      "host": "uat.hushhtech.com"
+    },
+    "prod": {
+      "project": "hushh-tech",
+      "host": "hushhtech.com"
+    }
+  },
+  "logMetrics": [
+    {
+      "name": "community_static_fallback",
+      "description": "Firestore read failed and the community list was served from the committed snapshot. Non-zero means the content system is degraded and readers are seeing stale posts.",
+      "match": "Falling back to static post snapshot"
+    },
+    {
+      "name": "community_detail_fallback",
+      "description": "A community post detail was served from the committed snapshot after a Firestore error.",
+      "match": "Falling back to static post detail"
+    },
+    {
+      "name": "community_pagination_truncated",
+      "description": "The community collection paged past its guard. Firestore returns 100 documents per page; if this fires the index is silently incomplete.",
+      "match": "stopped paging"
+    },
+    {
+      "name": "community_version_lookup_fallback",
+      "description": "A superseded-edition lookup fell back to the static snapshot, so a canonical forward may point at the wrong edition.",
+      "match": "Version lookup fell back to the static snapshot"
+    }
+  ],
+  "uptimeChecks": [
+    {
+      "name": "release identity",
+      "path": "/api/release",
+      "contains": "\"status\":\"ok\"",
+      "description": "Proves the application is serving, not merely that the load balancer answers."
+    },
+    {
+      "name": "community content",
+      "path": "/api/community/posts",
+      "contains": "\"slug\"",
+      "description": "Proves the Firestore read path end to end. A 200 with an empty list would pass a plain status check."
+    }
+  ],
+  "alerts": [
+    {
+      "name": "uptime check failing",
+      "kind": "uptime",
+      "documentation": "A synthetic check has failed from multiple regions. Check the Cloud Run revision, then /api/release for the serving commit.",
+      "durationSeconds": 300
+    },
+    {
+      "name": "content system degraded",
+      "kind": "logMetric",
+      "metric": "community_static_fallback",
+      "threshold": 0,
+      "durationSeconds": 300,
+      "documentation": "The community list is being served from the committed snapshot because Firestore reads are failing. Readers see stale content and the site looks healthy. Check Firestore availability and the runtime service account's datastore permissions."
+    },
+    {
+      "name": "community index truncated",
+      "kind": "logMetric",
+      "metric": "community_pagination_truncated",
+      "threshold": 0,
+      "durationSeconds": 300,
+      "documentation": "listAllDocuments() hit its page guard, so the community index is missing posts. Either the collection grew past 50 pages or a page token is looping."
+    },
+    {
+      "name": "server errors elevated",
+      "kind": "runMetric",
+      "metric": "run.googleapis.com/request_count",
+      "responseCodeClass": "5xx",
+      "threshold": 5,
+      "durationSeconds": 300,
+      "documentation": "More than five 5xx responses in a five-minute window. Check the revision logs and whether a recent deploy changed the image."
+    },
+    {
+      "name": "latency p95 above 3s",
+      "kind": "runLatency",
+      "metric": "run.googleapis.com/request_latencies",
+      "threshold": 3000,
+      "durationSeconds": 600,
+      "documentation": "95th percentile request latency is above three seconds. The service is capped at three instances; check instance count and whether asset streaming is saturating them."
+    },
+    {
+      "name": "instance count at ceiling",
+      "kind": "runMetric",
+      "metric": "run.googleapis.com/container/instance_count",
+      "threshold": 2.5,
+      "durationSeconds": 600,
+      "documentation": "The five-minute mean instance count is above 2.5 against a ceiling of 3, so the service is effectively pinned. Deck imagery streams through the application rather than a CDN, so a busy deck page can saturate it. Raise max-instances or put a CDN in front of /api/community/assets."
+    }
+  ]
+}

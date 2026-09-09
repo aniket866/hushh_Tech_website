@@ -34,3 +34,25 @@ private_keys/
 .pre-commit-cache/
 .gitleaks-report.json
 tmp/
+
+# Deck text for NDA-gated presentations. This repository is public; this content
+# lives only in the gated GCS prefix, never in git.
+content/decks/text-gated/
+
+# Gamma exports staged for conversion. NDA deck content — never committed.
+content/decks/gamma-export/
+
+# Local screenshot scratch for design work.
+.shots/
+
+# Structured cards for gated decks. NDA material — GCS only, never git.
+content/decks/cards-gated/
+
+# Origin CDN URLs for gated deck imagery — the originals are publicly fetchable.
+content/decks/media-map-gated.json
+
+# Playwright run output. The baselines under tests/visual/__screenshots__ are committed on purpose —
+# they are the reference the suite compares against — but a run's diffs, traces and HTML report are
+# per-run artefacts.
+/test-results/
+/playwright-report/

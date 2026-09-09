@@ -194,7 +194,7 @@
     {
       "pattern": "/careers",
       "sample": "/careers",
-      "terminal": "/careers",
+      "terminal": "/career",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -260,7 +260,7 @@
     {
       "pattern": "/Contact",
       "sample": "/Contact",
-      "terminal": "/Contact",
+      "terminal": "/contact",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -306,7 +306,7 @@
     {
       "pattern": "/disclosures",
       "sample": "/disclosures",
-      "terminal": "/disclosures",
+      "terminal": "/risk-disclosures",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -607,7 +607,7 @@
     {
       "pattern": "/Login",
       "sample": "/Login",
-      "terminal": "/Login",
+      "terminal": "/login",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -875,7 +875,7 @@
     {
       "pattern": "/philosophy",
       "sample": "/philosophy",
-      "terminal": "/philosophy",
+      "terminal": "/about/philosophy",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -886,7 +886,7 @@
     {
       "pattern": "/privacy",
       "sample": "/privacy",
-      "terminal": "/privacy",
+      "terminal": "/privacy-policy",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -1021,7 +1021,7 @@
     {
       "pattern": "/Signup",
       "sample": "/Signup",
-      "terminal": "/Signup",
+      "terminal": "/signup",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -1054,7 +1054,7 @@
     {
       "pattern": "/terms",
       "sample": "/terms",
-      "terminal": "/terms",
+      "terminal": "/terms-of-service",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -2145,5 +2145,5 @@
     "functions_retired": 1,
     "functions_blocked": 110
   },
-  "sha256": "6823815f641f31ba015c98c1781b33fe5072b9868b7dbf19d094b09faa570b7e"
+  "sha256": "206e0e29ae1015d38adb6dae763ac5bb776c40bc7364c98392817a65c9988585"
 }

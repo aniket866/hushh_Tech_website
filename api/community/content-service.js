@@ -1,7 +1,12 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { google } from "googleapis";
 import { STATIC_COMMUNITY_POSTS } from "./staticPosts.generated.js";
+import {
+  buildVersionIndex,
+  comparePublishedAtDesc,
+  selectLatestVersions,
+} from "./postVersions.js";
 import { executeDataRequest, resolveLegacyUserUuid, verifyFirebaseBearer } from "../shared/gcpDataRuntime.js";
 
 const PROJECT_ID =
@@ -160,9 +165,15 @@ const firestoreDocToPost = (doc) => {
     bodyMarkdown: fieldValue(fields.bodyMarkdown),
     bodyHtml: fieldValue(fields.bodyHtml),
     contentObject: fieldValue(fields.contentObject),
+    cardsObject: fieldValue(fields.cardsObject),
+    readingMinutes: fieldValue(fields.readingMinutes),
+    cardCount: fieldValue(fields.cardCount),
     assetObject: fieldValue(fields.assetObject),
     assetUrl: fieldValue(fields.assetUrl),
     mediaItems: fieldValue(fields.mediaItems),
+    docFamily: fieldValue(fields.docFamily),
+    docVersion: fieldValue(fields.docVersion),
+    supersedes: fieldValue(fields.supersedes),
   });
 };
 
@@ -185,11 +196,21 @@ export const normalizePost = (post) => {
     sourceKind,
     componentName: post.componentName || "",
     contentObject: post.contentObject || "",
+    cardsObject: post.cardsObject || "",
+    // Precomputed at snapshot time; the list response strips bodies, so nothing downstream can
+    // work these out for itself.
+    readingMinutes: Number(post.readingMinutes) || 0,
+    cardCount: Number(post.cardCount) || 0,
     assetObject: post.assetObject || "",
     assetUrl,
     mediaItems: normalizeMediaItems(post.mediaItems),
     bodyMarkdown: post.bodyMarkdown || "",
     bodyHtml: post.bodyHtml || "",
+    // Version identity. Absent on untagged posts, which are then their own family
+    // and always survive selectLatestVersions.
+    docFamily: post.docFamily || "",
+    docVersion: Number.isFinite(Number(post.docVersion)) ? Number(post.docVersion) : 0,
+    supersedes: Array.isArray(post.supersedes) ? post.supersedes : [],
   };
 };
 
@@ -198,10 +219,12 @@ const publishedWithAccess = (accessLevel) => (post) =>
 const publicPublished = publishedWithAccess(PUBLIC_ACCESS);
 const ndaPublished = publishedWithAccess(NDA_ACCESS);
 
+// Version selection runs before the access filter so an NDA-era edition can still
+// supersede a public one (and vice versa) instead of both surfacing side by side.
 export const staticPosts = (accessLevel = PUBLIC_ACCESS) =>
-  STATIC_COMMUNITY_POSTS.map(normalizePost)
+  selectLatestVersions(STATIC_COMMUNITY_POSTS.map(normalizePost))
     .filter(accessLevel === NDA_ACCESS ? ndaPublished : publicPublished)
-    .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
+    .sort(comparePublishedAtDesc);
 
 const allStaticPosts = () => STATIC_COMMUNITY_POSTS.map(normalizePost);
 
@@ -219,23 +242,137 @@ const fetchJson = async (url) => {
   return response.json();
 };
 
+/**
+ * A deck or article body, from the bucket, falling back to the committed copy.
+ *
+ * The generated snapshot no longer inlines deck prose — the same markdown is in GCS and in
+ * `content/decks/text/`, and duplicating 843 KB of it into a module the runtime parses on every
+ * cold start bought nothing. `withDetailContent` hydrates through here instead, so this is now the
+ * only path to a public deck's text and it has to survive a bucket that is unset or unreachable.
+ * Returning "" there would hand a crawler an empty document.
+ *
+ * Gated objects are never served from disk: `localDeckFile` matches the public `decks/` prefix
+ * only, and the gated directories are not in this repository.
+ */
 const fetchGcsText = async (objectName) => {
-  if (!BUCKET || !objectName) return "";
+  if (!objectName) return "";
+  const localDeck = localDeckFile(objectName);
+  const fromDisk = () => (localDeck ? readFileSync(localDeck.path, "utf8") : "");
+
+  if (!BUCKET) return fromDisk();
+
   const encodedObject = encodeURIComponent(objectName);
   const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(BUCKET)}/o/${encodedObject}?alt=media`;
-  const headers = await getAuthHeaders();
-  const response = await fetch(url, { headers });
-  if (!response.ok) return "";
-  return response.text();
+  try {
+    const response = await fetch(url, { headers: await getAuthHeaders() });
+    if (!response.ok) return fromDisk();
+    return response.text();
+  } catch (error) {
+    if (localDeck) {
+      console.warn(`[community] reading ${objectName} from the committed copy: ${error.message}`);
+      return fromDisk();
+    }
+    throw error;
+  }
+};
+
+/**
+ * The fields a list response is built from. Bodies are deliberately absent: api/community/posts.js
+ * strips bodyMarkdown and bodyHtml before responding, so fetching them was pure waste — roughly
+ * 430 KB of deck and article text read from Firestore and thrown away on every list request.
+ */
+const LIST_FIELD_MASK = [
+  "slug",
+  "title",
+  "publishedAt",
+  "description",
+  "category",
+  "accessLevel",
+  "status",
+  "sourceKind",
+  "componentName",
+  "contentObject",
+  "cardsObject",
+  "readingMinutes",
+  "cardCount",
+  "assetObject",
+  "assetUrl",
+  "pdfUrl",
+  "mediaItems",
+  "docFamily",
+  "docVersion",
+  "supersedes",
+];
+
+/**
+ * Reads the whole collection.
+ *
+ * Firestore's document list returns at most 100 documents per page. Both callers below used to
+ * issue one unpaginated GET and treat the result as the collection, so once `community_posts` grew
+ * past 100 documents the community index silently served whichever 100 sorted first by document
+ * id — 90 public posts out of 130, and the missing 40 were invisible with no error anywhere. The
+ * page size is now explicit and the page token is followed to the end.
+ *
+ * The page cap is a guard against a pathological token loop, not a content limit; it is an order
+ * of magnitude above the collection and logs rather than truncating silently.
+ */
+const listAllDocuments = async (fieldPaths = LIST_FIELD_MASK) => {
+  const documents = [];
+  let pageToken;
+  for (let page = 0; page < 50; page += 1) {
+    const url = new URL(
+      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}`,
+    );
+    url.searchParams.set("pageSize", "300");
+    for (const path of fieldPaths) url.searchParams.append("mask.fieldPaths", path);
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const data = await fetchJson(url.toString());
+    documents.push(...(data.documents || []));
+    pageToken = data.nextPageToken;
+    if (!pageToken) return documents;
+  }
+  console.error(`[community] stopped paging ${COLLECTION} after 50 pages; the collection may be truncated`);
+  return documents;
 };
 
 const listGcpPosts = async (accessLevel) => {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}`;
-  const data = await fetchJson(url);
-  return (data.documents || [])
-    .map(firestoreDocToPost)
+  const documents = await listAllDocuments();
+  return selectLatestVersions(documents.map(firestoreDocToPost))
     .filter(accessLevel === NDA_ACCESS ? ndaPublished : publicPublished)
-    .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
+    .sort(comparePublishedAtDesc);
+};
+
+/**
+ * Resolves the current edition of a post's family for the detail route.
+ *
+ * Only runs when the post declares a docFamily, so the common untagged case pays
+ * nothing; a tagged post costs one list read to learn where it forwards to.
+ */
+const resolveSupersededBy = async (post) => {
+  if (!post?.docFamily) return { ...post, isLatestVersion: true, supersededBy: "", supersededByTitle: "" };
+
+  let family = allStaticPosts();
+  if (isGcpEnabled()) {
+    try {
+      const documents = (await listAllDocuments()).map(firestoreDocToPost);
+      if (documents.length) family = documents;
+    } catch (error) {
+      console.error("[community] Version lookup fell back to the static snapshot:", error.message);
+    }
+  }
+
+  // The post itself may be newer than the snapshot, so fold it in before indexing.
+  const entry = buildVersionIndex([...family.filter((item) => item.slug !== post.slug), post]).get(post.slug);
+  if (!entry || entry.isLatest) {
+    return { ...post, isLatestVersion: true, supersededBy: "", supersededByTitle: "" };
+  }
+  return {
+    ...post,
+    isLatestVersion: false,
+    supersededBy: entry.latestSlug,
+    supersededByTitle: entry.latestTitle,
+  };
 };
 
 const withDetailContent = async (post) => {
@@ -288,17 +425,19 @@ export const getCommunityPost = async (slug, req) => {
       const authorizedPost = await authorizePost(post, req);
 
       if (!authorizedPost) return null;
-      return withDetailContent(authorizedPost);
+      return withDetailContent(await resolveSupersededBy(authorizedPost));
     } catch (error) {
       if (isCommunityAccessError(error)) throw error;
       console.error("[community] Falling back to static post detail:", error.message);
     }
   }
 
+  // Superseded editions resolve here on purpose: their URLs keep working, and the
+  // response carries supersededBy so the page can canonical forward.
   const post = allStaticPosts().find((item) => item.slug === slug);
   if (!post) return null;
   const authorizedPost = await authorizePost(post, req);
-  return authorizedPost ? withDetailContent(authorizedPost) : null;
+  return authorizedPost ? withDetailContent(await resolveSupersededBy(authorizedPost)) : null;
 };
 
 export const setCommunityCacheHeaders = (res, options = {}) => {
@@ -312,6 +451,39 @@ export const setCommunityCacheHeaders = (res, options = {}) => {
 
 const isNdaAsset = (objectName) =>
   /^(gated|nda|private|sensitive)\//i.test(objectName || "");
+
+/**
+ * The committed copy of a public deck body, if there is one on disk.
+ *
+ * `content/decks/` is the exact source `publish-deck-content.mjs` uploads from, so the bytes are
+ * the same. Falling back to it is what makes the static content backend an actual fallback:
+ * without it, a bucket that is unreachable — a GCS incident, or any environment with no GCP
+ * credentials — renders every deck as "the reading view could not be loaded" while the text sits
+ * unused inside the image.
+ *
+ * Gated decks are deliberately excluded. `content/decks/{cards,text}-gated` are gitignored, so
+ * there is nothing on disk to serve; the explicit guard keeps that true if that ever changes.
+ * The slug pattern also confines the lookup to two known directories — no traversal is expressible.
+ */
+const localDeckFile = (objectName) => {
+  const match = /^decks\/([a-z0-9][a-z0-9-]*)\/(cards\.json|index\.md)$/.exec(objectName);
+  if (!match) return null;
+  const [, assetName, fileName] = match;
+  const isCards = fileName === "cards.json";
+  const path = join(
+    process.cwd(),
+    isCards ? "content/decks/cards" : "content/decks/text",
+    `${assetName}${isCards ? ".json" : ".md"}`,
+  );
+  if (!existsSync(path)) return null;
+  return { path, contentType: isCards ? "application/json; charset=utf-8" : "text/markdown; charset=utf-8" };
+};
+
+const serveLocalDeckFile = (res, file) => {
+  res.setHeader("Content-Type", file.contentType);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  createReadStream(file.path).pipe(res);
+};
 
 export const streamCommunityAsset = async (req, res) => {
   const rawObject = req.params?.[0] || req.params?.object || "";
@@ -339,27 +511,65 @@ export const streamCommunityAsset = async (req, res) => {
     return;
   }
 
+  const privateAsset = isNdaAsset(objectName);
+  const localDeck = privateAsset ? null : localDeckFile(objectName);
+
   if (!BUCKET || !objectName) {
+    if (localDeck) {
+      serveLocalDeckFile(res, localDeck);
+      return;
+    }
     res.status(404).json({ error: "Asset not configured" });
     return;
   }
 
-  const privateAsset = isNdaAsset(objectName);
   if (privateAsset) {
     await assertNdaAccess(req);
   }
 
   const encodedObject = encodeURIComponent(objectName);
   const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(BUCKET)}/o/${encodedObject}?alt=media`;
-  const headers = await getAuthHeaders();
-  const upstream = await fetch(url, { headers });
+  // Minting a token and reaching the bucket both throw rather than return a status, and either is
+  // exactly the outage the committed copy exists for — so the whole upstream attempt is guarded.
+  let upstream;
+  try {
+    upstream = await fetch(url, { headers: await getAuthHeaders() });
+  } catch (error) {
+    if (localDeck) {
+      console.warn(`[community] serving ${objectName} from the committed copy: ${error.message}`);
+      serveLocalDeckFile(res, localDeck);
+      return;
+    }
+    throw error;
+  }
   if (!upstream.ok || !upstream.body) {
+    if (localDeck) {
+      serveLocalDeckFile(res, localDeck);
+      return;
+    }
     res.status(upstream.status).json({ error: "Asset not found" });
     return;
   }
 
   res.setHeader("Content-Type", upstream.headers.get("content-type") || "application/octet-stream");
-  res.setHeader("Cache-Control", privateAsset ? "private, no-store" : "public, max-age=3600");
+  // Card imagery is content-addressed — mirror-deck-images.mjs names each file by the sha256 of
+  // its bytes — so the URL can never point at different content and the response is safe to hold
+  // forever. Everything else keeps the conservative hour, and a gated asset is never stored.
+  const immutable = !privateAsset && /\/media\/[0-9a-f]{16}\.(?:jpg|png)$/.test(objectName);
+  res.setHeader(
+    "Cache-Control",
+    privateAsset
+      ? "private, no-store"
+      : immutable
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=3600",
+  );
+  // Lets a repeat visitor revalidate with a 304 instead of re-downloading a 200 KB image once the
+  // hour is up. GCS supplies both; neither was being passed through.
+  for (const header of ["etag", "last-modified"]) {
+    const value = upstream.headers.get(header);
+    if (value) res.setHeader(header, value);
+  }
   const reader = upstream.body.getReader();
   const pump = async () => {
     const { done, value } = await reader.read();

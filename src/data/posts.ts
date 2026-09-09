@@ -27,16 +27,6 @@ import LimitedPartnershipAgreement from '../content/posts/investors-faq/limitedP
 import FeeSchedule from '../content/posts/funds/feeSchedule'
 import Dmu22apr from '../content/posts/market/dmu22apr';
 import aiInfrastructure from '../content/posts/general/aiInfrastructure';
-import HolyGrailPortfolio from '../content/posts/general/holyGrailPortfolio';
-import Alpha27CashFlowMonarchy from '../content/posts/general/alpha27CashFlowMonarchy';
-import RenaissanceAIFirstFund from '../content/posts/general/renaissanceAIFirstFund';
-import AIDrivenPersonalAgents from '../content/posts/general/aiDrivenPersonalAgents';
-import AlphaAgentsPortfolio from '../content/posts/general/alphaAgentsPortfolio';
-import AIPoweredBerkshire from '../content/posts/general/aiPoweredBerkshire';
-import PerpetualAlphaEngine from '../content/posts/general/perpetualAlphaEngine';
-import MedallionModelIndia from '../content/posts/general/medallionModelIndia';
-import HushhRenaissanceAINative from '../content/posts/general/hushhRenaissanceAINative';
-import SellTheWallFeatured from '../content/posts/general/sellTheWallFeatured';
 
 // Images
 import FundsUpdateImg1 from '../components/images/0_Fund Performance.jpg';
@@ -165,6 +155,7 @@ import HushhVentures from '../content/posts/general/hushhVentures';
 import MarketOutlookMid2025 from '../content/posts/market/marketOutlookMid2025';
 import FcfAcesOfAcesPortfolioUpdate from '../content/posts/general/fcfAcesOfAcesPortfolioUpdate_corrected';
 import { communityBlogPostList } from '../content/posts/community-blog';
+import { deckPostList } from '../content/posts/general/decks';
 export interface PostData {
   slug: string;
   title: string;
@@ -177,6 +168,22 @@ export interface PostData {
   accessLevel: string;
   pdfUrl?: string; // Optional PDF URL
   mediaItems?: Array<string | { object?: string; assetObject?: string; url?: string; type?: "image" | "video"; alt?: string; name?: string }>;
+
+  /**
+   * Version identity for documents that get republished under a new slug.
+   *
+   * Within a docFamily only the highest docVersion appears in listings, the sitemap
+   * and llms.txt; older editions keep working at their URLs and canonical forward to
+   * the current one. Leave all three unset for a one-off post — untagged posts are
+   * their own family and are never hidden.
+   *
+   * Selection lives in api/community/postVersions.js, shared by the API and the UI.
+   */
+  docFamily?: string;
+  docVersion?: number;
+  supersedes?: string[];
+  /** Overrides the component-source sniff in the snapshot generator. */
+  sourceKind?: 'article' | 'deck' | 'document' | 'legacy';
 }
 
 const getPostComponentName = (post: PostData): string =>
@@ -230,123 +237,13 @@ export const posts: PostData[] = [
     accessLevel: 'Public',
   },
   // Featured Post - Sell the Wall (Nov 30, 2025)
-  {
-    count: 181,
-    slug: 'general/sell-the-wall-featured',
-    title: 'Sell the Wall',
-    publishedAt: '2025-11-30',
-    description: 'A systematic approach to capturing alpha through intelligent options selling on the world\'s most exceptional businesses—those rare monopolies printing cash while AI optimizes every trade.',
-    category: 'investment & financial strategies',
-    Component: SellTheWallFeatured,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
   // New December 2025 posts - Gamma presentations
-  {
-    count: 180,
-    slug: 'general/the-perpetual-alpha-engine',
-    title: 'The Perpetual Alpha Engine',
-    publishedAt: '2025-12-06',
-    description: 'A Technical Blueprint for Next-Generation Quantitative Investment Systems',
-    category: 'investment & financial strategies',
-    Component: PerpetualAlphaEngine,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 179,
-    slug: 'general/ai-powered-berkshire-hathaway',
-    title: 'The AI-Powered Berkshire Hathaway',
-    publishedAt: '2025-12-04',
-    description: 'Hushh Technologies Fund A Strategy – Investing in the Future of Free Cash Flow',
-    category: 'investment & financial strategies',
-    Component: AIPoweredBerkshire,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 178,
-    slug: 'general/alpha-agents-portfolio-construction',
-    title: 'AlphaAgents: Revolutionizing Portfolio Construction Through AI-Powered Intelligence',
-    publishedAt: '2025-12-02',
-    description: 'A groundbreaking multi-agent system that combines the precision of quantitative analysis with the adaptability of Large Language Models to identify elite investment opportunities in the world\'s fastest-growing markets.',
-    category: 'investment & financial strategies',
-    Component: AlphaAgentsPortfolio,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 177,
-    slug: 'general/holy-grail-portfolio',
-    title: 'The Holy Grail Portfolio',
-    publishedAt: '2025-12-01',
-    description: 'A Complete Implementation Playbook for the World\'s Most Sophisticated Capital Allocators',
-    category: 'investment & financial strategies',
-    Component: HolyGrailPortfolio,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 176,
-    slug: 'general/renaissance-ai-first-fund',
-    title: 'Renaissance AI First Fund',
-    publishedAt: '2025-11-28',
-    description: 'Aloha compounding in an AI decade. Finding the fastest absolute free cash flow growing businesses in the fastest growing markets — the King of Kings strategy for elite capital allocators.',
-    category: 'fund updates',
-    Component: RenaissanceAIFirstFund,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 175,
-    slug: 'general/alpha-27-cash-flow-monarchy',
-    title: 'Alpha 27: The Absolute Cash Flow Monarchy',
-    publishedAt: '2025-11-27',
-    description: 'For institutional allocators managing billions across sovereign wealth mandates, endowment perpetuity obligations, or multi-generational family office preservation goals, Alpha 27 offers something increasingly rare: a strategy you can explain in one sentence and defend with one formula.',
-    category: 'investment & financial strategies',
-    Component: Alpha27CashFlowMonarchy,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 174,
-    slug: 'general/ai-driven-personal-agents',
-    title: 'AI-Driven Personal Agents',
-    publishedAt: '2025-11-26',
-    description: 'Improving Financial Habits Through Everyday Wellness',
-    category: 'general',
-    Component: AIDrivenPersonalAgents,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 173,
-    slug: 'general/medallion-model-comes-to-india',
-    title: 'The Medallion Model Comes to India',
-    publishedAt: '2025-11-24',
-    description: 'A Letter to the World\'s Greatest Capital Allocators. Where Jim Simons\' legendary playbook meets India\'s elite AI talent—and creates the most asymmetric opportunity in systematic investing today.',
-    category: 'investment & financial strategies',
-    Component: MedallionModelIndia,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
-  {
-    count: 172,
-    slug: 'general/hushh-renaissance-ai-native-medallion',
-    title: 'Hushh Renaissance: The AI-Native Medallion Fund',
-    publishedAt: '2025-11-22',
-    description: 'Building India\'s first AI-native quantitative hedge fund targeting 60-69% annual returns through 1,000 autonomous AI agents discovering patterns in global markets.',
-    category: 'fund updates',
-    Component: HushhRenaissanceAINative,
-    image: HushhAiLogoImg,
-    accessLevel: 'Public',
-  },
   // Add the new market updates at the top of the array for newest first
   {
     count: 167,
     slug: 'fcf-aces-of-aces-portfolio-update',
     title: '2025 "Free Cash Flow Aces of Aces" Portfolio Update',
-    publishedAt: '21/07/2025',
+    publishedAt: '2025-07-21',
     description: 'An executive summary and update for the 2025 "Free Cash Flow Aces of Aces" portfolio.',
     category: 'general',
     Component: FcfAcesOfAcesPortfolioUpdate,
@@ -357,7 +254,7 @@ export const posts: PostData[] = [
     count: 166,
     slug: 'market-outlook-mid-2025',
     title: 'Market Outlook for Top 27 "FCF Aces of Aces" (Mid-2025)',
-    publishedAt: '15/07/2025',
+    publishedAt: '2025-07-15',
     description: 'Market Outlook for Top 27 "FCF Aces of Aces" (Mid-2025) as part of Hushh Fund A',
     category: 'market updates',
     Component: MarketOutlookMid2025,
@@ -368,7 +265,7 @@ export const posts: PostData[] = [
     count: 142,
     slug: 'daily-market-update/17-apr-2025',
     title: 'Daily Market Update - 17th April',
-    publishedAt: '17/04/2025',
+    publishedAt: '2025-04-17',
     description: 'Internal review and investor communication for the Aloha Alpha Fund, highlighting performance and strategy updates.',
     category: 'market updates',
     Component: Dmu17apr,
@@ -389,7 +286,7 @@ export const posts: PostData[] = [
     count: 141,
     slug: 'daily-market-update/16-apr-2025',
     title: 'Daily Market Update - 16th April',
-    publishedAt: '16/04/2025',
+    publishedAt: '2025-04-16',
     description: 'Internal review and investor communication for the Aloha Alpha Fund, highlighting performance and strategy updates.',
     category: 'market updates',
     Component: Dmu16apr,
@@ -419,7 +316,7 @@ export const posts: PostData[] = [
     count: 140,
     slug: 'daily-market-update/15-apr-2025',
     title: 'Daily Market Update - 15th April',
-    publishedAt: '15/04/2025',
+    publishedAt: '2025-04-15',
     description: 'Internal review and investor communication for the Aloha Alpha Fund, highlighting performance and strategy updates.',
     category: 'market updates',
     Component: Dmu15apr,
@@ -437,7 +334,7 @@ export const posts: PostData[] = [
     count: 139,
     slug: 'daily-market-update/11-apr-2025',
     title: 'Weekly Market Update - 11th April',
-    publishedAt: '11/04/2025',
+    publishedAt: '2025-04-11',
     description: 'Weekly market review and investor communication for the Aloha Alpha Fund, highlighting performance and strategy updates.',
     category: 'market updates',
     Component: Dmu11apr,
@@ -458,7 +355,7 @@ export const posts: PostData[] = [
     count: 138,
     slug: 'daily-market-update/10-apr-2025',
     title: 'Daily Market Update - 10th April',
-    publishedAt: '10/04/2025',
+    publishedAt: '2025-04-10',
     description: 'Internal review and investor communication for the Aloha Alpha Fund, highlighting performance and strategy updates.',
     category: 'market updates',
     Component: Dmu10apr,
@@ -1928,6 +1825,9 @@ export const posts: PostData[] = [
   pdfUrl: '/cash-free-manifesto.pdf', 
 },
   ...communityBlogPostList,
+  // Curated Gamma decks, generated from content/decks/manifest.json by
+  // scripts/community/generate-deck-posts.mjs.
+  ...deckPostList,
 ];
 
 export function getPosts(): PostData[] {

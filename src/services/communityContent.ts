@@ -19,11 +19,27 @@ export interface CommunityPostSummary {
   componentName?: string;
   assetUrl?: string;
   mediaItems?: CommunityMediaItem[];
+  /** Version identity; see api/community/postVersions.js. */
+  docFamily?: string;
+  docVersion?: number;
+  supersedes?: string[];
+  /** Cards in a deck, and minutes to read. Computed at snapshot time — the list response strips
+   * bodies, so the browser has nothing to count. */
+  cardCount?: number;
+  readingMinutes?: number;
+  /** Where the deck reader fetches this deck's cards, under its own access prefix. */
+  cardsObject?: string;
+  contentObject?: string;
 }
 
 export interface CommunityPostDetail extends CommunityPostSummary {
   bodyMarkdown?: string;
   bodyHtml?: string;
+  /** False when a newer edition of this document exists. */
+  isLatestVersion?: boolean;
+  /** Slug of the current edition, empty when this post is current. */
+  supersededBy?: string;
+  supersededByTitle?: string;
 }
 
 export class CommunityContentError extends Error {

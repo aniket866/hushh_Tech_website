@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +16,8 @@ import {
   isForbiddenProviderHost,
   isForbiddenProviderTarget,
 } from "./noHybridNetworkGuard";
+
+const execFileAsync = promisify(execFile);
 
 const temporaryRoots: string[] = [];
 
@@ -476,16 +480,52 @@ describe("fail-closed no-hybrid runtime gate", () => {
     }
   });
 
-  it("keeps the production API loader graph statically bounded", () => {
-    const result = scanNoHybridRuntime({
-      root: process.cwd(),
-      policy: loadNoHybridPolicy(),
-      validateWiring: false,
-      enforceBrowserCoverage: false,
-    });
+  /**
+   * The only test here that scans the real repository rather than a fixture, and the one that
+   * cannot run inside the vitest worker.
+   *
+   * The scan walks every source surface in the policy — src, api, cloud-run, scripts, public —
+   * reads each runtime file and resolves its import graph. It is synchronous and it is not quick:
+   * `npm run migration:no-hybrid:source` does the same work from the command line and takes about
+   * the same time. Measured back to back on one machine it costs the same on `main` as on a branch
+   * adding 400 KB to those surfaces, so no single change made it slow; CI's hardware simply spent
+   * about twelve of the fifteen seconds the suite allows, and ordinary growth spent the other
+   * three.
+   *
+   * Raising the budget alone does not work, and produces a more confusing failure than the one it
+   * replaces: synchronous work holds the worker's event loop, so past roughly a minute the worker
+   * stops answering vitest's `onTaskUpdate` heartbeat and the run dies on an unhandled
+   * `[vitest-worker]: Timeout calling "onTaskUpdate"` — with every test reported as passed and the
+   * process still exiting non-zero.
+   *
+   * So the scan runs in a child process and this test awaits it. The worker's event loop stays
+   * free, the assertion is unchanged, and the same code path runs — the child imports the same
+   * function with the same options.
+   */
+  it(
+    "keeps the production API loader graph statically bounded",
+    async () => {
+      const child = `
+        import { scanNoHybridRuntime, loadNoHybridPolicy } from "./scripts/ci/check-no-hybrid-runtime.mjs";
+        const result = scanNoHybridRuntime({
+          root: process.cwd(),
+          policy: loadNoHybridPolicy(),
+          validateWiring: false,
+          enforceBrowserCoverage: false,
+        });
+        process.stdout.write(JSON.stringify(result.violations.map((violation) => violation.code)));
+      `;
 
-    expect(codes(result)).not.toContain("UNRESOLVED_DYNAMIC_RUNTIME_IMPORT");
-  });
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        ["--input-type=module", "-e", child],
+        { cwd: process.cwd(), maxBuffer: 32 * 1024 * 1024 },
+      );
+
+      expect(JSON.parse(stdout) as string[]).not.toContain("UNRESOLVED_DYNAMIC_RUNTIME_IMPORT");
+    },
+    180_000,
+  );
 
   it("keeps package, PR, queue, post-merge, deploy, image, and 112-route wiring fail closed", () => {
     expect(validateGateWiring(process.cwd(), loadNoHybridPolicy())).toEqual([]);

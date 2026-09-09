@@ -1,0 +1,52 @@
+name: CodeQL
+
+# Static analysis for the JavaScript/TypeScript surfaces this repository owns:
+# src/**, api/**, server.js, scripts/** and cloud-run/**. Advisory by design —
+# it is not part of the ci-status required set, so it reports without gating merges.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly full scan catches advisories published after a PR merged.
+    - cron: "27 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      # No build step: CodeQL analyses JS/TS directly, and `npm run build:web`
+      # would add several minutes without improving coverage.
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript

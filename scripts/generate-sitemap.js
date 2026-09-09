@@ -1,262 +1,139 @@
+/**
+ * Generates public/sitemap.xml.
+ *
+ * The previous version concatenated four sources — a hardcoded static list, a hardcoded array of
+ * 52 community URLs, a directory scan of src/content/posts, and a committed Firestore slug
+ * snapshot — and de-duplicated only within one of them. The result was 258 entries covering 204
+ * unique URLs, with a dead branch reading a file that does not exist, and `lastmod` taken from
+ * file mtime, so a fresh clone rewrote every date and told search engines the whole site had
+ * changed.
+ *
+ * This version has one source of truth: the same deduplicated, access-filtered post set the API
+ * and llms.txt use, plus the public route table in api/seo/documentHead.js. A superseded edition
+ * never appears, an NDA post never appears, and noindex routes are excluded so the sitemap stops
+ * contradicting the robots rules.
+ *
+ * `lastmod` is the post's own publishedAt. For static pages it is sticky: the previous value is
+ * reused so routine rebuilds do not churn dates.
+ */
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+
+import { staticPosts } from "../api/community/content-service.js";
+import {
+  comparePublishedAtDesc,
+  normalizePublishedAt,
+  selectLatestVersions,
+} from "../api/community/postVersions.js";
+import { STATIC_ROUTES, isNoindexPath } from "../api/seo/documentHead.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SITE_URL = "https://hushhtech.com";
-const SITEMAP_PATH = path.join(__dirname, "../public/sitemap.xml");
-// Real, indexable public routes (must match registered routes in src/App.tsx).
-// Auth/onboarding/profile routes are intentionally excluded from the sitemap.
-const staticPages = [
-  "/",
-  "/discover-fund-a",
-  "/ai-powered-berkshire",
-  "/sell-the-wall",
-  "/community",
-  "/benefits",
-  "/career",
-  "/faq",
-  "/contact",
-  "/about/leadership",
-  "/about/philosophy",
-  "/support",
-  "/privacy-policy",
-  "/terms-of-service",
-  "/risk-disclosures",
-  "/california-privacy-policy",
-  "/eu-uk-jobs-privacy-policy",
+const outputPath = path.join(__dirname, "../public/sitemap.xml");
+
+/** Public routes that have no head entry but are still worth indexing. */
+const EXTRA_ROUTES = [
+  "/services/consumers",
+  "/services/business",
+  "/developer-docs",
+  "/investor-guide",
+  "/career-privacy-policy",
 ];
 
-// Additional community routes based on observed URL structure in posts.ts
-const communityRoutes = [
-  // Market updates
-  "/community/daily-market-update/10-apr-2025",
-  "/community/daily-market-update/11-apr-2025",
-  "/community/daily-market-update/15-apr-2025",
-  "/community/daily-market-update/16-apr-2025",
-  "/community/daily-market-update/17-apr-2025",
-  "/community/daily-market-update/14-feb-2025",
-  "/community/market/daily-market-update",
-  "/community/market/updates",
-  "/community/market/alpha-aloha-fund-update",
-  "/community/market/weekly-report",
-  "/community/market/feb-5-market-update",
-  "/community/market/latest-fund-update-11th-feb",
-  "/community/market/updates-28-feb-2025",
-  "/community/market/market-updates-1st-april",
-  "/community/market/market-updates-4th-april",
-  "/community/market/market-update-19-feb",
-  "/community/market/market-update-20-feb",
-  "/community/market/daily-update-30-may",
-  
-  // Funds
-  "/community/fund-documents/investment-prospectus",
-  "/community/fund-documents/private-placement-memorandum",
-  "/community/fund-documents/lp-master-lpa",
-  "/community/fund-documents/delaware-feeder-lpa",
-  "/community/funds/hushh-technology-fund",
-  "/community/funds/renaissance-tech",
-  "/community/funds/fund-ahushh",
-  "/community/funds/fee-schedule",
-  "/community/funds/alpha-aloha-fund-update-feb6",
-  "/community/funds/hushh-alpha-fund-nav-update",
-  
-  // General
-  "/community/general/manifesto",
-  "/community/general/ai-infrastructure-thesis",
-  "/community/general/fund-afaq",
-  "/community/general/hushh-fund-faq",
-  "/community/general/hushh-employee-champion-handbook",
-  "/community/general/hushhtech-prospectus",
-  "/community/general/compensation-report",
-  
-  // Product updates
-  "/community/product/product-updates",
-  "/community/product/hushh-wallet",
-  "/community/product/renaissance-tech",
-  
-  // Investor relations
-  "/community/investor-relations/investor-faq/charlie-munger-edition",
-  "/community/investors-faq/shared-class-explanation",
-  "/community/investors-faq/withdrawal-schedule",
-  "/community/investors-faq/investor-suitability-questionnarie",
-  "/community/investors-news/market-wrap",
-  "/community/investment-strategies/sell-the-wall",
-  "/community/investment-strategy/hushh-alpha-fund-growth-plan",
-  "/community/investment-strategy/investment-framework-renting-maximum-income",
-  "/community/news/investment-perspective"
-];
+const PRIORITY = { "/": "1.0", "/community": "0.9", "/discover-fund-a": "0.9" };
 
-function readExistingLastMods() {
-  const candidateContents = [];
+/**
+ * Reuse the previous run's lastmod for static pages so a rebuild does not restamp every URL.
+ * Reads the committed sitemap from git first, falling back to the working tree.
+ */
+const previousLastMods = () => {
+  const parse = (xml) => {
+    const map = new Map();
+    for (const block of xml.match(/<url>[\s\S]*?<\/url>/g) || []) {
+      const loc = /<loc>([^<]+)<\/loc>/.exec(block)?.[1];
+      const lastmod = /<lastmod>([^<]+)<\/lastmod>/.exec(block)?.[1];
+      if (loc && lastmod) map.set(loc, lastmod);
+    }
+    return map;
+  };
 
   try {
-    candidateContents.push(execSync("git show HEAD:public/sitemap.xml", { encoding: "utf8" }));
+    return parse(execSync("git show HEAD:public/sitemap.xml", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
   } catch {
-    // Fall back to the current working-tree sitemap when the repo has no tracked file yet.
-  }
-
-  if (fs.existsSync(SITEMAP_PATH)) {
-    candidateContents.push(fs.readFileSync(SITEMAP_PATH, "utf8"));
-  }
-
-  for (const existingSitemap of candidateContents) {
-    const entries = [...existingSitemap.matchAll(/<url>\s*<loc>(.*?)<\/loc>\s*<lastmod>(.*?)<\/lastmod>/gs)];
-    if (entries.length > 0) {
-      return new Map(entries.map(([, loc, lastmod]) => [loc.trim(), lastmod.trim()]));
+    try {
+      return parse(fs.readFileSync(outputPath, "utf8"));
+    } catch {
+      return new Map();
     }
   }
-
-  return new Map();
-}
-
-function getStableLastMod(existingLastMods, url, fallbackLastMod) {
-  return existingLastMods.get(url) || fallbackLastMod;
-}
-
-const generateSitemap = () => {
-  console.log("🔹 Generating sitemap...");
-  const existingLastMods = readExistingLastMods();
-  const fallbackLastMod = fs.statSync(path.join(__dirname, "../package.json")).mtime.toISOString();
-  const scannedPostLastMods = new Map();
-
-  // Generate URLs for static pages
-  const staticUrls = staticPages.map((page) => {
-    const url = `${SITE_URL}${page}`;
-    return `
-      <url>
-        <loc>${url}</loc>
-        <lastmod>${getStableLastMod(existingLastMods, url, fallbackLastMod)}</lastmod>
-        <changefreq>daily</changefreq>
-        <priority>0.7</priority>
-      </url>`;
-  });
-
-  // Additionally, scan directories for any posts that might not be included
-  const postUrls = [];
-  let postCount = 0;
-  
-  // Directories containing community posts
-  const publicPostDirectories = [
-    path.join(__dirname, "../src/content/posts/market"),
-    path.join(__dirname, "../src/content/posts/funds"),
-    path.join(__dirname, "../src/content/posts/general"),
-    path.join(__dirname, "../src/content/posts/investors-faq"),
-    path.join(__dirname, "../src/content/posts/product")
-  ];
-  
-  // Process each public directory
-  publicPostDirectories.forEach(directory => {
-    if (fs.existsSync(directory)) {
-      // Get the category name from the directory path
-      const category = path.basename(directory);
-      
-      // Get all the files in the directory
-      const files = fs.readdirSync(directory);
-      
-      files.forEach(file => {
-        // Skip if not a .tsx or .jsx file
-        if (!file.endsWith('.tsx') && !file.endsWith('.jsx')) return;
-        
-        // Get the file name without extension to use as a slug part
-        const fileName = path.basename(file, path.extname(file));
-        
-        // Create a slug for the post (convert to kebab-case if needed)
-        const slug = fileName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-        
-        // Use file's modified date as lastmod
-        const filePath = path.join(directory, file);
-        const stats = fs.statSync(filePath);
-        const lastMod = stats.mtime.toISOString();
-        const url = `${SITE_URL}/community/${category}/${slug}`;
-        scannedPostLastMods.set(url, lastMod);
-        
-        // Add URL entry for the post
-        postUrls.push(`
-      <url>
-        <loc>${url}</loc>
-        <lastmod>${lastMod}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.8</priority>
-      </url>`);
-        
-        postCount++;
-      });
-    }
-  });
-
-  // Generate URLs for community routes with deterministic lastmod values.
-  const communityUrls = communityRoutes.map((route) => {
-    const url = `${SITE_URL}${route}`;
-    const lastMod =
-      scannedPostLastMods.get(url) || getStableLastMod(existingLastMods, url, fallbackLastMod);
-    return `
-      <url>
-        <loc>${url}</loc>
-        <lastmod>${lastMod}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.8</priority>
-      </url>`;
-  });
-
-  // WhatsApp community blog posts so the live community blog is indexable:
-  //  - static posts from whatsappCommunityPosts.ts route as /community/wa/<slugified-title>
-  //  - public Firestore-published posts route as /community/<slug>
-  const slugifyTitle = (value) =>
-    String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
-  const communityBlogSlugs = [];
-  try {
-    const waData = fs.readFileSync(path.join(__dirname, "../src/data/whatsappCommunityPosts.ts"), "utf8");
-    for (const match of waData.matchAll(/"title":\s*"((?:[^"\\]|\\.)*)"/g)) {
-      const slug = slugifyTitle(match[1].replace(/\\"/g, '"'));
-      if (slug) communityBlogSlugs.push(`wa/${slug}`);
-    }
-  } catch {
-    // whatsappCommunityPosts.ts may be absent in some checkouts — ignore.
-  }
-  // Public Firestore-published community posts (community_posts collection),
-  // routed as /community/<slug>. This is a committed snapshot of the live
-  // /api/community/posts slugs — refresh it by re-running the capture in
-  // scripts/community/community-firestore-slugs.json when posts change.
-  try {
-    const firestoreSlugs = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "community/community-firestore-slugs.json"), "utf8"),
-    );
-    if (Array.isArray(firestoreSlugs)) {
-      communityBlogSlugs.push(...firestoreSlugs.filter(Boolean));
-    }
-  } catch {
-    // Snapshot may be absent in some checkouts — the directory scanner above
-    // still covers content-derived community posts; ignore.
-  }
-  const communityBlogUrls = [...new Set(communityBlogSlugs)].map((slug) => {
-    const url = `${SITE_URL}/community/${slug}`;
-    const lastMod = getStableLastMod(existingLastMods, url, fallbackLastMod);
-    return `
-      <url>
-        <loc>${url}</loc>
-        <lastmod>${lastMod}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.7</priority>
-      </url>`;
-  });
-
-  // Combine all URLs
-  const allUrls = [...staticUrls, ...communityUrls, ...communityBlogUrls, ...postUrls].join("\n");
-
-  const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>
-    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      ${allUrls}
-    </urlset>`;
-
-  fs.writeFileSync(SITEMAP_PATH, sitemapContent);
-
-  console.log(`✅ Sitemap successfully generated at ${SITEMAP_PATH}`);
-  console.log(`✅ Added ${staticUrls.length} static pages, ${communityUrls.length} community pages, ${communityBlogUrls.length} community blog posts, and ${postCount} scanned posts`);
-  console.log(`🔎 Verifying file: ${fs.existsSync(SITEMAP_PATH) ? "✅ Exists" : "❌ Not Found"}`);
 };
 
-generateSitemap();
+const escapeXml = (value) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+const main = () => {
+  const previous = previousLastMods();
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = new Map();
+
+  const add = (route, { lastmod, changefreq, priority }) => {
+    if (isNoindexPath(route)) return;
+    const loc = `${SITE_URL}${route}`;
+    if (entries.has(loc)) return; // first writer wins; one URL, one entry
+    entries.set(loc, { loc, lastmod, changefreq, priority });
+  };
+
+  for (const route of [...STATIC_ROUTES.keys(), ...EXTRA_ROUTES]) {
+    const loc = `${SITE_URL}${route}`;
+    add(route, {
+      lastmod: previous.get(loc) || today,
+      changefreq: route === "/" || route === "/community" ? "daily" : "monthly",
+      priority: PRIORITY[route] || "0.7",
+    });
+  }
+
+  const posts = selectLatestVersions(staticPosts("Public")).sort(comparePublishedAtDesc);
+  for (const post of posts) {
+    add(`/community/${post.slug}`, {
+      lastmod: normalizePublishedAt(post.publishedAt) || previous.get(`${SITE_URL}/community/${post.slug}`) || today,
+      changefreq: "monthly",
+      priority: "0.8",
+    });
+  }
+
+  const urls = [...entries.values()]
+    .map(
+      ({ loc, lastmod, changefreq, priority }) => `  <url>
+    <loc>${escapeXml(loc)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`,
+    )
+    .join("\n");
+
+  fs.writeFileSync(
+    outputPath,
+    `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`,
+  );
+
+  console.log(
+    `✅ sitemap.xml generated — ${entries.size} unique URLs ` +
+      `(${posts.length} community posts, ${entries.size - posts.length} pages)`,
+  );
+};
+
+main();

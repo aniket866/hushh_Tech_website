@@ -167,7 +167,10 @@ if (!registryOnly) {
     "google-auth-library",
     "pg",
   ]);
-  assert.deepEqual(packageJson.overrides, { uuid: "11.1.1" });
+  // Exact by design: this runtime keeps a frozen dependency allowlist, so an
+  // unreviewed override fails the check. qs is pinned past GHSA-x5fp-wj9c-mxmx
+  // and GHSA-4mjr-xmp4-gh2g, which express 5 otherwise pulls in transitively.
+  assert.deepEqual(packageJson.overrides, { uuid: "11.1.1", qs: "^6.16.0" });
 
   const dockerfile = await readFile(resolve(root, "Dockerfile"), "utf8");
   assert.doesNotMatch(dockerfile, /^ARG\s+.*PLATFORM/m);

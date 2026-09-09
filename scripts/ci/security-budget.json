@@ -1,6 +1,6 @@
 {
-  "low": 2,
-  "moderate": 32,
-  "high": 16,
-  "critical": 3
+  "low": 0,
+  "moderate": 0,
+  "high": 0,
+  "critical": 0
 }

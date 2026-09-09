@@ -23,6 +23,12 @@ faster.
 > "how to deploy + speed it up" companion. For broad CI-governance / branch-
 > protection / merge-queue questions, prefer `repo-operations`.
 
+> Deploying a **branch** rather than a green `main`, or working where Actions and
+> `gcloud` are both unavailable? Use `branch-uat-deploy` instead — it ships to UAT
+> through the Cloud Build and Cloud Run REST APIs with a read-modify-write PATCH,
+> and its credential is 403 on production by construction. This skill remains the
+> only path to production.
+
 ## Environments
 
 | Env  | URL                     | GCP project      | Cloud Run service   | Trigger |
@@ -48,6 +54,24 @@ manually (defaults to latest `origin/main` if no SHA given):
 gh workflow run deploy-uat.yml --ref main            # latest green main
 gh workflow run deploy-uat.yml --ref main -f sha=<green-main-sha>
 ```
+
+### UAT from a branch (validation, not release)
+
+The golden rule above is about releases. Validating a branch on UAT before it can
+be green on `main` is a different job, and `.github/workflows/deploy-uat.yml`
+correctly refuses to do it. Use the branch path instead:
+
+```bash
+node scripts/deploy/uat-deploy.mjs --dry-run   # print the build and the service patch
+npm run deploy:uat                             # build HEAD in Cloud Build, then patch Cloud Run
+npm run verify:deployment                      # 22 checks against the deployed host
+```
+
+It needs `GCP_DEPLOY_SA_KEY_B64` and no gcloud. It refuses to run on a dirty tree,
+so `DEPLOY_COMMIT_SHA` always names the commit the image was built from. The
+deploy is a read-modify-write on the live service — it changes only the image, the
+commit SHA and the revision labels — and it fails if the env var count moves,
+printing the `--rollback` command. Never use it for prod: the key is 403 there.
 
 ### PROD
 PROD is **manual only** and requires the exact SHA:
@@ -113,21 +137,26 @@ File/line anchors are in [references/pipeline.md](references/pipeline.md).
 5. **Cache `build:assets`.** `build:web` regenerates the community snapshot +
    sitemap + robots on every build; skip/cache when their inputs are unchanged.
 
-6. **Kill pipeline redundancy.** Three deploy mechanisms coexist: GitHub Actions
-   `--source .` (runtime [`Dockerfile`](../../../Dockerfile)), Cloud Build
-   triggers (`cloudbuild-uat.yaml` / `cloudbuild-prod.yaml` → `Dockerfile.gcp`,
-   which builds Vite *inside* the image), and Vercel (`vercel.json`). Maintaining
-   parallel pipelines multiplies time and invites drift. Pick one source of truth
-   per env (keep Vercel for previews if you use it; retire whichever is legacy).
+6. **Kill pipeline redundancy.** Deploy paths that coexist: GitHub Actions
+   `--source .` (runtime [`Dockerfile`](../../../Dockerfile), `dist/` prebuilt on
+   the runner), the branch path above (`Dockerfile.gcp`, Vite built inside the
+   image), and Vercel (`vercel.json`). `cloudbuild-uat.yaml` and
+   `cloudbuild-prod.yaml` are NOT a third path — no Cloud Build trigger exists in
+   either project, and the UAT file's deploy step has been removed because its
+   `--set-env-vars` / `--set-secrets` would have replaced 48 env bindings with 16.
+   Pick one source of truth per env (keep Vercel for previews if you use it).
 
 **Recommended order:** start with #2 + #3 (low-risk, save minutes immediately),
 then #1 (biggest win) — but test #1 on UAT first since it rewrites the prod
 deploy path.
 
 ## Gotchas
-- A deploy that ships a `dist/` missing compiled Supabase auth config fails *in
-  the container build* on purpose (see the guard in the `Dockerfile`). If a
-  deploy dies there, the build-time `VITE_SUPABASE_*` env wasn't injected.
+- A deploy that ships a `dist/` missing compiled Firebase auth config fails *in
+  the container build* on purpose. Both `Dockerfile` and `Dockerfile.gcp` grep the
+  built bundle for `identitytoolkit.googleapis.com`. If a deploy dies there, the
+  build-time `VITE_FIREBASE_API_KEY` / `VITE_FIREBASE_AUTH_DOMAIN` were not
+  injected — without the guard it would have shipped a login page whose OAuth
+  client is undefined.
 - PROD must be dispatched from `main` (the workflow asserts `GITHUB_REF_NAME`).
 - The smoke step uploads an artifact and is `if: always()` — a red smoke still
   surfaces the JSON for debugging.

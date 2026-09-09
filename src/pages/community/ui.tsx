@@ -13,7 +13,7 @@ import {
   appleFont,
   appleDisplayFont,
 } from "../../components/hushh-tech-ui/HushhAppleUI";
-import { getCategoryVariant, useCommunityListLogic } from "./logic";
+import { getCategoryVariant, PINNED_SLUGS, useCommunityListLogic } from "./logic";
 import CommunityCover from "./CommunityCover";
 import SeoHead from "../../components/seo/SeoHead";
 
@@ -87,6 +87,52 @@ const SearchBar = ({
   </div>
 );
 
+/**
+ * A deck's own first page, used as its cover.
+ *
+ * Every deck in a category otherwise drew from the same small pool of Unsplash photos, so the grid
+ * read as one repeated image. Only public decks: a gated page image needs a bearer token that an
+ * `<img>` cannot send, and the deck's title card is not something to show before the NDA anyway.
+ */
+const coverImageFor = (post: CommunityPost): string | undefined => {
+  const record = post as unknown as { sourceKind?: string; accessLevel?: string; slug?: string };
+  if (record.sourceKind !== "deck" || record.accessLevel === "NDA") return undefined;
+  const assetName = (record.slug || "").split("/").pop();
+  return assetName ? `/api/community/assets/decks/${assetName}/pages/page-001.jpg` : undefined;
+};
+
+/** What kind of thing this is, in the reader's terms. */
+const kindLabelFor = (post: CommunityPost): string => {
+  const record = post as unknown as { sourceKind?: string; cardCount?: number };
+  if (record.sourceKind === "deck") return record.cardCount ? `Deck · ${record.cardCount} cards` : "Deck";
+  if (record.sourceKind === "document") return "Document";
+  return "";
+};
+
+const readingLabelFor = (post: CommunityPost): string => {
+  const minutes = (post as unknown as { readingMinutes?: number }).readingMinutes || 0;
+  return minutes ? `${minutes} min read` : "";
+};
+
+/** Deck / reading-time chips. Scanning a 130-post index needs more than a date. */
+const KindMeta = ({ post }: { post: CommunityPost }) => {
+  const chips = [kindLabelFor(post), readingLabelFor(post)].filter(Boolean);
+  if (!chips.length) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.06em] text-[#1D1D1F]/50"
+      style={{ fontFamily: appleFont }}
+    >
+      {chips.map((chip, index) => (
+        <span key={chip} className="inline-flex items-center gap-2">
+          {index > 0 ? <span className="h-0.5 w-0.5 rounded-full bg-[#1D1D1F]/30" /> : null}
+          {chip}
+        </span>
+      ))}
+    </span>
+  );
+};
+
 /* ── Small category badge ── */
 const CategoryBadge = ({ label, tint }: { label: string; tint: string }) => (
   <span
@@ -142,6 +188,7 @@ const SpotlightCard = ({
       category={category}
       title={post.title}
       slug={post.slug}
+      imageSrc={coverImageFor(post)}
       className="h-56 w-full md:h-72"
       rounded="rounded-none"
     />
@@ -149,6 +196,7 @@ const SpotlightCard = ({
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <CategoryBadge label={category} tint={tint} />
         <ArticleMeta date={date} author={author} />
+        <KindMeta post={post} />
       </div>
       <h2
         className="mb-2.5 text-[26px] font-semibold leading-[1.08] tracking-[-0.025em] text-[#1D1D1F] md:text-[30px]"
@@ -199,6 +247,7 @@ const TrendingRow = ({
       category={category}
       title={post.title}
       slug={post.slug}
+      imageSrc={coverImageFor(post)}
       className="h-[64px] w-[88px] shrink-0"
       rounded="rounded-[12px]"
     />
@@ -217,6 +266,7 @@ const TrendingRow = ({
         >
           {date}
         </span>
+        <KindMeta post={post} />
       </div>
       <h3
         className="line-clamp-2 text-[15px] font-semibold leading-[1.25] tracking-[-0.018em] text-[#1D1D1F]"
@@ -252,6 +302,7 @@ const ArticleCard = ({
       category={category}
       title={post.title}
       slug={post.slug}
+      imageSrc={coverImageFor(post)}
       className="aspect-[16/10] w-full"
       rounded="rounded-none"
     />
@@ -271,8 +322,9 @@ const ArticleCard = ({
       >
         {description}
       </p>
-      <div className="mt-auto pt-1">
+      <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
         <ArticleMeta date={date} author={author} />
+        <KindMeta post={post} />
       </div>
     </div>
   </article>
@@ -332,9 +384,40 @@ export default function CommunityPage() {
 
   const isMagazineView = selectedCategory === "All" && !searchQuery.trim();
 
-  /* Magazine layout grouping (only for the All + no-search overview). */
-  const spotlight = isMagazineView ? filteredContent[0] : undefined;
-  const trending = isMagazineView ? filteredContent.slice(1, 4) : [];
+  /*
+   * Magazine layout grouping (only for the All + no-search overview).
+   *
+   * `filteredContent` is pin-ordered: PINNED_SLUGS in logic.ts moves two hand-picked posts to the
+   * front. That made the lead story a December 2025 post while the newest work on the site was from
+   * August 2026 — the top of a publication showing nine-month-old content. Recency leads now, and
+   * the pinned posts get their own Featured row, which is what pinning is actually for.
+   */
+  const byRecency = useMemo(
+    () =>
+      isMagazineView
+        ? [...filteredContent].sort((a, b) =>
+            String(b.publishedAt || b.date || "").localeCompare(String(a.publishedAt || a.date || "")),
+          )
+        : [],
+    [isMagazineView, filteredContent],
+  );
+
+  const featured = useMemo(() => {
+    if (!isMagazineView) return [] as CommunityPost[];
+    const order = new Map(PINNED_SLUGS.map((slug, index) => [slug, index]));
+    return filteredContent
+      .filter((post) => order.has(post.slug))
+      .sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
+  }, [isMagazineView, filteredContent]);
+
+  const spotlight = byRecency[0];
+  const trending = byRecency.slice(1, 4);
+
+  const deckCount = useMemo(
+    () => filteredContent.filter((post) => post.sourceKind === "deck").length,
+    [filteredContent],
+  );
+  const latestDate = spotlight ? formatDisplayDate(spotlight.date) : "";
 
   const categorySections = useMemo(() => {
     if (!isMagazineView) return [] as { category: string; posts: CommunityPost[] }[];
@@ -343,14 +426,23 @@ export default function CommunityPage() {
       (option) => option !== "All" && option !== NDA_OPTION
     );
 
+    // The four newest posts already lead the page as Spotlight and Trending. Without
+    // this they appeared a second time inside their own category section, so the top
+    // of /community read as duplicated content.
+    const featuredSlugs = new Set(
+      [spotlight, ...trending, ...featured].filter(Boolean).map((post) => (post as CommunityPost).slug)
+    );
+
     return presentCategories
       .map((category) => ({
         category,
-        posts: filteredContent.filter((post) => categoryOf(post) === category),
+        posts: filteredContent.filter(
+          (post) => categoryOf(post) === category && !featuredSlugs.has(post.slug)
+        ),
       }))
       .filter((section) => section.posts.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMagazineView, railOptions, filteredContent, NDA_OPTION]);
+  }, [isMagazineView, railOptions, filteredContent, NDA_OPTION, spotlight, trending, featured]);
 
   const renderPostLink = (
     post: CommunityPost,
@@ -380,7 +472,7 @@ export default function CommunityPage() {
         <button
           type="button"
           onClick={onReadMore}
-          className="inline-flex shrink-0 items-center gap-1 text-[14px] font-medium text-[#0066CC] transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35"
+          className="-my-3 inline-flex shrink-0 items-center gap-1 py-3 text-[14px] font-medium text-[#0066CC] transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35"
           style={{ fontFamily: appleFont }}
         >
           Read More {Icon.chevronRight("#0066CC", 12)}
@@ -415,14 +507,26 @@ export default function CommunityPage() {
               className="text-[clamp(34px,5vw,56px)] font-semibold leading-[1.05] tracking-[-0.025em] text-[#1D1D1F]"
               style={{ fontFamily: appleDisplayFont }}
             >
-              All Articles
+              Research &amp; Letters
             </h1>
             <p
               className="mt-3 max-w-[52ch] text-[clamp(16px,1.6vw,19px)] font-normal leading-[1.5] text-[#1D1D1F]/62"
               style={{ fontFamily: appleFont }}
             >
-              Insights, news, and privacy technology updates from Hushh Technologies.
+              Investment research, fund letters, market notes and deep dives from Hushh
+              Technologies — published in the open, sourced and dated.
             </p>
+            {/* The size of the library is the first thing a reader wants to know about one. */}
+            {!apiLoading && filteredContent.length ? (
+              <p
+                className="mt-4 text-[13px] font-medium uppercase tracking-[0.1em] text-[#1D1D1F]/40"
+                style={{ fontFamily: appleFont }}
+              >
+                {filteredContent.length} pieces
+                {deckCount ? ` · ${deckCount} decks` : ""}
+                {latestDate ? ` · latest ${latestDate}` : ""}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -441,7 +545,7 @@ export default function CommunityPage() {
                     type="button"
                     onClick={() => onCategoryChange(option)}
                     aria-current={active ? "true" : undefined}
-                    className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium tracking-[-0.01em] transition ${
+                    className={`flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full px-4 text-[13px] font-medium tracking-[-0.01em] transition ${
                       active
                         ? "bg-[#0066CC] text-white"
                         : "bg-[#1D1D1F]/[0.05] text-[#1D1D1F]/65 hover:bg-[#1D1D1F]/[0.08]"
@@ -472,7 +576,7 @@ export default function CommunityPage() {
                           type="button"
                           onClick={() => onCategoryChange(option)}
                           aria-current={active ? "true" : undefined}
-                          className={`group flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 ${
+                          className={`group flex min-h-[44px] w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 ${
                             active ? "bg-[#0066CC]/[0.08]" : "hover:bg-[#1D1D1F]/[0.04]"
                           }`}
                         >
@@ -529,7 +633,7 @@ export default function CommunityPage() {
                   {/* Spotlight */}
                   {spotlight ? (
                     <section aria-labelledby="community-spotlight">
-                      {sectionHeader("Spotlight", "#0066CC")}
+                      {sectionHeader("Latest", "#0066CC")}
                       {renderPostLink(
                         spotlight,
                         <SpotlightCard
@@ -560,6 +664,29 @@ export default function CommunityPage() {
                               rank={index + 1}
                             />,
                             "block rounded-none transition-colors hover:bg-[#1D1D1F]/[0.015]"
+                          )
+                        )}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {/* Editor's picks — the pinned posts, which no longer displace the lead story. */}
+                  {featured.length > 0 ? (
+                    <section aria-label="Featured">
+                      {sectionHeader("Featured", "#AF52DE")}
+                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                        {featured.map((post) =>
+                          renderPostLink(
+                            post,
+                            <ArticleCard
+                              post={post}
+                              date={formatDisplayDate(post.date)}
+                              category={categoryOf(post)}
+                              tint={tintFor(categoryOf(post))}
+                              description={getPostDescription(post)}
+                              author={authorOf(post)}
+                            />,
+                            "block h-full"
                           )
                         )}
                       </div>

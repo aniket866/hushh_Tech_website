@@ -116,11 +116,13 @@ function isLikelyHtmlResponse(body: string, contentType: string | null) {
 async function fetchSummaryFromApi(windowDays: number) {
   const query = `window_days=${clampWindowDays(windowDays)}`;
   const candidates = [`/api/metrics/summary?${query}`];
+  // Dev-only, for the same reason as the analytics collector: a production bundle served from
+  // 127.0.0.1 would otherwise chase two dead ports and trip CSP on each one.
   const isLocalhost =
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1";
 
-  if (isLocalhost) {
+  if (import.meta.env.DEV && isLocalhost) {
     candidates.push(`http://127.0.0.1:3005/api/metrics/summary?${query}`);
     candidates.push(`http://127.0.0.1:3000/api/metrics/summary?${query}`);
   }

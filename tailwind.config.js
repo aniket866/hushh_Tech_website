@@ -1,3 +1,5 @@
+import typography from "@tailwindcss/typography";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -46,5 +48,11 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // The `prose` classes used by the community article body and the deck reader were inert until
+    // now — `prose`, `prose-neutral` and every `prose-h4:` modifier resolved to nothing, so long-form
+    // content rendered as unstyled HTML: 16px headings at normal weight, no list markers, no table
+    // borders. This is the plugin those classes were written against.
+    typography,
+  ],
 }

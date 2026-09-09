@@ -1,5 +1,4 @@
 import React from "react";
-import { appleFont } from "../../components/hushh-tech-ui/HushhAppleUI";
 import { getCoverImage } from "./coverImages";
 
 /**
@@ -21,6 +20,13 @@ export interface CommunityCoverProps {
   slug: string;
   className?: string; // applied to the root element
   rounded?: string; // optional tailwind rounding override, default "rounded-[18px]"
+  /**
+   * An image that belongs to this specific post, used ahead of the category stock photo.
+   * A deck's own title card is a far better cover than a hashed Unsplash photo: it is the
+   * article's actual first page, it is distinctive, and every deck in a category otherwise draws
+   * from the same small pool and the grid reads as one repeated image.
+   */
+  imageSrc?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -92,13 +98,16 @@ export default function CommunityCover({
   slug,
   className,
   rounded = "rounded-[18px]",
+  imageSrc,
 }: CommunityCoverProps): JSX.Element {
   const { accent, deep } = accentFor(category);
 
-  // Try to resolve a real photo for this article. May be null (use the SVG
-  // gradient fallback) and may fail to load at runtime (we then swap to it too).
-  const img = getCoverImage(category, slug, title);
+  // The post's own image wins; otherwise a category photo; otherwise the SVG gradient. A runtime
+  // load failure falls through to the gradient as before.
+  const stock = getCoverImage(category, slug, title);
+  const img = imageSrc ? { src: imageSrc, srcSet: "", alt: title } : stock;
   const [failed, setFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
   const showImage = Boolean(img) && !failed;
 
   // Derive deterministic variation from slug (fall back to title so empty slugs
@@ -115,9 +124,6 @@ export default function CommunityCover({
   // Motif selection: 0 = concentric rings, 1 = diagonal sheen bands, 2 = arcs.
   const motif = (seed >> 11) % 3;
 
-  // Faint monogram watermark from the category (first letter).
-  const monogram = ((category || "H").trim().charAt(0) || "H").toUpperCase();
-
   // Unique-ish ids so multiple covers on a page don't collide.
   const uid = `cc-${(seed % 0xffffff).toString(16)}`;
 
@@ -125,6 +131,123 @@ export default function CommunityCover({
   // className. The root only provides position/overflow/rounding.
   const rootClass = ["relative overflow-hidden", rounded, className || ""].join(
     " "
+  );
+
+  /** Always-painted backdrop; a photo, when there is one, fades in over it. */
+  const gradient = (
+    <svg
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 400 250"
+      preserveAspectRatio="xMidYMid slice"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+    <defs>
+      {/* Background gradient — deep accent into brand ink for depth. */}
+      <linearGradient
+        id={`${uid}-bg`}
+        gradientTransform={`rotate(${angle}, 0.5, 0.5)`}
+      >
+        <stop offset="0%" stopColor={deep} />
+        <stop offset="55%" stopColor={BRAND.blueDeep} stopOpacity="0.92" />
+        <stop offset="100%" stopColor={BRAND.ink} />
+      </linearGradient>
+
+      {/* Soft radial glow positioned by the seed. */}
+      <radialGradient
+        id={`${uid}-glow`}
+        cx={`${cx}%`}
+        cy={`${cy}%`}
+        r="70%"
+      >
+        <stop offset="0%" stopColor={accent} stopOpacity="0.55" />
+        <stop offset="45%" stopColor={accent} stopOpacity="0.18" />
+        <stop offset="100%" stopColor={accent} stopOpacity="0" />
+      </radialGradient>
+
+      {/* Diagonal sheen overlay. */}
+      <linearGradient id={`${uid}-sheen`} x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor={BRAND.white} stopOpacity="0.14" />
+        <stop offset="38%" stopColor={BRAND.white} stopOpacity="0" />
+        <stop offset="100%" stopColor={BRAND.white} stopOpacity="0" />
+      </linearGradient>
+    </defs>
+
+    {/* Base */}
+    <rect x="0" y="0" width="400" height="250" fill={`url(#${uid}-bg)`} />
+    {/* Glow */}
+    <rect x="0" y="0" width="400" height="250" fill={`url(#${uid}-glow)`} />
+
+
+    {/* Abstract motif — varies by seed, always restrained line-art. */}
+    {motif === 0 && (
+      <g
+        stroke={accent}
+        strokeOpacity="0.5"
+        fill="none"
+        strokeWidth="1.25"
+      >
+        {[26, 52, 80, 110, 142].map((r, i) => (
+          <circle
+            key={r}
+            cx={(cx / 100) * 400}
+            cy={(cy / 100) * 250}
+            r={r}
+            strokeOpacity={0.42 - i * 0.06}
+          />
+        ))}
+      </g>
+    )}
+
+    {motif === 1 && (
+      <g stroke={accent} strokeOpacity="0.4" strokeWidth="1.25">
+        {[0, 1, 2, 3, 4, 5].map((i) => {
+          const x = -60 + i * 90 + (seed % 40);
+          return (
+            <line
+              key={i}
+              x1={x}
+              y1={0}
+              x2={x + 150}
+              y2={250}
+              strokeOpacity={0.36 - i * 0.04}
+            />
+          );
+        })}
+      </g>
+    )}
+
+    {motif === 2 && (
+      <g
+        stroke={accent}
+        strokeOpacity="0.5"
+        fill="none"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      >
+        {[60, 110, 165, 225].map((r, i) => {
+          const ox = (cx / 100) * 400;
+          const oy = (cy / 100) * 250;
+          return (
+            <path
+              key={r}
+              d={`M ${ox - r} ${oy} A ${r} ${r} 0 0 1 ${ox} ${oy - r}`}
+              strokeOpacity={0.45 - i * 0.07}
+            />
+          );
+        })}
+      </g>
+    )}
+
+      {/* Diagonal sheen on top for the glassy Apple feel. */}
+      <rect
+        x="0"
+        y="0"
+        width="400"
+        height="250"
+        fill={`url(#${uid}-sheen)`}
+      />
+    </svg>
   );
 
   return (
@@ -137,16 +260,27 @@ export default function CommunityCover({
         boxShadow: "inset 0 0 0 0.5px rgba(0,0,0,0.06)",
       }}
     >
+      {/*
+        The gradient is always painted, and the photo fades in over it. Previously the root was a
+        flat near-black rectangle until the image decoded, so a grid of lazily loaded cards showed a
+        wall of black boxes on first paint and again on any slow connection — the loading state
+        looked like a bug rather than a placeholder.
+      */}
+      {gradient}
+
       {showImage && img ? (
         <>
           <img
             src={img.src}
-            srcSet={img.srcSet}
+            srcSet={img.srcSet || undefined}
             sizes="(max-width: 640px) 100vw, 400px"
             alt=""
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
           />
           {/* Subtle depth/cohesion overlay over the photo. */}
@@ -159,134 +293,7 @@ export default function CommunityCover({
             }}
           />
         </>
-      ) : (
-        <svg
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full"
-          viewBox="0 0 400 250"
-          preserveAspectRatio="xMidYMid slice"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-        <defs>
-          {/* Background gradient — deep accent into brand ink for depth. */}
-          <linearGradient
-            id={`${uid}-bg`}
-            gradientTransform={`rotate(${angle}, 0.5, 0.5)`}
-          >
-            <stop offset="0%" stopColor={deep} />
-            <stop offset="55%" stopColor={BRAND.blueDeep} stopOpacity="0.92" />
-            <stop offset="100%" stopColor={BRAND.ink} />
-          </linearGradient>
-
-          {/* Soft radial glow positioned by the seed. */}
-          <radialGradient
-            id={`${uid}-glow`}
-            cx={`${cx}%`}
-            cy={`${cy}%`}
-            r="70%"
-          >
-            <stop offset="0%" stopColor={accent} stopOpacity="0.55" />
-            <stop offset="45%" stopColor={accent} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </radialGradient>
-
-          {/* Diagonal sheen overlay. */}
-          <linearGradient id={`${uid}-sheen`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={BRAND.white} stopOpacity="0.14" />
-            <stop offset="38%" stopColor={BRAND.white} stopOpacity="0" />
-            <stop offset="100%" stopColor={BRAND.white} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Base */}
-        <rect x="0" y="0" width="400" height="250" fill={`url(#${uid}-bg)`} />
-        {/* Glow */}
-        <rect x="0" y="0" width="400" height="250" fill={`url(#${uid}-glow)`} />
-
-        {/* Faint monogram watermark */}
-        <text
-          x="370"
-          y="232"
-          textAnchor="end"
-          fontSize="190"
-          fontWeight={700}
-          fill={BRAND.white}
-          fillOpacity="0.05"
-          style={{ fontFamily: appleFont }}
-        >
-          {monogram}
-        </text>
-
-        {/* Abstract motif — varies by seed, always restrained line-art. */}
-        {motif === 0 && (
-          <g
-            stroke={accent}
-            strokeOpacity="0.5"
-            fill="none"
-            strokeWidth="1.25"
-          >
-            {[26, 52, 80, 110, 142].map((r, i) => (
-              <circle
-                key={r}
-                cx={(cx / 100) * 400}
-                cy={(cy / 100) * 250}
-                r={r}
-                strokeOpacity={0.42 - i * 0.06}
-              />
-            ))}
-          </g>
-        )}
-
-        {motif === 1 && (
-          <g stroke={accent} strokeOpacity="0.4" strokeWidth="1.25">
-            {[0, 1, 2, 3, 4, 5].map((i) => {
-              const x = -60 + i * 90 + (seed % 40);
-              return (
-                <line
-                  key={i}
-                  x1={x}
-                  y1={0}
-                  x2={x + 150}
-                  y2={250}
-                  strokeOpacity={0.36 - i * 0.04}
-                />
-              );
-            })}
-          </g>
-        )}
-
-        {motif === 2 && (
-          <g
-            stroke={accent}
-            strokeOpacity="0.5"
-            fill="none"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          >
-            {[60, 110, 165, 225].map((r, i) => {
-              const ox = (cx / 100) * 400;
-              const oy = (cy / 100) * 250;
-              return (
-                <path
-                  key={r}
-                  d={`M ${ox - r} ${oy} A ${r} ${r} 0 0 1 ${ox} ${oy - r}`}
-                  strokeOpacity={0.45 - i * 0.07}
-                />
-              );
-            })}
-          </g>
-        )}
-
-          {/* Diagonal sheen on top for the glassy Apple feel. */}
-          <rect
-            x="0"
-            y="0"
-            width="400"
-            height="250"
-            fill={`url(#${uid}-sheen)`}
-          />
-        </svg>
-      )}
+      ) : null}
     </div>
   );
 }

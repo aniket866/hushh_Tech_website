@@ -40,7 +40,7 @@ const SearchButton = ({ onClick }: { onClick: () => void }) => (
   <button
     type="button"
     onClick={onClick}
-    className="flex h-[38px] w-[38px] items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+    className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
     aria-label="Search HushhTech"
   >
     {Icon.search("currentColor", 18)}
@@ -240,7 +240,7 @@ const HushhTechHeader: React.FC<HushhTechHeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(true)}
-                  className="flex h-[38px] w-[38px] items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+                  className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
                   aria-label="Open menu"
                 >
                   {Icon.menu("currentColor", 18)}

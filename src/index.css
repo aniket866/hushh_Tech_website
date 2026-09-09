@@ -7,6 +7,24 @@
 
 :root {
   --font-main: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /*
+   * How much of the bottom edge the floating mobile tab bar occupies, safe area included.
+   *
+   * HushhTechFooter docks that bar at `env(safe-area-inset-bottom) + 0.85rem` and the pill it sits
+   * in is ~3.75rem tall. Apple's guidance is that nothing else may sit under a tab bar, so anything
+   * else pinned to the bottom of a phone screen clears it by referencing this variable rather than
+   * repeating the arithmetic. Change the bar's height and every dependent control follows.
+   *
+   * The bar is `md:hidden`, so above that breakpoint the clearance collapses to the safe area.
+   */
+  --hushh-tabbar-clearance: calc(env(safe-area-inset-bottom, 0px) + 4.6rem);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --hushh-tabbar-clearance: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 html,
@@ -642,7 +660,15 @@ html,
 body,
 #root {
   max-width: 100%;
+  /*
+   * `overflow-x: hidden` here made body and #root scroll containers, which silently disabled
+   * `position: sticky` for every descendant on the site — the community category rail and the deck
+   * contents rail both scrolled away instead of sticking. `clip` clips the same overflow without
+   * creating a scroll container, so sticky resolves against the viewport as intended. `hidden` is
+   * kept first as the fallback for browsers without `clip` (Safari below 16).
+   */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @media (prefers-reduced-motion: reduce) {

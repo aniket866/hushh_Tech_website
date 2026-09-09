@@ -1,0 +1,224 @@
+# Micron Technology (MU): Deep Dive
+
+## Micron Technology (MU): Deep Dive
+
+Who They Are, What They Solve, and Why It Matters — a comprehensive exploration of the world's leading American memory and storage semiconductor company, built for the age of AI, data centers, mobile computing, and the intelligent edge.
+
+## What We'll Cover Today
+
+This deep dive is structured to build understanding from the ground up — starting with who Micron is, then exploring the customer problems that drive their existence, before mapping each product and business unit to the specific pain points they solve.
+
+#### Company Overview
+
+47+ years of history, market position, scale, and core identity as the only U.S.-based manufacturer of leading-edge memory chips.
+
+#### Products & Technology
+
+HBM3E, HBM4, DRAM (DDR5/LPDDR5X), NAND, SSDs, SOCAMM — what each product does and who it serves.
+
+#### Business Units
+
+Four distinct divisions: Cloud Memory (CMBU), Core Data Center (CDBU), Mobile & Client (MCBU), and Automotive & Embedded (AEBU).
+
+#### Customer Problems
+
+The eight critical memory and compute challenges that Micron was built to solve — from memory bandwidth bottlenecks to data sovereignty.
+
+#### Competitive Landscape
+
+How Micron competes against Samsung, SK Hynix, Kioxia, Western Digital, and Solidigm across DRAM, NAND, and HBM.
+
+#### Future & Takeaways
+
+Where Micron is headed, the macro trends driving growth, and the strategic implications of the AI memory supercycle for the market.
+
+## About Micron: 47+ Years of Memory Innovation
+
+Company Background
+
+#### Founded & Headquartered
+
+Micron Technology was founded in 1978 in Boise, Idaho — starting as a four-person semiconductor design consulting company working out of a dentist's office basement. Over nearly five decades, Micron has evolved from a modest DRAM startup into the world's foremost American authority on memory and storage technology, consistently ahead of the market in recognizing where compute bottlenecks would become existential problems for the most demanding digital environments on the planet.
+
+#### The Journey from Startup to Essential
+
+In the late 1970s, Micron's founders recognized that the computing industry would need enormous quantities of advanced memory as processors grew more powerful. As data centers, AI systems, and mobile devices began demanding memory at rates that previous generations could not have imagined, Micron had already spent decades engineering solutions for exactly that class of problem. That foresight has compounded into a 47-year technology lead. Today, Micron employs over 53,000 people worldwide, serving some of the most demanding computing environments ever built — from hyperscale AI data centers to automotive control systems.
+
+## Core Identity: The Only U.S. Memory Manufacturer
+
+Micron's identity is precise and strategically vital: the world's only major American manufacturer of leading-edge DRAM, NAND, and High Bandwidth Memory (HBM). This is not a general-purpose semiconductor company that drifted into memory — it is a company that has been purpose-built, from the fab level to the product stack, for the most demanding memory environments on Earth.
+
+#### Memory Technology Pioneer
+
+Micron pioneered multiple generations of DRAM, NAND, and NOR memory — introducing the world's smallest 256K DRAM in the early 1980s and continuing to lead with innovations like 1-beta and 1-gamma process nodes that set industry standards for density and power efficiency.
+
+#### AI Infrastructure Leader
+
+As GPU clusters have become the core of AI research and enterprise AI adoption, Micron has emerged as a dominant memory supplier — with HBM3E powering NVIDIA H200 and HBM4 designed for NVIDIA Vera Rubin, making Micron an essential ingredient in every leading AI accelerator platform.
+
+#### Full Portfolio Ownership
+
+Unlike competitors who specialize in either DRAM or NAND, Micron owns both complete technology families plus HBM, SSDs, and managed solutions — giving customers a single technology partner for their entire memory and storage hierarchy from the GPU to the archive tier.
+
+## The Big Picture: Memory as the Invisible Engine
+
+Every breakthrough happening at the frontier of science, commerce, and national security runs on memory infrastructure that most people never see. Micron exists at the center of this invisible engine, providing the DRAM, NAND, and HBM that make the world's most important computing possible.
+
+#### Artificial Intelligence
+
+Training and running large AI models requires moving petabytes of data between memory and compute at extraordinary speeds. Without memory systems capable of delivering data fast enough to keep GPUs fed, AI workloads stall, costs explode, and research timelines stretch. Micron's HBM is literally inside every NVIDIA AI GPU powering the AI revolution.
+
+#### Genomics & Life Sciences
+
+A single whole-genome sequencing run produces over 200GB of raw data. At scale — across a hospital network or pharmaceutical company — the memory demands are staggering. Micron's high-density DRAM and NVMe SSDs make real-time genomic analysis and drug discovery computationally practical.
+
+#### Mobile & Client Computing
+
+Every smartphone, laptop, and tablet depends on LPDDR and NAND flash memory to deliver speed, responsiveness, and storage capacity. Micron's LPDDR5X delivers 5x higher throughput and 73% less energy than prior generations — enabling on-device AI features that define the modern mobile experience.
+
+#### Automotive & Industrial
+
+Modern vehicles contain hundreds of sensors and compute systems requiring reliable, temperature-hardened memory that can operate for decades in extreme conditions. Micron's automotive-grade DRAM and NAND underpin autonomous driving systems, ADAS platforms, and connected vehicle architectures.
+
+## Micron's Mission: Fuel the Data Economy
+
+> Transform how the world uses information to enrich life for all — delivering innovative memory and storage solutions that fuel the data economy and enable advances in AI and compute-intensive applications.
+
+This mission statement is deceptively simple. In the context of Micron's customers, a memory bottleneck isn't a minor inconvenience — it is an existential constraint on AI capability, scientific discovery, and competitive advantage. When an AI GPU cluster sits at low utilization because memory bandwidth cannot keep up, or when a smartphone's on-device AI feature is too slow because LPDDR capacity is insufficient, the bottleneck has a dollar value measured in stranded compute investment. Micron's entire product philosophy is organized around identifying where these bottlenecks occur and engineering them out of existence.
+
+#### What "Fueling the Data Economy" Means in Practice
+
+- HBM4 delivering greater than 2.8 TB/s bandwidth per stack — enabling the next generation of AI accelerators to train larger models faster
+- LPDDR5X providing 5x higher throughput versus DDR5 in AI inference servers, with 73% lower energy consumption
+- 232-layer NAND enabling data center SSDs with industry-leading density and performance for AI training data pipelines
+- Automotive DRAM qualified to AEC-Q100 Grade 1 for reliable operation across the full temperature range of vehicle deployments
+
+#### The Engineering Philosophy
+
+Micron engineers don't start with a memory product and ask "who can we sell this to?" They start with the most extreme workload imaginable — the next-generation AI GPU, the most demanding autonomous vehicle platform, the most memory-intensive server application — define what memory technology would need to look like to fully serve that workload, and then build it. This reverse-engineering from customer pain is the philosophical core of Micron's product development — and it's why their products consistently outperform commodity alternatives in head-to-head benchmarks.
+
+## Market Position: Trusted by the World's Most Demanding Technology Platforms
+
+Micron's market position is validated not by analyst rankings or marketing claims, but by the AI systems, devices, and infrastructure platforms that have staked their most critical compute workloads on Micron memory. These are platforms where failure is not an option and performance is a product requirement.
+
+**$58B+** —
+
+#### FY2026 Revenue
+
+Micron reported record revenues driven by strong demand for AI-driven High Bandwidth Memory and data center DRAM, reflecting explosive growth as the AI infrastructure buildout accelerates globally.
+
+**Big 3** —
+
+#### Global DRAM Oligopoly
+
+Micron is one of three companies — alongside Samsung and SK Hynix — that control the global DRAM market. This oligopolistic structure reflects the extraordinary capital intensity and technology barriers required to manufacture leading-edge memory at scale.
+
+**53,000** —
+
+#### Employees Worldwide
+
+Over 53,000 employees across manufacturing, R&D, and sales operations worldwide — with deep engineering concentrations in Idaho, Virginia, Japan, Singapore, and Taiwan enabling global customer support.
+
+**60K+** —
+
+#### Lifetime Patents Granted
+
+Micron has reached 60,000 lifetime patents granted — reflecting decades of bold engineering thinking and technical excellence across DRAM, NAND, HBM, and advanced packaging technologies.
+
+## Revenue & Scale: A Publicly Traded Powerhouse
+
+Micron Technology (Nasdaq: MU) has been a publicly traded company since its IPO in 1984, giving it access to capital markets to fund the multi-billion dollar fabrication investments that define the semiconductor memory industry. The company's revenue trajectory has undergone a dramatic transformation as AI infrastructure investment has accelerated — from $15.5 billion in fiscal 2023 to record revenues exceeding $58 billion in fiscal 2026, driven by surging demand for HBM and data center DRAM.
+
+#### Financial Snapshot
+
+FY2026 Revenue: Record revenues of approximately $58 billion, reflecting the AI-driven memory supercycle. DRAM products represent approximately 77% of total revenue, with HBM and data center memory the fastest-growing segments within that category.
+
+Employee Base: 53,000+ employees worldwide, with significant concentrations in manufacturing engineering, process R&D, and field applications engineering — reflecting a customer base that demands deep technical co-development rather than off-the-shelf purchasing.
+
+#### Global Manufacturing Footprint
+
+Manufacturing Centers: Micron operates world-class fabrication facilities in Boise, Idaho; Manassas, Virginia; Hiroshima, Japan; and Singapore — plus assembly and test operations in multiple Asian countries. Its global manufacturing network enables it to serve customers across every time zone with responsive supply and technical support.
+
+U.S. Expansion: Backed by up to $6.4 billion in CHIPS Act grants, Micron is building two new leading-edge DRAM fabs in Idaho and a planned four-fab megafab in Clay, New York — the largest announced investment in cleanroom space in U.S. history, projected to create approximately 90,000 direct and indirect jobs.
+
+## Key Milestones: Building the Full-Stack Memory Portfolio
+
+Micron's product portfolio has been built through a combination of organic engineering investment and strategic acquisitions that have filled critical capability gaps. Each milestone reflects a deliberate expansion into adjacent problem spaces that Micron's core customers were asking to have solved.
+
+#### IM Flash — 2006
+
+Micron partnered with Intel to establish IM Flash Technologies, a joint venture focused on NAND flash memory production. This collaboration dramatically strengthened Micron's position in the flash memory market and established the manufacturing foundation for its enterprise SSD business.
+
+#### Elpida Memory — 2013
+
+The $2.5 billion acquisition of bankrupt Japanese memory manufacturer Elpida Memory transformed Micron into the world's second-largest DRAM manufacturer, boosting DRAM capacity by roughly 50% and securing Apple as a major customer for iPhone and iPad memory.
+
+#### Inotera Memories — 2016
+
+Micron completed full acquisition of Inotera Memories in Taiwan, consolidating its manufacturing footprint, eliminating potential capacity constraints, and securing a wholly-owned Taiwan DRAM fab as a strategic pillar of its global supply chain.
+
+#### HBM Leadership — 2024–2026
+
+Micron's breakthrough into High Bandwidth Memory with HBM3E for NVIDIA H200 and HBM4 for NVIDIA Vera Rubin transformed it into a critical AI infrastructure supplier — with HBM supply fully allocated through 2026 and a projected HBM TAM of $100 billion by 2028.
+
+## Customer Segments: Who Relies on Micron
+
+Micron's customer base spans the most demanding computing environments in existence. What unites them is a common characteristic: their workloads generate, process, and require access to data at rates that commodity or inferior memory infrastructure simply cannot support. Each segment has distinct technical requirements, performance constraints, and business outcomes they are trying to achieve.
+
+#### Hyperscale AI & Cloud
+
+Microsoft, Google, Meta, Amazon, and other hyperscalers building massive AI training and inference clusters. Primary need: HBM with maximum bandwidth and power efficiency to keep GPU utilization high.
+
+#### Enterprise Data Centers
+
+OEM server manufacturers and enterprise IT organizations deploying DDR5 and data center NVMe SSDs for AI inference, database, and cloud application workloads at scale.
+
+#### Mobile & Client Devices
+
+Smartphone OEMs (Apple, Samsung, Qualcomm-based Android), PC manufacturers, and tablet makers requiring LPDDR5X and UFS/NAND storage for flagship devices with on-device AI features.
+
+#### Automotive & ADAS
+
+Leading automakers and Tier 1 suppliers designing ADAS, autonomous driving, and connected vehicle platforms requiring AEC-Q100-qualified memory with multi-decade reliability.
+
+#### Industrial & Embedded
+
+Industrial automation, IoT, robotics, and smart infrastructure deployments requiring ruggedized, long-lifecycle memory qualified for extreme temperature and vibration environments.
+
+#### Federal & Defense
+
+U.S. Department of Defense, national laboratories, and intelligence agencies requiring domestically manufactured memory with supply chain security certifications and sovereign production capabilities.
+
+## Understanding the Customer
+
+Section 1
+
+#### What Problems Drive Micron's Existence?
+
+Before examining Micron's products, it is essential to understand the real-world pain that makes those products necessary. Micron was not built in a laboratory and then pushed into the market — it was built by listening carefully to the most demanding computing organizations in the world and engineering solutions to specific, measurable, expensive problems. The following eight problems define the market Micron serves.
+
+## Problem #1 — The Memory Bandwidth Wall
+
+#### AI model complexity is doubling faster than memory bandwidth. Legacy DRAM cannot keep up.
+
+The pace of AI model complexity growth has broken every projection made even five years ago. In 2019, a state-of-the-art language model could be trained with standard DDR4 server DRAM delivering tens of GB/s of bandwidth. By 2026, frontier AI accelerators require HBM delivering more than 2.8 TB/s of bandwidth per stack — a 100x increase in memory bandwidth demand over just seven years. This exponential gap means that an organization investing in standard DRAM memory today may already find that infrastructure insufficient for next-generation AI workloads.
+
+The problem is compounded by the fact that AI models are growing in context length by approximately 30 times per year, while the number of tokens a model must process in each inference step increases proportionally. This creates a memory capacity problem alongside the bandwidth problem — AI systems need both more memory and faster memory simultaneously, a combination that only HBM and advanced LPDDR architectures can deliver.
+
+#### The Scale Reality
+
+Bandwidth Growth Rate: AI accelerator memory bandwidth requirements have grown from tens of GB/s to multiple TB/s per chip in under a decade — a pace that standard DRAM DIMM architectures cannot match without fundamental architectural changes like HBM's 3D stacking and TSV interconnects.
+
+Memory Content per Server: Memory content per AI server has doubled in the past three years as model sizes have grown. A single AI training rack today may contain more memory capacity than an entire data center held a decade ago.
+
+HBM TAM Explosion: The HBM total addressable market is forecast to grow from approximately $35 billion in 2025 to around $100 billion in 2028 — a 40% compound annual growth rate that reflects the scale of the memory bandwidth crisis facing the AI industry.
+
+## Problem #2 — GPU Memory Starvation: The AI Accelerator Crisis
+
+#### AI GPUs sit starved for data. Memory bandwidth is the most expensive bottleneck in every AI cluster.
+
+The central challenge of modern AI infrastructure is that the most expensive component — the GPU — spends a significant portion of its time starved for data. In a poorly architected AI system, GPU utilization rates fall dramatically when memory cannot deliver the next batch of activation data fast enough. The GPUs are not failing; they are waiting. This is memory bandwidth starvation, and it is a multi-billion dollar inefficiency in the global AI infrastructure ecosystem.
+
+#### Why Memory Starvation Happens
+
+Modern AI inference requires that each GPU receive

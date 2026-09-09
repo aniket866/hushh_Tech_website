@@ -22,12 +22,22 @@ COPY postcss.config.js tailwind.config.js ./
 COPY src/ src/
 COPY public/ public/
 COPY files/ files/
-COPY scripts/generate-sitemap.js scripts/generate-robots.js scripts/
+COPY scripts/generate-sitemap.js scripts/generate-robots.js scripts/generate-llms-txt.mjs scripts/
+# build:community regenerates the API's static post snapshot from src/data.
+COPY scripts/community/ scripts/community/
+# generate-llms-txt.mjs and the snapshot generator read the community API modules.
+COPY api/ api/
+COPY content/ content/
 
 # Build args for VITE_* env vars (injected at build time)
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_API_KEY
 ARG VITE_GCP_AUTH_REDIRECT_URL
+# Required by scripts/ci/env-contract.json but previously undeclared here, so a Cloud Build
+# image silently shipped without the Plaid OAuth return URL that the Actions build sets.
+ARG VITE_PLAID_REDIRECT_URI
+# Must stay "false" in every deployed environment; declared so it is explicit, not inherited.
+ARG VITE_ALLOW_INSECURE_BROWSER_LLM=false
 ARG VITE_KYC_ENV=production
 ARG VITE_KYC_DEMO_MODE=false
 ARG VITE_KYC_API_BASE
@@ -47,7 +57,28 @@ ARG VITE_OPENAI_API_KEY
 ARG VITE_VOICE_AGENT_URL
 
 # Run build (skips tests in Docker — tests run in CI before Docker build)
-RUN npx vite build && node scripts/generate-sitemap.js && node scripts/generate-robots.js
+# Was: `npx vite build && node scripts/generate-sitemap.js && node scripts/generate-robots.js`.
+# That skipped build:community entirely, so the image shipped whatever post snapshot
+# happened to be committed, and it regenerated sitemap.xml/robots.txt AFTER Vite had
+# already copied public/ into dist/ — so the regenerated files never reached the image.
+# build:web runs build:community, then the generators, then Vite, in that order.
+RUN npm run build:web
+
+# The root Dockerfile makes the same assertion over a pre-built dist/. Build args are easy to
+# forget on a build submitted by hand, and a missing VITE_FIREBASE_* arg produces a bundle whose
+# OAuth client is undefined — a login page that fails only once a user tries to sign in. Fail the
+# image build instead.
+RUN node --input-type=module -e "\
+  import fs from 'node:fs';\
+  import path from 'node:path';\
+  const assetsDir = path.join(process.cwd(), 'dist', 'assets');\
+  const jsFiles = fs.readdirSync(assetsDir).filter((file) => file.endsWith('.js'));\
+  const hasAuthConfig = jsFiles.some((file) => /identitytoolkit\\.googleapis\\.com/.test(fs.readFileSync(path.join(assetsDir, file), 'utf8')));\
+  if (!hasAuthConfig) {\
+    console.error('Built dist/ is missing compiled Firebase auth config. Pass VITE_FIREBASE_AUTH_DOMAIN and VITE_FIREBASE_API_KEY as build args from GCP Secret Manager.');\
+    process.exit(1);\
+  }\
+"
 
 # ---------------------------------------------------------------------------
 # Stage 2: Production runtime
@@ -67,6 +98,12 @@ COPY --from=builder /app/dist/ dist/
 COPY server.js ./
 COPY api/ api/
 COPY scripts/ci/check-no-hybrid-runtime.mjs scripts/ci/no-hybrid-runtime-policy.json scripts/ci/
+
+# The committed public deck bodies (~3 MB), so the community asset route can serve a deck when the
+# bucket is unreachable instead of rendering "the reading view could not be loaded". Only the two
+# public directories: `cards-gated/` and `text-gated/` are gitignored and must never reach an image.
+COPY content/decks/cards/ content/decks/cards/
+COPY content/decks/text/ content/decks/text/
 
 # Direct Cloud Build cannot bypass the no-hybrid artifact proof.
 RUN node scripts/ci/check-no-hybrid-runtime.mjs --artifact-only --require-dist

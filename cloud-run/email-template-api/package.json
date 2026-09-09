@@ -16,5 +16,9 @@
     "node": ">=18.0.0"
   },
   "author": "Hushh.ai",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "qs": "^6.16.0",
+    "body-parser": "^1.20.6"
+  }
 }

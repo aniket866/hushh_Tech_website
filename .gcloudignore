@@ -53,4 +53,5 @@ package-lock.json
 *.sh
 *.txt
 !dist/robots.txt
+!dist/llms.txt
 *.tsbuildinfo

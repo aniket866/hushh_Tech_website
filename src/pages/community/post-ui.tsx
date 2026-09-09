@@ -93,7 +93,10 @@ export default function CommunityPostPage() {
       ? firstImage
       : `${SITE_URL}${firstImage}`
     : undefined;
-  const canonicalPath = `/community/${post.slug}`;
+  // A superseded edition keeps its URL working but points search engines at the
+  // current one, so link equity consolidates instead of editions competing.
+  const supersededBy = post.isLatestVersion === false ? post.supersededBy : "";
+  const canonicalPath = `/community/${supersededBy || post.slug}`;
   const seoHead = (
     <SeoHead
       title={post.title}
@@ -120,6 +123,25 @@ export default function CommunityPostPage() {
     />
   );
 
+  // Superseded editions stay readable — the banner just tells the reader, and the
+  // canonical above tells search engines, where the current one lives.
+  const supersededNotice = supersededBy ? (
+    <div className="mx-auto w-full max-w-[900px] px-4 md:px-8 pt-4">
+      <div
+        role="note"
+        className="rounded-xl border border-[#E5C07B] bg-[#FFF8E7] px-4 py-3 text-[15px] leading-6 text-[#6B5314]"
+      >
+        You are reading an earlier version of this document.{" "}
+        <a
+          href={`/community/${supersededBy}`}
+          className="font-medium text-[#0066CC] underline underline-offset-2"
+        >
+          Read the current version{post.supersededByTitle ? `: ${post.supersededByTitle}` : ""}
+        </a>
+      </div>
+    </div>
+  ) : null;
+
   const LegacyPostComponent =
     legacyPost && typeof legacyPost.Component !== "string"
       ? legacyPost.Component
@@ -138,6 +160,7 @@ export default function CommunityPostPage() {
       >
         {seoHead}
         <HushhTechBackHeader onBackClick={handleBack} rightType="hamburger" />
+        {supersededNotice}
 
         <main>
           <AppleSection tone="light" pad="tight">
@@ -184,14 +207,20 @@ export default function CommunityPostPage() {
       >
         {seoHead}
         <HushhTechBackHeader onBackClick={handleBack} rightType="hamburger" />
-        <main>
-          <AppleSection tone="light" pad="tight">
-            <Eyebrow>{post.category || "Community"}</Eyebrow>
-            <Display as="h1" size="sm" maxWidth="max-w-[760px]">
-              {post.title}
-            </Display>
-            {post.description ? <Lede>{post.description}</Lede> : null}
-          </AppleSection>
+        {supersededNotice}
+        <main id="main-content">
+          {/* A deck renders its own header — category, title, description, card count, reading time
+              and the Read/Slides control belong together above the contents rail. Rendering the
+              generic hero as well printed the title and description twice on every deck page. */}
+          {post.sourceKind === "deck" ? null : (
+            <AppleSection tone="light" pad="tight">
+              <Eyebrow>{post.category || "Community"}</Eyebrow>
+              <Display as="h1" size="sm" maxWidth="max-w-[760px]">
+                {post.title}
+              </Display>
+              {post.description ? <Lede>{post.description}</Lede> : null}
+            </AppleSection>
+          )}
           <section className={legacyPostLayoutClassName}>
             <LegacyPostComponent />
           </section>
@@ -225,6 +254,7 @@ export default function CommunityPostPage() {
     >
       {seoHead}
       <HushhTechBackHeader onBackClick={handleBack} rightType="hamburger" />
+      {supersededNotice}
 
       <main id="main-content">
         <AppleSection tone="light" pad="tight">

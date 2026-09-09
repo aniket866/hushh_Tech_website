@@ -1,3 +1,14 @@
+<!--
+  The `PR Hygiene` check parses the labelled bullets below as `- key: value`, so the text before
+  the first colon has to stay exactly as written. Bolding a label — `- **what changed:**` — makes
+  the key `**what changed` and the check reports the field as unfilled, which reads as a mysterious
+  failure on a body that looks complete. Write values after the colon and leave the labels bare.
+
+  `linked issue` needs an issue number, a ticket id or a URL. If there genuinely is none, say so
+  with the words "none", "n/a" or "not applicable" in the sentence, or the check treats the field
+  as unanswered rather than as a deliberate choice.
+-->
+
 ## Summary
 
 - what changed:

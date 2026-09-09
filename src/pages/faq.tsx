@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import HushhTechHeader from "../components/hushh-tech-header/HushhTechHeader";
 import HushhTechFooter from "../components/hushh-tech-footer/HushhTechFooter";
+import SeoHead from "../components/seo/SeoHead";
 import {
   AppleSection,
   Display,
@@ -105,6 +106,23 @@ const faqCategories: FaqCategory[] = [
 // categories (only one panel open at a time across the entire page).
 const flatFaqs: FaqItem[] = faqCategories.flatMap((category) => category.items);
 
+/**
+ * FAQPage structured data, built from the same array the page renders.
+ *
+ * These questions and answers already existed here; nothing pointed a search engine at them, so
+ * they were never eligible for an FAQ rich result. Generating the schema from faqCategories keeps
+ * it honest — the markup can never describe answers the page does not show.
+ */
+const FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: flatFaqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.question,
+    acceptedAnswer: { "@type": "Answer", text: faq.answer },
+  })),
+};
+
 const FaqPage: React.FC = () => {
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);
   const [activeCategory, setActiveCategory] = React.useState<string>("All");
@@ -124,6 +142,12 @@ const FaqPage: React.FC = () => {
       className="min-h-screen bg-white text-[#1D1D1F] antialiased selection:bg-[#0066CC] selection:text-white"
       style={{ fontFamily: appleFont }}
     >
+      <SeoHead
+        title="Frequently asked questions"
+        description="Common questions about HushhTech, Fund A, eligibility, fees and how the investment process works."
+        path="/faq"
+        jsonLd={FAQ_SCHEMA}
+      />
       <HushhTechHeader showSearch={false} />
 
       <main id="main-content">

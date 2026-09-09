@@ -207,11 +207,15 @@ async function getAccessToken() {
 
 function getCollectorCandidates() {
   const candidates = ["/api/analytics/collect"];
+  // Dev-only fallbacks for when the Vite proxy is not up. Gated on `import.meta.env.DEV` and not
+  // on the hostname alone: a production bundle served from 127.0.0.1 (`npm run preview`, the
+  // visual-regression harness) otherwise beacons at a port nothing listens on, and every attempt
+  // trips the `connect-src 'self'` CSP. Vite strips this branch from the production build.
   const isLocalhost =
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1";
 
-  if (isLocalhost) {
+  if (import.meta.env.DEV && isLocalhost) {
     candidates.push("http://127.0.0.1:3005/api/analytics/collect");
     candidates.push("http://127.0.0.1:3000/api/analytics/collect");
   }

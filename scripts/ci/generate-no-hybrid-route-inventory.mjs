@@ -25,6 +25,24 @@ const TERMINAL_OVERRIDES = Object.freeze({
   "/onboarding/step-8": "/login",
   "/onboarding/step-9": "/login",
   "/user-registration": "/hushh-user-profile",
+
+  // Server-side 301s, which are even further out of this scanner's reach than an
+  // in-component redirect: they are issued by server.js before React ever loads.
+  // App.tsx registers each of these as a duplicate route for the same page, so
+  // every one of them used to answer 200 and ask search engines to index a second
+  // URL for content that already had one.
+  //
+  // ALIAS_REDIRECTS in api/seo/documentHead.js is the source of truth. If the two
+  // drift apart, the browser leg of this gate is what says so — that is precisely
+  // how these eight came to be listed here.
+  "/philosophy": "/about/philosophy",
+  "/privacy": "/privacy-policy",
+  "/terms": "/terms-of-service",
+  "/disclosures": "/risk-disclosures",
+  "/careers": "/career",
+  "/Login": "/login",
+  "/Contact": "/contact",
+  "/Signup": "/signup",
 });
 const PARAMETER_SAMPLES = Object.freeze({
   jobId: "quantitative-research-scientist",

@@ -10,6 +10,8 @@
  */
 
 import express from 'express';
+import compression from 'compression';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import {
@@ -80,6 +82,26 @@ const loadApi = async (name) => {
 // ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
+
+/*
+ * Response compression.
+ *
+ * Nothing on this site was compressed. The entry bundle is 5.48 MB of JavaScript and it went over
+ * the wire raw, on every first visit; gzip takes the JS and CSS from 5.53 MB to 1.58 MB. The
+ * community list response is 95 KB of JSON, a deck page 91 KB of HTML, a deck's cards 119-233 KB —
+ * all text, all uncompressed, all repeated per request.
+ *
+ * Level 6 is the default trade: near-maximum ratio for a fraction of the CPU of level 9, which
+ * matters on a service capped at three instances. The 1 KB threshold skips payloads where the
+ * gzip header would cost more than it saves. Images, video and fonts are already compressed, so
+ * the filter defers to compression's own mime check and additionally refuses when a caller sets
+ * `x-no-compression`.
+ */
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => (req.headers['x-no-compression'] ? false : compression.filter(req, res)),
+}));
 
 // Global security headers for Cloud Run. This file is the authoritative runtime config.
 app.use((_req, res, next) => {
@@ -232,33 +254,123 @@ app.use(express.static(DIST_DIR, {
 // ---------------------------------------------------------------------------
 
 // No-cache pages (auth, profile, onboarding, etc.)
+/**
+ * Routes whose shell must never be stored.
+ *
+ * `/community` was on this list, which meant every public research page — now 91-115 KB of HTML
+ * each, because the crawler-visible body is spliced in — was re-sent in full on every view, with
+ * no browser cache, no back/forward cache and nothing a CDN could hold. It does not belong here:
+ * the shell is identical for every visitor. Gated content never reaches it (an NDA post resolves
+ * no head, so its shell carries zero body text) and the reader fetches everything else client-side
+ * through the API, where the NDA check actually lives.
+ *
+ * What stays: authenticated and identity-bearing surfaces, where a shared cache holding a response
+ * is a real risk.
+ */
 const NO_CACHE_PATHS = [
   '/login', '/signup', '/onboarding', '/hushh-user-profile',
-  '/discover-fund-a', '/profile', '/community', '/delete-account', '/sign-nda', '/metric', '/metrics', '/deployments',
+  '/discover-fund-a', '/profile', '/delete-account', '/sign-nda', '/metric', '/metrics', '/deployments',
 ];
+
+/** Public pages: short shared cache, long grace. Revalidation is cheap; a cold render is not. */
+const PUBLIC_SHELL_CACHE = 'public, max-age=300, stale-while-revalidate=86400';
 
 app.get('/metric', (_req, res) => {
   res.redirect(302, '/metrics');
 });
 
-app.get('*', (req, res) => {
+/**
+ * SEO/AEO: the SPA shell is the same bytes for every URL, so a crawler that does not run
+ * JavaScript sees one title and an empty root div for the whole site. These helpers splice a real
+ * per-route head — title, description, canonical, Open Graph, JSON-LD — plus a <noscript> block
+ * with the page's heading and text into that shell before sending it.
+ *
+ * The template is read once and cached; injection is a string replace, so this costs a map lookup
+ * per request and changes nothing about how the SPA hydrates.
+ */
+let cachedShell = null;
+let seoModule = null;
+
+const loadSeo = async () => {
+  if (!seoModule) seoModule = await import('./api/seo/documentHead.js');
+  return seoModule;
+};
+
+const readShell = () => {
+  if (cachedShell === null) {
+    try {
+      cachedShell = readFileSync(join(DIST_DIR, 'index.html'), 'utf8');
+    } catch {
+      cachedShell = '';
+    }
+  }
+  return cachedShell;
+};
+
+/**
+ * Known community slugs, public and NDA alike. An NDA post must still resolve — the gate is in the
+ * API, not the URL — but a slug that has never existed should 404 rather than return 200 with the
+ * shell, which is what produced soft 404s for every typo and retired link.
+ */
+let cachedSlugs = null;
+const knownCommunitySlugs = async () => {
+  if (!cachedSlugs) {
+    try {
+      const { STATIC_COMMUNITY_POSTS } = await import('./api/community/staticPosts.generated.js');
+      cachedSlugs = new Set(STATIC_COMMUNITY_POSTS.map((post) => post.slug));
+    } catch {
+      cachedSlugs = new Set();
+    }
+  }
+  return cachedSlugs;
+};
+
+app.get('*', async (req, res) => {
+  const seo = await loadSeo();
+
+  // Alias routes previously served 200 with the homepage canonical, asking search engines to
+  // index several URLs for one page.
+  const alias = seo.ALIAS_REDIRECTS.get(req.path);
+  if (alias) {
+    return res.redirect(301, alias);
+  }
+
   // Set no-cache for dynamic pages
   const isNoCachePath = NO_CACHE_PATHS.some((p) => req.path === p || req.path.startsWith(p + '/'));
-  if (isNoCachePath || req.path === '/' || req.path === '/index.html') {
+  if (isNoCachePath || seo.isNoindexPath(req.path)) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+  } else {
+    res.setHeader('Cache-Control', PUBLIC_SHELL_CACHE);
   }
-  if (
-    req.path === '/metric' ||
-    req.path.startsWith('/metric/') ||
-    req.path === '/metrics' ||
-    req.path.startsWith('/metrics/')
-  ) {
+
+  if (seo.isNoindexPath(req.path)) {
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   }
 
-  res.sendFile(join(DIST_DIR, 'index.html'));
+  // Real 404s, conservatively: a community slug that does not exist, and any path that looks like
+  // a missing file. Everything else still falls through to the SPA so client-only routes work.
+  let notFound = false;
+  if (req.path.startsWith('/community/')) {
+    const slugs = await knownCommunitySlugs();
+    notFound = slugs.size > 0 && !slugs.has(req.path.slice('/community/'.length));
+  } else if (/\.[a-z0-9]{2,5}$/i.test(req.path) && req.path !== '/index.html') {
+    notFound = true;
+  }
+  if (notFound) {
+    res.status(404);
+    res.setHeader('X-Robots-Tag', 'noindex');
+  }
+
+  const shell = readShell();
+  if (!shell) {
+    return res.sendFile(join(DIST_DIR, 'index.html'));
+  }
+
+  const head = notFound ? null : seo.resolveHead(req.path);
+  res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+  return res.send(head ? seo.injectIntoTemplate(shell, head) : shell);
 });
 
 // ---------------------------------------------------------------------------

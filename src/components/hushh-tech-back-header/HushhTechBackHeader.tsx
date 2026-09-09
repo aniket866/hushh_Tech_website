@@ -114,7 +114,7 @@ const HushhTechBackHeader: React.FC<HushhTechBackHeaderProps> = ({
                 <button
                   type="button"
                   onClick={handleBackClick}
-                  className="flex h-[42px] w-[42px] items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+                  className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
                   aria-label="Go back"
                 >
                   {Icon.back("currentColor", 18)}
@@ -131,7 +131,7 @@ const HushhTechBackHeader: React.FC<HushhTechBackHeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(true)}
-                  className="flex h-[38px] w-[38px] items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+                  className="flex h-11 w-11 items-center justify-center text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
                   aria-label="Open menu"
                 >
                   {Icon.menu("currentColor", 18)}
@@ -145,7 +145,7 @@ const HushhTechBackHeader: React.FC<HushhTechBackHeaderProps> = ({
               <button
                 type="button"
                 onClick={handleRightClick}
-                className="flex h-[42px] items-center justify-center px-5 text-[12px] font-medium tracking-[0.08em] text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
+                className="flex h-11 items-center justify-center px-5 text-[12px] font-medium tracking-[0.08em] text-[#1D1D1F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 focus-visible:ring-offset-2"
                 aria-label={rightLabel}
                 style={{ fontFamily: appleFont }}
               >
