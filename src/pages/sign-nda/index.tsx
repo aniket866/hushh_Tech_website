@@ -567,7 +567,7 @@ const SignNDAPage: React.FC = () => {
 
         <StepCardStack />
 
-        <AppleSection tone="gray" pad="normal">
+        <AppleSection tone="gray" pad="normal" last>
           <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-10">
             <Eyebrow>Investor Agreements</Eyebrow>
             <Display size="sm" maxWidth="max-w-[580px]">
