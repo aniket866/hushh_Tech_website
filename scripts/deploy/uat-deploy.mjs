@@ -34,8 +34,10 @@
  *   node scripts/deploy/uat-deploy.mjs --image <ref>   # skip the build, deploy an existing image
  *   node scripts/deploy/uat-deploy.mjs --rollback <image>   # PATCH an earlier image back
  *
- * Credentials come from GCP_DEPLOY_SA_KEY_B64. That key is 403 on the production project, so this
- * script cannot reach prod even if someone edits PROJECT below.
+ * Local credentials may come from GCP_DEPLOY_SA_KEY_B64. Cloud Build uses ADC from the trigger
+ * service account, so no long-lived key is placed in the trigger or the build workspace. The UAT
+ * project is still fixed below; this script cannot reach production even if someone edits a local
+ * environment variable.
  */
 
 import { execFileSync } from "node:child_process";
@@ -55,7 +57,8 @@ const SOURCE_BUCKET = "hushh-tech-uat_cloudbuild";
 const IMAGE_REPO = `${REGION}-docker.pkg.dev/${PROJECT}/cloud-run-source-deploy/${SERVICE}`;
 // The legacy <project-number>@cloudbuild SA no longer exists in this project; recent successful
 // builds all ran as the compute default. Naming it explicitly keeps the behaviour pinned.
-const BUILD_SA = `projects/${PROJECT}/serviceAccounts/175298245599-compute@developer.gserviceaccount.com`;
+const BUILD_SA = process.env.GCP_BUILD_SA ||
+  `projects/${PROJECT}/serviceAccounts/175298245599-compute@developer.gserviceaccount.com`;
 
 /**
  * Exactly the paths Dockerfile.gcp copies. A whole-tree archive is 188 MB and most of it — the
@@ -131,21 +134,38 @@ const fail = (message) => { console.error(`uat-deploy: ${message}`); process.exi
 // --------------------------------------------------------------------------------------------
 
 /**
- * `git archive` rather than a tar of the working tree, so the image provably contains the commit
- * that DEPLOY_COMMIT_SHA names. An uncommitted edit would make that label a lie, so refuse.
+ * `git archive` rather than a tar of the working tree, so a local image provably contains the
+ * commit that DEPLOY_COMMIT_SHA names. Cloud Build's source trigger intentionally omits `.git`;
+ * there the trigger's immutable COMMIT_SHA is required and the checked-out source tree is archived
+ * directly. This keeps the same helper usable locally and in the GCP-only deploy lane.
  */
 const buildSourceArchive = async (sha, directory) => {
-  const dirty = git("status", "--porcelain");
-  if (dirty) fail(`working tree is dirty; commit first so the image matches ${sha.slice(0, 8)}\n${dirty}`);
-
   // gzip -1: the archive is mostly already-compressed images, so a higher level costs seconds and
   // saves almost nothing.
   const archivePath = join(directory, "source.tgz");
-  execFileSync(
-    "bash",
-    ["-c", `git archive --format=tar ${sha} -- ${SOURCE_PATHS.join(" ")} | gzip -1 > ${JSON.stringify(archivePath)}`],
-    { cwd: root },
-  );
+  let hasGit = false;
+  try {
+    execFileSync("git", ["rev-parse", "--git-dir"], { cwd: root, stdio: "ignore" });
+    hasGit = true;
+  } catch {
+    // Cloud Build source checkouts contain the trigger commit but no Git metadata.
+  }
+
+  if (hasGit) {
+    const dirty = git("status", "--porcelain");
+    if (dirty) fail(`working tree is dirty; commit first so the image matches ${sha.slice(0, 8)}\n${dirty}`);
+    execFileSync(
+      "bash",
+      ["-c", `git archive --format=tar ${sha} -- ${SOURCE_PATHS.join(" ")} | gzip -1 > ${JSON.stringify(archivePath)}`],
+      { cwd: root },
+    );
+  } else {
+    const triggerSha = process.env.COMMIT_SHA;
+    if (!triggerSha || triggerSha !== sha) {
+      fail("Cloud Build source has no Git metadata; require --sha to equal the trigger COMMIT_SHA");
+    }
+    execFileSync("tar", ["-czf", archivePath, "-C", root, ...SOURCE_PATHS]);
+  }
   const { size } = await stat(archivePath);
   if (size < 1024) fail("source archive is empty");
   return { archivePath, size };
@@ -153,7 +173,10 @@ const buildSourceArchive = async (sha, directory) => {
 
 const uploadSource = async (archivePath, objectName) => {
   const { Storage } = await import("@google-cloud/storage");
-  const storage = new Storage({ credentials: serviceAccount(), projectId: PROJECT });
+  const credentials = serviceAccount();
+  const options = { projectId: PROJECT };
+  if (credentials) options.credentials = credentials;
+  const storage = new Storage(options);
   const [file] = await storage
     .bucket(SOURCE_BUCKET)
     .upload(archivePath, { destination: objectName, resumable: true, contentType: "application/gzip" });

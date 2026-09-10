@@ -16,16 +16,24 @@ const SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
 let cached = null;
 
+/**
+ * Local runs may provide a short-lived, operator-owned key. Cloud Build runs with
+ * its trigger service account and should use Application Default Credentials (ADC)
+ * instead; a deploy key must never be copied into a build trigger or image.
+ */
 export const serviceAccount = () => {
   const encoded = process.env.GCP_DEPLOY_SA_KEY_B64;
-  if (!encoded) throw new Error("GCP_DEPLOY_SA_KEY_B64 is not set");
+  if (!encoded) return null;
   return JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
 };
 
 /** Tokens last an hour; a build can outlive that, so re-mint when we are inside the last minute. */
 export const accessToken = async () => {
   if (cached && cached.expiresAt - Date.now() > 60_000) return cached.token;
-  const auth = new GoogleAuth({ credentials: serviceAccount(), scopes: [SCOPE] });
+  const credentials = serviceAccount();
+  const options = { scopes: [SCOPE] };
+  if (credentials) options.credentials = credentials;
+  const auth = new GoogleAuth(options);
   const client = await auth.getClient();
   const { token } = await client.getAccessToken();
   if (!token) throw new Error("failed to mint an access token");

@@ -137,6 +137,27 @@ const validPrBody = `## Summary
 `;
 
 describe("CI workflow scripts", () => {
+  it("keeps the direct GCP lane UAT-only and separate from merge authority", () => {
+    const triggerConfig = fs.readFileSync(
+      path.join(repoRoot, "deploy/uat-tag-trigger.cloudbuild.yaml"),
+      "utf8"
+    );
+    const registration = fs.readFileSync(
+      path.join(repoRoot, "scripts/gcp/register-direct-uat-trigger.sh"),
+      "utf8"
+    );
+
+    expect(triggerConfig).toContain("node scripts/deploy/uat-deploy.mjs --sha \"$COMMIT_SHA\"");
+    expect(triggerConfig).toContain("GitHub PR validation, merge_group");
+    expect(triggerConfig).not.toContain("GCP_DEPLOY_SA_KEY_B64");
+    expect(triggerConfig).not.toContain("cloudbuild.prod.yaml");
+    expect(triggerConfig).not.toContain("ALLOW_PRODUCTION");
+    expect(registration).toContain("--apply");
+    expect(registration).toContain("--tag-pattern='uat-.*'");
+    expect(registration).toContain("deploy/uat-tag-trigger.cloudbuild.yaml");
+    expect(registration).toContain("never grants roles or creates keys");
+  });
+
   it("loads local env vars when running the dev API server", () => {
     const rootPackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")

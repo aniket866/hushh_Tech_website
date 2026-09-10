@@ -33,6 +33,8 @@
     "obs:plan": "node scripts/gcp/observability/apply-observability.mjs",
     "obs:apply": "node scripts/gcp/observability/apply-observability.mjs --apply",
     "deploy:uat": "node scripts/deploy/uat-deploy.mjs",
+    "gcp:uat-trigger:plan": "bash scripts/gcp/register-direct-uat-trigger.sh",
+    "gcp:uat-trigger:apply": "bash scripts/gcp/register-direct-uat-trigger.sh --apply",
     "community:sync-firestore": "node scripts/community/sync-community-firestore.mjs",
     "build:assets": "npm run build:community && node scripts/generate-sitemap.js && node scripts/generate-robots.js && node scripts/generate-llms-txt.mjs",
     "migration:storage:contract": "node scripts/migration/storage-cutover-plan.mjs --mode contract",
