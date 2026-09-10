@@ -59,8 +59,8 @@ describe("HushhTechHeader layout stability", () => {
       "img[alt='AAPL logo']",
     );
 
-    expect(tickerLogo?.getAttribute("width")).toBe("14");
-    expect(tickerLogo?.getAttribute("height")).toBe("14");
+    expect(tickerLogo?.getAttribute("width")).toBe("12");
+    expect(tickerLogo?.getAttribute("height")).toBe("12");
     expect(tickerLogo?.getAttribute("loading")).toBe("lazy");
   });
 
