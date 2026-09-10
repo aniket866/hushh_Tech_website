@@ -5,10 +5,14 @@ import { actorObjectPath, normalizeObjectPath } from "../api/gcp-storage.js";
 import {
   compileTableQuery,
   executeDataRequest,
+  BLOCKED_RPCS,
+  BLOCKED_STORAGE_BUCKETS,
+  BLOCKED_TABLES,
   RPC_NAMES,
   resolveLegacyUserUuid,
   runtimeConfig,
   STORAGE_BUCKETS,
+  storageRuntime,
   TABLE_OPERATIONS,
   verifyFirebaseBearer,
 } from "../api/shared/gcpDataRuntime.js";
@@ -50,8 +54,11 @@ describe("GCP backend runtime boundary", () => {
   it("uses an explicit operation/table/RPC/bucket manifest", () => {
     expect(Object.keys(TABLE_OPERATIONS).length).toBeGreaterThan(40);
     expect(TABLE_OPERATIONS.onboarding_data).toContain("upsert");
-    expect(RPC_NAMES.has("sign_global_nda")).toBe(true);
-    expect(STORAGE_BUCKETS.has("assets")).toBe(true);
+    expect(BLOCKED_RPCS.has("sign_global_nda")).toBe(true);
+    expect(BLOCKED_TABLES.has("hushh_ai_users")).toBe(true);
+    expect(BLOCKED_STORAGE_BUCKETS.has("assets")).toBe(true);
+    expect(RPC_NAMES.has("sign_global_nda")).toBe(false);
+    expect(STORAGE_BUCKETS.has("assets")).toBe(false);
     expect((TABLE_OPERATIONS as Record<string, unknown>).arbitrary_table).toBeUndefined();
     expect(RPC_NAMES.has("arbitrary_rpc")).toBe(false);
     expect(STORAGE_BUCKETS.has("arbitrary-bucket")).toBe(false);
@@ -120,6 +127,15 @@ describe("GCP backend runtime boundary", () => {
   it("requires a Firebase bearer before any data operation", async () => {
     process.env = { ...process.env, ...validEnv() };
     await expect(verifyFirebaseBearer("")).rejects.toMatchObject({ status: 401, code: "AUTH_REQUIRED" });
+  });
+
+  it("fails blocked data, RPC, and storage contracts before opening a target", async () => {
+    process.env = { ...process.env, ...validEnv() };
+    await expect(executeDataRequest({ kind: "table", table: "hushh_ai_users", operation: "select" }, "uid"))
+      .rejects.toMatchObject({ status: 503, code: "DATA_CONTRACT_BLOCKED" });
+    await expect(executeDataRequest({ kind: "rpc", name: "sign_global_nda", args: {} }, "uid"))
+      .rejects.toMatchObject({ status: 503, code: "RPC_CONTRACT_BLOCKED" });
+    expect(() => storageRuntime().bucket("assets")).toThrow("Storage contract is not available in UAT");
   });
 
   it("resolves Firebase users to migrated legacy UUIDs inside the runtime context", async () => {

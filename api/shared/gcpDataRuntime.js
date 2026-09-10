@@ -28,15 +28,6 @@ export const TABLE_OPERATIONS = Object.freeze({
   fund_stripe_payments: ["select", "insert", "update", "delete"],
   fund_stripe_subscriptions: ["select", "insert", "update", "delete"],
   fund_transfers: ["select", "insert", "update", "delete"],
-  hushh_ai_chats: ["select", "insert", "update", "delete"],
-  hushh_ai_media_limits: ["select", "insert", "update", "delete"],
-  hushh_ai_messages: ["select", "insert", "update", "delete"],
-  hushh_ai_users: ["select", "insert", "update", "delete"],
-  identity_verifications: ["select", "insert", "update", "delete"],
-  intelligence_conversations: ["select", "insert", "update", "delete"],
-  intelligence_media_limits: ["select", "insert", "update", "delete"],
-  intelligence_messages: ["select", "insert", "update", "delete"],
-  intelligence_users: ["select", "insert", "update", "delete"],
   investor_profiles: ["select", "insert", "update", "upsert", "delete"],
   kyc_profiles: ["select", "insert", "update", "delete"],
   lead_events: ["select", "insert", "update", "delete"],
@@ -55,7 +46,6 @@ export const TABLE_OPERATIONS = Object.freeze({
   plaid_statement_metadata: ["select", "insert", "update", "delete"],
   plaid_sync_cursors: ["select", "insert", "update", "delete"],
   plaid_transactions: ["select", "insert", "update", "delete"],
-  plaid_transfer_accounts: ["select", "insert", "update", "upsert", "delete"],
   site_analytics_events: ["select", "insert", "delete"],
   site_analytics_sessions: ["select", "insert", "update", "delete"],
   swipe_actions: ["select", "insert", "delete"],
@@ -68,6 +58,22 @@ export const TABLE_OPERATIONS = Object.freeze({
 });
 
 export const RPC_NAMES = new Set([
+]);
+
+export const BLOCKED_TABLES = new Set([
+  "hushh_ai_chats",
+  "hushh_ai_media_limits",
+  "hushh_ai_messages",
+  "hushh_ai_users",
+  "identity_verifications",
+  "intelligence_conversations",
+  "intelligence_media_limits",
+  "intelligence_messages",
+  "intelligence_users",
+  "plaid_transfer_accounts",
+]);
+
+export const BLOCKED_RPCS = new Set([
   "check_user_nda_status",
   "get_public_investor_profile",
   "increment_hushh_ai_uploads",
@@ -77,15 +83,15 @@ export const RPC_NAMES = new Set([
 ]);
 
 export const STORAGE_BUCKETS = new Set([
-  "assets",
   "community-uploads",
   "hushh-agent-profile-images",
-  "hushh-ai-media",
   "hushh-gamma-pdf",
   "wa-evidence",
   "alohafundsreport-images",
   "alohafundsreport-videos",
 ]);
+
+export const BLOCKED_STORAGE_BUCKETS = new Set(["assets", "hushh-ai-media"]);
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 const TARGET_PROJECT = "hushh-tech-uat";
@@ -307,6 +313,12 @@ export async function executeDataRequest(request, uid, dependencies = {}) {
   if (typeof uid !== "string" || !uid || uid.length > 128) {
     throw Object.assign(new Error("Firebase user is invalid."), { status: 401, code: "AUTH_INVALID" });
   }
+  if (request?.kind === "table" && BLOCKED_TABLES.has(request.table)) {
+    throw Object.assign(new Error("The requested data contract is not available in UAT."), { status: 503, code: "DATA_CONTRACT_BLOCKED" });
+  }
+  if (request?.kind === "rpc" && BLOCKED_RPCS.has(request.name)) {
+    throw Object.assign(new Error("The requested RPC is not available in UAT."), { status: 503, code: "RPC_CONTRACT_BLOCKED" });
+  }
   const activePool = dependencies.pool || await databasePool(config);
   const client = await activePool.connect();
   try {
@@ -338,6 +350,7 @@ export function storageRuntime() {
   const storage = new Storage({ projectId: TARGET_PROJECT });
   return {
     bucket(sourceBucket) {
+      if (BLOCKED_STORAGE_BUCKETS.has(sourceBucket)) throw Object.assign(new Error("Storage contract is not available in UAT."), { status: 503, code: "STORAGE_CONTRACT_BLOCKED" });
       if (!STORAGE_BUCKETS.has(sourceBucket)) throw Object.assign(new Error("Storage bucket is not manifested."), { status: 403, code: "BUCKET_DENIED" });
       return storage.bucket(`${config.storagePrefix}-${sourceBucket}`);
     },
