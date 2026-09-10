@@ -140,6 +140,10 @@ const fail = (message) => { console.error(`uat-deploy: ${message}`); process.exi
  * directly. This keeps the same helper usable locally and in the GCP-only deploy lane.
  */
 const buildSourceArchive = async (sha, directory) => {
+  if (!/^[0-9a-f]{7,64}$/i.test(sha)) {
+    fail("source commit must be a hexadecimal Git SHA");
+  }
+
   // gzip -1: the archive is mostly already-compressed images, so a higher level costs seconds and
   // saves almost nothing.
   const archivePath = join(directory, "source.tgz");
@@ -154,11 +158,17 @@ const buildSourceArchive = async (sha, directory) => {
   if (hasGit) {
     const dirty = git("status", "--porcelain");
     if (dirty) fail(`working tree is dirty; commit first so the image matches ${sha.slice(0, 8)}\n${dirty}`);
-    execFileSync(
-      "bash",
-      ["-c", `git archive --format=tar ${sha} -- ${SOURCE_PATHS.join(" ")} | gzip -1 > ${JSON.stringify(archivePath)}`],
-      { cwd: root },
-    );
+    // Keep the commit SHA and paths as argv values. Shell interpolation here would let a
+    // malformed --sha turn the deploy helper into an arbitrary command runner.
+    const archive = execFileSync("git", ["archive", "--format=tar", sha, "--", ...SOURCE_PATHS], {
+      cwd: root,
+      maxBuffer: 512 * 1024 * 1024,
+    });
+    const compressed = execFileSync("gzip", ["-1"], {
+      input: archive,
+      maxBuffer: 512 * 1024 * 1024,
+    });
+    await writeFile(archivePath, compressed);
   } else {
     const triggerSha = process.env.COMMIT_SHA;
     if (!triggerSha || triggerSha !== sha) {

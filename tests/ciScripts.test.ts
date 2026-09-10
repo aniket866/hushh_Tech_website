@@ -158,6 +158,13 @@ describe("CI workflow scripts", () => {
     expect(registration).toContain("never grants roles or creates keys");
   });
 
+  it("archives the direct UAT source without shell-interpolating the commit SHA", () => {
+    const deployer = fs.readFileSync(path.join(repoRoot, "scripts/deploy/uat-deploy.mjs"), "utf8");
+    expect(deployer).toContain('execFileSync("git", ["archive", "--format=tar", sha');
+    expect(deployer).toContain("source commit must be a hexadecimal Git SHA");
+    expect(deployer).not.toContain('"-c", `git archive');
+  });
+
   it("loads local env vars when running the dev API server", () => {
     const rootPackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
