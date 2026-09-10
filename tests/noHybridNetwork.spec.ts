@@ -258,6 +258,37 @@ test("generated anonymous routes reach their exact terminal surfaces without pro
   test.setTimeout(240_000);
   const networkGate = await installNoHybridNetworkGate(context);
   await context.route("**/api/**", async (route) => {
+    const requestUrl = new URL(route.request().url());
+
+    // These are public, browser-readable surfaces. Return their minimal
+    // response contracts so a deliberately offline fixture does not turn an
+    // expected unavailable backend response into a WebKit page error. All
+    // other API calls remain fail-closed below, which keeps protected-route
+    // coverage and provider-egress assertions intact.
+    if (route.request().method() === "GET" && requestUrl.pathname === "/api/community/posts") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ posts: [] }),
+      });
+      return;
+    }
+
+    if (route.request().method() === "POST" && requestUrl.pathname === "/api/stock-quotes") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: false,
+          quotes: [],
+          fetchedAt: "2026-01-01T00:00:00.000Z",
+          count: 0,
+          error: "Deterministic browser fixture.",
+        }),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 503,
       contentType: "application/json",
