@@ -75,9 +75,6 @@ export const BLOCKED_TABLES = new Set([
 
 export const BLOCKED_RPCS = new Set([
   "check_user_nda_status",
-  "get_public_investor_profile",
-  "increment_hushh_ai_uploads",
-  "increment_intelligence_uploads",
   "sign_global_nda",
   "track_product_usage",
 ]);
@@ -254,6 +251,179 @@ export function compileTableQuery(request) {
   return { text: `${text} RETURNING ${returning}`, values: parameters };
 }
 
+function invalidRpcArguments(message, code = "INVALID_RPC_ARGUMENT") {
+  throw Object.assign(new Error(message), { status: 400, code });
+}
+
+function exactRpcArguments(args, required, optional = []) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    invalidRpcArguments("RPC arguments are invalid.");
+  }
+  const actual = Object.keys(args).sort();
+  if (actual.length > MAX_RPC_ARGUMENTS) {
+    throw Object.assign(new Error("Too many RPC arguments."), { status: 413, code: "RPC_ARGUMENT_LIMIT_EXCEEDED" });
+  }
+  const requiredKeys = [...required].sort();
+  const allowed = new Set([...requiredKeys, ...optional]);
+  if (
+    requiredKeys.some((key) => !actual.includes(key))
+    || actual.some((key) => !allowed.has(key))
+  ) {
+    invalidRpcArguments("RPC arguments do not match the manifested contract.");
+  }
+}
+
+export function compileRpcQuery(request, uid) {
+  const name = request?.name;
+  if (!RPC_NAMES.has(name)) {
+    throw Object.assign(new Error("Data operation is not manifested."), { status: 403, code: "DATA_OPERATION_DENIED" });
+  }
+
+  const args = request.args || {};
+  if (name === "check_user_nda_status") {
+    exactRpcArguments(args, ["p_user_id"]);
+    if (args.p_user_id !== uid) {
+      throw Object.assign(new Error("RPC identity does not match the authenticated user."), { status: 403, code: "RPC_IDENTITY_MISMATCH" });
+    }
+    return {
+      text: `SELECT COALESCE(
+        (
+          SELECT jsonb_build_object(
+            'hasSignedNda', signed_at IS NOT NULL,
+            'signedAt', signed_at,
+            'ndaVersion', nda_version,
+            'signerName', signer_name
+          )
+          FROM public.nda_signatures
+          WHERE user_id = hushh_identity.current_legacy_user_uuid()
+        ),
+        jsonb_build_object(
+          'hasSignedNda', false,
+          'signedAt', NULL,
+          'ndaVersion', NULL,
+          'signerName', NULL
+        )
+      ) AS result`,
+      values: [],
+    };
+  }
+
+  if (name === "track_product_usage") {
+    exactRpcArguments(args, ["p_product_name"], ["p_metadata"]);
+    if (typeof args.p_product_name !== "string" || !args.p_product_name.trim() || args.p_product_name.length > 128) {
+      invalidRpcArguments("Product name is invalid.");
+    }
+    if (args.p_metadata !== undefined && args.p_metadata !== null && (typeof args.p_metadata !== "object" || Array.isArray(args.p_metadata))) {
+      invalidRpcArguments("Product metadata is invalid.");
+    }
+    return {
+      text: `WITH actor AS (
+        SELECT hushh_identity.current_legacy_user_uuid() AS user_id
+      ), upserted AS (
+        INSERT INTO public.user_product_usage (
+          user_id, product_name, usage_count, last_used_at, metadata
+        )
+        SELECT user_id, $1, 1, NOW(), COALESCE($2::jsonb, '{}'::jsonb)
+        FROM actor
+        WHERE user_id IS NOT NULL
+        ON CONFLICT (user_id, product_name) DO UPDATE SET
+          usage_count = public.user_product_usage.usage_count + 1,
+          last_used_at = NOW(),
+          metadata = EXCLUDED.metadata,
+          updated_at = NOW()
+        RETURNING 1
+      )
+      SELECT COALESCE(
+        (SELECT jsonb_build_object('success', true) FROM upserted),
+        jsonb_build_object('success', false, 'error', 'User identity is not mapped')
+      ) AS result`,
+      values: [args.p_product_name, args.p_metadata ?? {}],
+    };
+  }
+
+  exactRpcArguments(args, ["p_signer_name"], [
+    "p_consent_version",
+    "p_documents_acknowledged",
+    "p_nda_version",
+    "p_pdf_url",
+    "p_signer_ip",
+  ]);
+  if (typeof args.p_signer_name !== "string" || !args.p_signer_name.trim()) {
+    invalidRpcArguments("Signer name is invalid.");
+  }
+  if (args.p_documents_acknowledged !== undefined && args.p_documents_acknowledged !== null && !Array.isArray(args.p_documents_acknowledged)) {
+    invalidRpcArguments("Acknowledged documents are invalid.");
+  }
+  return {
+    text: `WITH actor AS (
+      SELECT hushh_identity.current_legacy_user_uuid() AS user_id
+    ), prior AS MATERIALIZED (
+      SELECT s.user_id, s.nda_version
+      FROM public.nda_signatures s
+      JOIN actor ON actor.user_id = s.user_id
+    ), upserted AS (
+      INSERT INTO public.nda_signatures (
+        user_id, signer_name, signer_email, signer_ip, nda_version, pdf_url,
+        documents_acknowledged, consent_version, signed_at, created_at, updated_at
+      )
+      SELECT
+        actor.user_id,
+        $1,
+        (SELECT email FROM public.users WHERE id = actor.user_id),
+        COALESCE($4, 'unknown'),
+        COALESCE($2, 'v1.0'),
+        $3,
+        COALESCE($5::jsonb, '[]'::jsonb),
+        $6,
+        NOW(),
+        NOW(),
+        NOW()
+      FROM actor
+      WHERE actor.user_id IS NOT NULL
+      ON CONFLICT (user_id) DO UPDATE SET
+        signer_name = EXCLUDED.signer_name,
+        signer_ip = COALESCE($4, public.nda_signatures.signer_ip),
+        nda_version = COALESCE(EXCLUDED.nda_version, public.nda_signatures.nda_version),
+        pdf_url = COALESCE(EXCLUDED.pdf_url, public.nda_signatures.pdf_url),
+        documents_acknowledged = COALESCE(EXCLUDED.documents_acknowledged, public.nda_signatures.documents_acknowledged),
+        consent_version = COALESCE(EXCLUDED.consent_version, public.nda_signatures.consent_version),
+        signed_at = NOW(),
+        updated_at = NOW()
+      RETURNING signed_at, signer_name, nda_version
+    )
+    SELECT COALESCE(
+      (
+        SELECT jsonb_build_object(
+          'success', true,
+          'signedAt', signed_at,
+          'signerName', signer_name,
+          'ndaVersion', nda_version,
+          'wasInserted', NOT EXISTS (SELECT 1 FROM prior),
+          'versionChanged', EXISTS (
+            SELECT 1 FROM prior
+            WHERE prior.nda_version IS DISTINCT FROM nda_version
+          ),
+          'shouldNotify', NOT EXISTS (SELECT 1 FROM prior)
+            OR EXISTS (
+              SELECT 1 FROM prior
+              WHERE prior.nda_version IS DISTINCT FROM nda_version
+            )
+        )
+        FROM upserted
+      ),
+      jsonb_build_object('success', false, 'error', 'User identity is not mapped')
+    ) AS result`,
+    values: [
+      args.p_signer_name,
+      args.p_nda_version ?? "v1.0",
+      args.p_pdf_url ?? null,
+      args.p_signer_ip ?? null,
+      args.p_documents_acknowledged ?? [],
+      args.p_consent_version ?? null,
+    ],
+  };
+}
+
 function firebaseAdminAuth(projectId) {
   const appName = `hushh-tech-${projectId}`;
   const app = getApps().find((candidate) => candidate.name === appName) || initializeApp({ projectId }, appName);
@@ -326,14 +496,10 @@ export async function executeDataRequest(request, uid, dependencies = {}) {
     await client.query("SELECT set_config('app.firebase_uid', $1, true)", [uid]);
     let query;
     if (request?.kind === "table") query = compileTableQuery(request);
-    else if (request?.kind === "rpc" && RPC_NAMES.has(request.name)) {
-      const entries = Object.entries(request.args || {});
-      if (entries.length > MAX_RPC_ARGUMENTS) throw Object.assign(new Error("Too many RPC arguments."), { status: 413, code: "RPC_ARGUMENT_LIMIT_EXCEEDED" });
-      if (entries.some(([key]) => !IDENTIFIER.test(key))) throw Object.assign(new Error("RPC argument is invalid."), { status: 400, code: "INVALID_RPC_ARGUMENT" });
-      query = { text: `SELECT * FROM public.${identifier(request.name)}(${entries.map(([key], index) => `${identifier(key)} => $${index + 1}`).join(", ")})`, values: entries.map(([, value]) => value) };
-    } else throw Object.assign(new Error("Data operation is not manifested."), { status: 403, code: "DATA_OPERATION_DENIED" });
+    else if (request?.kind === "rpc") query = compileRpcQuery(request, uid);
+    else throw Object.assign(new Error("Data operation is not manifested."), { status: 403, code: "DATA_OPERATION_DENIED" });
     const result = await client.query(query);
-    const data = resolveCardinality(request, result.rows);
+    const data = request?.kind === "rpc" ? result.rows?.[0]?.result ?? null : resolveCardinality(request, result.rows);
     await client.query("COMMIT");
     return { data, count: result.rowCount };
   } catch (error) {
