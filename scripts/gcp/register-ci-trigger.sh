@@ -82,7 +82,7 @@ expected="$(jq -cn \
   '{repository:$repo,pull_request_pattern:"^main$",comment_control:"COMMENTS_ENABLED_FOR_EXTERNAL_CONTRIBUTORS_ONLY",filename:"cloudbuild.ci.yaml",include_build_logs:"INCLUDE_BUILD_LOGS_WITH_STATUS",service_account:$service_account}')"
 
 if ((existing_count == 1)); then
-  current="$(jq '.[0] | {
+  current="$(jq -c '.[0] | {
     repository:(.repositoryEventConfig.repository // ""),
     pull_request_pattern:(.repositoryEventConfig.pullRequest.branch // ""),
     comment_control:(.repositoryEventConfig.pullRequest.commentControl // ""),
