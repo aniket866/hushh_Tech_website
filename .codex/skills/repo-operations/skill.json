@@ -6,6 +6,9 @@
   "description": "Use when working on Hushhtech PR checks, CI/CD, branch protection, merge queue, deploys, env parity, or operational verification.",
   "owned_paths": [
     ".github/workflows",
+    "cloudbuild.ci.yaml",
+    "scripts/gcp/register-ci-trigger.sh",
+    "docs/reference/operations/cloudbuild-ci.md",
     "scripts/ci",
     "scripts/security",
     "scripts/check-production.sh",
@@ -33,6 +36,8 @@
     "docs/reference/operations/ci-governance.md",
     "docs/reference/operations/README.md",
     ".github/workflows/ci.yml",
+    "docs/reference/operations/cloudbuild-ci.md",
+    "cloudbuild.ci.yaml",
     ".github/workflows/pr-agent.yml",
     ".github/workflows/pr-intake.yml",
     "scripts/ci/orchestrate.sh"
@@ -41,7 +46,8 @@
     "npm run env:check",
     "npm run lint:ci",
     "npm run security:audit",
-    "bash scripts/ci/orchestrate.sh queue"
+    "bash scripts/ci/orchestrate.sh queue",
+    "npm run gcp:ci-trigger:plan"
   ],
   "verification_bundles": [
     {
@@ -50,12 +56,14 @@
         "npm run env:check",
         "npm run lint:ci",
         "npm run security:audit",
-        "bash scripts/ci/orchestrate.sh queue"
+        "bash scripts/ci/orchestrate.sh queue",
+        "npm run gcp:ci-trigger:plan"
       ],
       "tests": [
         "npm run env:check",
         "npm run security:audit",
-        "bash scripts/ci/orchestrate.sh queue"
+        "bash scripts/ci/orchestrate.sh queue",
+        "npm run gcp:ci-trigger:plan"
       ]
     }
   ],

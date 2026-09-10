@@ -46,7 +46,7 @@ Do not use `.cursorrules` as the stack or runtime source of truth for this repos
 - `VITE_*` variables are browser-visible. Do not treat them as secrets.
 - Route changes under `api/**` are incomplete if `server.js` runtime wiring is not kept in sync.
 - Auth, env, workflow, deploy, and migration changes require proof, not just intent.
-- `PR Validation` is the authoritative code-executing merge gate. Advisory reviewers do not replace it.
+- Cloud Build trigger `hushh-tech-website-ci` is the authoritative pull-request code gate. The lightweight GitHub `PR Policy Gate` and `Cloud Build Status Gate` publish the required `CI Status Gate`; the full `PR Validation (GitHub backup)` workflow is manual-only. Advisory reviewers do not replace these gates.
 - Prefer narrow, evidence-backed findings. Do not invent architecture, hidden services, or vendor behavior that is not checked in.
 
 ## Validation Commands

@@ -53,7 +53,7 @@ Do not enable RAG against a stale default branch. Merge the grounding branch fir
 Required outcome:
 
 1. `main` contains the repo-root grounding files
-2. `PR Validation` blocks on `Reviewer Context & Compliance`
+2. `PR Policy Gate` blocks on reviewer grounding and `Cloud Build Status Gate` publishes the required `CI Status Gate`
 3. GitHub Copilot cloud agent can read `.github/copilot-instructions.md` and the Hushh-specific custom agent profile
 
 ### Phase 1: Index only `hushh_Tech_website`
@@ -125,7 +125,7 @@ Stop the rollout or pause widening if:
 
 ## Operational rules
 
-1. `PR Validation` remains the merge authority
+1. Cloud Build `hushh-tech-website-ci` plus `Cloud Build Status Gate` remain the default merge authority
 2. `Hushh Signalkeeper` remains advisory, even with RAG enabled
 3. GitHub Copilot cloud agent instructions and Qodo reviewer grounding should stay aligned
 4. update `AGENTS.md`, `QODO.MD`, `.github/copilot-instructions.md`, and `pr_compliance_checklist.yaml` whenever runtime topology or CI policy changes

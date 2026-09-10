@@ -15,8 +15,10 @@ description: >-
 
 This repo ships a Vite/React + Express app to **Google Cloud Run** in two
 environments. Deploys run through GitHub Actions — you do not `gcloud deploy`
-from a laptop. This skill covers how to deploy safely and how to make the cycle
-faster.
+from a laptop. Pull-request code validation runs through the
+`hushh-tech-website-ci` Cloud Build trigger; GitHub Actions keeps a manual full
+suite backup and owns merge-group freshness. This skill covers how to deploy
+safely and how to make the cycle faster.
 
 > Ownership note: `.github/workflows`, `scripts/ci`, and the deploy scripts are
 > *owned* by the `repo-operations` skill. This skill is the focused
@@ -84,10 +86,10 @@ deployed host. Full step-by-step in
 
 ## Why deploys feel slow (and the fix)
 
-The pain is real: every change — even a one-liner — goes through the full
-gauntlet (PR validation with a 35-min `web-validation` job, post-merge smoke,
-then a deploy that rebuilds a container from source and installs a browser).
-There is currently no fast lane. Apply these levers, **highest impact first**.
+The expensive path is now concentrated in one Cloud Build PR fan-out (shared
+install, cache, and concurrent gates), followed by post-merge smoke and a
+deploy that rebuilds a container from source and installs a browser. Apply
+these levers, **highest impact first**.
 File/line anchors are in [references/pipeline.md](references/pipeline.md).
 
 1. **Deploy a prebuilt image instead of `--source .` (biggest win).**
@@ -99,18 +101,18 @@ File/line anchors are in [references/pipeline.md](references/pipeline.md).
    (`package-server.json`) caches across deploys, so a frontend-only change just
    swaps the `dist/` layer → deploy in seconds. Reconsider `--clear-base-image`.
 
-2. **Skip heavy CI jobs when nothing relevant changed (path-aware CI).**
-   In `.github/workflows/ci.yml`, gate `web-validation`, `lint`, and e2e behind
-   a `dorny/paths-filter` (or `paths:` / `paths-ignore:`) so docs/config-only
-   PRs don't pay the 35-min build. Keep `secret-scan` / `security-audit` always
-   on — this is a fund; security gates stay.
+2. **Skip heavy Cloud Build jobs when nothing relevant changed (path-aware CI).**
+   Add reviewed `includedFiles` or `ignoredFiles` filters to the
+   `hushh-tech-website-ci` trigger only when the affected-surface contract is
+   explicit. Keep `secret-scan`, policy, and security gates on for every
+   code-bearing pull request.
 
-3. **Cache `node_modules` and Playwright.** The 9 PR jobs + both deploys each run
-   a fresh `npm ci` (only the npm download cache is shared, not `node_modules`).
-   Add `actions/cache` on `node_modules` keyed by `package-lock.json`. Cache
-   Playwright browsers (`~/.cache/ms-playwright`) — or replace the browser-based
-   OAuth smoke with a plain `node fetch` health check so Chromium isn't
-   downloaded at deploy time at all.
+3. **Cache dependencies and pin browser tooling.** Cloud Build installs the
+   root tree once with a lockfile-keyed npm download cache; its service lane
+   reuses that cache. The no-hybrid gate uses the version-pinned
+   `mcr.microsoft.com/playwright:v1.57.0-noble` image, so Chromium/WebKit system
+   packages and browser binaries are not downloaded on every pull request.
+   Deploys still run their own environment-scoped install.
 
 4. **Decouple tests from build; run affected-only on PRs.** `npm run build` is
    `vitest run && build:web` — the Vite build is fast, the full test suite is the

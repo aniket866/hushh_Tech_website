@@ -2,7 +2,9 @@ name: Hushh Signalkeeper
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # Vertex review is expensive and does not need to rerun for every push.
+    # Authors and maintainers can request a fresh pass with `/review`.
+    types: [opened, reopened, ready_for_review, review_requested]
   issue_comment:
     types: [created]
 
@@ -250,7 +252,7 @@ jobs:
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
           github_action_config.auto_improve: "false"
-          github_action_config.pr_actions: '["opened","synchronize","reopened","ready_for_review"]'
+          github_action_config.pr_actions: '["opened","reopened","ready_for_review","review_requested"]'
 
       - name: Verify Signalkeeper produced usable review output
         if: ${{ always() && steps.signalkeeper.outcome != 'skipped' }}

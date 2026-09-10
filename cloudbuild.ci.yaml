@@ -11,22 +11,20 @@
 # we already pay for. It is modelled on hushh-labs/hushh-search-console: a fan rather than a line,
 # so the gates run concurrently after a single dependency install instead of serially.
 #
-# NOT WIRED. No Cloud Build trigger points at this file, and `.github/workflows/ci.yml` remains
-# the merge gate through its `ci-status` job. This is here so flipping repository visibility back
-# to private is a one-command change rather than a project.
+# The default pull-request code gate is the `hushh-tech-website-ci` Cloud Build
+# trigger. It reports its result back to GitHub; the checked-in
+# `Cloud Build Status Gate` workflow combines that result with the lightweight
+# GitHub PR policy check and publishes the required `CI Status Gate` status.
+# `.github/workflows/ci.yml` remains available as an explicit full GitHub backup.
 #
 # To wire it (the 2nd-gen GitHub connection `hushh-github` already exists in us-central1):
 #
-#   gcloud builds triggers create github \
-#     --name=hushh-tech-website-ci \
-#     --project=hushh-tech-uat --region=us-central1 \
-#     --repository=projects/hushh-tech-uat/locations/us-central1/connections/hushh-github/repositories/hushh_tech_website \
-#     --pull-request-pattern='^main$' \
-#     --build-config=cloudbuild.ci.yaml
+#   npm run gcp:ci-trigger:plan
+#   npm run gcp:ci-trigger:apply
 #
-# Gates deliberately NOT ported: the PR-metadata jobs (DCO, PR hygiene, semantic guard, Phase 2
-# policy). They read GitHub pull-request context that Cloud Build does not have, and they belong
-# where that context lives.
+# PR-metadata jobs (DCO, PR hygiene, semantic guard, Phase 2 policy) stay in the
+# GitHub `PR Policy Gate` because Cloud Build does not receive pull-request body
+# context. The status adapter joins that policy result with these code gates.
 # =============================================================================
 
 steps:
@@ -45,7 +43,7 @@ steps:
         set -u
         hash="$$(sha256sum package-lock.json | cut -c1-32)"
         echo "$$hash" > /workspace/.npm-cache-key
-        gsutil -q cp "gs://${_CACHE_BUCKET}/npm/$$hash.tar.gz" /workspace/npm-cache.tar.gz || true
+        gsutil -q cp "gs://${_CACHE_BUCKET}/npm-v2/$$hash.tar.gz" /workspace/npm-cache.tar.gz || true
         if [ -f /workspace/npm-cache.tar.gz ]; then
           tar -xzf /workspace/npm-cache.tar.gz -C /workspace || rm -f /workspace/npm-cache.tar.gz
           echo "npm cache hit for $$hash"
@@ -61,7 +59,32 @@ steps:
       - -c
       - |
         set -euo pipefail
-        npm ci --no-audit --no-fund
+        npm ci --no-audit --no-fund --cache /workspace/.npm-cache --prefer-offline
+
+  # Cloud Build checks out a shallow source snapshot. A small set of contract tests
+  # intentionally verifies pinned historical revisions; fetch those exact objects once
+  # and let every dependent gate reuse them. This avoids a full clone and duplicate fetches.
+  - id: history-restore
+    name: node:20.19.0
+    entrypoint: bash
+    waitFor: ["-"]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # Preserve the ancestry proof required by the historical contracts while
+        # keeping the checkout bounded. The oldest required base is currently
+        # within this window; exact object fetches below cover non-ancestor tests.
+        if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+          git fetch --no-tags --deepen=128 origin
+        fi
+        for commit in \
+          7b41548d3af0532a59e7c6b008e795feece381fc \
+          cbfde1b1bf5ef97ebb71766953857750b711d791; do
+          if ! git cat-file -e "$$commit^{commit}"; then
+            git fetch --no-tags origin "$$commit"
+          fi
+        done
 
   # ---------------------------------------------------------------------------
   # The fan. Every step below waits only on `install`, so they run concurrently. Adding a gate
@@ -70,8 +93,13 @@ steps:
   - id: web
     name: node:20.19.0
     entrypoint: bash
-    waitFor: ["install"]
-    args: ["-c", "set -euo pipefail; bash scripts/ci/orchestrate.sh web"]
+    waitFor: ["install", "history-restore"]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        bash scripts/ci/orchestrate.sh web
+        node scripts/ci/check-deploy-build-context.mjs
 
   - id: lint
     name: node:20.19.0
@@ -91,8 +119,9 @@ steps:
     waitFor: ["install"]
     args: ["-c", "set -euo pipefail; bash scripts/ci/orchestrate.sh retirement"]
 
-  # The two no-hybrid contract checks that need no browser. The Playwright half of that phase
-  # (`test:e2e:no-hybrid`) stays on Actions, where the browser image is already cached.
+  # Generate the route/source inventory while the web gate is building. The
+  # runtime half below reuses the web step's dist/ output instead of building
+  # the application a second time in the same Cloud Build.
   - id: no-hybrid-contract
     name: node:20.19.0
     entrypoint: bash
@@ -104,12 +133,31 @@ steps:
         npm run migration:no-hybrid:routes
         npm run migration:no-hybrid:source
 
+  - id: no-hybrid-runtime
+    name: mcr.microsoft.com/playwright:v1.57.0-noble
+    entrypoint: bash
+    waitFor: ["web", "no-hybrid-contract"]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # The version-pinned Playwright image already contains the Chromium and
+        # WebKit system dependencies and browser binaries. Keep this inventory
+        # check read-only so every build avoids a repeated apt/browser download.
+        npx playwright install --list
+        npm run migration:no-hybrid:check
+        npm run test:e2e:no-hybrid
+
   # Cloud Run service package: its own lockfile, its own audit budget.
   - id: service
     name: node:20.19.0
     entrypoint: bash
-    waitFor: ["install"]
-    args: ["-c", "set -euo pipefail; bash scripts/ci/orchestrate.sh service"]
+    waitFor: ["install", "history-restore"]
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        NPM_CONFIG_CACHE=/workspace/.npm-cache bash scripts/ci/orchestrate.sh service
 
   - id: security-audit
     name: node:20.19.0
@@ -135,7 +183,7 @@ steps:
         node --check scripts/community/verify-sensitive-nda-gate.mjs
 
   - id: secret-scan
-    name: zricethezav/gitleaks:latest
+    name: zricethezav/gitleaks:v8.24.2
     entrypoint: sh
     waitFor: ["-"]
     args: ["-c", "gitleaks detect --source . --no-git --redact --exit-code 1"]
@@ -146,15 +194,15 @@ steps:
   - id: cache-save
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
-    waitFor: ["web", "lint", "env-contract", "retirement", "no-hybrid-contract", "service", "security-audit", "sensitive-nda-gate"]
+    waitFor: ["web", "lint", "env-contract", "retirement", "no-hybrid-runtime", "service", "security-audit", "sensitive-nda-gate"]
     args:
       - -c
       - |
         set -u
         hash="$$(cat /workspace/.npm-cache-key)"
-        if ! gsutil -q stat "gs://${_CACHE_BUCKET}/npm/$$hash.tar.gz"; then
-          tar -czf /workspace/npm-cache-new.tar.gz node_modules || exit 0
-          gsutil -q cp /workspace/npm-cache-new.tar.gz "gs://${_CACHE_BUCKET}/npm/$$hash.tar.gz" || true
+        if ! gsutil -q stat "gs://${_CACHE_BUCKET}/npm-v2/$$hash.tar.gz"; then
+          tar -czf /workspace/npm-cache-new.tar.gz .npm-cache || exit 0
+          gsutil -q cp /workspace/npm-cache-new.tar.gz "gs://${_CACHE_BUCKET}/npm-v2/$$hash.tar.gz" || true
         fi
 
 substitutions:

@@ -1,13 +1,13 @@
 # Hushh Tech first-pass Qodo PR compliance checklist.
 # Keep this file focused on blocking standards that protect production behavior,
-# security boundaries, and the existing PR Validation gate.
+# security boundaries, and the Cloud Build pull-request gate.
 
 pr_compliances:
-  - title: "Required PR Validation Integrity"
+  - title: "Required Cloud Build CI Integrity"
     compliance_label: true
-    objective: "Pull requests must not weaken the authoritative pre-merge validation gate for this repository."
-    success_criteria: "Changes to .github/workflows/**, scripts/ci/**, package scripts, or CI helpers preserve the required PR Validation jobs and their blocking behavior: DCO, Secret Scan, Env Contract Check, PR Hygiene, Web Validation, Lint, Security Audit, and CI Status Gate. Advisory lanes such as Signalkeeper Preflight, Hushh Signalkeeper, and Semantic PR Guard are not presented as replacements for PR Validation."
-    failure_criteria: "A PR removes, bypasses, skips, or makes non-blocking any required validation job; adds continue-on-error or || true style suppression to required checks; or changes CI so advisory review lanes can substitute for the code-executing PR Validation gate."
+    objective: "Pull requests must not weaken the authoritative Cloud Build validation gate for this repository."
+    success_criteria: "Changes to .github/workflows/**, cloudbuild.ci.yaml, scripts/ci/**, package scripts, or CI helpers preserve the blocking Cloud Build code gates (web, lint, environment, retirement, no-hybrid browser/runtime, service, security audit, sensitive NDA, and secret scan), the metadata-only PR Policy Gate, and the required CI Status Gate bridge. The full PR Validation (GitHub backup) workflow remains available for explicit incident recovery, and Queue Validation remains the merge-group freshness gate. Advisory lanes such as Signalkeeper Preflight and Hushh Signalkeeper are not presented as replacements for these gates."
+    failure_criteria: "A PR removes, bypasses, skips, or makes non-blocking any required Cloud Build or policy gate; adds continue-on-error or || true style suppression to required checks; or changes CI so advisory review lanes or a manual backup can substitute for the default Cloud Build code gate."
 
   - title: "Environment Contract Completeness"
     compliance_label: true
