@@ -4,6 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Request,
 } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
@@ -87,13 +88,32 @@ async function installAuthenticatedApiFixture(
         data = { status: "complete" };
       } else if (body.table === "investor_profiles") {
         data = investorProfileFixture(persona);
-      } else if (body.kind === "rpc" && body.name === "check_user_nda_status") {
+      } else if (body.kind === "nda" && body.operation === "status") {
+        // Mirror the explicit NDA contract without accepting a caller-selected
+        // identity or restoring the retired RPC compatibility path.
+        expect(body).toEqual({ kind: "nda", operation: "status" });
         data = {
           hasSignedNda: true,
           signedAt: "2026-01-01T00:00:00.000Z",
-          ndaVersion: "fixture-v1",
+          ndaVersion: "v1.0",
           signerName: "Automated fixture",
         };
+      } else if (body.kind === "nda" && body.operation === "record") {
+        expect(body).toEqual({ kind: "nda", operation: "record" });
+        data = {
+          signedAt: "2026-01-01T00:00:00.000Z",
+          ndaVersion: "v1.0",
+          signerName: "Automated fixture",
+          pdfUrl: null,
+        };
+      } else if (body.kind === "nda" || ["check_user_nda_status", "sign_global_nda"].includes(String(body.name))) {
+        // These route-read fixtures never simulate successful legal signing.
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { code: "UNSUPPORTED_NDA_FIXTURE_OPERATION" } }),
+        });
+        return;
       } else if (body.cardinality === "single" || body.cardinality === "maybe-single") {
         data = null;
       }
@@ -127,6 +147,24 @@ async function assertRouteReady(page: Page, route: InventoryClientRoute) {
     ).toBeVisible();
   }
   await expect.poll(() => page.evaluate(() => document.readyState)).toBe("complete");
+}
+
+function trackAnonymousApiRequests(page: Page) {
+  // DOM/render readiness does not complete React's asynchronous API fetches.
+  // This sweep replaces the document on every iteration: let responses finish
+  // before navigation can cancel them (WebKit reports access-control errors).
+  // This is in addition to, not instead of, the route and page-error assertions.
+  const pending = new Set<Request>();
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) pending.add(request);
+  });
+  page.on("requestfinished", (request) => pending.delete(request));
+  page.on("requestfailed", (request) => pending.delete(request));
+  return async () => {
+    await expect.poll(() => [...pending].map((request) => new URL(request.url()).pathname), {
+      message: "Anonymous API responses must finish before the next document navigation",
+    }).toEqual([]);
+  };
 }
 
 async function newFixtureContext(browser: Browser, persona: FixturePersona) {
@@ -256,6 +294,7 @@ test("network guard samples five unauthenticated application routes", async ({ c
 
 test("generated anonymous routes reach their exact terminal surfaces without provider egress", async ({ context, page }) => {
   test.setTimeout(240_000);
+  const settleAnonymousRoute = trackAnonymousApiRequests(page);
   const networkGate = await installNoHybridNetworkGate(context);
   const fixtureCorsHeaders = {
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
@@ -323,12 +362,70 @@ test("generated anonymous routes reach their exact terminal surfaces without pro
     await test.step(`${route.pattern} reaches ${route.terminal}`, async () => {
       await page.goto(route.sample, { waitUntil: "domcontentloaded" });
       await assertRouteReady(page, route);
+      await settleAnonymousRoute();
       networkGate.assertClean();
     });
   }
 
   expect(pageErrors).toEqual([]);
   expect(anonymousRoutes).toHaveLength(inventory.counts.client_anonymous);
+});
+
+test("anonymous route sweep completes delayed success and denied responses before navigating", async ({ context, page }) => {
+  const settleAnonymousRoute = trackAnonymousApiRequests(page);
+  const networkGate = await installNoHybridNetworkGate(context);
+  const pageErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("requestfailed", (request) => failedRequests.push(new URL(request.url()).pathname));
+
+  for (const status of [200, 503]) {
+    let release!: () => void;
+    let requested!: () => void;
+    const heldResponse = new Promise<void>((resolve) => { release = resolve; });
+    const requestStarted = new Promise<void>((resolve) => { requested = resolve; });
+    const documentPath = `/__no-hybrid-delayed-${status}`;
+    const apiPath = `/api/__no-hybrid-delayed-${status}`;
+    await context.route(`**${documentPath}`, (route) => route.fulfill({
+      contentType: "text/html",
+      body: `<main id="fixture">Ready</main><output id="status">pending</output>
+        <script>fetch('${apiPath}').then(async response => {
+          await response.json();
+          document.querySelector('#status').textContent = String(response.status);
+        });</script>`,
+    }));
+    await context.route(`**${apiPath}`, async (route) => {
+      requested();
+      await heldResponse;
+      await route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ status }) });
+    });
+
+    try {
+      await page.goto(documentPath, { waitUntil: "domcontentloaded" });
+      await requestStarted;
+      await assertRouteReady(page, {
+        pattern: documentPath, sample: documentPath, terminal: documentPath,
+        access: "anonymous", render: { selector: "#fixture", text: "Ready" },
+      });
+      // Reproduce the old gap: render + document.complete with an unfinished
+      // API response. Removing the completion barrier must fail this test.
+      await expect(page.locator("#status")).toHaveText("pending");
+      let settled = false;
+      const completion = settleAnonymousRoute().then(() => { settled = true; });
+      await page.evaluate(() => document.readyState);
+      expect(settled).toBe(false);
+      release();
+      await completion;
+      await expect(page.locator("#status")).toHaveText(String(status));
+      await page.goto("/robots.txt", { waitUntil: "domcontentloaded" });
+    } finally {
+      release();
+    }
+  }
+
+  expect(failedRequests).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  networkGate.assertClean();
 });
 
 test("two isolated Firebase users reach every authenticated React route without provider egress", async ({ browser }) => {

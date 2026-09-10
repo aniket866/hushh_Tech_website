@@ -22,6 +22,7 @@ import {
 import config from '../../resources/config/config';
 import { signNDA, sendNDANotification, generateNDAPdf, uploadSignedNDA } from '../../services/nda/ndaService';
 import { FUND_DOCUMENTS, NDA_CONSENT_VERSION } from '../../services/nda/ndaDocuments';
+import { isUatNdaPage } from '../../services/nda/uatNdaPage';
 import HushhTechHeader from '../../components/hushh-tech-header/HushhTechHeader';
 import HushhTechFooter from '../../components/hushh-tech-footer/HushhTechFooter';
 import { useAuthSession } from '../../auth/AuthSessionProvider';
@@ -388,7 +389,9 @@ const SignNDAPage: React.FC = () => {
 
       /* PDF generation — non-blocking */
       try {
-        if (accessToken) {
+        // The separate PDF service does not yet accept the UAT Firebase token.
+        // Personalized PDF generation is optional; consent is persisted below.
+        if (!isUatNdaPage()) {
           const pdfResult = await generateNDAPdf(
             {
               signerName: trimmedName,
@@ -428,15 +431,16 @@ const SignNDAPage: React.FC = () => {
         generatedPdfUrl,
         acknowledgedDocs,
         NDA_CONSENT_VERSION,
+        agreedToTerms,
       );
 
       if (!isMountedRef.current) return;
 
       if (result.success) {
         // Notify only on a first sign or a genuine version change — an accidental
-        // re-sign of the same version emails no one. (Old RPC without the signal
-        // returns shouldNotify=undefined → default to notifying.)
-        if (result.shouldNotify !== false) {
+        // re-sign of the same version emails no one. Consent is already durable;
+        // notification/PDF failures cannot turn this into a failed signature.
+        if (result.shouldNotify === true) {
           sendNDANotification(
             trimmedName,
             result.signedAt || signedAtIso,
@@ -497,6 +501,7 @@ const SignNDAPage: React.FC = () => {
     userId,
     validateForm,
     isSubmitting,
+    agreedToTerms,
   ]);
 
   const reviewedCount = FUND_DOCUMENTS.filter((d) => docAcknowledged[d.id]).length;
@@ -526,7 +531,7 @@ const SignNDAPage: React.FC = () => {
       className="flex min-h-screen flex-col bg-white text-[#202124] antialiased selection:bg-[#1D1D1F] selection:text-white"
       style={{ fontFamily: appleFont }}
     >
-      <HushhTechHeader />
+      <HushhTechHeader showTicker={!isUatNdaPage()} />
 
       <main id="main-content" className="flex-grow">
         <AppleSection tone="light" pad="tight" fill>

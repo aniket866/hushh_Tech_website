@@ -38,7 +38,16 @@ describe('Cloud Build repository provenance inputs', () => {
   it.each(['web', 'service'])('requires history preparation before the unchanged %s gate', (gate) => {
     const step = pipeline.steps.find((entry) => entry.id === gate)!;
     expect(step.waitFor).toEqual(['install', 'repository-history']);
-    expect(step.args.join('\n')).toContain(`bash scripts/ci/orchestrate.sh ${gate}`);
+    expect(step.args.slice(0, 1)).toEqual(['-c']);
+    const commands = step.args[1].trim().split('\n');
+    expect(commands).toEqual(gate === 'web' ? [
+      'set -euo pipefail',
+      'bash scripts/ci/orchestrate.sh web',
+      'node scripts/ci/check-deploy-build-context.mjs',
+    ] : [
+      'set -euo pipefail',
+      'NPM_CONFIG_CACHE=/workspace/.npm-cache bash scripts/ci/orchestrate.sh service',
+    ]);
     expect(pipeline.steps.find((entry) => entry.id === 'repository-history')).not.toHaveProperty('allowFailure');
     expect(pipeline.steps.find((entry) => entry.id === 'repository-history')).not.toHaveProperty('allowExitCodes');
   });

@@ -14,7 +14,7 @@
 
 import React, { useEffect, useRef, useState, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Box, Spinner, VStack, Text } from '@chakra-ui/react';
+import { Box, Button, Spinner, VStack, Text } from '@chakra-ui/react';
 import { checkNDAStatus } from '../services/nda/ndaService';
 import { useAuthSession } from '../auth/AuthSessionProvider';
 import {
@@ -49,6 +49,8 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
   const { session, status } = useAuthSession();
   const [isChecking, setIsChecking] = useState(true);
   const [hasSignedNDA, setHasSignedNDA] = useState<boolean | null>(null);
+  const [ndaError, setNdaError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const isResearchModeActive = isHushhResearchAuthMode();
   const isResearchSessionHint =
     session?.user?.app_metadata?.auth_source === HUSHH_RESEARCH_SOURCE;
@@ -79,9 +81,8 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
           '[GlobalNDAGate] Boot timeout reached (8s). Forcing access check to resolve.'
         );
         setIsChecking(false);
-        // Allow access to public/guest routes; authenticated-only routes
-        // will be caught by ProtectedRoute downstream.
-        setHasSignedNDA(canGuestAccessRoute(location.pathname));
+        setHasSignedNDA(false);
+        setNdaError('Access verification timed out. Please retry.');
       }, 8000);
     } else if (bootTimeoutRef.current) {
       clearTimeout(bootTimeoutRef.current);
@@ -100,6 +101,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
     let cancelled = false;
 
     const checkNDA = async () => {
+      setNdaError(null);
       const pathname = location.pathname;
       const isDevOnboardingPreview = isLocalOnboardingPreview(pathname, location.search);
 
@@ -121,7 +123,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
       if (isDevOnboardingPreview) {
         if (!cancelled) {
           setIsChecking(false);
-          setHasSignedNDA(true);
+          setHasSignedNDA(false);
         }
         return;
       }
@@ -130,7 +132,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
       if (isGuestAuthRoute(pathname)) {
         if (!cancelled) {
           setIsChecking(false);
-          setHasSignedNDA(true);
+          setHasSignedNDA(false);
         }
         return;
       }
@@ -140,7 +142,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
       if (isPublicSharedProfileRoute(pathname)) {
         if (!cancelled) {
           setIsChecking(false);
-          setHasSignedNDA(true);
+          setHasSignedNDA(false);
         }
         return;
       }
@@ -170,7 +172,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
         // Allow public marketing and guest-accessible routes for non-authenticated users
         if (!cancelled) {
           setIsChecking(false);
-          setHasSignedNDA(canGuestAccessRoute(pathname));
+          setHasSignedNDA(false);
         }
         return;
       }
@@ -227,14 +229,10 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
         }
 
         if (!ndaResult) {
-          // Timeout fallback — allow access optimistically.
-          // The NDA status will be rechecked on next navigation.
-          console.warn('[GlobalNDAGate] NDA check returned null, allowing access optimistically.');
-          setHasSignedNDA(true);
-          return;
+          throw new Error('NDA status is unavailable. Please retry.');
         }
 
-        setHasSignedNDA(ndaResult.hasSignedNda);
+        setHasSignedNDA(ndaResult.hasSignedNda === true);
 
         // If NDA not signed, redirect to NDA page
         if (!ndaResult.hasSignedNda) {
@@ -248,18 +246,8 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
           return;
         }
 
-        // If the error is a timeout, allow access optimistically
-        if (error instanceof Error && error.message === 'NDA check timed out') {
-          console.warn('[GlobalNDAGate] NDA check timed out after 5s. Allowing access optimistically.');
-          setHasSignedNDA(true);
-          return;
-        }
-
-        console.error('Error checking NDA status:', error);
-        // On non-timeout error, redirect to NDA page to be safe
-        sessionStorage.setItem('nda_redirect_after', pathname);
-        navigate('/sign-nda', { replace: true });
-        return; // Stop execution here
+        setHasSignedNDA(false);
+        setNdaError(error instanceof Error ? error.message : 'NDA status is unavailable. Please retry.');
       } finally {
         if (!cancelled) {
           setIsChecking(false);
@@ -272,7 +260,13 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
     return () => {
       cancelled = true;
     };
-  }, [isResearchBoundaryActive, location.hash, location.pathname, location.search, navigate, session?.user?.id, status]);
+  }, [isResearchBoundaryActive, location.hash, location.pathname, location.search, navigate, session?.user?.id, status, retry]);
+
+  // A failed status lookup is neither unsigned nor proof of consent. Keep the
+  // existing Research boundary and explicitly public auth/profile routes intact.
+  if (!isResearchBoundaryActive && ndaError && !isGuestAuthRoute(location.pathname) && !isPublicSharedProfileRoute(location.pathname)) {
+    return <Box role="alert" p={8}><Text>{ndaError}</Text><Button mt={4} onClick={() => setRetry((value) => value + 1)}>Retry access check</Button></Box>;
+  }
 
   // Show loading state while checking - Apple-style black/white design
   if (isChecking) {
@@ -310,7 +304,7 @@ const GlobalNDAGate: React.FC<GlobalNDAGateProps> = ({ children }) => {
     isPublicSharedProfileRoute(location.pathname);
   const canAccess = isResearchBoundaryActive
     ? canResearchSessionAccessWithoutLegacyNda(location.pathname)
-    : hasSignedNDA ||
+    : (status === 'authenticated' && hasSignedNDA === true) ||
       isLocalOnboardingPreview(location.pathname, location.search) ||
       canAccessWithoutNda;
   

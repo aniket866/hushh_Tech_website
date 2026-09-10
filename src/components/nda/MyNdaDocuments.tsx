@@ -33,6 +33,8 @@ export default function MyNdaDocuments({ className }: MyNdaDocumentsProps) {
   const { status, user } = useAuthSession();
   const [ndaRecord, setNdaRecord] = useState<NDARecord | null>(null);
   const [ndaLoading, setNdaLoading] = useState(true);
+  const [ndaError, setNdaError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -42,9 +44,13 @@ export default function MyNdaDocuments({ className }: MyNdaDocumentsProps) {
       return;
     }
     setNdaLoading(true);
+    setNdaError(null);
     getNDARecord(user.id)
       .then((rec) => {
         if (active) setNdaRecord(rec);
+      })
+      .catch((error: unknown) => {
+        if (active) setNdaError(error instanceof Error ? error.message : "Unable to load your agreement.");
       })
       .finally(() => {
         if (active) setNdaLoading(false);
@@ -52,7 +58,7 @@ export default function MyNdaDocuments({ className }: MyNdaDocumentsProps) {
     return () => {
       active = false;
     };
-  }, [status, user]);
+  }, [status, user, retry]);
 
   return (
     <section className={className ?? DEFAULT_SECTION_CLASS}>
@@ -66,7 +72,12 @@ export default function MyNdaDocuments({ className }: MyNdaDocumentsProps) {
         </h2>
       </div>
 
-      {ndaLoading ? (
+      {ndaError ? (
+        <div role="alert">
+          <p>{ndaError}</p>
+          <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry agreement lookup</button>
+        </div>
+      ) : ndaLoading ? (
         <div className="flex items-center gap-3 py-6 text-[14px] text-[#1D1D1F]/55">
           <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-[#0066CC]" />
           Loading your agreement…

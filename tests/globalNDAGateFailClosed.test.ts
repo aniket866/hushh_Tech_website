@@ -187,6 +187,25 @@ describe("GlobalNDAGate fail-closed rendering", () => {
     ).toBeNull();
   });
 
+  it.each(['timeout', 'identity failure'])("denies main-app access on %s and exposes a real retryable error", async (failure) => {
+    if (failure === 'timeout') checkNDAStatusMock.mockReturnValue(new Promise(() => {}));
+    else checkNDAStatusMock.mockRejectedValue(new Error('Identity requires review.'));
+    await act(async () => {
+      root.render(React.createElement(ChakraProvider, null,
+        React.createElement(MemoryRouter, { initialEntries: ['/onboarding/step5'] },
+          React.createElement(GlobalNDAGate, null, React.createElement('main', { 'data-testid': 'protected-child' })))));
+    });
+    await flushPromises();
+    if (failure === 'timeout') await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(container.querySelector('[data-testid="protected-child"]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(failure === 'timeout' ? 'timed out' : 'Identity requires review');
+    expect(navigateMock).not.toHaveBeenCalled();
+    checkNDAStatusMock.mockResolvedValue({ hasSignedNda: true });
+    await act(async () => { container.querySelector('[role="alert"] button')?.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    await flushPromises();
+    expect(container.querySelector('[data-testid="protected-child"]')).not.toBeNull();
+  });
+
   it("allows a public route without treating Research access-state as NDA proof", async () => {
     authSessionMock = {
       status: "authenticated",
@@ -431,5 +450,25 @@ describe("GlobalNDAGate fail-closed rendering", () => {
       container.querySelector("[data-testid='legacy-metrics-child']"),
     ).toBeNull();
     expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+  });
+
+  it('does not reuse public NDA-page access as proof of signed consent on navigation', async () => {
+    checkNDAStatusMock.mockResolvedValue({ hasSignedNda: false });
+    const mountedProtected = vi.fn();
+    const ProtectedProbe = () => {
+      React.useEffect(() => { mountedProtected(); }, []);
+      return React.createElement('main');
+    };
+    const RouteProbe = () => useLocation().pathname === '/sign-nda'
+      ? React.createElement(Link, { to: '/onboarding/step5', 'data-testid': 'leave-nda' }, 'Continue')
+      : React.createElement(ProtectedProbe);
+    await act(async () => {
+      root.render(React.createElement(ChakraProvider, null,
+        React.createElement(MemoryRouter, { initialEntries: ['/sign-nda'] }, React.createElement(GlobalNDAGate, null, React.createElement(RouteProbe)))));
+    });
+    await act(async () => { container.querySelector('[data-testid="leave-nda"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
+    await flushPromises();
+    expect(mountedProtected).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledWith('/sign-nda', { replace: true });
   });
 });

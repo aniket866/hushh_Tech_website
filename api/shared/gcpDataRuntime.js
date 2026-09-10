@@ -33,7 +33,8 @@ export const TABLE_OPERATIONS = Object.freeze({
   lead_events: ["select", "insert", "update", "delete"],
   lead_requests: ["select", "insert", "update", "delete"],
   messages: ["select", "insert", "update", "delete"],
-  nda_signatures: ["select", "insert", "update", "delete"],
+  // Consent mutations must pass the explicit NDA validator, not generic DML.
+  nda_signatures: ["select"],
   notifications: ["select", "insert", "update", "delete"],
   onboarding_data: ["select", "insert", "update", "upsert", "delete"],
   onboarding_invites: ["select", "insert", "update", "upsert", "delete"],
@@ -461,6 +462,37 @@ export async function resolveLegacyUserUuid(uid, dependencies = {}) {
     try { await client.query("RESET app.firebase_uid"); } catch {}
     client.release();
   }
+}
+
+// The verified API actor is the only source of transaction identity. Callers
+// must never forward browser-supplied context, principal IDs or SQL here.
+export async function withFirebaseTransaction(uid, work, dependencies = {}) {
+  const config = runtimeConfig();
+  if (typeof uid !== "string" || !uid || uid.length > 128 || uid.includes("\u0000")) {
+    throw Object.assign(new Error("Firebase user is invalid."), { status: 401, code: "AUTH_INVALID" });
+  }
+  const activePool = dependencies.pool || await databasePool(config);
+  const client = await activePool.connect();
+  let discard = false;
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.firebase_uid', $1, true), set_config('app.firebase_project', $2, true)", [uid, config.firebaseProjectId]);
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch { discard = true; }
+    throw error;
+  } finally {
+    try {
+      await client.query("RESET app.firebase_uid; RESET app.firebase_project");
+    } catch { discard = true; }
+    client.release(discard);
+  }
+}
+
+export async function readVerifiedFirebaseAccount(uid) {
+  return firebaseAdminAuth(runtimeConfig().firebaseProjectId).getUser(uid);
 }
 
 function resolveCardinality(request, rows) {

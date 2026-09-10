@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import dataHandler from "../api/gcp-data.js";
 import { actorObjectPath, normalizeObjectPath } from "../api/gcp-storage.js";
@@ -59,18 +59,49 @@ describe("GCP backend runtime boundary", () => {
     expect(BLOCKED_TABLES.has("hushh_ai_users")).toBe(true);
     expect(BLOCKED_STORAGE_BUCKETS.has("assets")).toBe(true);
     expect(RPC_NAMES.has("sign_global_nda")).toBe(false);
+    expect(RPC_NAMES.has("check_user_nda_status")).toBe(false);
     expect(STORAGE_BUCKETS.has("assets")).toBe(false);
     expect((TABLE_OPERATIONS as Record<string, unknown>).arbitrary_table).toBeUndefined();
     expect(RPC_NAMES.has("arbitrary_rpc")).toBe(false);
     expect(STORAGE_BUCKETS.has("arbitrary-bucket")).toBe(false);
-    expect([...RPC_NAMES].sort()).toEqual([]);
+    // Retired compatibility compilers are not runtime admission. NDA uses the
+    // explicit kind=nda boundary, covered by gcpNdaContract/gcpNdaPostgres tests.
+    expect([...RPC_NAMES]).toEqual([]);
+    expect([...BLOCKED_RPCS].sort()).toEqual([
+      "check_user_nda_status", "sign_global_nda", "track_product_usage",
+    ]);
   });
 
-  it("does not compile blocked or withheld RPCs through the authenticated data path", () => {
+  it.each(["firebase-user", "another-user"])("denies retired NDA status compilation even for %s", (userId) => {
+    expect(() => compileRpcQuery({
+      kind: "rpc", name: "check_user_nda_status", args: { p_user_id: userId },
+    }, "firebase-user")).toThrow(expect.objectContaining({ status: 403, code: "DATA_OPERATION_DENIED" }));
+  });
+
+  it.each(["hushh-ai", ""])("denies retired product-usage compilation regardless of arguments: %j", (product) => {
+    expect(() => compileRpcQuery({
+      kind: "rpc", name: "track_product_usage",
+      args: { p_product_name: product, p_metadata: { platform: "web" } },
+    }, "firebase-user")).toThrow(expect.objectContaining({ status: 403, code: "DATA_OPERATION_DENIED" }));
+  });
+
+  it("denies the legacy signing compiler rather than bypassing explicit NDA consent validation", () => {
+    expect(() => compileRpcQuery({
+      kind: "rpc",
+      name: "sign_global_nda",
+      args: {
+        p_signer_name: "Ada Example",
+        p_nda_version: "v1.0",
+        p_pdf_url: null,
+        p_signer_ip: "unknown",
+        p_documents_acknowledged: ["fund-a"],
+        p_consent_version: "2026-06-02",
+      },
+    }, "firebase-user")).toThrow(expect.objectContaining({ status: 403, code: "DATA_OPERATION_DENIED" }));
+  });
+
+  it("does not invoke withheld or public RPCs through the authenticated data path", () => {
     for (const name of [
-      "check_user_nda_status",
-      "sign_global_nda",
-      "track_product_usage",
       "get_public_investor_profile",
       "increment_hushh_ai_uploads",
       "increment_intelligence_uploads",
@@ -138,6 +169,49 @@ describe("GCP backend runtime boundary", () => {
     expect(statements).toContain("ROLLBACK");
     expect(statements).not.toContain("COMMIT");
     expect(statements.indexOf("ROLLBACK")).toBeGreaterThan(statements.findIndex((entry) => entry.startsWith("UPDATE")));
+  });
+
+  it.each(["check_user_nda_status", "sign_global_nda", "track_product_usage"])(
+    "rejects retired %s execution before acquiring a database connection", async (name) => {
+      process.env = { ...process.env, ...validEnv() };
+      const connect = vi.fn();
+      await expect(executeDataRequest({ kind: "rpc", name, args: {} }, "firebase-user", {
+        pool: { connect },
+      })).rejects.toMatchObject({ status: 503, code: "RPC_CONTRACT_BLOCKED" });
+      expect(connect).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns a single manifested table row and commits with the verified actor context", async () => {
+    process.env = { ...process.env, ...validEnv() };
+    const statements: Array<{ text: string; values?: unknown[] }> = [];
+    const client = {
+      async query(query: string | { text: string; values?: unknown[] }, values?: unknown[]) {
+        const text = typeof query === "string" ? query : query.text;
+        const queryValues = typeof query === "string" ? values : query.values;
+        statements.push({ text, values: queryValues });
+        if (text.startsWith('SELECT "user_id"')) return { rows: [{ user_id: "legacy-user" }], rowCount: 1 };
+        return { rows: [], rowCount: null };
+      },
+      release() {},
+    };
+    const fakePool = { async connect() { return client; } };
+
+    await expect(executeDataRequest({
+      kind: "table", table: "onboarding_data", operation: "select",
+      columns: "user_id", cardinality: "single",
+      filters: [{ operator: "eq", column: "user_id", value: "legacy-user" }],
+    }, "firebase-user", { pool: fakePool })).resolves.toEqual({
+      data: { user_id: "legacy-user" },
+      count: 1,
+    });
+    expect(statements).toEqual([
+      { text: "BEGIN", values: undefined },
+      { text: "SELECT set_config('app.firebase_uid', $1, true)", values: ["firebase-user"] },
+      { text: 'SELECT "user_id" FROM public."onboarding_data" WHERE "user_id" = $1', values: ["legacy-user"] },
+      { text: "COMMIT", values: undefined },
+      { text: "RESET app.firebase_uid", values: undefined },
+    ]);
   });
 
   it("requires a Firebase bearer before any data operation", async () => {

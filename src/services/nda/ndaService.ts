@@ -31,41 +31,43 @@ export interface SignNDAResult {
 /**
  * Check if the current user has signed the NDA
  */
-export const checkNDAStatus = async (userId: string): Promise<NDAStatus> => {
-  try {
-    if (!config.gcpBackendClient) {
-      console.error('GcpBackend client not initialized');
-      return {
-        hasSignedNda: false,
-        signedAt: null,
-        ndaVersion: null,
-        signerName: null,
-      };
-    }
-    
-    const { data, error } = await config.gcpBackendClient
-      .rpc('check_user_nda_status', { p_user_id: userId });
-    
-    if (error) {
-      console.error('Error checking NDA status:', error);
-      return {
-        hasSignedNda: false,
-        signedAt: null,
-        ndaVersion: null,
-        signerName: null,
-      };
-    }
-    
-    return data as NDAStatus;
-  } catch (err) {
-    console.error('Error in checkNDAStatus:', err);
-    return {
-      hasSignedNda: false,
-      signedAt: null,
-      ndaVersion: null,
-      signerName: null,
-    };
+async function ndaOperation<T>(operation: 'status' | 'record' | 'sign', signing?: Record<string, unknown>, accessToken?: string): Promise<T> {
+  let token = accessToken;
+  if (token === undefined) {
+    if (!config.gcpBackendClient) throw new Error('Authentication is unavailable. Please sign in again.');
+    const { data, error } = await config.gcpBackendClient.auth.getSession();
+    if (error) throw new Error('Please sign in again before reviewing the NDA.');
+    token = data?.session?.access_token;
   }
+  if (!token?.trim()) throw new Error('Please sign in again before reviewing the NDA.');
+  const response = await fetch('/api/gcp/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind: 'nda', operation, ...(signing ? { signing } : {}) }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.error) throw new Error(result?.error?.message || 'NDA service unavailable. Please retry.');
+  if (!result || !Object.prototype.hasOwnProperty.call(result, 'data')) throw new Error('Invalid NDA response. Please retry.');
+  return result.data as T;
+}
+
+// The parameter is retained for existing callers only. Ownership is always
+// resolved by the server from the verified Firebase token, never this value.
+export const checkNDAStatus = async (userId: string): Promise<NDAStatus> => {
+  void userId; // Compatibility only; never sent as a principal selector.
+  return checkNDAStatusWithToken();
+};
+
+// Protected-content callers already hold the Firebase session token. Reuse the
+// same operation and server identity boundary, not the retired REST table API.
+export const checkNDAStatusWithToken = async (accessToken?: string): Promise<NDAStatus> => {
+  const status = await ndaOperation<NDAStatus>('status', undefined, accessToken);
+  if (!status || typeof status.hasSignedNda !== 'boolean' ||
+      ![status.signedAt, status.ndaVersion, status.signerName].every((value) => value === null || typeof value === 'string') ||
+      (status.hasSignedNda && (typeof status.signedAt !== 'string' || !Number.isFinite(Date.parse(status.signedAt))))) {
+    throw new Error('Invalid NDA status response. Please retry.');
+  }
+  return status;
 };
 
 /**
@@ -77,38 +79,14 @@ export const signNDA = async (
   pdfUrl?: string,
   documentsAcknowledged?: string[],
   consentVersion?: string,
+  consentAccepted: boolean = false,
 ): Promise<SignNDAResult> => {
   try {
-    if (!config.gcpBackendClient) {
-      console.error('GcpBackend client not initialized');
-      return {
-        success: false,
-        error: 'GcpBackend client not initialized',
-      };
-    }
-
-    // The full electronic-signature evidence (real IP via x-forwarded-for, the
-    // device, and the signature ID) is captured + persisted server-side by the
-    // nda-signed-notification edge function — the browser is never trusted for it.
-    const { data, error } = await config.gcpBackendClient
-      .rpc('sign_global_nda', {
-        p_signer_name: signerName,
-        p_nda_version: ndaVersion,
-        p_pdf_url: pdfUrl || null,
-        p_signer_ip: 'unknown',
-        p_documents_acknowledged: documentsAcknowledged ?? [],
-        p_consent_version: consentVersion ?? null,
-      });
-    
-    if (error) {
-      console.error('Error signing NDA:', error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-    
-    return data as SignNDAResult;
+    return await ndaOperation<SignNDAResult>('sign', {
+      signerName, ndaVersion, pdfUrl: pdfUrl || null,
+      documentsAcknowledged: documentsAcknowledged ?? [],
+      consentVersion: consentVersion ?? null, consentAccepted,
+    });
   } catch (err) {
     console.error('Error in signNDA:', err);
     return {
@@ -283,9 +261,9 @@ export const uploadSignedNDA = async (
     }
     
     const fileName = `nda_${userId}_${Date.now()}.pdf`;
-    const filePath = `signed-ndas/${fileName}`;
+    const filePath = `${userId}/signed-ndas/${fileName}`;
     
-    const { data, error } = await config.gcpBackendClient.storage
+    const { error } = await config.gcpBackendClient.storage
       .from('assets')
       .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
@@ -326,39 +304,12 @@ export interface NDARecord {
 }
 
 /**
- * Fetch the current user's NDA signature row for their profile. RLS on
- * `nda_signatures` restricts this to the caller's own row, so it's safe to
- * query directly from the client. Returns null when the user hasn't signed yet.
+ * Fetch through the same verified identity boundary as status/signing.
+ * Only a successful unsigned response is null; failures are not unsigned.
  */
 export const getNDARecord = async (userId: string): Promise<NDARecord | null> => {
-  try {
-    if (!config.gcpBackendClient) {
-      console.error('GcpBackend client not initialized');
-      return null;
-    }
-
-    const { data, error } = await config.gcpBackendClient
-      .from('nda_signatures')
-      .select('signer_name, nda_version, signed_at, pdf_url')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) {
-      console.warn('[NDA] getNDARecord error:', error.message);
-      return null;
-    }
-    if (!data) return null;
-
-    return {
-      signerName: data.signer_name ?? null,
-      ndaVersion: data.nda_version ?? null,
-      signedAt: data.signed_at ?? null,
-      pdfUrl: data.pdf_url ?? null,
-    };
-  } catch (err) {
-    console.warn('[NDA] getNDARecord exception:', err);
-    return null;
-  }
+  void userId; // Compatibility only; the backend derives ownership.
+  return ndaOperation<NDARecord | null>('record');
 };
 
 export default {

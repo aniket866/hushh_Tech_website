@@ -1,9 +1,9 @@
 import axios from "axios";
 import {
   getNdaGenerationUrl,
-  getGcpBackendBaseUrl,
   getGcpBackendRpcUrl,
 } from "../runtime/mainWeb";
+import { checkNDAStatusWithToken } from "../nda/ndaService";
 
 export type AccessStatus = string;
 const APPROVED_STATUS = "Approved";
@@ -39,19 +39,8 @@ async function postRpc<T>(
 }
 
 export async function checkAccessStatus(accessToken: string): Promise<AccessStatus> {
-  const response = await axios.get<Array<{ signed_at: string | null }>>(
-    `${getGcpBackendBaseUrl()}/rest/v1/nda_signatures`,
-    {
-      headers: getAuthenticatedHeaders(accessToken),
-      params: {
-        select: "signed_at",
-        signed_at: "not.is.null",
-        limit: "1",
-      },
-    }
-  );
-
-  return response.data?.some((row) => Boolean(row.signed_at))
+  const status = await checkNDAStatusWithToken(accessToken);
+  return status.hasSignedNda
     ? APPROVED_STATUS
     : NDA_REQUIRED_STATUS;
 }

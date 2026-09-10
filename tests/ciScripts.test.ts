@@ -184,7 +184,12 @@ describe("CI workflow scripts", () => {
     expect(cloudBuild).toContain("node scripts/ci/check-deploy-build-context.mjs");
     expect(cloudBuild).toContain("zricethezav/gitleaks:v8.24.2");
     expect(cloudBuild).toContain("id: repository-history");
-    expect(cloudBuild).toContain("scripts/ci/prepare-repository-history.mjs");
+    expect(cloudBuild).toContain('args: ["scripts/ci/prepare-repository-history.mjs"]');
+    const history = fs.readFileSync(path.join(repoRoot, "scripts/ci/prepare-repository-history.mjs"), "utf8");
+    expect(history).toContain("7b41548d3af0532a59e7c6b008e795feece381fc");
+    expect(history).toContain("cbfde1b1bf5ef97ebb71766953857750b711d791");
+    expect(history).toContain("'--unshallow'");
+    expect(history).toContain("repositories/hushh_Tech_website:accessReadToken");
     expect(cloudBuild).not.toContain("git fetch --no-tags --deepen=128 origin");
     expect(cloudBuild).not.toContain("git fetch --no-tags origin \"$$commit\"");
     expect(githubBackup).toMatch(/\non:\n  workflow_dispatch:/);

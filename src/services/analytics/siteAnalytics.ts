@@ -1,4 +1,5 @@
 import config from "../../resources/config/config";
+import { isUatNdaPage } from "../nda/uatNdaPage";
 import {
   isHushhResearchAuthMode,
 } from "../hushhResearch/firebaseAuth";
@@ -259,6 +260,9 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
   const requestedPath = sanitizeAnalyticsPath(
     options.routePath || window.location.pathname,
   );
+  // Optional telemetry is not NDA consent evidence. Do not invoke the
+  // unavailable UAT collector for this route (including its exit events).
+  if (isUatNdaPage(currentPath) || isUatNdaPage(requestedPath)) return;
   if (
     isHushhResearchAuthMode() ||
     isHushhResearchAuthRoute(window.location.pathname) ||
@@ -302,6 +306,8 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
   }
 
   for (const candidate of getCollectorCandidates()) {
+    // Context/token resolution can span navigation into the NDA page.
+    if (isUatNdaPage()) return;
     try {
       const response = await fetch(candidate, {
         method: "POST",
