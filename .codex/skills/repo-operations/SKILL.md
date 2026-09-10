@@ -19,19 +19,22 @@ description: Use when working on Hushhtech PR checks, CI/CD, branch protection, 
 Owned repo surfaces:
 
 1. `.github/workflows`
-2. `scripts/ci`
-3. `scripts/security`
-4. `scripts/check-production.sh`
-5. `scripts/deploy-gcp.sh`
-6. `scripts/deploy-location-geocode.sh`
-7. `scripts/deploy-ria-intelligence-api.sh`
-8. `scripts/gcloud-devops-setup.sh`
-9. `scripts/refresh-vertex-ai-token.sh`
-10. `scripts/setup-cloud-scheduler-token-refresh.sh`
-11. `scripts/setup-token-refresh-cron.sh`
-12. `scripts/update-supabase-auth-url.sh`
-13. `docs/reference/operations/README.md`
-14. `docs/reference/operations/ci-governance.md`
+2. `cloudbuild.ci.yaml`
+3. `scripts/gcp/register-ci-trigger.sh`
+4. `docs/reference/operations/cloudbuild-ci.md`
+5. `scripts/ci`
+6. `scripts/security`
+7. `scripts/check-production.sh`
+8. `scripts/deploy-gcp.sh`
+9. `scripts/deploy-location-geocode.sh`
+10. `scripts/deploy-ria-intelligence-api.sh`
+11. `scripts/gcloud-devops-setup.sh`
+12. `scripts/refresh-vertex-ai-token.sh`
+13. `scripts/setup-cloud-scheduler-token-refresh.sh`
+14. `scripts/setup-token-refresh-cron.sh`
+15. `scripts/update-supabase-auth-url.sh`
+16. `docs/reference/operations/README.md`
+17. `docs/reference/operations/ci-governance.md`
 
 Non-owned surfaces:
 
@@ -56,20 +59,26 @@ Non-owned surfaces:
 
 1. `docs/reference/operations/ci-governance.md`
 2. `docs/reference/operations/README.md`
-3. `.github/workflows/ci.yml`
-4. `.github/workflows/pr-agent.yml`
-5. `.github/workflows/pr-intake.yml`
-6. `scripts/ci/orchestrate.sh`
+3. `docs/reference/operations/cloudbuild-ci.md`
+4. `cloudbuild.ci.yaml`
+5. `.github/workflows/ci.yml`
+6. `.github/workflows/pr-agent.yml`
+7. `.github/workflows/pr-intake.yml`
+8. `scripts/ci/orchestrate.sh`
 
 ## Workflow
 
 1. Determine whether the visible checks are the full intended check surface.
-2. Separate PR feedback lane, queue lane, and post-merge lane.
-3. Report which failing checks are process-only versus code-authoritative.
-4. For community sensitive-document work, require the blocking `Sensitive NDA Gate`
+2. Treat Cloud Build `hushh-tech-website-ci` as the default code lane using the
+   existing `cloud-run-build` non-deployer identity, `PR Policy Gate`
+   as the metadata lane, and `Cloud Build Status Gate` as the `CI Status Gate` bridge.
+   Treat the full `PR Validation (GitHub backup)` workflow as manual incident recovery.
+3. Separate PR feedback lane, queue lane, and post-merge lane.
+4. Report which failing checks are process-only versus code-authoritative.
+5. For community sensitive-document work, require the blocking `Sensitive NDA Gate`
    PR/queue check and the deployed-host UAT verifier before calling the gate
    healthy.
-5. Hand back the PR decision to `oss-contribution-triage` once the CI truth is clear.
+6. Hand back the PR decision to `oss-contribution-triage` once the CI truth is clear.
 
 ## Handoff Rules
 
@@ -86,4 +95,5 @@ npm run lint:ci
 npm run security:audit
 npm run verify:sensitive-nda-gate -- --target=uat
 bash scripts/ci/orchestrate.sh queue
+npm run gcp:ci-trigger:plan
 ```

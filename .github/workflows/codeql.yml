@@ -1,20 +1,10 @@
-name: CodeQL
+name: CodeQL (manual backup)
 
-# Static analysis for the JavaScript/TypeScript surfaces this repository owns:
-# src/**, api/**, server.js, scripts/** and cloud-run/**. Advisory by design —
-# it is not part of the ci-status required set, so it reports without gating merges.
+# Static analysis for the JavaScript/TypeScript surfaces this repository owns.
+# Manual backup only: automatic PR, push, and scheduled scans are disabled so
+# CodeQL does not create a second heavyweight analysis cycle beside Cloud Build.
 
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-  push:
-    branches:
-      - main
-  schedule:
-    # Weekly full scan catches advisories published after a PR merged.
-    - cron: "27 4 * * 1"
   workflow_dispatch:
 
 permissions:

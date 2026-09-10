@@ -5,6 +5,7 @@ const token = process.env.GITHUB_TOKEN || "";
 const repository = process.env.GITHUB_REPOSITORY || "";
 const reviewLaneName = process.env.REVIEW_LANE_NAME || "Hushh Signalkeeper";
 const semanticGuardName = process.env.SEMANTIC_GUARD_NAME || "Semantic PR Guard";
+const validationLaneName = "Cloud Build CI + PR Policy Gate";
 const apiBaseUrl = trimTrailingSlash(process.env.GITHUB_API_URL || "https://api.github.com");
 const validationChecks = String(process.env.PR_VALIDATION_CHECKS || "")
   .split(",")
@@ -348,16 +349,16 @@ function validationAvailability(pr, isFork) {
       message:
         "Blocked for now: GitHub will not start `pull_request` workflows while the PR has merge conflicts, and forked PRs may still need maintainer approval after conflicts are resolved.",
       conflictNote:
-        "GitHub currently reports merge conflicts on the PR merge branch. `Signalkeeper Preflight` still runs because it uses `pull_request_target`, but `PR Validation` will not run until the conflicts are fixed.",
+        `GitHub currently reports merge conflicts on the PR merge branch. \`Signalkeeper Preflight\` still runs because it uses \`pull_request_target\`, but \`${validationLaneName}\` will not run until the conflicts are fixed.`,
     };
   }
 
   if (hasConflicts) {
     return {
       message:
-        "Blocked for now: GitHub will not start `pull_request` workflows while the PR has merge conflicts. Resolve conflicts before expecting `PR Validation` checks to appear.",
+        `Blocked for now: GitHub will not start \`pull_request\` workflows while the PR has merge conflicts. Resolve conflicts before expecting \`${validationLaneName}\` checks to appear.`,
       conflictNote:
-        "GitHub currently reports merge conflicts on the PR merge branch. `Signalkeeper Preflight` still runs because it uses `pull_request_target`, but `PR Validation` will not run until the conflicts are fixed.",
+        `GitHub currently reports merge conflicts on the PR merge branch. \`Signalkeeper Preflight\` still runs because it uses \`pull_request_target\`, but \`${validationLaneName}\` will not run until the conflicts are fixed.`,
     };
   }
 
@@ -372,14 +373,14 @@ function validationAvailability(pr, isFork) {
   if (mergeabilityPending) {
     return {
       message:
-        "Mergeability is still being computed by GitHub. If the PR later shows conflicts, `PR Validation` will wait until those conflicts are resolved.",
+        `Mergeability is still being computed by GitHub. If the PR later shows conflicts, \`${validationLaneName}\` will wait until those conflicts are resolved.`,
       conflictNote:
-        "GitHub has not finished computing mergeability yet. If conflicts appear, `PR Validation` will wait until they are resolved.",
+        `GitHub has not finished computing mergeability yet. If conflicts appear, \`${validationLaneName}\` will wait until they are resolved.`,
     };
   }
 
   return {
-    message: "`PR Validation` should start automatically for this PR and report its check suite.",
+    message: `\`${validationLaneName}\` should start automatically for this PR and report its check suite.`,
     conflictNote: "GitHub is not currently reporting merge conflicts for this PR.",
   };
 }
@@ -472,9 +473,9 @@ const body = [
   "- This lane: comment-only `pull_request_target` guidance; it does not execute PR code.",
   `- AI first review: \`${reviewLaneName}\` is the advisory review lane and can be retriggered with \`/review\`.`,
   `- Advisory semantic guard: \`${semanticGuardName}\` runs in warning-first mode and is not yet part of the blocking merge gate.`,
-  "- Merge check lane: `PR Validation` is the authoritative code-executing `pull_request` lane.",
-  `- PR Validation checks: ${validationChecks.map((name) => `\`${name}\``).join(", ")}`,
-  `- Current PR Validation availability: ${availability.message}`,
+  `- Merge check lane: \`${validationLaneName}\` is the authoritative code-executing lane plus the GitHub metadata gate.`,
+  `- ${validationLaneName} checks: ${validationChecks.map((name) => `\`${name}\``).join(", ")}`,
+  `- Current ${validationLaneName} availability: ${availability.message}`,
   `- Advisory checks currently visible: ${checks.advisoryVisible.length > 0 ? checks.advisoryVisible.join(", ") : "none detected yet"}`,
   `- Authoritative checks currently visible: ${checks.visibleValidation.length > 0 ? checks.visibleValidation.join(", ") : "none detected yet"}`,
   `- Missing authoritative checks on the current head SHA: ${checks.missingValidation.length > 0 ? checks.missingValidation.join(", ") : "none"}`,
@@ -503,7 +504,7 @@ const body = [
   "## Reviewer Focus",
   ...(focus.length > 0
     ? focus.map((line) => `- ${line}`)
-    : ["- This diff does not trip any extra preflight callouts beyond the standard PR Validation suite."]),
+    : [`- This diff does not trip any extra preflight callouts beyond the standard ${validationLaneName} suite.`]),
 ].join("\n");
 
 const existing = comments.find((comment) =>

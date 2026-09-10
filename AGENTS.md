@@ -33,7 +33,8 @@ Use these lower-case hostnames as the canonical spellings for production and UAT
 ## Protected Branch Ownership
 
 - GitHub repository rulesets are the enforcement surface for `main` and `develop`; classic branch protection is not the source of truth.
-- `@ankitkumarsingh1702` (GitHub user id `94732725`) and `@Jhumma-hushh` (GitHub user id `262395004`) may bypass protected-branch pull request review rules or merge protected-branch PRs into `main` or `develop`.
+- `@hushh-labs/allowed-maintainers-to-approve` (team id `17036409`) is the required code-owner and approving-review team for protected changes. It has repository maintain access and is not a ruleset bypass actor.
+- `@hushh-labs/main-emergency-bypass` (closed team id `19427424`) is the only bypass actor on the `Protect main branch` ruleset. It contains exactly `kushaltrivedi5`, `msainani`, `ankitkumarsingh1702`, `Jhumma-hushh`, `DamriaNeelesh`, and `RGlodAkshat`. Use it only for a documented emergency pull-request bypass; the normal path is independent maintainer approval followed by the merge queue.
 - Other collaborators may push topic branches and open PRs, but they must not update protected refs, bypass protected-branch review rules, or merge protected-branch PRs.
 - If live GitHub settings disagree with this section, treat the live settings as drift and repair the ruleset or repository access before relying on the merge path.
 
@@ -99,7 +100,7 @@ Use these nodes and edges as the repository map.
 - `server.js` lazy-loads `api/**` handlers and is the authoritative runtime route map for Cloud Run.
 - `api/**` routes may depend on `api/shared/**`, Supabase, Google APIs, mail providers, wallet integrations, or other vendor services visible in the repo.
 - `supabase/migrations/**` can change assumptions used by API routes, metrics, auth, and profile flows.
-- `.github/workflows/**` execute `scripts/ci/**` and define the authoritative merge and deploy policy.
+- `.github/workflows/**` provide the GitHub policy, queue-freshness, backup, and deploy lanes; the default pull-request code gate is the Cloud Build trigger defined by `cloudbuild.ci.yaml`.
 - `cloud-run/**` services are separate deploy units and should not be assumed to share web runtime behavior unless the repo shows that linkage.
 
 ## Reviewer Routing By Surface
@@ -115,7 +116,7 @@ Use these nodes and edges as the repository map.
 - `VITE_*` variables are browser-visible; suspicious secret-like names in `VITE_*` are a real risk.
 - Runtime route changes in `api/**` are incomplete if `server.js` route registration is not kept in sync.
 - Auth, env, deploy, workflow, and migration changes need proof, not only intent.
-- `PR Validation` is the authoritative code-executing merge gate. `Signalkeeper Preflight`, `Hushh Signalkeeper`, and other advisory lanes do not replace it.
+- Cloud Build `hushh-tech-website-ci` is the authoritative pull-request code gate. The lightweight GitHub `PR Policy Gate` supplies pull-request metadata checks, and `Cloud Build Status Gate` joins both into the required `CI Status Gate` status. The full `PR Validation (GitHub backup)` workflow is manual-only. `Queue Validation` remains the merge-group freshness gate; `Signalkeeper Preflight`, `Hushh Signalkeeper`, and other advisory lanes do not replace these gates.
 
 ## High-Signal Validation Commands
 

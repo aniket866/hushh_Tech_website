@@ -1,0 +1,98 @@
+name: PR Policy
+
+# GitHub keeps the small amount of policy that requires pull-request metadata
+# (DCO, body hygiene, reviewer grounding, and Phase 2 eligibility). Code and
+# browser execution happen in the Cloud Build trigger; this workflow never
+# installs the application or runs the heavy test/build fan-out.
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - review_requested
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.19.0"
+
+jobs:
+  policy:
+    name: PR Policy Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate signed-off commits
+        run: bash scripts/ci/check-dco.sh
+
+      - name: Verify reviewer grounding and compliance sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import tomllib
+
+          required_files = [
+              ".pr_agent.toml",
+              ".ai_config.toml",
+              "AGENTS.md",
+              "QODO.MD",
+              "best_practices.md",
+              "docs/project_context_map.md",
+              "pr_compliance_checklist.yaml",
+          ]
+          for file_name in required_files:
+              if not pathlib.Path(file_name).is_file():
+                  raise SystemExit(f"required reviewer source missing: {file_name}")
+
+          with open(".pr_agent.toml", "rb") as fh:
+              pr_agent = tomllib.load(fh)
+          with open(".ai_config.toml", "rb") as fh:
+              tomllib.load(fh)
+          config = pr_agent.get("config", {})
+          if config.get("add_repo_metadata") is not True:
+              raise SystemExit(".pr_agent.toml must enable add_repo_metadata = true")
+          metadata_files = set(config.get("add_repo_metadata_file_list", []))
+          required_metadata = {"AGENTS.md", "QODO.MD", "pr_compliance_checklist.yaml"}
+          missing = sorted(required_metadata - metadata_files)
+          if missing:
+              raise SystemExit("reviewer metadata missing: " + ", ".join(missing))
+          PY
+          ruby -e 'require "yaml"; YAML.load_file("pr_compliance_checklist.yaml")'
+
+      - name: Validate pull-request body
+        run: npm run pr:hygiene
+
+      - name: Validate Phase 2 policy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ci/check-phase2-pr-policy.mjs
+
+      - name: Run semantic policy guard in advisory mode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEMANTIC_PR_GUARD_MODE: advisory
+        run: node scripts/ci/check-pr-semantic-guardrails.mjs

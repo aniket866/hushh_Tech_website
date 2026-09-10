@@ -7,10 +7,10 @@ This playbook defines how maintainers should review open-source pull requests af
 1. PR title and description
 2. `Signalkeeper Preflight` walkthrough for changed surfaces, claimed validation, and fork/conflict state
 3. changed files and affected surface
-4. `Reviewer Context & Compliance` status so you know whether the reviewer and checklist sources were actually grounded
+4. `PR Policy Gate` status so you know whether the reviewer and checklist sources were actually grounded
 5. `Hushh Signalkeeper` findings
 6. `Semantic PR Guard` findings
-7. `PR Validation` status
+7. `Cloud Build Status Gate` / `CI Status Gate` status
 8. whether the PR comes from a fork and whether full checks actually ran
 
 ## Maintainer decision flow
