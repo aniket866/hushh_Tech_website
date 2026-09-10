@@ -1,29 +1,29 @@
 # Default ownership
-* @ankitkumarsingh1702
+* @hushh-labs/allowed-maintainers-to-approve
 
 # Governance and deployment
-.github/ @ankitkumarsingh1702
-.github/workflows/ @ankitkumarsingh1702
-LICENSE @ankitkumarsingh1702
-NOTICE @ankitkumarsingh1702
-README.md @ankitkumarsingh1702
-CONTRIBUTING.md @ankitkumarsingh1702
-SECURITY.md @ankitkumarsingh1702
+.github/ @hushh-labs/allowed-maintainers-to-approve
+.github/workflows/ @hushh-labs/allowed-maintainers-to-approve
+LICENSE @hushh-labs/allowed-maintainers-to-approve
+NOTICE @hushh-labs/allowed-maintainers-to-approve
+README.md @hushh-labs/allowed-maintainers-to-approve
+CONTRIBUTING.md @hushh-labs/allowed-maintainers-to-approve
+SECURITY.md @hushh-labs/allowed-maintainers-to-approve
 
 # Runtime-sensitive application paths
-api/ @ankitkumarsingh1702
-server.js @ankitkumarsingh1702
-src/auth/ @ankitkumarsingh1702
-src/resources/config/ @ankitkumarsingh1702
-src/services/runtime/ @ankitkumarsingh1702
+api/ @hushh-labs/allowed-maintainers-to-approve
+server.js @hushh-labs/allowed-maintainers-to-approve
+src/auth/ @hushh-labs/allowed-maintainers-to-approve
+src/resources/config/ @hushh-labs/allowed-maintainers-to-approve
+src/services/runtime/ @hushh-labs/allowed-maintainers-to-approve
 
 # Security, env, and operational tooling
-scripts/ci/ @ankitkumarsingh1702
-scripts/security/ @ankitkumarsingh1702
-.env.local.example @ankitkumarsingh1702
-src/vite-env.d.ts @ankitkumarsingh1702
+scripts/ci/ @hushh-labs/allowed-maintainers-to-approve
+scripts/security/ @hushh-labs/allowed-maintainers-to-approve
+.env.local.example @hushh-labs/allowed-maintainers-to-approve
+src/vite-env.d.ts @hushh-labs/allowed-maintainers-to-approve
 
 # Compliance — investor consent / disclosure copy (legal sign-off required;
 # the Consent Sign-off Gate workflow blocks changes that still carry the
 # "pending legal sign-off" placeholder marker)
-src/services/consent/ @ankitkumarsingh1702
+src/services/consent/ @hushh-labs/allowed-maintainers-to-approve
