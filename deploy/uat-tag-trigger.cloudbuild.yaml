@@ -1,0 +1,26 @@
+# Cloud Build tag-trigger lane for an on-demand UAT deploy.
+#
+# A tag named uat-* runs this file in GCP. The trigger service account uses ADC;
+# no deploy key is stored in GitHub, this YAML, or the build workspace. The
+# existing UAT helper then builds from the trigger's exact COMMIT_SHA and uses a
+# Cloud Run read-modify-write patch that preserves the live runtime configuration.
+#
+# This is a deployment-execution lane only. GitHub PR validation, merge_group
+# validation, main smoke, and production approval remain the release authority.
+# Do not add a push-to-main trigger: that would double-deploy with Actions.
+
+steps:
+  - id: deploy-uat
+    name: node:20.19.0
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        npm ci --no-audit --no-fund
+        node scripts/deploy/uat-deploy.mjs --sha "$COMMIT_SHA"
+
+timeout: "2400s"
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY

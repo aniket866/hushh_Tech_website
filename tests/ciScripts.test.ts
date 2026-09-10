@@ -137,6 +137,34 @@ const validPrBody = `## Summary
 `;
 
 describe("CI workflow scripts", () => {
+  it("keeps the direct GCP lane UAT-only and separate from merge authority", () => {
+    const triggerConfig = fs.readFileSync(
+      path.join(repoRoot, "deploy/uat-tag-trigger.cloudbuild.yaml"),
+      "utf8"
+    );
+    const registration = fs.readFileSync(
+      path.join(repoRoot, "scripts/gcp/register-direct-uat-trigger.sh"),
+      "utf8"
+    );
+
+    expect(triggerConfig).toContain("node scripts/deploy/uat-deploy.mjs --sha \"$COMMIT_SHA\"");
+    expect(triggerConfig).toContain("GitHub PR validation, merge_group");
+    expect(triggerConfig).not.toContain("GCP_DEPLOY_SA_KEY_B64");
+    expect(triggerConfig).not.toContain("cloudbuild.prod.yaml");
+    expect(triggerConfig).not.toContain("ALLOW_PRODUCTION");
+    expect(registration).toContain("--apply");
+    expect(registration).toContain("--tag-pattern='uat-.*'");
+    expect(registration).toContain("deploy/uat-tag-trigger.cloudbuild.yaml");
+    expect(registration).toContain("never grants roles or creates keys");
+  });
+
+  it("archives the direct UAT source without shell-interpolating the commit SHA", () => {
+    const deployer = fs.readFileSync(path.join(repoRoot, "scripts/deploy/uat-deploy.mjs"), "utf8");
+    expect(deployer).toContain('execFileSync("git", ["archive", "--format=tar", sha');
+    expect(deployer).toContain("source commit must be a hexadecimal Git SHA");
+    expect(deployer).not.toContain('"-c", `git archive');
+  });
+
   it("routes default pull-request code gates to Cloud Build without automatic CodeQL or full Actions cycles", () => {
     const cloudBuild = fs.readFileSync(path.join(repoRoot, "cloudbuild.ci.yaml"), "utf8");
     const githubBackup = fs.readFileSync(path.join(repoRoot, ".github/workflows/ci.yml"), "utf8");
@@ -155,11 +183,10 @@ describe("CI workflow scripts", () => {
     expect(cloudBuild).toContain("npm ci --no-audit --no-fund --cache /workspace/.npm-cache --prefer-offline");
     expect(cloudBuild).toContain("node scripts/ci/check-deploy-build-context.mjs");
     expect(cloudBuild).toContain("zricethezav/gitleaks:v8.24.2");
-    expect(cloudBuild).toContain("id: history-restore");
-    expect(cloudBuild).toContain("7b41548d3af0532a59e7c6b008e795feece381fc");
-    expect(cloudBuild).toContain("cbfde1b1bf5ef97ebb71766953857750b711d791");
-    expect(cloudBuild).toContain("git fetch --no-tags --deepen=128 origin");
-    expect(cloudBuild).toContain("git fetch --no-tags origin \"$$commit\"");
+    expect(cloudBuild).toContain("id: repository-history");
+    expect(cloudBuild).toContain("scripts/ci/prepare-repository-history.mjs");
+    expect(cloudBuild).not.toContain("git fetch --no-tags --deepen=128 origin");
+    expect(cloudBuild).not.toContain("git fetch --no-tags origin \"$$commit\"");
     expect(githubBackup).toMatch(/\non:\n  workflow_dispatch:/);
     expect(githubBackup).not.toMatch(/\n  pull_request:/);
     expect(codeql).toMatch(/\non:\n  workflow_dispatch:/);

@@ -129,6 +129,15 @@ That check creates a temporary test user, proves sensitive community posts fail 
 - file: `.github/workflows/deploy-prod.yml`
 - purpose: manual promotion from an approved green `main` SHA
 
+### Direct GCP UAT lane
+
+- file: `deploy/uat-tag-trigger.cloudbuild.yaml`
+- registration: `scripts/gcp/register-direct-uat-trigger.sh` (plan by default; `--apply` is explicit)
+- trigger: an explicit `uat-*` tag in Cloud Build, after the repository link and deployer identity have been reviewed
+- purpose: execute the existing read-modify-write UAT deploy helper inside GCP when an operator needs a deploy without a GitHub-hosted runner
+
+This lane is execution-only. It does not validate pull requests, enter the merge queue, establish a green `main` SHA, or authorize production. Keep `PR Validation`, `Queue Validation`, `Main Post-Merge Smoke`, and the environment-gated Actions release workflows as the merge and release authority until an equivalent Cloud Build status-reporting and production evidence contract is proven. Do not add a push-to-`main` trigger alongside the post-merge UAT workflow; that would deploy twice.
+
 ### `Deploy Email Template API`
 
 - file: `.github/workflows/deploy-cloud-run.yml`

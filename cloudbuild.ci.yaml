@@ -61,30 +61,14 @@ steps:
         set -euo pipefail
         npm ci --no-audit --no-fund --cache /workspace/.npm-cache --prefer-offline
 
-  # Cloud Build checks out a shallow source snapshot. A small set of contract tests
-  # intentionally verifies pinned historical revisions; fetch those exact objects once
-  # and let every dependent gate reuse them. This avoids a full clone and duplicate fetches.
-  - id: history-restore
+  # Web and service evidence tests verify historical bytes AND ancestry.
+  # Match Actions' fetch-depth: 0 for the exact tested HEAD, without checking
+  # out a moving branch or relaxing any provenance/hash assertions.
+  - id: repository-history
     name: node:20.19.0
-    entrypoint: bash
-    waitFor: ["-"]
-    args:
-      - -c
-      - |
-        set -euo pipefail
-        # Preserve the ancestry proof required by the historical contracts while
-        # keeping the checkout bounded. The oldest required base is currently
-        # within this window; exact object fetches below cover non-ancestor tests.
-        if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
-          git fetch --no-tags --deepen=128 origin
-        fi
-        for commit in \
-          7b41548d3af0532a59e7c6b008e795feece381fc \
-          cbfde1b1bf5ef97ebb71766953857750b711d791; do
-          if ! git cat-file -e "$$commit^{commit}"; then
-            git fetch --no-tags origin "$$commit"
-          fi
-        done
+    entrypoint: node
+    waitFor: ["install"]
+    args: ["scripts/ci/prepare-repository-history.mjs"]
 
   # ---------------------------------------------------------------------------
   # The fan. Every step below waits only on `install`, so they run concurrently. Adding a gate
@@ -93,7 +77,7 @@ steps:
   - id: web
     name: node:20.19.0
     entrypoint: bash
-    waitFor: ["install", "history-restore"]
+    waitFor: ["install", "repository-history"]
     args:
       - -c
       - |
@@ -152,7 +136,7 @@ steps:
   - id: service
     name: node:20.19.0
     entrypoint: bash
-    waitFor: ["install", "history-restore"]
+    waitFor: ["install", "repository-history"]
     args:
       - -c
       - |

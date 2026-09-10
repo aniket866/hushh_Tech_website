@@ -15,6 +15,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 8. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
 9. [No-Hybrid Runtime Gate](./no-hybrid-runtime-gate.md) for the blocking source, artifact, native, workflow, and browser proof that the deployable product cannot reach Supabase
 10. [Cloud Build CI](./cloudbuild-ci.md) for the default GCP pull-request code gate, GitHub policy bridge, and manual Actions backup
+11. [Direct GCP Deployment](./gcp-direct-deploy.md) for the UAT-only Cloud Build tag lane and private-repository readiness
 
 ## Canonical workflow and governance
 

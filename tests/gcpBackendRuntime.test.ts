@@ -63,79 +63,14 @@ describe("GCP backend runtime boundary", () => {
     expect((TABLE_OPERATIONS as Record<string, unknown>).arbitrary_table).toBeUndefined();
     expect(RPC_NAMES.has("arbitrary_rpc")).toBe(false);
     expect(STORAGE_BUCKETS.has("arbitrary-bucket")).toBe(false);
-    expect([...RPC_NAMES].sort()).toEqual([
+    expect([...RPC_NAMES].sort()).toEqual([]);
+  });
+
+  it("does not compile blocked or withheld RPCs through the authenticated data path", () => {
+    for (const name of [
       "check_user_nda_status",
       "sign_global_nda",
       "track_product_usage",
-    ]);
-  });
-
-  it("compiles NDA status with server-derived identity and rejects cross-user arguments", () => {
-    const query = compileRpcQuery({
-      kind: "rpc",
-      name: "check_user_nda_status",
-      args: { p_user_id: "firebase-user" },
-    }, "firebase-user");
-
-    expect(query.values).toEqual([]);
-    expect(query.text).toContain("hushh_identity.current_legacy_user_uuid()");
-    expect(query.text).toContain("public.nda_signatures");
-    expect(() => compileRpcQuery({
-      kind: "rpc",
-      name: "check_user_nda_status",
-      args: { p_user_id: "another-user" },
-    }, "firebase-user")).toThrow(/identity does not match/);
-  });
-
-  it("compiles product usage as an atomic, user-scoped upsert", () => {
-    const query = compileRpcQuery({
-      kind: "rpc",
-      name: "track_product_usage",
-      args: { p_product_name: "hushh-ai", p_metadata: { platform: "web" } },
-    }, "firebase-user");
-
-    expect(query.values).toEqual(["hushh-ai", { platform: "web" }]);
-    expect(query.text).toContain("current_legacy_user_uuid()");
-    expect(query.text).toContain("ON CONFLICT (user_id, product_name) DO UPDATE");
-    expect(query.text).toContain("usage_count = public.user_product_usage.usage_count + 1");
-    expect(query.text).not.toContain("p_user_id");
-    expect(() => compileRpcQuery({
-      kind: "rpc",
-      name: "track_product_usage",
-      args: { p_product_name: "" },
-    }, "firebase-user")).toThrow(/Product name is invalid/);
-  });
-
-  it("compiles NDA signing with an atomic upsert and no client-selected user", () => {
-    const query = compileRpcQuery({
-      kind: "rpc",
-      name: "sign_global_nda",
-      args: {
-        p_signer_name: "Ada Example",
-        p_nda_version: "v1.0",
-        p_pdf_url: null,
-        p_signer_ip: "unknown",
-        p_documents_acknowledged: ["fund-a"],
-        p_consent_version: "2026-06-02",
-      },
-    }, "firebase-user");
-
-    expect(query.values).toEqual([
-      "Ada Example",
-      "v1.0",
-      null,
-      "unknown",
-      ["fund-a"],
-      "2026-06-02",
-    ]);
-    expect(query.text).toContain("current_legacy_user_uuid()");
-    expect(query.text).toContain("ON CONFLICT (user_id) DO UPDATE");
-    expect(query.text).toContain("documents_acknowledged");
-    expect(query.text).not.toContain("p_user_id");
-  });
-
-  it("does not invoke withheld or public RPCs through the authenticated data path", () => {
-    for (const name of [
       "get_public_investor_profile",
       "increment_hushh_ai_uploads",
       "increment_intelligence_uploads",
@@ -203,32 +138,6 @@ describe("GCP backend runtime boundary", () => {
     expect(statements).toContain("ROLLBACK");
     expect(statements).not.toContain("COMMIT");
     expect(statements.indexOf("ROLLBACK")).toBeGreaterThan(statements.findIndex((entry) => entry.startsWith("UPDATE")));
-  });
-
-  it("returns scalar RPC compatibility data and commits the transaction", async () => {
-    process.env = { ...process.env, ...validEnv() };
-    const statements: Array<{ text: string; values?: unknown[] }> = [];
-    const client = {
-      async query(query: string | { text: string; values?: unknown[] }, values?: unknown[]) {
-        const text = typeof query === "string" ? query : query.text;
-        const queryValues = typeof query === "string" ? values : query.values;
-        statements.push({ text, values: queryValues });
-        if (text.includes("AS result")) return { rows: [{ result: { success: true } }], rowCount: 1 };
-        return { rows: [], rowCount: null };
-      },
-      release() {},
-    };
-    const fakePool = { async connect() { return client; } };
-
-    await expect(executeDataRequest({
-      kind: "rpc",
-      name: "track_product_usage",
-      args: { p_product_name: "hushh-ai", p_metadata: {} },
-    }, "firebase-user", { pool: fakePool })).resolves.toEqual({
-      data: { success: true },
-      count: 1,
-    });
-    expect(statements.map(({ text }) => text)).toContain("COMMIT");
   });
 
   it("requires a Firebase bearer before any data operation", async () => {
