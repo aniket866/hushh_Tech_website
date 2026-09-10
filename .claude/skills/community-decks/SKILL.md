@@ -41,17 +41,61 @@ node scripts/community/mirror-deck-images.mjs
 #    image in the cards points back at the origin CDN.
 node scripts/community/convert-gamma-export.mjs
 
-# 4. Publish cards.json + index.md to the deck's own GCS prefix.
+# 4. Repair the <img> tags the converter cannot get right on its own — see below.
+#    Run it TWICE: the second pass is the gated decks, which need --gated because their
+#    images answer 401 over HTTP and have to be read out of the bucket instead.
+node scripts/community/repair-deck-image-html.mjs
+node scripts/community/repair-deck-image-html.mjs --apply
+node scripts/community/repair-deck-image-html.mjs --gated
+node scripts/community/repair-deck-image-html.mjs --gated --apply
+
+# 5. Publish cards.json + index.md to the deck's own GCS prefix.
 node scripts/community/publish-deck-content.mjs
 
-# 5. Regenerate the committed snapshot and the deck post wrappers.
+# 6. Regenerate the committed snapshot and the deck post wrappers.
 node scripts/community/generate-deck-posts.mjs
 npm run build:community
 
-# 6. Reconcile Firestore. Dry-run by default — read the plan before writing.
+# 7. Reconcile Firestore — UAT only. Dry-run by default; read the plan before writing.
+#    Production has no Firestore database; do not point this at hushh-tech-prod.
 npm run community:sync-firestore
 npm run community:sync-firestore -- --apply
 ```
+
+## The converter cannot size an image, and ships a broken one
+
+Two defects came out of `convert-gamma-export.mjs`, both in the `<img>` tags, both invisible to
+every gate we have because the markup is valid and the page returns 200:
+
+1. **No `src`.** The converter keeps an allowlisted attribute only when the source tag has it, but
+   emitted the `<img>` either way — so an image whose `src` did not survive attribute filtering
+   shipped as `<img alt="..." loading="lazy" decoding="async" />`, a broken-image placeholder on a
+   live page. One was serving on production. The converter now skips the element instead.
+2. **No intrinsic size.** It reads width and height from Gamma's own
+   `meta='{"width":...,"height":...}'`, and Gamma does not always emit it — 81 of 280 tags had
+   neither. Each one is a layout shift: the browser cannot reserve the box, so the paragraph under
+   the image jumps once per image, on every deck page, on every uncached visit.
+
+`repair-deck-image-html.mjs` fixes both. It reads the real dimensions out of the image header — the
+PNG IHDR chunk or the JPEG SOF frame marker — over a ranged GET, a few KB per image, no image
+library. `sharp` would do it in a line and is deliberately absent from `package.json`; this script
+is why it does not need to be added. It is idempotent, so re-running it after a fresh conversion
+only fills the new gaps.
+
+**It defaults to the public decks, and the gated ones need a second pass.** Without `--gated` it
+reads `content/decks/cards/` and fetches headers over HTTP from the public host — which is exactly
+what a gated asset refuses, by design, with a `401`. So a run that looks complete leaves the NDA
+decks untouched: 21 of their 73 tags had no size the first time this was done, and none of them
+would have been caught. `--gated` switches to `content/decks/cards-gated/` and reads the bytes
+straight out of the bucket with the operator credential, mapping the card's
+`/api/community/assets/<objectName>` src 1:1 onto the object name.
+
+Nothing NDA leaves the machine: `cards-gated/` is gitignored, and the only edit is a width and a
+height per image.
+
+**Committing the repaired `cards.json` changes nothing on its own.** The reader fetches cards from
+the bucket and only falls back to the committed copy when the bucket is unreachable, so step 5
+against *each* environment's bucket is what makes the fix visible.
 
 ## Access level is the thing you must not get wrong
 

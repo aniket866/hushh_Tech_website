@@ -206,7 +206,12 @@ const normalizeHtml = (html) => {
       .join("");
 
     if (mapped === "img") {
-      output += `<img${kept}${imageDimensions(attrs)} loading="lazy" decoding="async" />`;
+      // `kept` drops an allowlisted attribute the source tag does not carry, so an image whose
+      // src did not survive that filter would otherwise ship as `<img alt="..." />` — a broken
+      // image placeholder on a live page rather than a missing one. No source, no element.
+      if (attrs.src) {
+        output += `<img${kept}${imageDimensions(attrs)} loading="lazy" decoding="async" />`;
+      }
       continue;
     }
     if (mapped === "br" || mapped === "hr") {
