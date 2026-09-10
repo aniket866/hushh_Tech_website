@@ -27,6 +27,8 @@ The GitHub path owns review, freshness, protected merging, and release approval.
 
 The tag lane is intentionally UAT-only. A tag can point at a topic commit, so its result is a branch-preview deployment and is not evidence that the commit is eligible for production. Production remains the manual, green-`main` Actions workflow until a separate design binds an immutable UAT verification receipt, environment-neutral artifact, serving revision, smoke result, and automatic rollback. Do not promote a UAT image that embeds UAT browser callback or KYC values into production.
 
+The trigger configuration is part of this repository so the deployed build definition is reviewable alongside the helper it invokes. Updating the Cloud Build trigger is a separate, explicit infrastructure operation.
+
 ## Private-repository readiness
 
 Changing repository visibility does not itself move CI or deploy execution. Before making the repository private, verify the organization plan supports the protected ruleset and merge queue, confirm the Cloud Build GitHub App connection still has repository access, and rehearse the required `merge_group` status checks. Keep the GitHub `merge_group` workflow while Cloud Build validation is being evaluated; it is the status-bearing freshness gate for the protected queue.
