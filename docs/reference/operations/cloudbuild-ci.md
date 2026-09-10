@@ -31,9 +31,15 @@ artifact/Chromium/WebKit proof. It does not download browsers or build the
 application a second time. The remaining steps run the Cloud Run service
 checks, npm audit, sensitive NDA regressions, and pinned gitleaks.
 A failed step fails the build; cache restore/save is the only best-effort work.
-The `history-restore` preparation deepens a shallow checkout by at most 128
-commits and fetches only the two additional pinned revisions required by the
-contract tests, preserving ancestry proofs without a full repository clone.
+The `repository-history` preparation obtains a short-lived read token from the
+existing Cloud Build repository connection, unshallows the exact tested HEAD,
+and verifies the pinned recovery revision without moving HEAD. The token is
+passed to Git through a child-only HTTP header and is never written to disk,
+logs, or the build configuration. The build identity needs only
+`roles/cloudbuild.readTokenAccessor`; it does not receive deployer access or a
+long-lived GitHub credential. This preserves the historical ancestry proofs
+without relying on the source-fetch credential helper, which is unavailable in
+ordinary build steps.
 
 The GitHub `PR Policy Gate` is intentionally small. It runs DCO, reviewer
 context, PR body hygiene, Phase 2 policy, and the advisory semantic guard because

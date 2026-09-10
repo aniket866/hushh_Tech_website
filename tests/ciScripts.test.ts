@@ -183,11 +183,10 @@ describe("CI workflow scripts", () => {
     expect(cloudBuild).toContain("npm ci --no-audit --no-fund --cache /workspace/.npm-cache --prefer-offline");
     expect(cloudBuild).toContain("node scripts/ci/check-deploy-build-context.mjs");
     expect(cloudBuild).toContain("zricethezav/gitleaks:v8.24.2");
-    expect(cloudBuild).toContain("id: history-restore");
-    expect(cloudBuild).toContain("7b41548d3af0532a59e7c6b008e795feece381fc");
-    expect(cloudBuild).toContain("cbfde1b1bf5ef97ebb71766953857750b711d791");
-    expect(cloudBuild).toContain("git fetch --no-tags --deepen=128 origin");
-    expect(cloudBuild).toContain("git fetch --no-tags origin \"$$commit\"");
+    expect(cloudBuild).toContain("id: repository-history");
+    expect(cloudBuild).toContain("scripts/ci/prepare-repository-history.mjs");
+    expect(cloudBuild).not.toContain("git fetch --no-tags --deepen=128 origin");
+    expect(cloudBuild).not.toContain("git fetch --no-tags origin \"$$commit\"");
     expect(githubBackup).toMatch(/\non:\n  workflow_dispatch:/);
     expect(githubBackup).not.toMatch(/\n  pull_request:/);
     expect(codeql).toMatch(/\non:\n  workflow_dispatch:/);
