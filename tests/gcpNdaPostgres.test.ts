@@ -34,13 +34,14 @@ describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposa
   beforeAll(async () => {
     expect(execFileSync(join(bin, 'postgres'), ['--version'], { encoding: 'utf8' })).toMatch(/PostgreSQL\) 17\./);
     directory = mkdtempSync(join(tmpdir(), 'hushh-nda-pg-'));
-    execFileSync(join(bin, 'initdb'), ['-D', join(directory, 'data'), '-U', 'postgres', '-A', 'trust', '--no-locale', '-E', 'UTF8'], { stdio: 'pipe' });
+    execFileSync(join(bin, 'initdb'), ['-D', join(directory, 'data'), '-U', 'fixture_bootstrap', '-A', 'trust', '--no-locale', '-E', 'UTF8'], { stdio: 'pipe' });
     execFileSync(join(bin, 'pg_ctl'), ['-D', join(directory, 'data'), '-l', join(directory, 'postgres.log'), '-o', `-k ${directory} -h '' -p 55439`, '-w', 'start'], { stdio: 'pipe' });
     started = true;
     const config = { host: directory, port: 55439, user: 'postgres' };
-    const initial = new pg.Client({ ...config, database: 'postgres' });
+    const initial = new pg.Client({ ...config, user: 'fixture_bootstrap', database: 'postgres' });
     await initial.connect();
-    await initial.query('CREATE DATABASE hushh_tech_app');
+    await initial.query('CREATE ROLE postgres LOGIN SUPERUSER');
+    await initial.query('CREATE DATABASE hushh_tech_app OWNER postgres');
     await initial.end();
     admin = new pg.Pool({ ...config, database: 'hushh_tech_app' });
     for (const file of ['migration/sql/001_identity_migration_foundation.sql', 'tests/fixtures/ndaUatCatalog.sql']) {
@@ -59,6 +60,32 @@ describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposa
       expect((await executor.query("SELECT to_regclass('hushh_migration.nda_release_migrations') AS ledger")).rows[0].ledger).toBeNull();
       await executor.query(`REVOKE hushh_tech_schema_owner FROM "${webRole}"`);
       expect((await runRelease(executor)).ready).toBe(true);
+      // The explicit capability probe must not persist any migration/role or
+      // touch existing identities, even when every operation is permitted.
+      expect((await runRelease(executor, { mode: 'probe', releaseSha: 'd'.repeat(40) })).roleCapability).toBe('proven_rolled_back');
+      expect((await executor.query(`SELECT to_regrole('hushh_tech_identity_provisioner') AS provisioner,
+        to_regclass('hushh_migration.nda_release_migrations') AS ledger,
+        EXISTS(SELECT 1 FROM pg_enum WHERE enumlabel='FIREBASE_NATIVE') AS native_basis`)).rows[0])
+        .toEqual({ provisioner: null, ledger: null, native_basis: false });
+      expect((await executor.query('SELECT to_jsonb(l) AS evidence FROM hushh_identity.identity_links l')).rows).toEqual(originalIdentity);
+      // Ordinary PG17 postgres with CREATEROLE must still fail the real probe.
+      // A separate disposable LOCAL admin restores the bootstrap role in
+      // finally; none of these fixtures accept an external database URL.
+      const roleAdmin = new pg.Client({ ...config, user: 'fixture_bootstrap', database: 'hushh_tech_app' });
+      await roleAdmin.connect();
+      try {
+        await roleAdmin.query('GRANT USAGE ON SCHEMA hushh_identity,hushh_migration TO postgres');
+        await roleAdmin.query('ALTER ROLE postgres NOSUPERUSER CREATEROLE');
+        expect((await runRelease(executor)).roleCapability).toBe('requires_rollback_probe');
+        await expect(runRelease(executor, { mode: 'apply', releaseSha: 'd'.repeat(40) })).rejects.toMatchObject({
+          code: 'ROLE_LIFECYCLE_PROBE_FAILED', cause: { code: '42501' },
+        });
+        expect((await roleAdmin.query("SELECT to_regclass('hushh_migration.nda_release_migrations') AS ledger")).rows[0].ledger).toBeNull();
+      } finally {
+        await roleAdmin.query('ALTER ROLE postgres SUPERUSER');
+        await roleAdmin.query('REVOKE USAGE ON SCHEMA hushh_identity,hushh_migration FROM postgres');
+        await roleAdmin.end();
+      }
       await executor.query(`CREATE FUNCTION public.fixture_block_004() RETURNS event_trigger LANGUAGE plpgsql AS $$
         BEGIN IF EXISTS(SELECT 1 FROM pg_event_trigger_ddl_commands() WHERE object_identity='hushh_identity.runtime_admission')
           THEN RAISE EXCEPTION 'synthetic 004 failure'; END IF; END $$;
@@ -107,13 +134,13 @@ describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposa
       await client.query('CREATE ROLE fixture_provisioner NOLOGIN NOINHERIT NOSUPERUSER NOCREATEROLE NOBYPASSRLS');
       const grants = () => client.query(`SELECT m.admin_option,m.inherit_option,m.set_option,pg_get_userbyid(m.grantor) AS grantor
         FROM pg_auth_members m WHERE m.roleid='fixture_provisioner'::regrole`);
-      expect((await grants()).rows).toEqual([{ admin_option: true, inherit_option: false, set_option: false, grantor: 'postgres' }]);
+      expect((await grants()).rows).toEqual([{ admin_option: true, inherit_option: false, set_option: false, grantor: 'fixture_bootstrap' }]);
       await client.query('GRANT fixture_provisioner TO fixture_cloudsql_postgres');
       await client.query('SET LOCAL ROLE fixture_provisioner; RESET ROLE');
       await client.query('REVOKE fixture_provisioner FROM fixture_cloudsql_postgres');
       // The bootstrap-granted ADMIN membership survives the creator's REVOKE.
       // 004's final zero-members assertion must reject this, not ignore it.
-      expect((await grants()).rows).toEqual([{ admin_option: true, inherit_option: false, set_option: false, grantor: 'postgres' }]);
+      expect((await grants()).rows).toEqual([{ admin_option: true, inherit_option: false, set_option: false, grantor: 'fixture_bootstrap' }]);
     } finally {
       await client.query('ROLLBACK');
       await client.query('RESET SESSION AUTHORIZATION');

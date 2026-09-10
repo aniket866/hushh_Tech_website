@@ -219,62 +219,53 @@ There is no web grant. A failed 004 leaves a recorded committed 003 and can be
 retried; unknown/unrecorded partial state or changed hashes fail closed. No
 automatic down migration, role repair, or historical replay is provided.
 
-**Live read-only preflight, 2026-09-10:** `postgres` can connect with the existing
-secret over verified TLS, is CREATEROLE but not superuser, and inherits
-`cloudsqlsuperuser`. The web database identity is NOW an inheriting member of
-`hushh_tech_schema_owner` with SET ROLE, granted by `cloudsqladmin`. This differs
-from the earlier sealed catalog and both SQL files reject it. Do not silently
-revoke it, weaken preconditions, or use it to execute migrations. The designated
-database owner must review/remediate this drift through an approved change.
+### Managed-role capability: verified behavior, not a superuser assumption
 
-The read-only capability check also does NOT equate CREATEROLE or project Owner
-with ADMIN OPTION on an existing role. The standard superuser test is sufficient
-for the disposable local fixture, but Cloud SQL postgres fails that proof.
-`ROLE_ADMIN_CAPABILITY_NOT_PROVEN` is an intentional live blocker, not a request
-for SUPERUSER or an override flag. A reviewed, read-only-verifiable managed-role
-administration mechanism must be established before this executor can apply
-in Cloud SQL. Neither the audit identity nor IAM Owner resolves this contract.
+The 2026-09-11 authorized UAT rollback probe disproved the earlier assumption
+that Cloud SQL postgres cannot perform the required lifecycle. It successfully
+granted/set/reset/revoked the existing owner, created the exact restricted
+provisioner, granted/set/reset/revoked it, verified zero memberships and rolled
+everything back. Cloud SQL did not retain the automatic creator membership
+observed in ordinary PostgreSQL 17. This is target-specific operational proof,
+not authority inferred from GCP Owner or CREATEROLE.
 
-### Confirmed PG17 lifecycle incompatibility (not another IAM request)
+The separately authorized single web-to-schema-owner REVOKE was committed.
+Fresh read-only catalog evidence confirms zero sealed-role memberships,
+preserved web IAM/runtime memberships, FORCE RLS, owners and existing grants.
+Aggregate fingerprints/counts of all 369 links, 104 users and 327 signatures
+are unchanged. The original grantor was cloudsqladmin; the originating human
+or invocation remains unproven. No further role repair is performed by this
+executor. Migrations 003/004 and their ledger are still absent at this audit.
 
-A disposable PostgreSQL 17 regression now reproduces the relevant non-superuser
-CREATEROLE attributes instead of relying solely on a bootstrap superuser:
+The corrected executor separates three modes:
 
-1. Granting the existing sealed owner fails with SQLSTATE `42501` without
-   ADMIN OPTION. Giving postgres an ordinary SET/INHERIT membership would not
-   supply ADMIN OPTION and would also violate 003's entry precondition.
-2. Creating the provisioner as a non-superuser automatically creates a
-   bootstrap-superuser-granted ADMIN membership for the creator. The creator's
-   own GRANT/REVOKE cycle does not remove that original membership. Unchanged
-   004 therefore cannot satisfy its final zero-members assertion using only
-   ordinary PG17 CREATEROLE capabilities.
+- `preflight`: read-only catalog/hash/ledger/security checks. `ready=true`
+  means catalog readiness, not permission to apply. Pending SQL reports
+  `roleCapability=requires_rollback_probe`.
+- `probe`: requires the release SHA and session lock; runs the exact temporary
+  role lifecycle, verifies the selected actors and zero memberships, ALWAYS
+  rolls back, then rechecks the original catalog. No SQL migration or ledger
+  entry is committed. Success reports `proven_rolled_back`.
+- `apply`: repeats preflight and the mandatory rollback probe itself before
+  pending files. An earlier probe report is not trusted input. Failure stops
+  before migration SQL. Completed releases need only read-only postconditions.
 
-See [PostgreSQL 17 role attributes](https://www.postgresql.org/docs/17/role-attributes.html).
-The runner reports `PROVISIONER_SEAL_CAPABILITY_NOT_PROVEN` alongside the
-existing owner-administration blocker. It also refuses stray provisioner
-objects before 003 and rechecks security postconditions during read-only
-preflight when completion records exist. No override or SQL-byte substitution
-is introduced.
+No boolean override, fake superuser result, persistent grant, provider evidence
+or SQL checksum change is accepted. Real disposable PG17 tests preserve the
+ordinary CREATEROLE-denial/creator-membership regression alongside successful
+probe rollback, ordered commits, 004 failure recovery and idempotency tests.
+The live managed-role behavior requires separate UAT proof, not a fixture claim.
 
-The fresh live read-only query confirmed: postgres is not superuser; its only
-membership is `cloudsqlsuperuser`; web memberships are `cloudsqliamserviceaccount`,
-`hushh_tech_runtime`, and the drifted `hushh_tech_schema_owner`, all granted by
-`cloudsqladmin` without ADMIN OPTION. No callable non-system administrative
-grant/revoke helper was found. The 30-day database-user audit query returned no
-matching entries, so the human/invocation that created the drift is not proven.
+The corrected local executor's `probe` mode was also run against live UAT on
+2026-09-11 through the existing private VM/TLS path: preflight passed as
+non-superuser postgres, capability reported `proven_rolled_back`, and the
+subsequent preflight was identical. All 19 captured catalog/integrity sections
+matched before/after. This diagnostic is not a deployed image or migration
+approval. The governed NDA test account authenticated, but native `status` and
+`record` still returned HTTP 500; fresh Cloud SQL logs confirmed the missing
+`ensure_current_application_principal(jsonb)` function. No consent was submitted.
 
-Cloud SQL's documented [database-role assignment API/CLI](https://docs.cloud.google.com/sql/docs/postgres/add-manage-iam-users)
-is a supported control-plane surface for reviewing/remediating custom user
-memberships. Its replace-roles operation is not a proven transaction-safe
-executor for the SQL's temporary ADMIN/grant lifecycle. Do not blindly replace
-the web role list, lose its IAM/runtime memberships, or assume this API grants
-PostgreSQL ADMIN OPTION. The designated database owner must approve a supported
-managed lifecycle (or a narrowly reviewed migration/executor amendment) before
-either migration runs. GCP Owner, a password, or removing web-owner membership
-alone does not resolve both contradictions. Do not request broad additional IAM
-or PostgreSQL SUPERUSER as a workaround.
-
-Exact release sequence once those blockers are resolved:
+Exact release sequence:
 
 1. Authorized review of the executor, pinned 003/004 bytes, fresh catalog and
    managed-role capability proof. Land the reviewed change and require green
@@ -288,7 +279,8 @@ Exact release sequence once those blockers are resolved:
    and postgres-secret reference. No historical SQL is packaged.
 4. Run `MODE=preflight` on that reviewed image. The current image v6 is NOT this
    entrypoint. Abort on any blocker; do not use an execution override to defeat it.
-5. Only after successful proof/approval invoke the same image with `MODE=apply`
+5. Invoke `MODE=probe`, `RELEASE_SHA=<reviewed-full-main-sha>` and verify its
+   rolled-back result. Only after successful proof/approval invoke the same image with `MODE=apply`
    and `RELEASE_SHA=<reviewed-full-main-sha>`. 003 commits before 004 starts; SQL
    and completion records are atomic and 004 failure stops the job immediately.
 6. Re-run preflight and inspect restricted ledger/postconditions. Admission
@@ -297,9 +289,10 @@ Exact release sequence once those blockers are resolved:
 7. Deploy only through the existing green-main UAT workflow, then perform real
    existing/Google/Apple signing and protected-content verification.
 
-No exact live apply command is authorized today: the deployed image is still
-v6 and the role drift/managed-role proof remain blockers. No live schema, role,
-job, provider, or admission changes were made as part of this preparation.
+The executor correction must still pass review and land on green main before
+its image is released. The old deployed v6 is not an acceptable substitute.
+Provider/recovery evidence and an approved test identity remain separate
+prerequisites; do not enable admission or create legal signatures to bypass them.
 
 ### Historical live snapshot before PR preparation (2026-09-10)
 

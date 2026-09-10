@@ -10,6 +10,7 @@ export const MIGRATIONS = Object.freeze([
   { id: '004', file: '004_firebase_native_provisioning.sql', sha256: 'bc4045b25b7d42bcf3aa286fa2619f00f53d93863e94737f717864343c8e2eea' },
 ]);
 const OWNER = 'hushh_tech_schema_owner';
+const PROVISIONER = 'hushh_tech_identity_provisioner';
 const WEB = 'hushh-tech-web-uat@hushh-tech-uat.iam';
 const LEDGER = 'hushh_migration.nda_release_migrations';
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
@@ -58,17 +59,10 @@ export async function preflight(client) {
     if (context.database !== 'hushh_tech_app' || context.actor !== 'postgres' || context.version < 170000 || context.version >= 180000) blockers.push('WRONG_DATABASE_ACTOR_OR_VERSION');
     if (!owner || Object.values(owner).some(Boolean) || members.length) blockers.push('SEALED_ROLE_DRIFT');
     if (tables.length !== 3 || tables.some((t) => t.owner !== OWNER || !t.rls || !t.force)) blockers.push('TABLE_SECURITY_DRIFT');
-    // CREATEROLE is not ADMIN OPTION on a pre-existing role in PG17. Cloud SQL
-    // postgres is not a superuser. Do NOT infer an undocumented managed-service
-    // privilege or expose a boolean override to turn uncertainty into authority.
-    if (!context.rolsuper) {
-      blockers.push('ROLE_ADMIN_CAPABILITY_NOT_PROVEN');
-      // PG17 also automatically grants a new role to its CREATEROLE creator
-      // WITH ADMIN TRUE (grantor = bootstrap superuser). The creator cannot
-      // remove that grant, so 004's zero-members postcondition needs a proven
-      // managed administration path even AFTER existing-owner drift is fixed.
-      blockers.push('PROVISIONER_SEAL_CAPABILITY_NOT_PROVEN');
-    }
+    // Catalog readiness is not proof of role administration. Cloud SQL's
+    // managed postgres can support this lifecycle without rolsuper. Apply
+    // proves the actual operations in a rolled-back transaction below; there
+    // is no superuser shortcut, caller-supplied attestation or override flag.
     if (!context.rolsuper && !context.rolcreaterole) blockers.push('CREATE_ROLE_DENIED');
     if (applied.some((r, i) => r.migration_id !== MIGRATIONS[i]?.id || r.sha256 !== MIGRATIONS[i]?.sha256)) blockers.push('RELEASE_LEDGER_MISMATCH');
     if (Boolean(state.native_enum) !== applied.some((r) => r.migration_id === '003') ||
@@ -77,7 +71,8 @@ export async function preflight(client) {
     // A ledger entry is not sufficient proof: recheck live security even in
     // read-only preflight, not only after a caller opts into apply mode.
     if (!blockers.length) for (const row of applied) await postconditions(client, row.migration_id);
-    return { ready: blockers.length === 0, blockers, context, members, applied };
+    return { ready: blockers.length === 0, blockers, context, members, applied,
+      roleCapability: applied.length === MIGRATIONS.length ? 'not_required' : 'requires_rollback_probe' };
   } finally { await client.query('ROLLBACK'); }
 }
 
@@ -85,6 +80,11 @@ async function postconditions(client, id) {
   const { rows: [sealed] } = await client.query(`SELECT count(*)::int AS count FROM pg_auth_members m
     JOIN pg_roles r ON r.oid=m.roleid WHERE r.rolname IN ('hushh_tech_schema_owner','hushh_tech_identity_provisioner')`);
   if (sealed.count !== 0) fail('POSTCONDITION_ROLE_NOT_SEALED');
+  const { rows: [basis] } = await client.query(`SELECT EXISTS(SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid=e.enumtypid JOIN pg_namespace n ON n.oid=t.typnamespace
+    WHERE n.nspname='hushh_identity' AND t.typname='identity_mapping_basis'
+      AND e.enumlabel='FIREBASE_NATIVE') AS native_basis`);
+  if (!basis?.native_basis) fail('POSTCONDITION_NATIVE_BASIS_MISSING');
   if (id === '004') {
     const { rows: [fn] } = await client.query(`SELECT p.prosecdef,pg_get_userbyid(p.proowner) AS owner,p.proconfig,
       has_function_privilege($1,p.oid,'EXECUTE') AS web_execute
@@ -95,6 +95,36 @@ async function postconditions(client, id) {
       has_table_privilege($1,'hushh_identity.provider_ownership','INSERT,UPDATE,DELETE') AS ownership_write`, [WEB]);
     if (access.identity_write || access.ownership_write) fail('POSTCONDITION_WEB_IDENTITY_WRITE');
   }
+}
+
+// Called only after read-only preflight, under the release's session lock.
+// Even a failed GRANT or an automatic creator membership must roll back. This
+// probes the exact reviewed role names/attributes, never repairs live drift,
+// writes application data, or commits a role. Ordinary PG17 CREATEROLE must
+// still fail when it cannot administer or completely reseal these roles.
+async function proveRoleLifecycle(client, report) {
+  await client.query('BEGIN');
+  try {
+    await client.query("SET LOCAL lock_timeout='3s'; SET LOCAL statement_timeout='30s'");
+    await client.query('GRANT hushh_tech_schema_owner TO postgres; SET LOCAL ROLE hushh_tech_schema_owner');
+    if ((await client.query('SELECT current_user AS probe_actor')).rows[0]?.probe_actor !== OWNER) fail('ROLE_PROBE_ACTOR_INVALID');
+    await client.query('RESET ROLE; REVOKE hushh_tech_schema_owner FROM postgres');
+    if (!report.applied.some((r) => r.migration_id === '004')) {
+      await client.query('CREATE ROLE hushh_tech_identity_provisioner NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS');
+      await client.query('GRANT hushh_tech_identity_provisioner TO postgres; SET LOCAL ROLE hushh_tech_identity_provisioner');
+      if ((await client.query('SELECT current_user AS probe_actor')).rows[0]?.probe_actor !== PROVISIONER) fail('ROLE_PROBE_ACTOR_INVALID');
+      await client.query('RESET ROLE; REVOKE hushh_tech_identity_provisioner FROM postgres');
+    }
+    const { rows: [sealed] } = await client.query(`SELECT count(*)::int AS count FROM pg_auth_members m
+      JOIN pg_roles r ON r.oid=m.roleid WHERE r.rolname IN ('hushh_tech_schema_owner','hushh_tech_identity_provisioner')`);
+    if (sealed?.count !== 0) fail('ROLE_PROBE_NOT_SEALED');
+    if ((await client.query('SELECT current_user AS probe_actor')).rows[0]?.probe_actor !== 'postgres') fail('ROLE_PROBE_ACTOR_INVALID');
+  } catch (error) {
+    throw Object.assign(new Error('ROLE_LIFECYCLE_PROBE_FAILED'), { code: 'ROLE_LIFECYCLE_PROBE_FAILED', cause: error });
+  } finally { await client.query('ROLLBACK'); }
+  // Prove rollback restored the original catalog/ledger before any file runs.
+  const restored = await preflight(client);
+  if (!restored.ready || JSON.stringify(restored) !== JSON.stringify(report)) fail('ROLE_PROBE_ROLLBACK_DRIFT');
 }
 
 async function recordCompletion(client, migration, releaseSha) {
@@ -116,8 +146,8 @@ async function recordCompletion(client, migration, releaseSha) {
 }
 
 export async function runRelease(client, { mode = 'preflight', releaseSha } = {}) {
-  if (!['preflight', 'apply'].includes(mode)) fail('UNSUPPORTED_MODE');
-  if (mode === 'apply' && !/^[0-9a-f]{40}$/.test(releaseSha || '')) fail('APPROVED_RELEASE_SHA_REQUIRED');
+  if (!['preflight', 'probe', 'apply'].includes(mode)) fail('UNSUPPORTED_MODE');
+  if (mode !== 'preflight' && !/^[0-9a-f]{40}$/.test(releaseSha || '')) fail('APPROVED_RELEASE_SHA_REQUIRED');
   const migrations = await loadMigrations();
   if (mode === 'preflight') return preflight(client);
   // Session lock spans both committed files and also serializes retries.
@@ -126,6 +156,8 @@ export async function runRelease(client, { mode = 'preflight', releaseSha } = {}
   try {
     const report = await preflight(client);
     if (!report.ready) fail(report.blockers.join(','));
+    if (report.applied.length !== migrations.length) await proveRoleLifecycle(client, report);
+    if (mode === 'probe') return { ...report, roleCapability: report.applied.length === migrations.length ? 'not_required' : 'proven_rolled_back' };
     for (const migration of migrations) {
       if (report.applied.some((r) => r.migration_id === migration.id)) {
         await postconditions(client, migration.id);
