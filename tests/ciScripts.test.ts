@@ -165,6 +165,42 @@ describe("CI workflow scripts", () => {
     expect(deployer).not.toContain('"-c", `git archive');
   });
 
+  it("routes default pull-request code gates to Cloud Build without automatic CodeQL or full Actions cycles", () => {
+    const cloudBuild = fs.readFileSync(path.join(repoRoot, "cloudbuild.ci.yaml"), "utf8");
+    const githubBackup = fs.readFileSync(path.join(repoRoot, ".github/workflows/ci.yml"), "utf8");
+    const codeql = fs.readFileSync(path.join(repoRoot, ".github/workflows/codeql.yml"), "utf8");
+    const policy = fs.readFileSync(path.join(repoRoot, ".github/workflows/pr-policy.yml"), "utf8");
+    const bridge = fs.readFileSync(path.join(repoRoot, ".github/workflows/cloudbuild-status-gate.yml"), "utf8");
+    const signalkeeper = fs.readFileSync(path.join(repoRoot, ".github/workflows/pr-agent.yml"), "utf8");
+
+    expect(cloudBuild).toContain("hushh-tech-website-ci");
+    expect(cloudBuild).toContain("id: no-hybrid-contract");
+    expect(cloudBuild).toContain("id: no-hybrid-runtime");
+    expect(cloudBuild).toContain('waitFor: ["web", "no-hybrid-contract"]');
+    expect(cloudBuild).toContain("mcr.microsoft.com/playwright:v1.57.0-noble");
+    expect(cloudBuild).toContain("npx playwright install --list");
+    expect(cloudBuild).not.toContain("playwright install --with-deps");
+    expect(cloudBuild).toContain("npm ci --no-audit --no-fund --cache /workspace/.npm-cache --prefer-offline");
+    expect(cloudBuild).toContain("node scripts/ci/check-deploy-build-context.mjs");
+    expect(cloudBuild).toContain("zricethezav/gitleaks:v8.24.2");
+    expect(cloudBuild).toContain("id: history-restore");
+    expect(cloudBuild).toContain("7b41548d3af0532a59e7c6b008e795feece381fc");
+    expect(cloudBuild).toContain("cbfde1b1bf5ef97ebb71766953857750b711d791");
+    expect(cloudBuild).toContain("git fetch --no-tags --deepen=128 origin");
+    expect(cloudBuild).toContain("git fetch --no-tags origin \"$$commit\"");
+    expect(githubBackup).toMatch(/\non:\n  workflow_dispatch:/);
+    expect(githubBackup).not.toMatch(/\n  pull_request:/);
+    expect(codeql).toMatch(/\non:\n  workflow_dispatch:/);
+    expect(codeql).not.toMatch(/\n  pull_request:/);
+    expect(codeql).not.toMatch(/\n  push:/);
+    expect(codeql).not.toMatch(/\n  schedule:/);
+    expect(policy).toContain("name: PR Policy Gate");
+    expect(bridge).toContain('context:"CI Status Gate"');
+    expect(bridge).toContain("statuses: write");
+    expect(signalkeeper).toContain("review_requested");
+    expect(signalkeeper).not.toContain("synchronize");
+  });
+
   it("loads local env vars when running the dev API server", () => {
     const rootPackage = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")
@@ -241,7 +277,11 @@ describe("CI workflow scripts", () => {
       "utf8"
     );
 
-    for (const workflow of [prWorkflow, queueWorkflow]) {
+    expect(prWorkflow).toContain("name: PR Validation (GitHub backup)");
+    expect(prWorkflow).toMatch(/\non:\n  workflow_dispatch:/);
+    expect(prWorkflow).not.toMatch(/\n  pull_request:/);
+
+    for (const workflow of [queueWorkflow]) {
       expect(workflow).toContain('SERVICE_NODE_VERSION: "22.23.2"');
       expect(workflow).toContain("gcp-service-foundation:");
       expect(workflow).toContain("name: GCP Service Foundation");
@@ -256,7 +296,8 @@ describe("CI workflow scripts", () => {
     expect(orchestrator).toContain("npm ci --ignore-scripts");
     expect(orchestrator).toContain("npm run check");
     expect(orchestrator).toContain("npm audit --omit=dev");
-    expect(governance).toContain("9. `GCP Service Foundation`");
+    expect(governance).toContain("`Cloud Build CI` is the default pre-merge code-executing check surface");
+    expect(governance).toContain("`service`");
   });
 
   it("runs the network-off Cloud SQL attestor on its exact Node runtime", () => {
@@ -279,7 +320,10 @@ describe("CI workflow scripts", () => {
     expect(rootPackage.scripts["gcp:migration:check-cloudsql-attestor"]).toBe(
       "npm --prefix cloud-run/hushh-tech-cloudsql-attestor run check"
     );
-    for (const workflow of [prWorkflow, queueWorkflow]) {
+    expect(prWorkflow).toContain("name: PR Validation (GitHub backup)");
+    expect(prWorkflow).toMatch(/\non:\n  workflow_dispatch:/);
+    expect(prWorkflow).not.toMatch(/\n  pull_request:/);
+    for (const workflow of [queueWorkflow]) {
       expect(workflow).toContain('ATTESTOR_NODE_VERSION: "22.22.0"');
       expect(workflow).toContain("gcp-cloudsql-attestor:");
       expect(workflow).toContain("name: GCP Cloud SQL Attestor");
@@ -292,7 +336,8 @@ describe("CI workflow scripts", () => {
       expect(workflow).toContain("run: npm run gcp:migration:check-cloudsql-attestor");
       expect(workflow).toContain("needs.gcp-cloudsql-attestor.result");
     }
-    expect(governance).toContain("10. `GCP Cloud SQL Attestor`");
+    expect(governance).toContain("`Cloud Build CI` is the default pre-merge code-executing check surface");
+    expect(governance).toContain("`Queue Validation` remains the GitHub `merge_group` freshness check");
   });
 
   it("registers each Hushh Research compatibility route once", () => {

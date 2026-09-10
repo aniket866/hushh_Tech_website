@@ -7,7 +7,8 @@ state and the exact commit SHA are authoritative.
 
 ## Authority boundaries
 
-1. The ordinary path is PR validation followed by the protected `main` merge
+1. The ordinary path is Cloud Build code validation plus the GitHub PR Policy
+   and `CI Status Gate`, followed by the protected `main` merge
    queue.
 2. An Admin PR landing is a governed queue bypass, not a validation bypass. It
    requires an explicit decision to use the Admin path and an actor listed in

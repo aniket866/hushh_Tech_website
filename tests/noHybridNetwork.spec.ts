@@ -257,27 +257,44 @@ test("network guard samples five unauthenticated application routes", async ({ c
 test("generated anonymous routes reach their exact terminal surfaces without provider egress", async ({ context, page }) => {
   test.setTimeout(240_000);
   const networkGate = await installNoHybridNetworkGate(context);
+  const fixtureCorsHeaders = {
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "DELETE, GET, OPTIONS, PATCH, POST, PUT",
+    "Access-Control-Allow-Origin": "*",
+  };
+
   await context.route("**/api/**", async (route) => {
     const requestUrl = new URL(route.request().url());
+    const requestMethod = route.request().method();
+
+    if (requestMethod === "OPTIONS") {
+      await route.fulfill({
+        status: 204,
+        headers: fixtureCorsHeaders,
+      });
+      return;
+    }
 
     // These are public, browser-readable surfaces. Return their minimal
     // response contracts so a deliberately offline fixture does not turn an
     // expected unavailable backend response into a WebKit page error. All
     // other API calls remain fail-closed below, which keeps protected-route
     // coverage and provider-egress assertions intact.
-    if (route.request().method() === "GET" && requestUrl.pathname === "/api/community/posts") {
+    if (requestMethod === "GET" && requestUrl.pathname === "/api/community/posts") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: fixtureCorsHeaders,
         body: JSON.stringify({ posts: [] }),
       });
       return;
     }
 
-    if (route.request().method() === "POST" && requestUrl.pathname === "/api/stock-quotes") {
+    if (requestMethod === "POST" && requestUrl.pathname === "/api/stock-quotes") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
+        headers: fixtureCorsHeaders,
         body: JSON.stringify({
           success: false,
           quotes: [],
@@ -292,11 +309,7 @@ test("generated anonymous routes reach their exact terminal surfaces without pro
     await route.fulfill({
       status: 503,
       contentType: "application/json",
-      headers: {
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "DELETE, GET, OPTIONS, PATCH, POST, PUT",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: fixtureCorsHeaders,
       body: JSON.stringify({ error: { code: "DETERMINISTIC_FIXTURE", message: "Unavailable in anonymous route proof." } }),
     });
   });

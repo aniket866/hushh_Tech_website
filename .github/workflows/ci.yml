@@ -1,10 +1,11 @@
-name: PR Validation
+name: PR Validation (GitHub backup)
 
+# The default pull-request code gate runs in Cloud Build (`cloudbuild.ci.yaml`)
+# so the expensive test/build fan-out uses the GCP build project. Keep this
+# workflow as an explicit, full GitHub Actions backup for incident recovery.
+# `Queue Validation` remains on `merge_group` because GitHub owns merge-queue
+# freshness and must validate the synthetic queue ref.
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
   workflow_dispatch:
 
 permissions:

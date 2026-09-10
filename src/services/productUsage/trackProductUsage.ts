@@ -24,6 +24,11 @@ export interface ProductUsageRecord {
   updated_at: string;
 }
 
+export interface ProductUsageRpcResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
  * Detect device type from user agent
  */
@@ -67,12 +72,12 @@ function buildMetadata(): ProductUsageMetadata {
  * 
  * @param productName - The product identifier (e.g., 'hushh-ai', 'kyc', 'investor-profile')
  * @param additionalMetadata - Optional additional metadata to store
- * @returns The updated/created usage record, or null if not authenticated
+ * @returns The RPC result, or null if not authenticated
  */
 export async function trackProductUsage(
   productName: string,
   additionalMetadata?: Partial<ProductUsageMetadata>
-): Promise<ProductUsageRecord | null> {
+): Promise<ProductUsageRpcResult | null> {
   try {
     const gcpBackend = config.gcpBackendClient;
     if (!gcpBackend) {
@@ -97,7 +102,6 @@ export async function trackProductUsage(
 
     // Call the RPC function to upsert product usage
     const { data, error } = await gcpBackend.rpc('track_product_usage', {
-      p_user_id: user.id,
       p_product_name: productName,
       p_metadata: metadata,
     });
@@ -108,7 +112,7 @@ export async function trackProductUsage(
     }
 
     console.info(`[ProductUsage] Tracked access to "${productName}" for user ${user.id}`);
-    return data as ProductUsageRecord;
+    return data as ProductUsageRpcResult;
   } catch (err) {
     console.error('[ProductUsage] Unexpected error:', err);
     return null;

@@ -6,7 +6,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 
 1. [OSS Contribution Triage](./oss-contribution-triage.md) for the maintainer decision flow and triage handoffs
 2. [PR Decision Rubric](./pr-decision-rubric.md) for the four outcome buckets and patch-and-merge boundary
-3. [CI Governance](./ci-governance.md) for which PR and deploy lanes are inputs versus merge authority
+3. [CI Governance](./ci-governance.md) for Cloud Build's default PR gate, GitHub policy/backup lanes, and merge authority
 4. [Admin Merge And Release SOP](./admin-release-sop.md) for the exact-head merge queue, Admin bypass, UAT, production, and Firestore release state machine
 5. [Qodo Context Engine Rollout](./qodo-context-engine-rollout.md) for the hushhtech-first indexing and RAG adoption plan
 6. [Skill Taxonomy](./skill-taxonomy.md) for the first-wave owner and spoke skill layout behind this flow
@@ -14,7 +14,8 @@ This folder holds the lightweight operations references for the first-wave OSS c
    frozen no-hybrid migration inventory and its blocking CI contract
 8. [Supabase Native Cutover Gate](./supabase-native-cutover.md) for the fail-closed iOS and Android replacement-build requirement before Supabase deletion
 9. [No-Hybrid Runtime Gate](./no-hybrid-runtime-gate.md) for the blocking source, artifact, native, workflow, and browser proof that the deployable product cannot reach Supabase
-10. [Direct GCP Deployment](./gcp-direct-deploy.md) for the UAT-only Cloud Build tag lane and private-repository readiness
+10. [Cloud Build CI](./cloudbuild-ci.md) for the default GCP pull-request code gate, GitHub policy bridge, and manual Actions backup
+11. [Direct GCP Deployment](./gcp-direct-deploy.md) for the UAT-only Cloud Build tag lane and private-repository readiness
 
 ## Canonical workflow and governance
 
@@ -23,7 +24,7 @@ This folder holds the lightweight operations references for the first-wave OSS c
 3. [Project Context Map](../../project_context_map.md) for repo-surface ownership and default handoffs
 4. [AGENTS](../../../AGENTS.md), [QODO](../../../QODO.MD), [.pr_agent.toml](../../../.pr_agent.toml), [.ai_config.toml](../../../.ai_config.toml), [pr_compliance_checklist.yaml](../../../pr_compliance_checklist.yaml), [.github/copilot-instructions.md](../../../.github/copilot-instructions.md), and [Hushh Signalkeeper custom agent](../../../.github/agents/hushh-signalkeeper.agent.md) for live reviewer grounding and GitHub-agent context
 5. [README](../../../README.md), [CONTRIBUTING](../../../CONTRIBUTING.md), and [SECURITY](../../../SECURITY.md) for contributor-facing repo policy
-6. [Signalkeeper Preflight](../../../.github/workflows/pr-intake.yml), [Hushh Signalkeeper](../../../.github/workflows/pr-agent.yml), and [PR Validation](../../../.github/workflows/ci.yml) for the live PR automation path
+6. [Signalkeeper Preflight](../../../.github/workflows/pr-intake.yml), [Hushh Signalkeeper](../../../.github/workflows/pr-agent.yml), [PR Policy Gate](../../../.github/workflows/pr-policy.yml), and [Cloud Build Status Gate](../../../.github/workflows/cloudbuild-status-gate.yml) for the live PR automation path
 7. [Queue Validation](../../../.github/workflows/queue-validation.yml), [Main Post-Merge Smoke](../../../.github/workflows/main-post-merge-smoke.yml), [Deploy to UAT](../../../.github/workflows/deploy-uat.yml), and [Deploy to PROD](../../../.github/workflows/deploy-prod.yml) for merge freshness and release governance
 
 ## Suggested order

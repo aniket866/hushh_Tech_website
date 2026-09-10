@@ -6,7 +6,7 @@ speedup lever.
 
 ## Table of contents
 - [End-to-end flow](#end-to-end-flow)
-- [PR validation (ci.yml)](#pr-validation-ciyml)
+- [PR validation (Cloud Build + policy)](#pr-validation-cloud-build--policy)
 - [Post-merge gate](#post-merge-gate)
 - [UAT deploy](#uat-deploy)
 - [PROD deploy](#prod-deploy)
@@ -16,33 +16,42 @@ speedup lever.
 
 ## End-to-end flow
 ```
-PR → ci.yml (9 parallel jobs, gated by "CI Status Gate")
+PR → Cloud Build `hushh-tech-website-ci` (fan-out code gates) + GitHub `PR Policy Gate`
+   → `Cloud Build Status Gate` publishes "CI Status Gate"
    → merge to main
    → "Main Post-Merge Smoke" (main-post-merge-smoke.yml) → "Main Post-Merge Smoke Gate"
    → deploy-uat.yml fires automatically (workflow_run on success)
    → deploy-prod.yml dispatched MANUALLY with the green SHA
 ```
 
-## PR validation (ci.yml)
-`.github/workflows/ci.yml`, name **"PR Validation"**, runs on PRs to `main`/`develop`.
-`concurrency: cancel-in-progress: true` (new push cancels the old run). Jobs:
+## PR validation (Cloud Build + policy)
+`cloudbuild.ci.yaml`, invoked by the `hushh-tech-website-ci` 2nd-generation trigger,
+runs the code and browser gates in GCP. `.github/workflows/pr-policy.yml` runs the
+small metadata checks that need GitHub's pull-request payload. The full
+`.github/workflows/ci.yml` workflow is **"PR Validation (GitHub backup)"** and is
+manual-only.
 
-| Job | id | Timeout | Notes |
-|-----|----|---------| ------|
-| DCO | `dco` | 10m | `npm run dco:check` |
-| Secret Scan | `secret-scan` | 10m | installs gitleaks, `orchestrate.sh secret` |
-| Env Contract Check | `env-contract` | 10m | `orchestrate.sh env` |
-| Reviewer Context & Compliance | `reviewer-context` | 10m | asserts grounding files exist |
-| PR Hygiene | `pr-hygiene` | 10m | `npm run pr:hygiene` |
-| Phase 2 PR Policy | `phase2-pr-policy` | 10m | invite-only policy |
-| Semantic PR Guard | `semantic-pr-guard` | 10m | advisory |
-| **Web Validation** | `web-validation` | **35m** | `npm ci` + `orchestrate.sh web` (test + typecheck + build) — the slow one |
-| Lint | `lint` | 25m | `npm ci` + `orchestrate.sh lint` |
-| Security Audit | `security-audit` | 20m | `npm ci` + `npm audit` + regression budget |
-| CI Status Gate | `ci-status` | 5m | `needs:` all above; final required check |
+| Cloud Build step | Gate | Notes |
+|-------------------|------|-------|
+| `web` | tests, type-check, build, deploy context | runs after the shared install |
+| `lint` | phased lint | runs concurrently with the other code gates |
+| `env-contract` | environment contract | deterministic repository check |
+| `retirement` | frozen migration inventory | deterministic repository check |
+| `no-hybrid-contract` + `no-hybrid-runtime` | source, artifact, Chromium, WebKit | inventories source in parallel; the runtime gate uses the version-pinned Playwright image and reuses the `web` step's `dist/` output |
+| `service` | Cloud Run service package | syntax/static tests and runtime audit |
+| `security-audit` | npm audit regression budget | required security gate |
+| `sensitive-nda-gate` | sensitive API regressions | required NDA contract gate |
+| `secret-scan` | gitleaks | runs independently from install |
 
-Every `npm ci` job re-installs from scratch (only `cache: npm` download cache,
-not `node_modules`).
+`PR Policy Gate` runs DCO, reviewer grounding, PR hygiene, Phase 2 policy, and
+the advisory semantic guard on GitHub. `Cloud Build Status Gate` combines that
+policy result with the Cloud Build trigger result and publishes the required
+ `CI Status Gate` status.
+
+Cloud Build installs once with a lockfile-keyed npm cache and fans the gates out
+from that dependency step. The no-hybrid browser gate installs its pinned
+Playwright browsers in its own step. The GitHub backup retains the historical
+per-job installation model for incident recovery.
 
 ## Post-merge gate
 `.github/workflows/main-post-merge-smoke.yml` produces the
@@ -96,7 +105,8 @@ Three ways to ship the same app → triple the maintenance and drift surface.
 ## Speedup anchors
 Quick map from lever (see SKILL.md) → where to change it:
 1. Image deploy: `deploy-uat.yml:243`, `deploy-prod.yml:198` (`--source .` → build+push+`--image`).
-2. Path-aware CI: `ci.yml` jobs `web-validation` (`:228`), `lint` (`:246`).
+2. Path-aware CI: add reviewed `includedFiles` / `ignoredFiles` filters to the
+   `hushh-tech-website-ci` trigger once the affected-surface contract is explicit.
 3. Caching: add `actions/cache` for `node_modules` in every `npm ci` job;
    Playwright install at `deploy-uat.yml:260`, `deploy-prod.yml:215`.
 4. Tests vs build: `package.json:26` (`build`), add `build:check`.
