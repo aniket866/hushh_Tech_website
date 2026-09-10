@@ -236,10 +236,21 @@ const ensureAlerts = async (channel, uptimeIds) => {
   const existing = (await api(`${MONITORING}/alertPolicies`)).alertPolicies || [];
 
   for (const alert of config.alerts) {
+    // An alert whose condition is a given environment's normal operating state is worse than no
+    // alert: it fires forever and teaches everyone to mute the channel. config.json names those
+    // per environment, with the reason, so the exclusion is a stated decision rather than a gap.
+    if (alert.skipEnvironments?.includes(ENV)) {
+      note("skip", `alert ${alert.name} — ${alert.skipReason || `not applicable on ${ENV}`}`);
+      continue;
+    }
     const displayName = `${PREFIX} — ${alert.name}`;
     const conditions = conditionFor(alert, uptimeIds);
     if (!conditions.length) {
-      note("skip", `alert ${alert.name} (no uptime checks yet — re-run with --apply)`);
+      // A dry run has not created the uptime checks, so there are no check ids to point a policy
+      // at yet. Distinct from the skipEnvironments case above: this one IS created, on the apply.
+      // Saying "skip" for both left a reader of the plan unable to tell which alerts production
+      // would end up with.
+      note("defer", `alert ${alert.name} — needs the uptime checks; created on --apply`);
       continue;
     }
     const body = {
@@ -294,7 +305,10 @@ const main = async () => {
   const uptimeIds = await ensureUptimeChecks();
   await ensureAlerts(channel, uptimeIds);
 
-  console.log(`\n${plan.length} object(s) ${APPLY ? "applied" : "planned"}`);
+  // Skipped objects are deliberately not reconciled, so counting them as applied would overstate
+  // what this run actually did.
+  const reconciled = plan.filter((line) => !line.startsWith("skip")).length;
+  console.log(`\n${reconciled} object(s) ${APPLY ? "applied" : "planned"}`);
   if (!APPLY) console.log("re-run with --apply to write");
   if (deferred.length) {
     console.log(

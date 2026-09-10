@@ -127,20 +127,51 @@ changes. A UAT success does not authorize production.
 
 ## 6. Community Firestore synchronization
 
-When the landed SHA includes `scripts/community/sync-community-firestore.mjs`
-and production has `COMMUNITY_CONTENT_BACKEND=gcp`, the container deploy alone
-does not update authoritative community content. Run the sync against the
-target project after the production deploy:
+`COMMUNITY_CONTENT_BACKEND=gcp` is set in **both** environments, so it does not
+tell you whether a sync is required. Check the target project's databases
+instead — the two environments genuinely differ:
+
+| | `hushh-tech-uat` | `hushh-tech-prod` |
+| --- | --- | --- |
+| Firestore `(default)` database | exists | **does not exist** |
+| What the community index serves | Firestore, snapshot only on error | the committed snapshot, always |
+| Sync after a deploy | required | **not possible, and not needed** |
+
+### UAT
+
+When the landed SHA changes community content or
+`scripts/community/sync-community-firestore.mjs`, the container deploy alone
+does not update authoritative UAT content. Run the sync after the UAT deploy:
 
 ```bash
-npm run community:sync-firestore -- --project hushh-tech-prod
-npm run community:sync-firestore -- --project hushh-tech-prod --apply
+npm run community:sync-firestore -- --project hushh-tech-uat
+npm run community:sync-firestore -- --project hushh-tech-uat --apply
 ```
 
-The first command is a dry run. Inspect its plan and verify the production
-deployer identity has the required Firestore permissions before applying it.
-Never substitute a personal ADC, UAT service account, or a guessed project.
+The first command is a dry run. Inspect its plan and verify the deployer
+identity has the required Firestore permissions before applying it. Never
+substitute a personal ADC, a production service account, or a guessed project.
 Record the plan, applied document count, and resulting content verification.
+
+### Production
+
+Do not run this against `hushh-tech-prod`. The project has no Firestore
+`(default)` database at all — the databases list comes back empty, so every
+request 404s and the run cannot do anything but fail. Production's community
+content **is** the committed snapshot compiled into the image, which is why
+`community_static_fallback` is continuously non-zero there and is the steady
+state rather than a fault. A production content change therefore ships by
+rebuilding and redeploying the image, not by syncing a datastore.
+
+Deck bodies and imagery are the separate half and are per-bucket: they live in
+`hushh-tech-community-content-prod` and must be published or copied there
+explicitly. A deck present on UAT is not present on production until that
+happens, and the failure is invisible from the outside — the index lists every
+deck while each deck page renders "the reading view could not be loaded",
+because the crawler-visible body comes from the inlined `bodyMarkdown` and
+keeps working.
+
+Revisit this section the day production gets a Firestore database.
 
 ## 7. Close-out evidence
 

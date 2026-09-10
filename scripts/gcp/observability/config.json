@@ -20,7 +20,8 @@
       "host": "uat.hushhtech.com"
     },
     "prod": {
-      "project": "hushh-tech",
+      "$comment": "The production project is hushh-tech-prod. 'hushh-tech' is a different project that returns 403 to this operator key, and reading that 403 as 'production is protected' is what kept prod unmonitored.",
+      "project": "hushh-tech-prod",
       "host": "hushhtech.com"
     }
   },
@@ -73,6 +74,8 @@
       "metric": "community_static_fallback",
       "threshold": 0,
       "durationSeconds": 300,
+      "skipEnvironments": ["prod"],
+      "skipReason": "hushh-tech-prod has no Firestore (default) database at all, so every list read 404s and the snapshot fallback is the steady state, not a degradation. Creating this policy there would page continuously and teach everyone to ignore the channel. Production's equivalent signal is the content-matching uptime check on /api/community/posts plus the 5xx alert. Delete this key the day prod gets a Firestore database.",
       "documentation": "The community list is being served from the committed snapshot because Firestore reads are failing. Readers see stale content and the site looks healthy. Check Firestore availability and the runtime service account's datastore permissions."
     },
     {

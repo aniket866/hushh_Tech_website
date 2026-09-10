@@ -74,8 +74,20 @@ must contain `"slug"`.
   that way.
 - Production is the project `hushh-tech-prod`. `hushh-tech` is a different
   project and returns 403 — do not read a 403 there as "production is protected".
-  The operator key reads `hushh-tech-prod` fine, so `--env prod` is expected to
-  work; it has not been applied yet, so run it as a plan first and read the diff.
+  `config.json` itself carried `hushh-tech` for a while, so `--env prod` failed
+  with that 403 and looked like a wall rather than a typo. Corrected; the
+  operator key reads `hushh-tech-prod` fine.
+- **`hushh-tech-prod` has no Firestore `(default)` database at all** — the API
+  returns an empty list, not a 403. So the committed snapshot *is* production's
+  content system, `community_static_fallback` is continuously non-zero there,
+  and the *content system degraded* policy would fire forever. An alert whose
+  condition is the environment's steady state is worse than no alert: it teaches
+  everyone to mute the channel. `config.json` therefore supports
+  `skipEnvironments` + `skipReason` per alert, and the plan prints the skip
+  rather than silently omitting it. Remove the key when prod gets Firestore.
+- Check the content matchers against the live host *before* applying. An uptime
+  check created against content that is not there is an alert that fires the
+  moment it exists.
 
 Full write-up, including what existed before (nothing), is in
 `docs/observability.md`.

@@ -36,7 +36,11 @@
  *   node scripts/community/sync-community-firestore.mjs --apply
  *   node scripts/community/sync-community-firestore.mjs --apply --project hushh-tech-uat
  *
- * Credentials come from GCP_DEPLOY_SA_KEY_B64, which is 403 on the production project.
+ * Credentials come from GCP_DEPLOY_SA_KEY_B64. That key reads `hushh-tech-prod` fine — the 403 an
+ * earlier version of this comment described is against `hushh-tech`, a different project. What
+ * actually stops a production run is that `hushh-tech-prod` has no Firestore `(default)` database
+ * at all, so `--project hushh-tech-prod` 404s on every request. Production serves the committed
+ * snapshot by design; there is nothing there to sync until a database exists.
  */
 
 import { STATIC_COMMUNITY_POSTS } from "../../api/community/staticPosts.generated.js";
