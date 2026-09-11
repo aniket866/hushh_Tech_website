@@ -115,7 +115,7 @@ describe("Hushh Research UAT deployment contract", () => {
   it("binds the served UAT revision to one exact full Git SHA", () => {
     expect(uat).toContain("DEPLOY_COMMIT_SHA=${deploy_sha}");
     expect(uat).toContain(
-      "--update-labels=\"deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}\"",
+      "--update-labels=\"deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha},deploy-execution=${deploy_execution}\"",
     );
     expect(uat).toContain("- name: Verify exact UAT release identity");
     expect(uat).toContain('select(.name == "DEPLOY_COMMIT_SHA")');

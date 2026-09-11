@@ -310,12 +310,23 @@ jobs:
       - name: Deploy to Cloud Run
         shell: bash
         run: |
+          set -euo pipefail
           deploy_sha="${{ steps.resolve-sha.outputs.sha }}"
           if ! [[ "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Resolved deployment SHA is not a full lowercase Git SHA."
             exit 1
           fi
           short_sha="${deploy_sha:0:8}"
+          # gcloud only copies service labels to the revision template when the
+          # service label map changes. A direct UAT deploy can leave those maps
+          # different, even when the service already names this exact SHA.
+          # Force a label update on every Actions run/retry, without changing
+          # the Git SHA source or relaxing the exact-revision verification.
+          if ! [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]]; then
+            echo "::error::GitHub run identity is required for UAT revision labels."
+            exit 1
+          fi
+          deploy_execution="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           runtime_env="^|^NODE_ENV=staging|DEPLOY_COMMIT_SHA=${deploy_sha}|COMMUNITY_CONTENT_BACKEND=gcp|COMMUNITY_CONTENT_COLLECTION=community_posts|COMMUNITY_CONTENT_BUCKET=hushh-tech-community-content-uat|COMMUNITY_CONTENT_CACHE_SECONDS=300|GEMINI_INVESTOR_PROFILE_PROVIDER=vertex|GEMINI_INVESTOR_PROFILE_MODEL=gemini-2.5-flash|GOOGLE_CLOUD_PROJECT=hushh-tech-uat|GOOGLE_CLOUD_LOCATION=us-central1|GCP_DATA_RUNTIME_ENABLED=${GCP_DATA_RUNTIME_ENABLED}|CLOUD_SQL_INSTANCE_CONNECTION_NAME=hushh-tech-uat:us-central1:hushh-tech-app-pg-uat|CLOUD_SQL_DATABASE=hushh_tech_app|CLOUD_SQL_IAM_USER=hushh-tech-web-uat@hushh-tech-uat.iam|FIREBASE_PROJECT_ID=hushh-tech-uat|GCP_STORAGE_BUCKET_PREFIX=hushh-tech-uat|HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}|HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}|PROFILE_INTELLIGENCE_API_BASE_URL=https://hushh-ria-intelligence-api-53407187172.us-central1.run.app|PROFILE_INTELLIGENCE_TIMEOUT_MS=180000|PROFILE_INTELLIGENCE_DISABLED=true|HUSHH_RESEARCH_CLIENT_ENABLED=${HUSHH_RESEARCH_CLIENT_ENABLED}|HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST=${HUSHH_RESEARCH_UAT_FIREBASE_UID_ALLOWLIST}|HUSHH_RESEARCH_API_BASE_URL=${HUSHH_RESEARCH_API_BASE_URL}|HUSHH_RESEARCH_WEB_BASE_URL=${HUSHH_RESEARCH_WEB_BASE_URL}|HUSHH_RESEARCH_AUDIENCE=${HUSHH_RESEARCH_AUDIENCE}|HUSHH_RESEARCH_REDIRECT_URI=${HUSHH_RESEARCH_REDIRECT_URI}|HUSHH_RESEARCH_FIREBASE_PROJECT_ID=${HUSHH_RESEARCH_FIREBASE_PROJECT_ID}|HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN=${HUSHH_RESEARCH_FIREBASE_AUTH_DOMAIN}|HUSHH_RESEARCH_DEVELOPER_APP_ID=${HUSHH_RESEARCH_DEVELOPER_APP_ID}"
           runtime_secrets="GCP_SERVER_ACTOR_UID=hushh-tech-server-actor-uid:latest"
           runtime_secrets+=",DELETE_ACCOUNT_AUDIT_SECRET=hushh-tech-delete-account-audit-secret:latest"
@@ -357,7 +368,7 @@ jobs:
             --timeout=240s \
             --update-env-vars="$runtime_env" \
             --set-secrets="$runtime_secrets" \
-            --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha}" \
+            --update-labels="deploy-env=uat,deploy-commit=${deploy_sha},deploy-tag=uat-${short_sha},deploy-execution=${deploy_execution}" \
             --clear-base-image \
             --quiet
 
