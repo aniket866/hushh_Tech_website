@@ -515,6 +515,44 @@ export function isCurrentUserOnboardingRead(request) {
     ["onboarding_data", "user_financial_data"].includes(request.table);
 }
 
+const POST_AUTH_OWNER_COLUMNS = Object.freeze({
+  investor_profiles: "user_id",
+  ceo_meeting_payments: "user_id",
+  onboarding_parties: "primary_user_id",
+  onboarding_invites: "primary_user_id",
+});
+
+export function isCurrentUserPostAuthRequest(request, actor) {
+  if (request?.kind !== "table") return false;
+  if (request.table === "onboarding_data" && ["insert", "update", "upsert"].includes(request.operation)) return true;
+  const ownerColumn = POST_AUTH_OWNER_COLUMNS[request.table];
+  // Explicit profile-by-application-UUID/public lookups retain their existing
+  // RLS contract. Only a self lookup expressed with the verified Firebase UID
+  // needs translation; never reinterpret an arbitrary requested principal.
+  return request.operation === "select" && Boolean(ownerColumn) &&
+    Array.isArray(request.filters) && request.filters.some((filter) =>
+      filter?.column === ownerColumn && filter.operator === "eq" && filter.value === actor?.uid);
+}
+
+export async function executeCurrentUserPostAuthRequest(request, actor, dependencies = {}) {
+  if (!isCurrentUserPostAuthRequest(request, actor)) {
+    throw Object.assign(new Error("Current-user data request is invalid."), { status: 403, code: "APPLICATION_IDENTITY_MISMATCH" });
+  }
+  const ownerColumn = POST_AUTH_OWNER_COLUMNS[request.table] || "user_id";
+  const ownerFilters = Array.isArray(request.filters) ? request.filters.filter((f) => f?.column === ownerColumn) : [];
+  const creates = ["insert", "upsert"].includes(request.operation);
+  const mutates = request.operation !== "select";
+  const rows = mutates ? mutationRows(request.values, { singleRow: true }).rows : [];
+  if ((!creates && (ownerFilters.length !== 1 || ownerFilters[0].operator !== "eq" || ownerFilters[0].value !== actor?.uid)) ||
+      (creates && (ownerFilters.length !== 0 || rows[0][ownerColumn] !== actor?.uid)) ||
+      rows.some((row) => Object.hasOwn(row, ownerColumn) && row[ownerColumn] !== actor?.uid) ||
+      (request.operation === "upsert" && request.options?.onConflict !== ownerColumn)) {
+    throw Object.assign(new Error("Current-user data requires the authenticated identity."), { status: 403, code: "APPLICATION_IDENTITY_MISMATCH" });
+  }
+  compileTableQuery(request);
+  return executeResolvedCurrentUserQuery(request, actor, ownerColumn, dependencies);
+}
+
 // The post-auth caller still identifies itself by Firebase UID. These tables
 // are keyed by application UUID, not Firebase UID. Reuse the same restricted
 // identity boundary as the existing GCP runtime; never cast a UID or infer an
@@ -528,14 +566,24 @@ export async function executeCurrentUserOnboardingRead(request, actor, dependenc
   }
   // Reject malformed queries before any provisioning side effect.
   compileTableQuery(request);
+  return executeResolvedCurrentUserQuery(request, actor, "user_id", dependencies);
+}
+
+// Shared by callback reads, post-auth navigation reads and onboarding saves.
+// The same verified Firebase evidence, restricted provisioner, transaction and
+// database RLS remain authoritative for every translated operation.
+async function executeResolvedCurrentUserQuery(request, actor, ownerColumn, dependencies) {
   const { prepareIdentityEvidence, ensureApplicationPrincipal } = await import("./gcpIdentityProvisioning.js");
   const evidence = await prepareIdentityEvidence(actor, dependencies);
   return withFirebaseTransaction(actor.uid, async (client) => {
     const { application_user_id: principal } = await ensureApplicationPrincipal(client, evidence);
     const query = compileTableQuery({
       ...request,
-      filters: request.filters.map((filter) => filter === userFilters[0]
+      filters: (request.filters || []).map((filter) => filter.column === ownerColumn
         ? { ...filter, value: principal } : filter),
+      ...(request.operation === "select" || request.values === undefined ? {} : { values: Array.isArray(request.values)
+        ? request.values.map((row) => Object.hasOwn(row, ownerColumn) ? { ...row, [ownerColumn]: principal } : row)
+        : Object.hasOwn(request.values, ownerColumn) ? { ...request.values, [ownerColumn]: principal } : request.values }),
     });
     const result = await client.query(query);
     return { data: resolveCardinality(request, result.rows), count: result.rowCount };

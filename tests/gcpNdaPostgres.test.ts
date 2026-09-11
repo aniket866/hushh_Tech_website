@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import pg from 'pg';
 import { executeNdaRequest, NDA_DOCUMENTS } from '../api/shared/gcpNdaRuntime.js';
 import { ensureApplicationPrincipal, prepareIdentityEvidence } from '../api/shared/gcpIdentityProvisioning.js';
-import { withFirebaseTransaction } from '../api/shared/gcpDataRuntime.js';
+import { executeCurrentUserPostAuthRequest, withFirebaseTransaction } from '../api/shared/gcpDataRuntime.js';
 import { preflight, runRelease } from '../scripts/gcp/migration/nda-release.mjs';
 
 // Explicit local binaries only; never accepts a remote DATABASE_URL. Requires
@@ -288,5 +288,46 @@ describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposa
       await expect(executeNdaRequest({ ...signing, signing: { ...signing.signing, ...patch } }, actor('invalid-new'), {}, deps('invalid-new'))).rejects.toMatchObject({ status: 400 });
     }
     expect((await admin.query(`SELECT count(*) FROM hushh_identity.identity_links WHERE firebase_uid='invalid-new'`)).rows[0].count).toBe('0');
+  });
+  it('persists onboarding and reads shared profile data under the verified live owner-column/RLS contract', async () => {
+    // Disposable LOCAL tables only. Owner UUID types and self policies match
+    // the read-only UAT catalog; no migration or deployed NDA table is altered.
+    for (const [table, owner] of [
+      ['onboarding_data', 'user_id'], ['investor_profiles', 'user_id'],
+      ['ceo_meeting_payments', 'user_id'], ['onboarding_parties', 'primary_user_id'],
+      ['onboarding_invites', 'primary_user_id'],
+    ]) {
+      await admin.query(`CREATE TABLE public.${table} (${owner} uuid NOT NULL UNIQUE REFERENCES hushh_identity.identity_links(legacy_user_uuid), current_step integer);
+        ALTER TABLE public.${table} OWNER TO hushh_tech_schema_owner;
+        ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.${table} FORCE ROW LEVEL SECURITY;
+        GRANT SELECT,INSERT,UPDATE ON public.${table} TO hushh_tech_runtime;
+        CREATE POLICY self_access ON public.${table} TO hushh_tech_runtime
+          USING (${owner}=hushh_identity.current_legacy_user_uuid()) WITH CHECK (${owner}=hushh_identity.current_legacy_user_uuid());`);
+    }
+    const request = (uid: string, table = 'onboarding_data', column = 'user_id') => ({
+      kind: 'table', table, operation: 'select', columns: '*', cardinality: 'maybe-single',
+      filters: [{ column, operator: 'eq', value: uid }],
+    });
+    for (const uid of ['existing', 'post-auth-google', 'post-auth-apple']) {
+      const provider = uid.endsWith('apple') ? 'apple.com' : 'google.com';
+      const dependencies = deps(uid, uid, provider);
+      const body = { ...request(uid), operation: 'insert', filters: [], values: { user_id: uid, current_step: 1 } };
+      const saved = await executeCurrentUserPostAuthRequest(body, actor(uid), dependencies);
+      const mapped = await bootstrap(uid, uid, provider);
+      expect(saved.data).toEqual({ user_id: mapped.application_user_id, current_step: 1 });
+      await executeCurrentUserPostAuthRequest({ ...request(uid), operation: 'update', values: { current_step: 2 } }, actor(uid), dependencies);
+      const persisted = await withFirebaseTransaction(uid, (c: pg.PoolClient) => c.query('SELECT * FROM public.onboarding_data'), { pool: runtime });
+      expect(persisted.rows).toEqual([{ user_id: mapped.application_user_id, current_step: 2 }]);
+      for (const [table, column] of [['investor_profiles', 'user_id'], ['ceo_meeting_payments', 'user_id'], ['onboarding_parties', 'primary_user_id'], ['onboarding_invites', 'primary_user_id']]) {
+        await admin.query(`INSERT INTO public.${table} (${column},current_step) VALUES ($1,2)`, [mapped.application_user_id]);
+        const data = await executeCurrentUserPostAuthRequest(request(uid, table, column), actor(uid), dependencies);
+        expect(data.data).toEqual({ [column]: mapped.application_user_id, current_step: 2 });
+      }
+    }
+    const blocked = await withFirebaseTransaction('post-auth-google', (c: pg.PoolClient) => c.query("UPDATE public.onboarding_data SET current_step=99 WHERE user_id='10000000-0000-4000-8000-000000000001' RETURNING *"), { pool: runtime });
+    expect(blocked.rowCount).toBe(0);
+    expect((await runtime.query('SELECT * FROM public.onboarding_data')).rows).toEqual([]);
+    expect((await admin.query("SELECT count(*) FROM pg_auth_members WHERE roleid IN ('hushh_tech_schema_owner'::regrole,'hushh_tech_identity_provisioner'::regrole)")).rows[0].count).toBe('0');
   });
 });

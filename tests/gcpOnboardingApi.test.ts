@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ verify: vi.fn(), onboarding: vi.fn(), data: vi.fn(), nda: vi.fn() }));
+const mocks = vi.hoisted(() => ({ verify: vi.fn(), onboarding: vi.fn(), postAuth: vi.fn(), data: vi.fn(), nda: vi.fn() }));
 vi.mock('../api/shared/gcpDataRuntime.js', async (importOriginal) => ({
   ...await importOriginal(),
   verifyFirebaseBearer: mocks.verify,
   executeCurrentUserOnboardingRead: mocks.onboarding,
+  executeCurrentUserPostAuthRequest: mocks.postAuth,
   executeDataRequest: mocks.data,
 }));
 vi.mock('../api/shared/gcpNdaRuntime.js', () => ({ executeNdaRequest: mocks.nda }));
@@ -48,13 +49,29 @@ describe('callback onboarding API dispatch', () => {
   });
 
   it.each([
-    { kind: 'table', table: 'onboarding_data', operation: 'upsert' },
     { kind: 'table', table: 'investor_profiles', operation: 'select' },
+    { kind: 'table', table: 'app_config', operation: 'select' },
   ])('leaves unrelated data contracts on the existing executor', async (body) => {
     mocks.verify.mockResolvedValue({ uid: 'verified' });
     mocks.data.mockResolvedValue({ data: [] });
     await handler({ method: 'POST', headers: {}, body }, response());
     expect(mocks.data).toHaveBeenCalledWith(body, 'verified');
     expect(mocks.onboarding).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { kind: 'table', table: 'onboarding_data', operation: 'insert', values: { user_id: 'verified' } },
+    ...['investor_profiles', 'ceo_meeting_payments'].map((table) => ({ kind: 'table', table, operation: 'select', filters: [{ column: 'user_id', operator: 'eq', value: 'verified' }] })),
+    ...['onboarding_parties', 'onboarding_invites'].map((table) => ({ kind: 'table', table, operation: 'select', filters: [{ column: 'primary_user_id', operator: 'eq', value: 'verified' }] })),
+  ])('routes post-auth self requests through the verified actor boundary', async (body) => {
+    const actor = { uid: 'verified' };
+    mocks.verify.mockResolvedValue(actor);
+    mocks.postAuth.mockResolvedValue({ data: null, count: 0 });
+    const res = response();
+    await handler({ method: 'POST', headers: {}, body: { ...body, actor: { uid: 'forged' } } }, res);
+    expect(mocks.postAuth).toHaveBeenCalledWith({ ...body, actor: { uid: 'forged' } }, actor);
+    expect(mocks.data).not.toHaveBeenCalled();
+    expect(mocks.nda).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

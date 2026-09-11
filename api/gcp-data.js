@@ -1,4 +1,4 @@
-import { executeCurrentUserOnboardingRead, executeDataRequest, isCurrentUserOnboardingRead, verifyFirebaseBearer } from "./shared/gcpDataRuntime.js";
+import { executeCurrentUserOnboardingRead, executeCurrentUserPostAuthRequest, executeDataRequest, isCurrentUserOnboardingRead, isCurrentUserPostAuthRequest, verifyFirebaseBearer } from "./shared/gcpDataRuntime.js";
 import { executeNdaRequest } from "./shared/gcpNdaRuntime.js";
 
 export default async function handler(req, res) {
@@ -14,7 +14,9 @@ export default async function handler(req, res) {
       })
       : isCurrentUserOnboardingRead(req.body)
         ? await executeCurrentUserOnboardingRead(req.body, actor)
-        : await executeDataRequest(req.body, actor.uid);
+        : isCurrentUserPostAuthRequest(req.body, actor)
+          ? await executeCurrentUserPostAuthRequest(req.body, actor)
+          : await executeDataRequest(req.body, actor.uid);
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(result);
   } catch (error) {
