@@ -1,6 +1,12 @@
 import { executeCurrentUserOnboardingRead, executeCurrentUserPostAuthRequest, executeDataRequest, isCurrentUserOnboardingRead, isCurrentUserPostAuthRequest, verifyFirebaseBearer } from "./shared/gcpDataRuntime.js";
 import { executeNdaRequest } from "./shared/gcpNdaRuntime.js";
 
+// Fixed public messages only: never expose SQL/provider exception text for 5xx.
+const identityAvailabilityMessages = new Map([
+  ["IDENTITY_CREATION_DISABLED", "Your sign-in succeeded, but new application account setup is not enabled yet. Please contact support."],
+  ["IDENTITY_EVIDENCE_UNAVAILABLE", "Your sign-in succeeded, but application account setup requires identity review. Please contact support."],
+]);
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "POST required." } });
@@ -24,7 +30,9 @@ export default async function handler(req, res) {
     const status = invalidIdentity ? 401 : Number.isInteger(error?.status) ? error.status : 500;
     return res.status(status).json({ error: {
       code: invalidIdentity ? "AUTH_INVALID" : error?.code || "GCP_DATA_ERROR",
-      message: invalidIdentity ? "Please sign in again." : status >= 500 ? "GCP data service unavailable." : error.message,
+      message: invalidIdentity ? "Please sign in again." : status >= 500
+        ? identityAvailabilityMessages.get(error?.code) || "GCP data service unavailable."
+        : error.message,
     } });
   }
 }

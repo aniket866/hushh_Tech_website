@@ -19,6 +19,7 @@ const AuthCallback: React.FC = () => {
   const { revalidateSession } = useAuthSession();
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorHeading, setErrorHeading] = useState('Sign-in Failed');
   const callbackHandledRef = useRef(false);
 
   // Get custom redirect from URL param (for Hushh AI and other modules)
@@ -56,6 +57,8 @@ const AuthCallback: React.FC = () => {
         return;
       }
       callbackHandledRef.current = true;
+
+      let sessionRestored = false;
 
       try {
         const gcpBackend = config.gcpBackendClient;
@@ -108,6 +111,7 @@ const AuthCallback: React.FC = () => {
         }
 
         const user = sessionSnapshot.user;
+        sessionRestored = true;
         const onboardingData = await fetchResolvedOnboardingProgress(
           gcpBackend,
           user.id,
@@ -128,7 +132,16 @@ const AuthCallback: React.FC = () => {
       } catch (err) {
         console.error('Verification error:', err);
         setVerificationStatus('error');
-        setErrorMessage('An unexpected error occurred');
+        if (sessionRestored) {
+          setErrorHeading('Account setup unavailable');
+          const failure = err as { code?: string; message?: string } | null;
+          const identityFailure = ['IDENTITY_CREATION_DISABLED', 'IDENTITY_EVIDENCE_UNAVAILABLE', 'IDENTITY_REVIEW_REQUIRED', 'IDENTITY_DENIED'].includes(failure?.code || '');
+          setErrorMessage(identityFailure && typeof failure?.message === 'string'
+            ? failure.message
+            : 'Your sign-in succeeded, but we could not load your application account. Please retry or contact support.');
+        } else {
+          setErrorMessage('An unexpected error occurred');
+        }
       }
     };
 
@@ -190,7 +203,7 @@ const AuthCallback: React.FC = () => {
         {verificationStatus === 'error' && (
           <Flex direction="column" align="center" py={6}>
             <Icon as={AlertTriangle} w={16} h={16} color="red.500" mb={6} />
-            <Heading size="lg" mb={4}>Sign-in Failed</Heading>
+            <Heading size="lg" mb={4}>{errorHeading}</Heading>
             <Alert status="error" mb={6}>
               <AlertIcon />
               {errorMessage || 'There was an error completing sign-in. Please try again.'}

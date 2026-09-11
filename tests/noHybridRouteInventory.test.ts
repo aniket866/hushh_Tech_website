@@ -69,6 +69,7 @@ describe("no-hybrid exhaustive route inventory", () => {
       "/onboarding/step-7": "/login",
       "/onboarding/step-8": "/login",
       "/onboarding/step-9": "/login",
+      "/sign-nda": "/login",
     })) {
       expect(inventory.client.find((route: any) => route.pattern === pattern)?.terminal).toBe(
         terminal,

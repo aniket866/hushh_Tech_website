@@ -13,6 +13,17 @@ const response = () => ({ setHeader: vi.fn(), status: vi.fn().mockReturnThis(), 
 beforeEach(() => vi.resetAllMocks());
 
 describe('callback onboarding API dispatch', () => {
+  it.each(['IDENTITY_CREATION_DISABLED', 'IDENTITY_EVIDENCE_UNAVAILABLE'].flatMap(code => ['onboarding', 'nda-status'].map(operation => ({ code, operation }))))('reports $code safely for $operation while preserving the failure status', async ({ code, operation }) => {
+    mocks.verify.mockResolvedValue({ uid: 'verified' });
+    (operation === 'onboarding' ? mocks.onboarding : mocks.nda).mockRejectedValue({ status: 503, code, message: 'private SQL/provider detail' });
+    const res = response();
+    const body = operation === 'onboarding' ? { kind: 'table', table: 'onboarding_data', operation: 'select' } : { kind: 'nda', operation: 'status' };
+    await handler({ method: 'POST', headers: {}, body }, res);
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({ error: { code, message: expect.stringContaining('Your sign-in succeeded') } });
+    expect(JSON.stringify(res.json.mock.calls)).not.toContain('private SQL');
+    expect(mocks.data).not.toHaveBeenCalled();
+  });
   it.each(['onboarding_data', 'user_financial_data'])('uses the verified actor for %s reads', async (table) => {
     const actor = { uid: 'verified', sub: 'verified', aud: 'hushh-tech-uat' };
     const body = { kind: 'table', table, operation: 'select', actor: { uid: 'forged' } };

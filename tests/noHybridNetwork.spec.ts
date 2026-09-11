@@ -155,12 +155,26 @@ function trackAnonymousApiRequests(page: Page) {
   // before navigation can cancel them (WebKit reports access-control errors).
   // This is in addition to, not instead of, the route and page-error assertions.
   const pending = new Set<Request>();
+  let lastActivity = Date.now();
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.startsWith("/api/")) pending.add(request);
+    if (new URL(request.url()).pathname.startsWith("/api/")) {
+      pending.add(request);
+      lastActivity = Date.now();
+    }
   });
-  page.on("requestfinished", (request) => pending.delete(request));
-  page.on("requestfailed", (request) => pending.delete(request));
+  const complete = (request: Request) => {
+    if (pending.delete(request)) lastActivity = Date.now();
+  };
+  page.on("requestfinished", complete);
+  page.on("requestfailed", complete);
   return async () => {
+    // An empty set at one instant can precede React's deferred fetches. Wait
+    // for a fresh 500ms API-idle window, reset by every request event. Unlike
+    // document networkidle, this cannot reuse a previously reached load state.
+    lastActivity = Date.now();
+    await expect.poll(() => pending.size === 0 && Date.now() - lastActivity >= 500, {
+      message: "Anonymous API lifecycle must be idle before replacing the document",
+    }).toBe(true);
     await expect.poll(() => [...pending].map((request) => new URL(request.url()).pathname), {
       message: "Anonymous API responses must finish before the next document navigation",
     }).toEqual([]);
@@ -389,10 +403,11 @@ test("anonymous route sweep completes delayed success and denied responses befor
     await context.route(`**${documentPath}`, (route) => route.fulfill({
       contentType: "text/html",
       body: `<main id="fixture">Ready</main><output id="status">pending</output>
-        <script>fetch('${apiPath}').then(async response => {
+        <button id="start">Start deferred request</button>
+        <script>document.querySelector('#start').onclick = () => setTimeout(() => fetch('${apiPath}').then(async response => {
           await response.json();
           document.querySelector('#status').textContent = String(response.status);
-        });</script>`,
+        }), 100);</script>`,
     }));
     await context.route(`**${apiPath}`, async (route) => {
       requested();
@@ -402,17 +417,17 @@ test("anonymous route sweep completes delayed success and denied responses befor
 
     try {
       await page.goto(documentPath, { waitUntil: "domcontentloaded" });
-      await requestStarted;
       await assertRouteReady(page, {
         pattern: documentPath, sample: documentPath, terminal: documentPath,
         access: "anonymous", render: { selector: "#fixture", text: "Ready" },
       });
-      // Reproduce the old gap: render + document.complete with an unfinished
-      // API response. Removing the completion barrier must fail this test.
+      // Render readiness can precede a deferred effect's first request. Start
+      // settling while the pending set is still empty, then hold the response.
       await expect(page.locator("#status")).toHaveText("pending");
+      await page.locator("#start").click();
       let settled = false;
       const completion = settleAnonymousRoute().then(() => { settled = true; });
-      await page.evaluate(() => document.readyState);
+      await requestStarted;
       expect(settled).toBe(false);
       release();
       await completion;

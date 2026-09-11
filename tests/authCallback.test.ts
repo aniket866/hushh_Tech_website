@@ -149,7 +149,7 @@ describe("AuthCallback", () => {
     expect(mockGetRedirectResult).toHaveBeenCalledOnce();
   });
 
-  it("reproduces the reported error when onboarding rejects a raw Firebase UID after session restore", async () => {
+  it("keeps post-auth data failure distinct from Firebase authentication failure", async () => {
     const failure = { code: "22P02", message: "GCP data service unavailable." };
     maybeSingleMock.mockResolvedValue({ data: null, error: failure });
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -157,8 +157,21 @@ describe("AuthCallback", () => {
     expect(mockGetRedirectResult).toHaveBeenCalledOnce();
     expect(revalidateSessionMock).toHaveBeenCalled();
     expect(errorLog).toHaveBeenCalledWith("Verification error:", failure);
-    expect(container.textContent).toContain("An unexpected error occurred");
+    expect(container.textContent).toContain("Account setup unavailable");
+    expect(container.textContent).toContain("Your sign-in succeeded");
+    expect(container.textContent).not.toContain("Sign-in Failed");
     expect(navigateMock).not.toHaveBeenCalled();
     errorLog.mockRestore();
+  });
+
+  it.each(['IDENTITY_CREATION_DISABLED', 'IDENTITY_EVIDENCE_UNAVAILABLE', 'IDENTITY_REVIEW_REQUIRED', 'IDENTITY_DENIED'])("preserves %s without navigating or claiming account readiness", async (code) => {
+    maybeSingleMock.mockResolvedValue({ data: null, error: { code, message: 'Application account setup requires support.' } });
+    await renderCallback();
+    expect(container.textContent).toContain('Account setup unavailable');
+    expect(container.textContent).toContain('Application account setup requires support.');
+    expect(container.textContent).not.toContain('Welcome to HushhTech!');
+    expect(sessionStorage.getItem('showWelcomeToast')).toBeNull();
+    expect(mockGetRedirectResult).toHaveBeenCalledOnce();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });

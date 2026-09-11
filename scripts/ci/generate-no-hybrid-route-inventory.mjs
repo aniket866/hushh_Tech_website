@@ -24,6 +24,8 @@ const TERMINAL_OVERRIDES = Object.freeze({
   "/onboarding/step-7": "/login",
   "/onboarding/step-8": "/login",
   "/onboarding/step-9": "/login",
+  // SignNDAPage's existing auth effect redirects anonymous users after boot.
+  "/sign-nda": "/login",
   "/user-registration": "/hushh-user-profile",
 
   // Server-side 301s, which are even further out of this scanner's reach than an

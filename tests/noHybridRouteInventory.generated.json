@@ -999,7 +999,7 @@
     {
       "pattern": "/sign-nda",
       "sample": "/sign-nda",
-      "terminal": "/sign-nda",
+      "terminal": "/login",
       "access": "anonymous",
       "wrappers": [],
       "source_owner": "src/App.tsx",
@@ -2159,5 +2159,5 @@
     "functions_retired": 1,
     "functions_blocked": 110
   },
-  "sha256": "553d2370fe0e39a9f5824d455bb81d70a5a4784f0b595f71911380dd38aa716e"
+  "sha256": "fded83438e7e000caac6b39b101297c0933986f3f14d3ef2bd6b2cc3a08d9268"
 }
