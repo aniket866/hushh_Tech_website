@@ -98,7 +98,7 @@ const SOURCE_PATHS = [
  * image and an Actions image describe the same environment.
  */
 const BUILD_ARGS = {
-  VITE_FIREBASE_AUTH_DOMAIN: "hushh-tech-uat.firebaseapp.com",
+  VITE_FIREBASE_AUTH_DOMAIN: "uat.hushhtech.com",
   VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat",
   VITE_GCP_AUTH_REDIRECT_URL: "https://uat.hushhtech.com/auth/callback",
   VITE_PLAID_REDIRECT_URI: "https://uat.hushhtech.com/onboarding/financial-link",
