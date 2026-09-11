@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isUatWebsite } from '../services/uatOptionalTraffic';
 
 const STOCK_QUOTES_API_URL = '/api/stock-quotes';
 
@@ -173,13 +174,14 @@ function generateFallbackData(): StockQuote[] {
 
 // Hook for fetching stock quotes via GcpBackend edge function
 export function useStockQuotes(refreshInterval = 120000, enabled = true) {
+  const requestEnabled = enabled && !isUatWebsite();
   const [quotes, setQuotes] = useState<StockQuote[]>(generateFallbackData());
-  const [loading, setLoading] = useState(enabled);
+  const [loading, setLoading] = useState(requestEnabled);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchAllQuotes = useCallback(async () => {
-    if (!enabled) {
+    if (!requestEnabled) {
       setError(null);
       setLoading(false);
       return;
@@ -226,7 +228,7 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
       setError('Failed to fetch stock quotes');
       setLoading(false);
     }
-  }, [enabled]);
+  }, [requestEnabled]);
 
   // Initial fetch
   useEffect(() => {
@@ -243,11 +245,11 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
 
   // Auto-refresh at specified interval (default 2 minutes for 27 stocks)
   useEffect(() => {
-    if (enabled && refreshInterval > 0) {
+    if (requestEnabled && refreshInterval > 0) {
       const interval = setInterval(fetchAllQuotes, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [enabled, refreshInterval, fetchAllQuotes]);
+  }, [requestEnabled, refreshInterval, fetchAllQuotes]);
 
   return {
     quotes,

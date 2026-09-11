@@ -1,5 +1,5 @@
 import config from "../../resources/config/config";
-import { isUatNdaPage } from "../nda/uatNdaPage";
+import { isUatWebsite } from "../uatOptionalTraffic";
 import {
   isHushhResearchAuthMode,
 } from "../hushhResearch/firebaseAuth";
@@ -256,13 +256,14 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
     return;
   }
 
+  // UAT has no supported collector upsert contract. Optional telemetry must
+  // not invoke it; this does not affect GA4 or durable NDA consent evidence.
+  if (isUatWebsite()) return;
+
   const currentPath = sanitizeAnalyticsPath(window.location.pathname);
   const requestedPath = sanitizeAnalyticsPath(
     options.routePath || window.location.pathname,
   );
-  // Optional telemetry is not NDA consent evidence. Do not invoke the
-  // unavailable UAT collector for this route (including its exit events).
-  if (isUatNdaPage(currentPath) || isUatNdaPage(requestedPath)) return;
   if (
     isHushhResearchAuthMode() ||
     isHushhResearchAuthRoute(window.location.pathname) ||
@@ -306,8 +307,8 @@ export async function trackSiteEvent(eventName: string, options: TrackEventOptio
   }
 
   for (const candidate of getCollectorCandidates()) {
-    // Context/token resolution can span navigation into the NDA page.
-    if (isUatNdaPage()) return;
+    // Recheck before transport after asynchronous context/token resolution.
+    if (isUatWebsite()) return;
     try {
       const response = await fetch(candidate, {
         method: "POST",

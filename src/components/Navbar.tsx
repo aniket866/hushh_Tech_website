@@ -7,6 +7,7 @@ import hushhLogo from "../components/images/Hushhogo.png";
 import LanguageSwitcher from "./LanguageSwitcher";
 import DeleteAccountModal from "./DeleteAccountModal";
 import { useStockQuotes, StockQuote } from "../hooks/useStockQuotes";
+import { isUatWebsite } from "../services/uatOptionalTraffic";
 import { useConstantTickerMotion } from "../hooks/useConstantTickerMotion";
 import config from "../resources/config/config";
 import { useAuthSession } from "../auth/AuthSessionProvider";
@@ -73,7 +74,7 @@ export default function Navbar() {
   // Hide ticker strip on onboarding & profile pages to keep UX clean
   const isOnboarding = location.pathname.startsWith('/onboarding');
   const isProfilePage = location.pathname.startsWith('/hushh-user-profile');
-  const hideTicker = isOnboarding || isProfilePage;
+  const hideTicker = isOnboarding || isProfilePage || isUatWebsite();
   const isResearchBoundary = isHushhResearchProductBoundary(
     location.pathname,
     user,

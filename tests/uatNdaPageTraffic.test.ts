@@ -37,7 +37,7 @@ describe('optional UAT NDA traffic boundary', () => {
   });
   it.each([
     'https://hushhtech.com/sign-nda',
-    'https://uat.hushhtech.com/profile',
+    'https://hushhtech.com/profile',
   ])('still sends optional analytics outside the boundary: %s', async (url) => {
     const { localStorage, sessionStorage } = window;
     vi.stubGlobal('window', { location: new URL(url), localStorage, sessionStorage });

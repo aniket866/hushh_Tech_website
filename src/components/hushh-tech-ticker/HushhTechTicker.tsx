@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useOptionalAuthSession } from "../../auth/AuthSessionProvider";
 import { useConstantTickerMotion } from "../../hooks/useConstantTickerMotion";
 import { StockQuote, useStockQuotes } from "../../hooks/useStockQuotes";
+import { isUatWebsite } from "../../services/uatOptionalTraffic";
 import { isHushhResearchProductBoundary } from "../../services/hushhResearch/legacyProductData";
 import { Icon, SYS, appleFont } from "../hushh-tech-ui/HushhAppleUI";
 
@@ -87,11 +88,14 @@ export default function HushhTechTicker() {
   );
 
   useConstantTickerMotion({
-    enabled: quotes.length > 0,
+    enabled: !isUatWebsite() && quotes.length > 0,
     loopRef: tickerLoopRef,
     trackRef: tickerTrackRef,
     pixelsPerSecond: TICKER_SCROLL_PIXELS_PER_SECOND,
   });
+
+  // Do not label fallback/random quotes as live while the UAT gateway is off.
+  if (isUatWebsite()) return null;
 
   return (
     <section

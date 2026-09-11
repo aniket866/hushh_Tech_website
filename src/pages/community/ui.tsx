@@ -15,6 +15,7 @@ import {
 } from "../../components/hushh-tech-ui/HushhAppleUI";
 import { getCategoryVariant, PINNED_SLUGS, useCommunityListLogic } from "./logic";
 import CommunityCover from "./CommunityCover";
+import { coverImageFor } from "./deckCover";
 import SeoHead from "../../components/seo/SeoHead";
 
 /* ── Category accent tints (brand-aligned, used only for small badges/dots) ── */
@@ -86,20 +87,6 @@ const SearchBar = ({
     ) : null}
   </div>
 );
-
-/**
- * A deck's own first page, used as its cover.
- *
- * Every deck in a category otherwise drew from the same small pool of Unsplash photos, so the grid
- * read as one repeated image. Only public decks: a gated page image needs a bearer token that an
- * `<img>` cannot send, and the deck's title card is not something to show before the NDA anyway.
- */
-const coverImageFor = (post: CommunityPost): string | undefined => {
-  const record = post as unknown as { sourceKind?: string; accessLevel?: string; slug?: string };
-  if (record.sourceKind !== "deck" || record.accessLevel === "NDA") return undefined;
-  const assetName = (record.slug || "").split("/").pop();
-  return assetName ? `/api/community/assets/decks/${assetName}/pages/page-001.jpg` : undefined;
-};
 
 /** What kind of thing this is, in the reader's terms. */
 const kindLabelFor = (post: CommunityPost): string => {
