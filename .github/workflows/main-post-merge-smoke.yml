@@ -61,8 +61,16 @@ jobs:
         run: npm run test:e2e:no-hybrid
 
       - name: Run compact smoke suite
+        id: compact_smoke
         env:
           SMOKE_REPORT_PATH: /tmp/ci/main-post-merge-smoke.json
+        run: bash scripts/ci/orchestrate.sh smoke
+
+      - name: Run smoke diagnostics after an earlier gate failure
+        if: ${{ failure() && !cancelled() && steps.compact_smoke.outcome == 'skipped' }}
+        env:
+          SMOKE_REPORT_PATH: /tmp/ci/main-post-merge-smoke.json
+          SMOKE_UPSTREAM_STATUS: ${{ job.status }}
         run: bash scripts/ci/orchestrate.sh smoke
 
       - name: Upload smoke artifact
