@@ -1,4 +1,4 @@
-import { executeDataRequest, verifyFirebaseBearer } from "./shared/gcpDataRuntime.js";
+import { executeCurrentUserOnboardingRead, executeDataRequest, isCurrentUserOnboardingRead, verifyFirebaseBearer } from "./shared/gcpDataRuntime.js";
 import { executeNdaRequest } from "./shared/gcpNdaRuntime.js";
 
 export default async function handler(req, res) {
@@ -12,7 +12,9 @@ export default async function handler(req, res) {
         // deployment's trusted proxy chain is attested, retain unknown IP.
         userAgent: req.headers["user-agent"],
       })
-      : await executeDataRequest(req.body, actor.uid);
+      : isCurrentUserOnboardingRead(req.body)
+        ? await executeCurrentUserOnboardingRead(req.body, actor)
+        : await executeDataRequest(req.body, actor.uid);
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(result);
   } catch (error) {

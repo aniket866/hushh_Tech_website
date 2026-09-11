@@ -510,6 +510,38 @@ function resolveCardinality(request, rows) {
   return rows;
 }
 
+export function isCurrentUserOnboardingRead(request) {
+  return request?.kind === "table" && request.operation === "select" &&
+    ["onboarding_data", "user_financial_data"].includes(request.table);
+}
+
+// The post-auth caller still identifies itself by Firebase UID. These tables
+// are keyed by application UUID, not Firebase UID. Reuse the same restricted
+// identity boundary as the existing GCP runtime; never cast a UID or infer an
+// identity from email. Keep the browser query/response and RLS contracts intact.
+export async function executeCurrentUserOnboardingRead(request, actor, dependencies = {}) {
+  const userFilters = Array.isArray(request?.filters)
+    ? request.filters.filter((filter) => filter?.column === "user_id") : [];
+  if (!isCurrentUserOnboardingRead(request) || userFilters.length !== 1 ||
+      userFilters[0].operator !== "eq" || userFilters[0].value !== actor?.uid) {
+    throw Object.assign(new Error("Onboarding reads require the authenticated user."), { status: 403, code: "ONBOARDING_IDENTITY_MISMATCH" });
+  }
+  // Reject malformed queries before any provisioning side effect.
+  compileTableQuery(request);
+  const { prepareIdentityEvidence, ensureApplicationPrincipal } = await import("./gcpIdentityProvisioning.js");
+  const evidence = await prepareIdentityEvidence(actor, dependencies);
+  return withFirebaseTransaction(actor.uid, async (client) => {
+    const { application_user_id: principal } = await ensureApplicationPrincipal(client, evidence);
+    const query = compileTableQuery({
+      ...request,
+      filters: request.filters.map((filter) => filter === userFilters[0]
+        ? { ...filter, value: principal } : filter),
+    });
+    const result = await client.query(query);
+    return { data: resolveCardinality(request, result.rows), count: result.rowCount };
+  }, dependencies);
+}
+
 export async function executeDataRequest(request, uid, dependencies = {}) {
   const config = runtimeConfig();
   if (typeof uid !== "string" || !uid || uid.length > 128) {

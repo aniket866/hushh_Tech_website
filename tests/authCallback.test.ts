@@ -49,6 +49,7 @@ vi.mock("../src/auth/AuthSessionProvider", () => ({
 }));
 
 import AuthCallback from "../src/pages/AuthCallback";
+import { FINANCIAL_LINK_ROUTE } from "../src/services/onboarding/flow";
 
 describe("AuthCallback", () => {
   let container: HTMLDivElement;
@@ -124,5 +125,40 @@ describe("AuthCallback", () => {
     });
 
     expect(navigateMock).toHaveBeenCalledWith("/delete-account");
+  });
+
+  const renderCallback = async () => {
+    await act(async () => {
+      root.render(React.createElement(ChakraProvider, { theme },
+        React.createElement(MemoryRouter, { initialEntries: ["/auth/callback"] },
+          React.createElement(AuthCallback))));
+    });
+    await flush();
+  };
+
+  it.each(["google", "apple"])("routes a restored new %s user with no onboarding row to onboarding", async (provider) => {
+    const user = { id: `${provider}-native-uid`, app_metadata: { provider } };
+    revalidateSessionMock.mockResolvedValue({ status: "authenticated", user, session: { user } });
+    maybeSingleMock.mockResolvedValue({ data: null, error: null });
+    await renderCallback();
+    expect(container.textContent).toContain("Welcome to HushhTech!");
+    expect(fromMock).toHaveBeenCalledWith("onboarding_data");
+    expect(fromMock).toHaveBeenCalledWith("user_financial_data");
+    await act(async () => { vi.runAllTimers(); });
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith(FINANCIAL_LINK_ROUTE);
+    expect(mockGetRedirectResult).toHaveBeenCalledOnce();
+  });
+
+  it("reproduces the reported error when onboarding rejects a raw Firebase UID after session restore", async () => {
+    const failure = { code: "22P02", message: "GCP data service unavailable." };
+    maybeSingleMock.mockResolvedValue({ data: null, error: failure });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    await renderCallback();
+    expect(mockGetRedirectResult).toHaveBeenCalledOnce();
+    expect(revalidateSessionMock).toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith("Verification error:", failure);
+    expect(container.textContent).toContain("An unexpected error occurred");
+    expect(navigateMock).not.toHaveBeenCalled();
+    errorLog.mockRestore();
   });
 });
