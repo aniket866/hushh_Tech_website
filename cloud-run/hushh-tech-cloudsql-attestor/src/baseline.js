@@ -43,6 +43,7 @@ export function loadBaseline() {
       "sourceExpectedSha256",
       "target",
       "expectedCatalog",
+      "policyEvidence",
       "reviewedExtensions",
     ]) ||
     baseline.version !== 1 ||
@@ -63,7 +64,14 @@ export function loadBaseline() {
       (key) => !Number.isSafeInteger(baseline.expectedCatalog[key]) || baseline.expectedCatalog[key] < 0,
     ) ||
     !Array.isArray(baseline.reviewedExtensions) ||
-    baseline.reviewedExtensions.join(",") !== "pgcrypto,uuid-ossp,vector"
+    baseline.reviewedExtensions.join(",") !== "pgcrypto,uuid-ossp,vector" ||
+    !exactKeys(baseline.policyEvidence, ["public", "operational"]) ||
+    !exactKeys(baseline.policyEvidence.public, ["mode", "expectedCount"]) ||
+    !exactKeys(baseline.policyEvidence.operational, ["mode", "expectedCount"]) ||
+    baseline.policyEvidence.public.mode !== "aggregate-only" ||
+    baseline.policyEvidence.operational.mode !== "aggregate-only" ||
+    baseline.policyEvidence.public.expectedCount !== baseline.expectedCatalog.publicPolicies ||
+    baseline.policyEvidence.operational.expectedCount !== baseline.expectedCatalog.operationalPolicies
   ) {
     throw new Error("ATTESTATION_BASELINE_INVALID");
   }

@@ -13,12 +13,14 @@ import {
   MAX_CANONICAL_ROW_BYTES,
   MAX_COLLECTION_ROW_COUNT,
   MAX_OUTPUT_BYTES,
+  MAX_POLICY_EVIDENCE_BYTES,
   MAX_RESULT_ROWS,
   TARGET,
   WORKER_DEADLINE_MS,
 } from "./constants.js";
 import { AttestorError } from "./errors.js";
 import { compareBaseline, loadBaseline } from "./baseline.js";
+import { buildPolicyEvidence, comparePolicySets, validatePolicyEvidence } from "./policy.js";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const IMAGE_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -34,6 +36,13 @@ const BASELINE_KEYS = Object.freeze([
   "missing",
   "drifted",
   "unexpected",
+]);
+const POLICY_COMPARISON_KEYS = Object.freeze([
+  "mode",
+  "matched",
+  "expectedOnly",
+  "observedOnly",
+  "drifted",
 ]);
 
 const CHECK_BLOCKERS = Object.freeze({
@@ -77,6 +86,10 @@ const NON_CAPTURE_BLOCKERS = new Set([
   "WORKER_EXIT_FAILED",
   "WORKER_OUTPUT_INVALID",
   "EXPECTED_CATALOG_DRIFT",
+  "POLICY_EVIDENCE_DUPLICATE",
+  "POLICY_EVIDENCE_INVALID",
+  "POLICY_EVIDENCE_LIMIT_EXCEEDED",
+  "POLICY_EVIDENCE_SENSITIVE",
 ]);
 
 function exactKeys(value, expected) {
@@ -126,6 +139,21 @@ function emptyCollections() {
 
 function emptyBaseline() {
   return null;
+}
+
+function emptyPolicyEvidence() {
+  return null;
+}
+
+function emptyPolicyComparison() {
+  return null;
+}
+
+function validPolicyComparison(value) {
+  return exactKeys(value, POLICY_COMPARISON_KEYS) &&
+    ["matched", "expectedOnly", "observedOnly", "drifted"].every(
+      (key) => value[key] === null || Array.isArray(value[key]),
+    );
 }
 
 function canonicalBaselineComparison(value) {
@@ -186,6 +214,11 @@ function sealEvidence(payload) {
     checks: payload.checks,
     collections: payload.collections,
     baseline: payload.baseline,
+    policyEvidenceComplete: payload.policyEvidenceComplete,
+    publicPoliciesEvidence: payload.publicPoliciesEvidence,
+    operationalPoliciesEvidence: payload.operationalPoliciesEvidence,
+    publicPoliciesComparison: payload.publicPoliciesComparison,
+    operationalPoliciesComparison: payload.operationalPoliciesComparison,
   });
   const envelope = { ...payload, captureSha256 };
   const evidence = { ...envelope, evidenceSha256: canonicalHash(envelope) };
@@ -207,6 +240,11 @@ export function buildNotExecutedEvidence({
     checks: emptyChecks(),
     collections: emptyCollections(),
     baseline: emptyBaseline(),
+    policyEvidenceComplete: false,
+    publicPoliciesEvidence: emptyPolicyEvidence(),
+    operationalPoliciesEvidence: emptyPolicyEvidence(),
+    publicPoliciesComparison: emptyPolicyComparison(),
+    operationalPoliciesComparison: emptyPolicyComparison(),
     blockers: [blocker],
   });
 }
@@ -259,9 +297,13 @@ export function normalizeCatalogResult(result) {
 
   let checks = null;
   let baseline = null;
+  let publicPoliciesEvidence = null;
+  let operationalPoliciesEvidence = null;
   const collections = result.rows.map((row, index) => {
     if (
-      !exactKeys(row, ["collection", "row_count", "canonical_sha256", "checks", "baseline"]) ||
+      !exactKeys(row, index === 0
+        ? ["collection", "row_count", "canonical_sha256", "public_policies", "operational_policies", "checks", "baseline"]
+        : ["collection", "row_count", "canonical_sha256", "checks", "baseline"]) ||
       row.collection !== COLLECTIONS[index] ||
       !/^(0|[1-9][0-9]*)$/.test(row.row_count ?? "") ||
       !SHA256_PATTERN.test(row.canonical_sha256 ?? "") ||
@@ -281,6 +323,14 @@ export function normalizeCatalogResult(result) {
       }
       checks = Object.fromEntries(CHECK_NAMES.map((name) => [name, row.checks[name]]));
       baseline = normalizeBaseline(row.baseline);
+      publicPoliciesEvidence = buildPolicyEvidence(row.public_policies);
+      operationalPoliciesEvidence = buildPolicyEvidence(row.operational_policies);
+      if (
+        Buffer.byteLength(JSON.stringify(publicPoliciesEvidence), "utf8") > MAX_POLICY_EVIDENCE_BYTES ||
+        Buffer.byteLength(JSON.stringify(operationalPoliciesEvidence), "utf8") > MAX_POLICY_EVIDENCE_BYTES
+      ) {
+        throw new AttestorError("POLICY_EVIDENCE_LIMIT_EXCEEDED");
+      }
     }
     return { name: row.collection, status: "CAPTURED", rowCount, sha256: row.canonical_sha256 };
   });
@@ -288,6 +338,11 @@ export function normalizeCatalogResult(result) {
     checks: Object.freeze(checks),
     collections: Object.freeze(collections),
     baseline: Object.freeze(baseline),
+    policyEvidenceComplete: true,
+    publicPoliciesEvidence,
+    operationalPoliciesEvidence,
+    publicPoliciesComparison: comparePolicySets(null, publicPoliciesEvidence.policies),
+    operationalPoliciesComparison: comparePolicySets(null, operationalPoliciesEvidence.policies),
   });
 }
 
@@ -331,6 +386,11 @@ export function buildCapturedEvidence({ normalized, imageDigest, cleanup }) {
     checks: normalized.checks,
     collections: normalized.collections,
     baseline: normalized.baseline,
+    policyEvidenceComplete: normalized.policyEvidenceComplete,
+    publicPoliciesEvidence: normalized.publicPoliciesEvidence,
+    operationalPoliciesEvidence: normalized.operationalPoliciesEvidence,
+    publicPoliciesComparison: normalized.publicPoliciesComparison,
+    operationalPoliciesComparison: normalized.operationalPoliciesComparison,
     blockers,
   });
 }
@@ -377,6 +437,11 @@ export function buildFailedExecutionEvidence({
     checks: emptyChecks(),
     collections: emptyCollections(),
     baseline: emptyBaseline(),
+    policyEvidenceComplete: false,
+    publicPoliciesEvidence: emptyPolicyEvidence(),
+    operationalPoliciesEvidence: emptyPolicyEvidence(),
+    publicPoliciesComparison: emptyPolicyComparison(),
+    operationalPoliciesComparison: emptyPolicyComparison(),
     blockers: [blocker],
   });
 }
@@ -419,7 +484,7 @@ function assertSanitized(evidence) {
   if (
     serialized.length > MAX_OUTPUT_BYTES ||
     serialized.includes(TARGET.auditIamDatabaseUser) ||
-    /@/.test(serialized) ||
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(serialized) ||
     /\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(serialized) ||
     /\b(?:postgres(?:ql)?|https?|wss?):\/\//i.test(serialized) ||
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(serialized) ||
@@ -432,7 +497,9 @@ function assertSanitized(evidence) {
 export function validateEvidence(evidence) {
   const evidenceKeys = [
     "version", "kind", "status", "target", "bindings", "execution", "checks",
-    "collections", "baseline", "blockers", "captureSha256", "evidenceSha256",
+    "collections", "baseline", "policyEvidenceComplete", "publicPoliciesEvidence",
+    "operationalPoliciesEvidence", "publicPoliciesComparison", "operationalPoliciesComparison",
+    "blockers", "captureSha256", "evidenceSha256",
   ];
   if (
     !exactKeys(evidence, evidenceKeys) ||
@@ -470,6 +537,17 @@ export function validateEvidence(evidence) {
     (capturedCollections(evidence.collections)
       ? !evidence.baseline || !exactKeys(evidence.baseline, BASELINE_KEYS)
       : evidence.baseline !== null) ||
+    (capturedCollections(evidence.collections)
+      ? evidence.policyEvidenceComplete !== true ||
+        !evidence.publicPoliciesEvidence ||
+        !evidence.operationalPoliciesEvidence ||
+        !validPolicyComparison(evidence.publicPoliciesComparison) ||
+        !validPolicyComparison(evidence.operationalPoliciesComparison)
+      : evidence.policyEvidenceComplete !== false ||
+        evidence.publicPoliciesEvidence !== null ||
+        evidence.operationalPoliciesEvidence !== null ||
+        evidence.publicPoliciesComparison !== null ||
+        evidence.operationalPoliciesComparison !== null) ||
     !Array.isArray(evidence.blockers) ||
     !SHA256_PATTERN.test(evidence.captureSha256 ?? "") ||
     !SHA256_PATTERN.test(evidence.evidenceSha256 ?? "")
@@ -484,9 +562,25 @@ export function validateEvidence(evidence) {
       checks: evidence.checks,
       collections: evidence.collections,
       baseline: evidence.baseline,
+      policyEvidenceComplete: evidence.policyEvidenceComplete,
+      publicPoliciesEvidence: evidence.publicPoliciesEvidence,
+      operationalPoliciesEvidence: evidence.operationalPoliciesEvidence,
+      publicPoliciesComparison: evidence.publicPoliciesComparison,
+      operationalPoliciesComparison: evidence.operationalPoliciesComparison,
     }) !== evidence.captureSha256
   ) {
     throw new AttestorError("EVIDENCE_INVALID");
+  }
+
+  if (captured) {
+    validatePolicyEvidence(evidence.publicPoliciesEvidence);
+    validatePolicyEvidence(evidence.operationalPoliciesEvidence);
+    if (
+      evidence.publicPoliciesComparison.mode !== "aggregate-only" ||
+      evidence.operationalPoliciesComparison.mode !== "aggregate-only"
+    ) {
+      throw new AttestorError("EVIDENCE_INVALID");
+    }
   }
 
   if (evidence.execution.enabled && captured) {

@@ -4,7 +4,7 @@
   "title": "Hushh Tech UAT Cloud SQL catalog capture evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "kind", "status", "target", "bindings", "execution", "checks", "collections", "baseline", "blockers", "captureSha256", "evidenceSha256"],
+  "required": ["version", "kind", "status", "target", "bindings", "execution", "checks", "collections", "baseline", "policyEvidenceComplete", "publicPoliciesEvidence", "operationalPoliciesEvidence", "publicPoliciesComparison", "operationalPoliciesComparison", "blockers", "captureSha256", "evidenceSha256"],
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "imageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -35,6 +35,65 @@
         "missing": { "type": "array", "items": { "type": "string" } },
         "drifted": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["key", "expected", "observed"], "properties": { "key": { "type": "string" }, "expected": { "type": "integer", "minimum": 0 }, "observed": { "type": "integer", "minimum": 0 } } } },
         "unexpected": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "table", "policyName", "command", "roles", "permissive", "usingExpression", "withCheckExpression"],
+      "properties": {
+        "schema": { "type": "string", "minLength": 1 },
+        "table": { "type": "string", "minLength": 1 },
+        "policyName": { "type": "string", "minLength": 1 },
+        "command": { "enum": ["SELECT", "INSERT", "UPDATE", "DELETE", "ALL"] },
+        "roles": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "permissive": { "type": "boolean" },
+        "usingExpression": { "type": ["string", "null"] },
+        "withCheckExpression": { "type": ["string", "null"] }
+      }
+    },
+    "policyEvidence": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["count", "hash", "policies"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0, "maximum": 512 },
+        "hash": { "$ref": "#/$defs/sha256" },
+        "policies": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/policy" } }
+      }
+    },
+    "policyComparison": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["mode", "matched", "expectedOnly", "observedOnly", "drifted"],
+      "properties": {
+        "mode": { "enum": ["aggregate-only", "exact"] },
+        "matched": { "type": ["array", "null"], "items": { "type": "string" } },
+        "expectedOnly": { "type": ["array", "null"], "items": { "type": "string" } },
+        "observedOnly": { "type": ["array", "null"], "items": { "type": "string" } },
+        "drifted": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["identity", "differences"],
+            "properties": {
+              "identity": { "type": "string", "minLength": 1 },
+              "differences": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["commandChanged", "rolesChanged", "permissiveChanged", "usingChanged", "withCheckChanged"],
+                "properties": {
+                  "commandChanged": { "type": "boolean" },
+                  "rolesChanged": { "type": "boolean" },
+                  "permissiveChanged": { "type": "boolean" },
+                  "usingChanged": { "type": "boolean" },
+                  "withCheckChanged": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -141,6 +200,11 @@
       "items": false
     },
     "baseline": { "$ref": "#/$defs/baseline" },
+    "policyEvidenceComplete": { "type": "boolean" },
+    "publicPoliciesEvidence": { "$ref": "#/$defs/policyEvidence" },
+    "operationalPoliciesEvidence": { "$ref": "#/$defs/policyEvidence" },
+    "publicPoliciesComparison": { "$ref": "#/$defs/policyComparison" },
+    "operationalPoliciesComparison": { "$ref": "#/$defs/policyComparison" },
     "blockers": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[A-Z0-9_]+$" },

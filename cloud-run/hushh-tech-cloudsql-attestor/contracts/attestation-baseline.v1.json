@@ -23,5 +23,9 @@
     "migrationFunctions": 1,
     "triggerFunctions": 8
   },
+  "policyEvidence": {
+    "public": { "mode": "aggregate-only", "expectedCount": 280 },
+    "operational": { "mode": "aggregate-only", "expectedCount": 19 }
+  },
   "reviewedExtensions": ["pgcrypto", "uuid-ossp", "vector"]
 }

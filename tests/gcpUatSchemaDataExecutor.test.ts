@@ -16,6 +16,10 @@ import {
   CHECK_NAMES,
   COLLECTIONS,
 } from '../cloud-run/hushh-tech-cloudsql-attestor/src/constants.js';
+import {
+  buildPolicyEvidence,
+  comparePolicySets,
+} from '../cloud-run/hushh-tech-cloudsql-attestor/src/policy.js';
 import { canonicalHash, canonicalJson } from '../scripts/gcp/migration/canonical-hash.mjs';
 import { PUBLIC_TABLES } from '../scripts/gcp/migration/contract.mjs';
 import { loadValidatedSourceMembers } from '../scripts/gcp/migration/uat-cloudsql-import-bundle.mjs';
@@ -44,6 +48,13 @@ import {
 
 const digest = (label: string) => canonicalHash({ label });
 const attestedBaseline = () => compareBaseline(loadBaseline().expectedCatalog);
+const emptyPolicyAttestation = () => ({
+  policyEvidenceComplete: true,
+  publicPoliciesEvidence: buildPolicyEvidence([]),
+  operationalPoliciesEvidence: buildPolicyEvidence([]),
+  publicPoliciesComparison: comparePolicySets(null, []),
+  operationalPoliciesComparison: comparePolicySets(null, []),
+});
 
 function greenEvidence() {
   const checks = Object.fromEntries(CHECK_NAMES.map((name) => [name, true]));
@@ -53,8 +64,9 @@ function greenEvidence() {
     rowCount: ['relations', 'sequences', 'functions', 'triggers'].includes(name) ? 0 : 1,
     sha256: digest(name),
   }));
+  const policyAttestation = emptyPolicyAttestation();
   return buildCapturedEvidence({
-    normalized: { checks, collections, baseline: attestedBaseline() },
+    normalized: { checks, collections, baseline: attestedBaseline(), ...policyAttestation },
     imageDigest: `sha256:${'a'.repeat(64)}`,
     cleanup: {
       connectorCreated: true,
@@ -183,7 +195,7 @@ describe('immutable UAT catalog gate', () => {
       sha256: digest(name),
     }));
     const evidence = buildCapturedEvidence({
-      normalized: { checks, collections, baseline: attestedBaseline() },
+      normalized: { checks, collections, baseline: attestedBaseline(), ...emptyPolicyAttestation() },
       imageDigest: `sha256:${'b'.repeat(64)}`,
       cleanup: { connectorCreated: true, poolCreated: true, connectorCloseCalled: true, poolCloseCalled: true },
     });

@@ -8,6 +8,7 @@ import {
   EXPECTED_EXECUTION_CONTRACT_SHA256,
   EXPECTED_QUERY_SET_SHA256,
   EXPECTED_SOURCE_SHA256,
+  MAX_OUTPUT_BYTES,
 } from "../src/constants.js";
 import { executeCli } from "../src/cli.js";
 import {
@@ -20,6 +21,7 @@ import {
 import { runAttestation } from "../src/runner.js";
 import { loadBaseline } from "../src/baseline.js";
 import { AttestorError, buildConnectionDiagnostic } from "../src/errors.js";
+import { buildPolicyEvidence, comparePolicySets } from "../src/policy.js";
 import {
   evidenceCanonicalSha256,
   EXPECTED_SERVICE_IDENTITY_SHA256,
@@ -137,6 +139,97 @@ test("rejects raw or extra catalog result fields", () => {
   );
 });
 
+test("policy evidence is deterministic across row, role, and safe whitespace ordering", () => {
+  const policy = {
+    schema: "public",
+    table: "search_index",
+    policyName: "search_read",
+    command: "r",
+    roles: ["authenticated", "anon"],
+    permissive: true,
+    usingExpression: "(body @@ plainto_tsquery('  hushh  '))",
+    withCheckExpression: null,
+  };
+  const reordered = {
+    ...policy,
+    roles: ["anon", "authenticated"],
+    usingExpression: "(  body   @@   plainto_tsquery('  hushh  '))",
+  };
+  assert.equal(buildPolicyEvidence([policy]).hash, buildPolicyEvidence([reordered]).hash);
+  assert.notEqual(buildPolicyEvidence([policy]).hash, buildPolicyEvidence([{
+    ...policy,
+    table: "other_table",
+    policyName: "other_read",
+  }]).hash);
+});
+
+test("policy comparison reports identity and semantic differences", () => {
+  const expected = [{
+    schema: "public",
+    table: "members",
+    policyName: "members_read",
+    command: "r",
+    roles: ["authenticated"],
+    permissive: true,
+    usingExpression: "(user_id = current_setting('app.user_id', true)::uuid)",
+    withCheckExpression: null,
+  }];
+  const observed = [{
+    ...expected[0],
+    roles: ["anon"],
+    usingExpression: "true",
+  }, {
+    ...expected[0],
+    policyName: "members_write",
+    command: "a",
+    withCheckExpression: "true",
+  }];
+  assert.deepEqual(comparePolicySets(expected, observed), {
+    mode: "exact",
+    matched: [],
+    expectedOnly: [],
+    observedOnly: ["public.members.members_write"],
+    drifted: [{
+      identity: "public.members.members_read",
+      differences: {
+        commandChanged: false,
+        rolesChanged: true,
+        permissiveChanged: false,
+        usingChanged: true,
+        withCheckChanged: false,
+      },
+    }],
+  });
+});
+
+test("policy evidence rejects duplicates, oversize sets, and sensitive expressions", () => {
+  const policy = {
+    schema: "public",
+    table: "members",
+    policyName: "members_read",
+    command: "r",
+    roles: ["authenticated"],
+    permissive: true,
+    usingExpression: "true",
+    withCheckExpression: null,
+  };
+  assert.throws(
+    () => buildPolicyEvidence([policy, policy]),
+    (error) => error.code === "POLICY_EVIDENCE_DUPLICATE",
+  );
+  assert.throws(
+    () => buildPolicyEvidence(Array.from({ length: 513 }, (_, index) => ({
+      ...policy,
+      policyName: `members_read_${index}`,
+    }))),
+    (error) => error.code === "POLICY_EVIDENCE_LIMIT_EXCEEDED",
+  );
+  assert.throws(
+    () => buildPolicyEvidence([{ ...policy, usingExpression: "Bearer raw-secret-token-value" }]),
+    (error) => error.code === "POLICY_EVIDENCE_SENSITIVE",
+  );
+});
+
 test("capture and evidence hashes reject forged result or root state", async () => {
   const { runtime } = fakeRuntime();
   const evidence = await runAttestation({ config, runtime });
@@ -182,6 +275,11 @@ test("external context rejects a self-resealed forged capture", async () => {
     checks: forged.checks,
     collections: forged.collections,
     baseline: forged.baseline,
+    policyEvidenceComplete: forged.policyEvidenceComplete,
+    publicPoliciesEvidence: forged.publicPoliciesEvidence,
+    operationalPoliciesEvidence: forged.operationalPoliciesEvidence,
+    publicPoliciesComparison: forged.publicPoliciesComparison,
+    operationalPoliciesComparison: forged.operationalPoliciesComparison,
   });
   const { evidenceSha256: _oldHash, ...forgedPayload } = forged;
   forged.evidenceSha256 = canonicalHash(forgedPayload);
@@ -203,7 +301,7 @@ test("external context rejects a self-resealed forged capture", async () => {
 test("serialized evidence is bounded and contains no raw principal, IP, URL, or secret", async () => {
   const { runtime } = fakeRuntime();
   const output = serializeEvidence(await runAttestation({ config, runtime }));
-  assert.ok(Buffer.byteLength(output, "utf8") < 16_384);
+  assert.ok(Buffer.byteLength(output, "utf8") < MAX_OUTPUT_BYTES);
   assert.doesNotMatch(output, /@|\b(?:\d{1,3}\.){3}\d{1,3}\b|postgres(?:ql)?:\/\/|Bearer/i);
   assert.doesNotMatch(output, /hushh-tech-audit-uat/);
 });

@@ -273,6 +273,85 @@ target_role_effective_function_default_acls AS (
     'hushh_tech_migration'
   )
 ),
+public_policy_rows AS (
+  SELECT
+    namespace.nspname AS schema_name,
+    relation.relname AS table_name,
+    policy.polname AS policy_name,
+    policy.polcmd::text AS command,
+    policy.polpermissive AS permissive,
+    ARRAY(
+      SELECT CASE
+        WHEN policy_role.oid = 0 THEN 'public'
+        ELSE role.rolname::text
+      END
+      FROM unnest(policy.polroles) AS policy_role(oid)
+      LEFT JOIN pg_catalog.pg_roles AS role ON role.oid = policy_role.oid
+      ORDER BY 1
+    ) AS roles,
+    pg_catalog.pg_get_expr(policy.polqual, policy.polrelid, true) AS using_expression,
+    pg_catalog.pg_get_expr(policy.polwithcheck, policy.polrelid, true) AS with_check_expression
+  FROM pg_catalog.pg_policy AS policy
+  JOIN pg_catalog.pg_class AS relation ON relation.oid = policy.polrelid
+  JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname = 'public'
+    AND NOT (
+      relation.relname = 'nda_signatures'
+      AND policy.polname = 'nda_signatures_engagement_api_select'
+    )
+),
+operational_policy_rows AS (
+  SELECT
+    namespace.nspname AS schema_name,
+    relation.relname AS table_name,
+    policy.polname AS policy_name,
+    policy.polcmd::text AS command,
+    policy.polpermissive AS permissive,
+    ARRAY(
+      SELECT CASE
+        WHEN policy_role.oid = 0 THEN 'public'
+        ELSE role.rolname::text
+      END
+      FROM unnest(policy.polroles) AS policy_role(oid)
+      LEFT JOIN pg_catalog.pg_roles AS role ON role.oid = policy_role.oid
+      ORDER BY 1
+    ) AS roles,
+    pg_catalog.pg_get_expr(policy.polqual, policy.polrelid, true) AS using_expression,
+    pg_catalog.pg_get_expr(policy.polwithcheck, policy.polrelid, true) AS with_check_expression
+  FROM pg_catalog.pg_policy AS policy
+  JOIN pg_catalog.pg_class AS relation ON relation.oid = policy.polrelid
+  JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+  WHERE namespace.nspname IN ('hushh_identity', 'hushh_migration')
+),
+policy_evidence AS (
+  SELECT
+    COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'schema', entry.schema_name,
+        'table', entry.table_name,
+        'policyName', entry.policy_name,
+        'command', entry.command,
+        'roles', entry.roles,
+        'permissive', entry.permissive,
+        'usingExpression', entry.using_expression,
+        'withCheckExpression', entry.with_check_expression
+      ) ORDER BY entry.schema_name, entry.table_name, entry.policy_name)
+      FROM public_policy_rows AS entry
+    ), '[]'::jsonb) AS public_policies,
+    COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'schema', entry.schema_name,
+        'table', entry.table_name,
+        'policyName', entry.policy_name,
+        'command', entry.command,
+        'roles', entry.roles,
+        'permissive', entry.permissive,
+        'usingExpression', entry.using_expression,
+        'withCheckExpression', entry.with_check_expression
+      ) ORDER BY entry.schema_name, entry.table_name, entry.policy_name)
+      FROM operational_policy_rows AS entry
+    ), '[]'::jsonb) AS operational_policies
+),
 baseline_observed AS (
   SELECT jsonb_build_object(
     'publicTables', (
@@ -637,7 +716,9 @@ collection_rows AS (
     1 AS ordinal,
     'database_identity'::text AS collection,
     count(*)::bigint AS row_count,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.database_name), '[]'::jsonb)::text, 'UTF8')), 'hex') AS canonical_sha256
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.database_name), '[]'::jsonb)::text, 'UTF8')), 'hex') AS canonical_sha256,
+    (SELECT public_policies FROM policy_evidence) AS public_policies,
+    (SELECT operational_policies FROM policy_evidence) AS operational_policies
   FROM database_identity_rows AS entry
 
   UNION ALL
@@ -646,7 +727,9 @@ collection_rows AS (
     2,
     'schemas',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM schema_rows AS entry
 
   UNION ALL
@@ -655,7 +738,9 @@ collection_rows AS (
     3,
     'relations',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.relation_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.relation_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM relation_rows AS entry
 
   UNION ALL
@@ -664,7 +749,9 @@ collection_rows AS (
     4,
     'sequences',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.sequence_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.sequence_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM sequence_rows AS entry
 
   UNION ALL
@@ -673,7 +760,9 @@ collection_rows AS (
     5,
     'functions',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.function_name, entry.identity_arguments), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.function_name, entry.identity_arguments), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM function_rows AS entry
 
   UNION ALL
@@ -682,7 +771,9 @@ collection_rows AS (
     6,
     'triggers',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.relation_name, entry.trigger_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.schema_name, entry.relation_name, entry.trigger_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM trigger_rows AS entry
 
   UNION ALL
@@ -691,7 +782,9 @@ collection_rows AS (
     7,
     'extensions',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.extension_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.extension_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM extension_rows AS entry
 
   UNION ALL
@@ -700,7 +793,9 @@ collection_rows AS (
     8,
     'roles',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.role_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.role_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM role_rows AS entry
 
   UNION ALL
@@ -709,7 +804,9 @@ collection_rows AS (
     9,
     'role_memberships',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.role_name, entry.member_name, entry.grantor_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.role_name, entry.member_name, entry.grantor_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM role_membership_rows AS entry
 
   UNION ALL
@@ -718,7 +815,9 @@ collection_rows AS (
     10,
     'object_ownership',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.object_type, entry.schema_name, entry.object_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.object_type, entry.schema_name, entry.object_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM object_ownership_rows AS entry
 
   UNION ALL
@@ -727,7 +826,9 @@ collection_rows AS (
     11,
     'object_acls',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.object_type, entry.schema_name, entry.object_name), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.object_type, entry.schema_name, entry.object_name), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM object_acl_rows AS entry
 
   UNION ALL
@@ -736,13 +837,17 @@ collection_rows AS (
     12,
     'default_acls',
     count(*)::bigint,
-    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.owner, entry.schema_name, entry.object_type), '[]'::jsonb)::text, 'UTF8')), 'hex')
+    encode(sha256(convert_to(COALESCE(jsonb_agg(encode(sha256(convert_to(to_jsonb(entry)::text, 'UTF8')), 'hex') ORDER BY entry.owner, entry.schema_name, entry.object_type), '[]'::jsonb)::text, 'UTF8')), 'hex'),
+    NULL::jsonb,
+    NULL::jsonb
   FROM default_acl_rows AS entry
 )
 SELECT
   collection,
   row_count::text AS row_count,
   canonical_sha256,
+  CASE WHEN ordinal = 1 THEN public_policies ELSE NULL END AS public_policies,
+  CASE WHEN ordinal = 1 THEN operational_policies ELSE NULL END AS operational_policies,
   CASE WHEN ordinal = 1 THEN (SELECT checks FROM safe_checks) ELSE NULL END AS checks,
   CASE WHEN ordinal = 1 THEN (SELECT baseline FROM safe_checks) ELSE NULL END AS baseline
 FROM collection_rows
