@@ -230,3 +230,23 @@ test("baseline drift blocks an otherwise safe captured catalog", () => {
   assert.equal(new Set(evidence.blockers).size, evidence.blockers.length);
   assert.equal(validateEvidence(evidence), true);
 });
+
+test("accepts SQL baseline comparisons whose set-like arrays are key-sorted", () => {
+  const baseline = loadBaseline();
+  const result = catalogResult({
+    baselineObserved: { ...baseline.expectedCatalog, publicTables: 71 },
+    mutateRow(rows) {
+      const comparison = rows[0].baseline;
+      rows[0].baseline = {
+        ...comparison,
+        matched: [...comparison.matched].sort(),
+        drifted: [...comparison.drifted].sort((left, right) => left.key.localeCompare(right.key)),
+      };
+    },
+  });
+  const normalized = normalizeCatalogResult(result);
+  assert.equal(normalized.baseline.status, "BLOCKED");
+  assert.deepEqual(normalized.baseline.drifted, [
+    { key: "publicTables", expected: 70, observed: 71 },
+  ]);
+});

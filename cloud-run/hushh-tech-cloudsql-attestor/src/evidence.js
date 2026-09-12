@@ -128,12 +128,22 @@ function emptyBaseline() {
   return null;
 }
 
+function canonicalBaselineComparison(value) {
+  return {
+    ...value,
+    matched: [...value.matched].sort(),
+    missing: [...value.missing].sort(),
+    drifted: [...value.drifted].sort((left, right) => left.key.localeCompare(right.key)),
+    unexpected: [...value.unexpected].sort(),
+  };
+}
+
 function normalizeBaseline(value) {
   if (!value || !exactKeys(value, BASELINE_KEYS)) {
     throw new AttestorError("CATALOG_RESULT_INVALID");
   }
   const expected = compareBaseline(value.observed, loadBaseline());
-  if (canonicalHash(value) !== canonicalHash(expected)) {
+  if (canonicalHash(canonicalBaselineComparison(value)) !== canonicalHash(canonicalBaselineComparison(expected))) {
     throw new AttestorError("CATALOG_RESULT_INVALID");
   }
   return expected;

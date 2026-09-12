@@ -49,7 +49,7 @@
     "imageDigestClaimRequired": true,
     "externalActualImageVerificationRequired": true
   },
-  "sourceSha256": "2c13d5c4e6efe691101f6f9a94a3d87f61ce9e6e18cf84679d9280753bd1b41b",
+  "sourceSha256": "b3872a83cb49d98fe2d9aa953a0f1fdd78457e111e71aa79d393f05d927877a7",
   "baseImageDigest": "sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51acf084a50ef483f3",
-  "contractSha256": "88e3ce397046bbb19d498eaa3e6f3805a7b138355a0064aa0571421b6dee6a07"
+  "contractSha256": "40fcc6e0508e16d2b2dd0f7268a19306f3e7a33957f9de3e27a0f017692bdecd"
 }

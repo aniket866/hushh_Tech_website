@@ -59,7 +59,7 @@
     },
     {
       "path": "src/evidence.js",
-      "sha256": "c87f527b1a4d6a0cc48e2fe1f7f22e895b37815697eec4c7a9d7f7c30544386e"
+      "sha256": "1cc559e113716aae190e0376de8869b92b1cf509fcaa83677e8ee13b4f1d5209"
     },
     {
       "path": "src/query-contract.js",
@@ -78,5 +78,5 @@
       "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
     }
   ],
-  "sourceSha256": "2c13d5c4e6efe691101f6f9a94a3d87f61ce9e6e18cf84679d9280753bd1b41b"
+  "sourceSha256": "b3872a83cb49d98fe2d9aa953a0f1fdd78457e111e71aa79d393f05d927877a7"
 }
