@@ -86,9 +86,9 @@ export default function OnboardingFinancialLink() {
       />
 
       {/* Main Content */}
-      <main className="mx-auto mt-6 w-full max-w-[520px] flex-grow px-5 pb-48">
+      <main className="mx-auto mt-4 w-full max-w-[520px] flex-grow px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:mt-6 sm:px-5">
         {/* Title Section */}
-        <section className="mb-10 pt-12 text-center">
+        <section className="mb-8 pt-8 text-center sm:mb-10 sm:pt-12">
           <Eyebrow>Link your account</Eyebrow>
           <Display as="h1" size="sm" maxWidth="max-w-[440px]">
             Verify your financial profile.
@@ -206,9 +206,9 @@ export default function OnboardingFinancialLink() {
           {verificationRows.map((row) => (
             <div
               key={row.title}
-              className="group flex items-center justify-between border-b border-[#1D1D1F]/[0.08] px-4 py-5 last:border-b-0"
+              className="group flex items-center justify-between gap-3 border-b border-[#1D1D1F]/[0.08] px-4 py-4 sm:py-5 last:border-b-0"
             >
-              <div className="flex items-center gap-6">
+              <div className="flex min-w-0 items-center gap-4 sm:gap-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-white shadow-[inset_0_0_0_0.5px_rgba(29,29,31,0.08)]">
                   <span
                     className="material-symbols-outlined text-[20px] text-[#1D1D1F]"
@@ -217,28 +217,46 @@ export default function OnboardingFinancialLink() {
                     {row.icon}
                   </span>
                 </div>
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col">
                   <span className="text-[15px] font-medium text-[#1D1D1F]">
                     {row.title}
                   </span>
-                  <span className={`text-[13px] font-light ${
-                    row.status === 'success' ? 'text-[#1D1D1F]/70' : 'text-[#1D1D1F]/45'
+                  <span className={`text-[13px] font-light leading-5 ${
+                    row.status === 'success'
+                      ? 'text-[#1D1D1F]/70'
+                      : row.status === 'error'
+                        ? 'text-[#B42318]'
+                        : 'text-[#1D1D1F]/45'
                   }`}>
-                    {row.status === 'loading' && (
+                    {(row.status === 'loading' || row.status === 'pending') && (
                       <span className="inline-flex items-center gap-1">
-                        <span className="w-3 h-3 border border-hushh-blue border-t-transparent rounded-full animate-spin inline-block" />
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border border-hushh-blue border-t-transparent motion-reduce:animate-none" />
                         {row.subtitle}
                       </span>
                     )}
-                    {row.status !== 'loading' && row.subtitle}
+                    {row.status !== 'loading' && row.status !== 'pending' && row.subtitle}
                   </span>
                 </div>
               </div>
               <span
-                className={`material-symbols-outlined text-[20px] ${row.status === 'success' ? 'text-[#34C759]' : 'text-[#1D1D1F]/30'}`}
+                className={`material-symbols-outlined shrink-0 text-[20px] ${
+                  row.status === 'success'
+                    ? 'text-[#34C759]'
+                    : row.status === 'error'
+                      ? 'text-[#FF3B30]'
+                      : row.status === 'loading' || row.status === 'pending'
+                        ? 'animate-spin text-[#0066CC] motion-reduce:animate-none'
+                        : 'text-[#1D1D1F]/30'
+                }`}
                 style={{ fontVariationSettings: "'wght' 200" }}
               >
-                {row.status === 'success' ? 'check_circle' : 'east'}
+                {row.status === 'success'
+                  ? 'check_circle'
+                  : row.status === 'error'
+                    ? 'error'
+                    : row.status === 'loading' || row.status === 'pending'
+                      ? 'progress_activity'
+                      : 'east'}
               </span>
             </div>
           ))}
@@ -301,7 +319,7 @@ export default function OnboardingFinancialLink() {
 
         {/* Error message */}
         {error && plaidStep === 'error' && (
-          <div className="mt-4 rounded-[16px] bg-[#FF3B30]/10 p-3 text-center shadow-[inset_0_0_0_1px_rgba(255,59,48,0.18)]">
+          <div role="alert" className="mt-4 rounded-[16px] bg-[#FF3B30]/10 p-3 text-center shadow-[inset_0_0_0_1px_rgba(255,59,48,0.18)]">
             <p className="text-[12px] font-medium text-[#B42318]">{error}</p>
           </div>
         )}
@@ -335,8 +353,8 @@ export default function OnboardingFinancialLink() {
         )}
 
         {/* Trust Badges */}
-        <section className="mt-auto flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <div className="flex items-center gap-3 opacity-60">
+        <section className="mt-7 flex flex-col items-center justify-center gap-3 py-4 text-center sm:mt-8 sm:py-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 opacity-60">
             <span className="text-[10px] font-medium uppercase tracking-[1.6px] text-[#1D1D1F]/55">
               PCI DSS
             </span>
@@ -359,7 +377,7 @@ export default function OnboardingFinancialLink() {
         </section>
 
         {/* CTAs — Plaid connection is required before onboarding can continue. */}
-        <section className="pb-12 space-y-3">
+        <section className="space-y-3">
           {/* Plaid data-sharing consent — shown only before a bank is linked.
               Inline, single acknowledgment; links open the Privacy Policy
               without toggling the box. */}

@@ -100,6 +100,7 @@ const SOURCE_PATHS = [
 const BUILD_ARGS = {
   VITE_FIREBASE_AUTH_DOMAIN: "uat.hushhtech.com",
   VITE_FIREBASE_PROJECT_ID: "hushh-tech-uat",
+  VITE_GCP_API_BASE_URL: "https://uat.hushhtech.com",
   VITE_GCP_AUTH_REDIRECT_URL: "https://uat.hushhtech.com/auth/callback",
   VITE_PLAID_REDIRECT_URI: "https://uat.hushhtech.com/onboarding/financial-link",
   VITE_ALLOW_INSECURE_BROWSER_LLM: "false",

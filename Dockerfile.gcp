@@ -32,6 +32,7 @@ COPY content/ content/
 # Build args for VITE_* env vars (injected at build time)
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_API_KEY
+ARG VITE_GCP_API_BASE_URL
 ARG VITE_GCP_AUTH_REDIRECT_URL
 # Required by scripts/ci/env-contract.json but previously undeclared here, so a Cloud Build
 # image silently shipped without the Plaid OAuth return URL that the Actions build sets.

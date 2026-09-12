@@ -347,6 +347,7 @@ export const usePlaidLinkHook = (
 
   const assetPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializedRef = useRef(false);
+  const initTokenInFlightRef = useRef(false);
   const isOAuthResumeRef = useRef(false);
 
   // Persist state on every change
@@ -371,7 +372,8 @@ export const usePlaidLinkHook = (
 
   // Step 1: Create link token (with OAuth support)
   const initToken = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || initTokenInFlightRef.current) return;
+    initTokenInFlightRef.current = true;
     setState(s => ({ ...s, step: 'creating_token', error: null }));
 
     try {
@@ -440,6 +442,8 @@ export const usePlaidLinkHook = (
         },
       });
       setState(s => ({ ...s, step: 'error', error: err.message || 'Failed to initialize' }));
+    } finally {
+      initTokenInFlightRef.current = false;
     }
   }, [userId, userEmail, getOAuthState, getRedirectUri]);
 
@@ -763,12 +767,13 @@ export const usePlaidLinkHook = (
   }, [ready, open]);
 
   const retry = useCallback(() => {
+    if (initTokenInFlightRef.current) return;
     clearPersistedState();
     clearOAuthResumeState(userId);
     setState(defaultState());
     initializedRef.current = false;
     expirationRef.current = null;
-    initToken();
+    void initToken();
   }, [initToken, userId]);
 
   return {

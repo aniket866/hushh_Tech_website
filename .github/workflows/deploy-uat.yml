@@ -26,6 +26,9 @@ env:
   NODE_VERSION: "20.19.0"
   SMOKE_BASE_URL: https://uat.hushhtech.com
   SHARED_SECRETS_PROJECT: "53407187172"
+  # Vite replaces this in the browser bundle. It must be the public, same-origin
+  # gateway rather than a private Cloud Run service URL.
+  VITE_GCP_API_BASE_URL: https://uat.hushhtech.com
   VITE_GCP_AUTH_REDIRECT_URL: https://uat.hushhtech.com/auth/callback
   VITE_PLAID_REDIRECT_URI: https://uat.hushhtech.com/onboarding/financial-link
   VITE_FIREBASE_AUTH_DOMAIN: uat.hushhtech.com
@@ -264,7 +267,7 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID VITE_GCP_AUTH_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
+          for name in VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID VITE_GCP_API_BASE_URL VITE_GCP_AUTH_REDIRECT_URL VITE_PLAID_REDIRECT_URI VITE_ALLOW_INSECURE_BROWSER_LLM; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for the web auth build"
               missing=1
@@ -275,8 +278,9 @@ jobs:
           fi
           if [ "$VITE_FIREBASE_AUTH_DOMAIN" != "uat.hushhtech.com" ] || \
              [ "$VITE_FIREBASE_PROJECT_ID" != "hushh-tech-uat" ] || \
+             [ "$VITE_GCP_API_BASE_URL" != "https://uat.hushhtech.com" ] || \
              [ "$VITE_GCP_AUTH_REDIRECT_URL" != "https://uat.hushhtech.com/auth/callback" ]; then
-            echo "::error::UAT Firebase auth domain, project and application callback must match the reviewed UAT configuration."
+            echo "::error::UAT Firebase auth domain, project, function API base and application callback must match the reviewed UAT configuration."
             exit 1
           fi
           if [ "$VITE_ALLOW_INSECURE_BROWSER_LLM" != "false" ]; then

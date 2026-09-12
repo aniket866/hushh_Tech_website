@@ -28,6 +28,42 @@ describe("onboarding edge-case hardening (P0)", () => {
     expect(handleExit).toContain("step: 'error'");
   });
 
+  it("GAP-2: Plaid token initialization is single-flight and retry refuses concurrent initialization", () => {
+    const hook = read("src/services/plaid/usePlaidLink.ts");
+    const initToken = hook.slice(
+      hook.indexOf("const initToken = useCallback"),
+      hook.indexOf("const refreshFromDatabase"),
+    );
+    const retry = hook.slice(
+      hook.indexOf("const retry = useCallback"),
+      hook.indexOf("return {", hook.indexOf("const retry = useCallback")),
+    );
+
+    expect(hook).toContain("const initTokenInFlightRef = useRef(false);");
+    expect(initToken).toContain("if (!userId || initTokenInFlightRef.current) return;");
+    expect(initToken).toContain("initTokenInFlightRef.current = true;");
+    expect(initToken).toContain("} finally {");
+    expect(initToken).toContain("initTokenInFlightRef.current = false;");
+
+    expect(retry).toContain("if (initTokenInFlightRef.current) return;");
+    expect(retry.indexOf("if (initTokenInFlightRef.current) return;")).toBeLessThan(
+      retry.indexOf("clearPersistedState();"),
+    );
+    expect(retry).toContain("void initToken();");
+  });
+
+  it("GAP-3: a link-token failure does not masquerade as product fetch failures", () => {
+    const logic = read("src/pages/onboarding/financial-link/logic.ts");
+    const resolver = logic.slice(
+      logic.indexOf("const resolveVerificationProductStatus"),
+      logic.indexOf("const getProductStatusSubtitle"),
+    );
+
+    expect(resolver).not.toContain("plaidStep === 'error'");
+    expect(resolver).toContain("plaidStep === 'exchanging' || plaidStep === 'fetching'");
+    expect(resolver).toContain("return 'idle';");
+  });
+
   it("GAP-01: financial-link pre-checks consent only when the persisted version matches CONSENT_VERSION", () => {
     const logic = read("src/pages/onboarding/financial-link/logic.ts");
 

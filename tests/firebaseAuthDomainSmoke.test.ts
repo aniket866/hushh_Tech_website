@@ -94,12 +94,17 @@ describe('UAT workflow auth-domain contract', () => {
   const steps = workflow.jobs.deploy.steps;
   const validation = steps.find(step => step.name === 'Validate client auth env')!.run!;
 
-  it('keeps the alternate UAT image builder aligned with the reviewed auth configuration', () => {
+  it('keeps both UAT build paths aligned with the reviewed client configuration', () => {
     // Read the constants without importing the executable deployment script.
     const deploySource = readFileSync(new URL('../scripts/deploy/uat-deploy.mjs', import.meta.url), 'utf8');
+    const dockerfile = readFileSync(new URL('../Dockerfile.gcp', import.meta.url), 'utf8');
     const buildArgs = deploySource.match(/const BUILD_ARGS = \{([\s\S]*?)\n\};/)?.[1];
     expect(buildArgs).toBeDefined();
-    for (const name of ['VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_GCP_AUTH_REDIRECT_URL']) {
+    expect(workflow.env.VITE_GCP_API_BASE_URL).toBe(origin);
+    expect(validation).toContain('VITE_GCP_API_BASE_URL');
+    expect(deploySource).toContain('--build-arg ${name}=${JSON.stringify(value)}');
+    expect(dockerfile).toContain('ARG VITE_GCP_API_BASE_URL');
+    for (const name of ['VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_GCP_API_BASE_URL', 'VITE_GCP_AUTH_REDIRECT_URL']) {
       const value = buildArgs!.match(new RegExp(`${name}:\\s*"([^"]+)"`))?.[1];
       expect(value, `${name} must match the governed UAT workflow`).toBe(workflow.env[name]);
     }
@@ -126,6 +131,7 @@ describe('UAT workflow auth-domain contract', () => {
   it.each([
     ['VITE_FIREBASE_AUTH_DOMAIN', 'hushh-tech-uat.firebaseapp.com'],
     ['VITE_FIREBASE_PROJECT_ID', 'wrong-project'],
+    ['VITE_GCP_API_BASE_URL', 'https://hushhtech.com'],
     ['VITE_GCP_AUTH_REDIRECT_URL', 'https://hushhtech.com/auth/callback'],
   ])('fails before build on %s drift without printing values', (name, value) => {
     const result = validate({ [name]: value });

@@ -11,13 +11,16 @@ import { usePlaidLinkHook } from '../../../services/plaid/usePlaidLink';
 import {
   createSandboxTestItem,
   formatCurrency,
+  getProductStatus,
   getPlaidSyncStatus,
   startPlaidDataSync,
   unlinkPlaidAccount,
   type PlaidDataProduct,
+  type ProductFetchStatus,
   type PlaidProductSyncStatus,
   type PlaidProductSyncStatusValue,
 } from '../../../services/plaid/plaidService';
+import { buildFinancialVerificationRows } from './verificationRows';
 import { upsertOnboardingData } from '../../../services/onboarding/upsertOnboardingData';
 import { CONSENT_VERSION } from '../../../services/consent/consentConfig';
 import {
@@ -114,6 +117,20 @@ const PRODUCT_SYNC_STATUS_TO_UI: Record<PlaidProductSyncStatusValue, ProductSync
   unsupported: 'unavailable',
   access_required: 'unavailable',
   failed: 'error',
+};
+
+const resolveVerificationProductStatus = (
+  status: ProductFetchStatus,
+  plaidStep: ReturnType<typeof usePlaidLinkHook>['step'],
+): ProductFetchStatus => {
+  if (status !== 'idle') return status;
+  if (plaidStep === 'exchanging' || plaidStep === 'fetching') return 'loading';
+  if (plaidStep === 'done') return 'unavailable';
+  // A link-token/configuration failure happens before any product endpoint is
+  // requested. Keep those cards idle rather than falsely reporting three
+  // independent retrieval failures; the page-level error identifies the
+  // failed initialization step.
+  return 'idle';
 };
 
 const getProductStatusSubtitle = (
@@ -589,42 +606,19 @@ export const useFinancialLinkLogic = () => {
 
   /* ─── Verification row statuses ─── */
   const verificationRows = useMemo(() => {
-    const balanceStatus = plaid.balanceStatus;
-    const assetsStatus = plaid.assetsStatus;
-    const investmentsStatus = plaid.investmentsStatus;
-    const hasIdentity = !!identityInfo;
+    const identityProductStatus = plaid.financialData?.identity
+      ? getProductStatus(plaid.financialData.identity)
+      : 'idle';
 
-    return [
-      {
-        icon: 'account_balance_wallet',
-        title: 'Assets',
-        subtitle: balanceStatus === 'success'
-          ? `${allAccounts.length} Accounts · ${formatCurrency(totalBalance)}`
-          : balanceStatus === 'loading' ? 'Fetching...' : 'Not Available',
-        status: balanceStatus,
-      },
-      {
-        icon: 'monitoring',
-        title: 'Investments',
-        subtitle: investmentsStatus === 'success'
-          ? investmentHoldings.length > 0
-            ? `${investmentHoldings.length} Holdings`
-            : investmentAccounts.length > 0
-              ? `${investmentAccounts.length} Linked Accounts · No holdings`
-              : 'No Investment Holdings'
-          : investmentsStatus === 'loading' ? 'Fetching...' : 'No Investment Holdings',
-        status: investmentsStatus,
-      },
-      {
-        icon: 'badge',
-        title: 'Identity',
-        subtitle: hasIdentity
-          ? `✓ Verified — ${identityInfo!.names[0] || ''}`
-          : plaid.step === 'done' ? 'Not Available' : 'Not Available',
-        status: hasIdentity ? 'success' as const : 'idle' as const,
-      },
-    ];
-  }, [plaid, allAccounts, totalBalance, identityInfo, investmentAccounts, investmentHoldings]);
+    return buildFinancialVerificationRows({
+      assetsStatus: resolveVerificationProductStatus(plaid.assetsStatus, plaid.step),
+      investmentsStatus: resolveVerificationProductStatus(plaid.investmentsStatus, plaid.step),
+      identityStatus: resolveVerificationProductStatus(identityProductStatus, plaid.step),
+      identityInfo,
+      investmentHoldingsCount: investmentHoldings.length,
+      investmentAccountsCount: investmentAccounts.length,
+    });
+  }, [plaid.assetsStatus, plaid.financialData?.identity, plaid.investmentsStatus, plaid.step, identityInfo, investmentAccounts.length, investmentHoldings.length]);
 
   const productSyncRows = useMemo(() => {
     if (!isDone && productSyncStatuses.length === 0) return [];

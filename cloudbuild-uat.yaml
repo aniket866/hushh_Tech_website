@@ -27,6 +27,8 @@ steps:
       - '--build-arg'
       - 'VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}'
       - '--build-arg'
+      - 'VITE_GCP_API_BASE_URL=https://uat.hushhtech.com'
+      - '--build-arg'
       - 'VITE_GCP_AUTH_REDIRECT_URL=${_VITE_GCP_AUTH_REDIRECT_URL}'
       - '--build-arg'
       - 'VITE_KYC_ENV=${_VITE_KYC_ENV}'
