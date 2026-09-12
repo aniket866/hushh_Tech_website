@@ -4,7 +4,7 @@
   "title": "Hushh Tech UAT Cloud SQL catalog capture evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "kind", "status", "target", "bindings", "execution", "checks", "collections", "blockers", "captureSha256", "evidenceSha256"],
+  "required": ["version", "kind", "status", "target", "bindings", "execution", "checks", "collections", "baseline", "blockers", "captureSha256", "evidenceSha256"],
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "imageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -19,6 +19,22 @@
         "status": { "enum": ["NOT_CAPTURED", "CAPTURED"] },
         "rowCount": { "type": ["integer", "null"], "minimum": 0, "maximum": 10000 },
         "sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      }
+    },
+    "baseline": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["status", "sourceArtifact", "sourceExpectedSha256", "expected", "observed", "matched", "missing", "drifted", "unexpected"],
+      "properties": {
+        "status": { "enum": ["ATTESTED", "BLOCKED"] },
+        "sourceArtifact": { "type": "string" },
+        "sourceExpectedSha256": { "$ref": "#/$defs/sha256" },
+        "expected": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "observed": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "matched": { "type": "array", "items": { "type": "string" } },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "drifted": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["key", "expected", "observed"], "properties": { "key": { "type": "string" }, "expected": { "type": "integer", "minimum": 0 }, "observed": { "type": "integer", "minimum": 0 } } } },
+        "unexpected": { "type": "array", "items": { "type": "string" } }
       }
     }
   },
@@ -124,6 +140,7 @@
       ],
       "items": false
     },
+    "baseline": { "$ref": "#/$defs/baseline" },
     "blockers": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[A-Z0-9_]+$" },

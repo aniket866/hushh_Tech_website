@@ -1,4 +1,5 @@
 import { CHECK_NAMES, COLLECTIONS } from "../src/constants.js";
+import { compareBaseline, loadBaseline } from "../src/baseline.js";
 import { ENV, parseConfig } from "../src/config.js";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
@@ -33,13 +34,15 @@ export function activeConfig(hashes) {
   );
 }
 
-export function catalogResult({ checks = {}, mutateRow } = {}) {
+export function catalogResult({ checks = {}, baselineObserved, mutateRow } = {}) {
   const safeChecks = Object.fromEntries(CHECK_NAMES.map((name) => [name, checks[name] ?? true]));
+  const baseline = compareBaseline(baselineObserved ?? loadBaseline().expectedCatalog);
   const rows = COLLECTIONS.map((collection, index) => ({
     collection,
     row_count: String(index),
     canonical_sha256: (index + 1).toString(16).repeat(64).slice(0, 64),
     checks: index === 0 ? safeChecks : null,
+    baseline: index === 0 ? baseline : null,
   }));
   if (mutateRow) mutateRow(rows);
   return { command: "SELECT", rowCount: rows.length, rows };

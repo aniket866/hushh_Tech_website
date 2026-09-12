@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "kind": "HUSHH_TECH_UAT_CLOUDSQL_ATTESTATION_BASELINE",
+  "sourceArtifact": "migration/cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json",
+  "sourceExpectedSha256": "a924487ab2660d2f7aa9226111a53de6539c590b52db4b2f2971bebc1ef774618",
+  "target": {
+    "project": "hushh-tech-uat",
+    "region": "us-central1",
+    "instance": "hushh-tech-app-pg-uat",
+    "database": "hushh_tech_app"
+  },
+  "expectedCatalog": {
+    "publicTables": 70,
+    "publicSequences": 0,
+    "publicTriggers": 24,
+    "explicitIndexes": 121,
+    "forcedRlsTables": 70,
+    "publicPolicies": 280,
+    "operationalPolicies": 19,
+    "executorPolicies": 0,
+    "reviewedExtensions": 3,
+    "identityFunctions": 2,
+    "migrationFunctions": 1,
+    "triggerFunctions": 8
+  },
+  "reviewedExtensions": ["pgcrypto", "uuid-ossp", "vector"]
+}

@@ -11,7 +11,11 @@
     },
     {
       "path": "contracts/attestation-evidence.schema.json",
-      "sha256": "02c0540c8605aaa4355813d9e733760514bf83f4c6101c85ed58f360a5286e06"
+      "sha256": "958084ef96ed5e4cf05fdaba5b9a3bf2ce13265c61bdfb4e598648b8bd8087e2"
+    },
+    {
+      "path": "contracts/attestation-baseline.v1.json",
+      "sha256": "8e06f0a00f380d61f0687eb7dad7a8644a87392237915403eca8a1ebac1291b5"
     },
     {
       "path": "package-lock.json",
@@ -27,7 +31,7 @@
     },
     {
       "path": "sql/catalog-attestation.v1.sql",
-      "sha256": "4f9b98f3bd2557f8012f820890ce473e4b5db717a91ce276ccab036f8709b50b"
+      "sha256": "77cd934f2ce3aa724ae9ddfa17356c0318ae7aaded74d8ec166a2efe2895a896"
     },
     {
       "path": "src/canonical.js",
@@ -47,7 +51,7 @@
     },
     {
       "path": "src/contracts.js",
-      "sha256": "2b2b988fec3625b075c6017b46f452c39ee978d14e70c676bd50d8491b4760ad"
+      "sha256": "e04cf4ea02df024e0cfc7295caf3aa6e2da2414ba714a86643638a1ef517519b"
     },
     {
       "path": "src/errors.js",
@@ -55,7 +59,7 @@
     },
     {
       "path": "src/evidence.js",
-      "sha256": "e5e05add503406484c304662b1231d82bfa8d49d7fec92a65254444cee4714cd"
+      "sha256": "c87f527b1a4d6a0cc48e2fe1f7f22e895b37815697eec4c7a9d7f7c30544386e"
     },
     {
       "path": "src/query-contract.js",
@@ -74,5 +78,5 @@
       "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
     }
   ],
-  "sourceSha256": "ffc7ea78aee164f4acef8f7a1e2b55b89945d3ba96f7fe612de3e01371534d51"
+  "sourceSha256": "2c13d5c4e6efe691101f6f9a94a3d87f61ce9e6e18cf84679d9280753bd1b41b"
 }

@@ -12,11 +12,13 @@ import {
 import { executeCli } from "../src/cli.js";
 import {
   bindSupervisorEvidence,
+  buildCapturedEvidence,
   normalizeCatalogResult,
   serializeEvidence,
   validateEvidence,
 } from "../src/evidence.js";
 import { runAttestation } from "../src/runner.js";
+import { loadBaseline } from "../src/baseline.js";
 import { AttestorError, buildConnectionDiagnostic } from "../src/errors.js";
 import {
   evidenceCanonicalSha256,
@@ -176,7 +178,11 @@ test("external context rejects a self-resealed forged capture", async () => {
 
   const forged = structuredClone(evidence);
   forged.collections[1].rowCount += 1;
-  forged.captureSha256 = canonicalHash({ checks: forged.checks, collections: forged.collections });
+  forged.captureSha256 = canonicalHash({
+    checks: forged.checks,
+    collections: forged.collections,
+    baseline: forged.baseline,
+  });
   const { evidenceSha256: _oldHash, ...forgedPayload } = forged;
   forged.evidenceSha256 = canonicalHash(forgedPayload);
   assert.equal(validateEvidence(forged), true);
@@ -200,4 +206,27 @@ test("serialized evidence is bounded and contains no raw principal, IP, URL, or 
   assert.ok(Buffer.byteLength(output, "utf8") < 16_384);
   assert.doesNotMatch(output, /@|\b(?:\d{1,3}\.){3}\d{1,3}\b|postgres(?:ql)?:\/\/|Bearer/i);
   assert.doesNotMatch(output, /hushh-tech-audit-uat/);
+});
+
+test("baseline drift blocks an otherwise safe captured catalog", () => {
+  const baseline = loadBaseline();
+  const result = catalogResult({
+    baselineObserved: { ...baseline.expectedCatalog, publicTables: 71 },
+  });
+  const normalized = normalizeCatalogResult(result);
+  const evidence = buildCapturedEvidence({
+    normalized,
+    imageDigest: `sha256:${"a".repeat(64)}`,
+    cleanup: {
+      connectorCreated: true,
+      poolCreated: true,
+      connectorCloseCalled: true,
+      poolCloseCalled: true,
+    },
+  });
+  assert.equal(evidence.status, "BLOCKED");
+  assert.equal(evidence.baseline.status, "BLOCKED");
+  assert.ok(evidence.blockers.includes("EXPECTED_CATALOG_DRIFT"));
+  assert.equal(new Set(evidence.blockers).size, evidence.blockers.length);
+  assert.equal(validateEvidence(evidence), true);
 });

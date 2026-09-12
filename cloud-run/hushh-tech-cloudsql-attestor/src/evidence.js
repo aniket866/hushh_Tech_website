@@ -18,11 +18,23 @@ import {
   WORKER_DEADLINE_MS,
 } from "./constants.js";
 import { AttestorError } from "./errors.js";
+import { compareBaseline, loadBaseline } from "./baseline.js";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const IMAGE_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const EVIDENCE_KIND = "HUSHH_TECH_UAT_CLOUDSQL_CATALOG_CAPTURE";
 const TRANSPORT_RETRY_POLICY = "CONNECTOR_LIBRARY_MANAGED_READ_ONLY_NOT_COUNTED";
+const BASELINE_KEYS = Object.freeze([
+  "status",
+  "sourceArtifact",
+  "sourceExpectedSha256",
+  "expected",
+  "observed",
+  "matched",
+  "missing",
+  "drifted",
+  "unexpected",
+]);
 
 const CHECK_BLOCKERS = Object.freeze({
   databaseMatches: "DATABASE_TARGET_MISMATCH",
@@ -42,7 +54,7 @@ const CHECK_BLOCKERS = Object.freeze({
   auditWritableMembershipDenied: "AUDIT_WRITABLE_MEMBERSHIP_PRESENT",
   auditWritableObjectPrivilegesDenied: "AUDIT_WRITABLE_OBJECT_PRIVILEGE_PRESENT",
   auditWritableDefaultPrivilegesDenied: "AUDIT_WRITABLE_DEFAULT_PRIVILEGE_PRESENT",
-  catalogBoundsSatisfied: "CATALOG_BOUNDS_EXCEEDED",
+  catalogBoundsSatisfied: "EXPECTED_CATALOG_DRIFT",
 });
 
 const NON_CAPTURE_BLOCKERS = new Set([
@@ -64,6 +76,7 @@ const NON_CAPTURE_BLOCKERS = new Set([
   "WORKER_DEADLINE_EXCEEDED",
   "WORKER_EXIT_FAILED",
   "WORKER_OUTPUT_INVALID",
+  "EXPECTED_CATALOG_DRIFT",
 ]);
 
 function exactKeys(value, expected) {
@@ -111,6 +124,21 @@ function emptyCollections() {
   }));
 }
 
+function emptyBaseline() {
+  return null;
+}
+
+function normalizeBaseline(value) {
+  if (!value || !exactKeys(value, BASELINE_KEYS)) {
+    throw new AttestorError("CATALOG_RESULT_INVALID");
+  }
+  const expected = compareBaseline(value.observed, loadBaseline());
+  if (canonicalHash(value) !== canonicalHash(expected)) {
+    throw new AttestorError("CATALOG_RESULT_INVALID");
+  }
+  return expected;
+}
+
 function executionState({
   enabled,
   hardProcessSupervisor = false,
@@ -144,7 +172,11 @@ function executionState({
 }
 
 function sealEvidence(payload) {
-  const captureSha256 = canonicalHash({ checks: payload.checks, collections: payload.collections });
+  const captureSha256 = canonicalHash({
+    checks: payload.checks,
+    collections: payload.collections,
+    baseline: payload.baseline,
+  });
   const envelope = { ...payload, captureSha256 };
   const evidence = { ...envelope, evidenceSha256: canonicalHash(envelope) };
   validateEvidence(evidence);
@@ -164,6 +196,7 @@ export function buildNotExecutedEvidence({
     execution: executionState({ enabled: false, hardProcessSupervisor }),
     checks: emptyChecks(),
     collections: emptyCollections(),
+    baseline: emptyBaseline(),
     blockers: [blocker],
   });
 }
@@ -215,13 +248,16 @@ export function normalizeCatalogResult(result) {
   }
 
   let checks = null;
+  let baseline = null;
   const collections = result.rows.map((row, index) => {
     if (
-      !exactKeys(row, ["collection", "row_count", "canonical_sha256", "checks"]) ||
+      !exactKeys(row, ["collection", "row_count", "canonical_sha256", "checks", "baseline"]) ||
       row.collection !== COLLECTIONS[index] ||
       !/^(0|[1-9][0-9]*)$/.test(row.row_count ?? "") ||
       !SHA256_PATTERN.test(row.canonical_sha256 ?? "") ||
-      (index === 0 ? !exactKeys(row.checks, CHECK_NAMES) : row.checks !== null)
+      (index === 0
+        ? !exactKeys(row.checks, CHECK_NAMES) || !row.baseline
+        : row.checks !== null || row.baseline !== null)
     ) {
       throw new AttestorError("CATALOG_RESULT_INVALID");
     }
@@ -234,10 +270,15 @@ export function normalizeCatalogResult(result) {
         throw new AttestorError("CATALOG_RESULT_INVALID");
       }
       checks = Object.fromEntries(CHECK_NAMES.map((name) => [name, row.checks[name]]));
+      baseline = normalizeBaseline(row.baseline);
     }
     return { name: row.collection, status: "CAPTURED", rowCount, sha256: row.canonical_sha256 };
   });
-  return Object.freeze({ checks: Object.freeze(checks), collections: Object.freeze(collections) });
+  return Object.freeze({
+    checks: Object.freeze(checks),
+    collections: Object.freeze(collections),
+    baseline: Object.freeze(baseline),
+  });
 }
 
 export function buildCapturedEvidence({ normalized, imageDigest, cleanup }) {
@@ -251,9 +292,16 @@ export function buildCapturedEvidence({ normalized, imageDigest, cleanup }) {
   ) {
     throw new AttestorError("CATALOG_CHECK_FAILED");
   }
-  const blockers = CHECK_NAMES.filter((name) => normalized.checks[name] !== true).map(
-    (name) => CHECK_BLOCKERS[name],
-  );
+  const blockers = [
+    ...new Set(
+      CHECK_NAMES.filter((name) => normalized.checks[name] !== true).map(
+        (name) => CHECK_BLOCKERS[name],
+      ),
+    ),
+  ];
+  if (normalized.baseline.status !== "ATTESTED" && !blockers.includes("EXPECTED_CATALOG_DRIFT")) {
+    blockers.push("EXPECTED_CATALOG_DRIFT");
+  }
   return sealEvidence({
     version: 1,
     kind: EVIDENCE_KIND,
@@ -272,6 +320,7 @@ export function buildCapturedEvidence({ normalized, imageDigest, cleanup }) {
     }),
     checks: normalized.checks,
     collections: normalized.collections,
+    baseline: normalized.baseline,
     blockers,
   });
 }
@@ -317,6 +366,7 @@ export function buildFailedExecutionEvidence({
     execution: executionState({ enabled: true, hardProcessSupervisor, ...metrics }),
     checks: emptyChecks(),
     collections: emptyCollections(),
+    baseline: emptyBaseline(),
     blockers: [blocker],
   });
 }
@@ -348,6 +398,12 @@ function validateCollections(collections, captured) {
   });
 }
 
+function capturedCollections(collections) {
+  return Array.isArray(collections) &&
+    collections.length === COLLECTIONS.length &&
+    collections.every((collection) => collection.status === "CAPTURED");
+}
+
 function assertSanitized(evidence) {
   const serialized = JSON.stringify(evidence);
   if (
@@ -366,7 +422,7 @@ function assertSanitized(evidence) {
 export function validateEvidence(evidence) {
   const evidenceKeys = [
     "version", "kind", "status", "target", "bindings", "execution", "checks",
-    "collections", "blockers", "captureSha256", "evidenceSha256",
+    "collections", "baseline", "blockers", "captureSha256", "evidenceSha256",
   ];
   if (
     !exactKeys(evidence, evidenceKeys) ||
@@ -401,6 +457,9 @@ export function validateEvidence(evidence) {
     typeof evidence.execution.hardProcessSupervisor !== "boolean" ||
     !exactKeys(evidence.checks, CHECK_NAMES) ||
     !Array.isArray(evidence.collections) ||
+    (capturedCollections(evidence.collections)
+      ? !evidence.baseline || !exactKeys(evidence.baseline, BASELINE_KEYS)
+      : evidence.baseline !== null) ||
     !Array.isArray(evidence.blockers) ||
     !SHA256_PATTERN.test(evidence.captureSha256 ?? "") ||
     !SHA256_PATTERN.test(evidence.evidenceSha256 ?? "")
@@ -408,18 +467,32 @@ export function validateEvidence(evidence) {
     throw new AttestorError("EVIDENCE_INVALID");
   }
 
-  const captured = evidence.collections.every((collection) => collection.status === "CAPTURED");
+  const captured = capturedCollections(evidence.collections);
   if (
     !validateCollections(evidence.collections, captured) ||
-    canonicalHash({ checks: evidence.checks, collections: evidence.collections }) !== evidence.captureSha256
+    canonicalHash({
+      checks: evidence.checks,
+      collections: evidence.collections,
+      baseline: evidence.baseline,
+    }) !== evidence.captureSha256
   ) {
     throw new AttestorError("EVIDENCE_INVALID");
   }
 
   if (evidence.execution.enabled && captured) {
-    const expectedBlockers = CHECK_NAMES.filter((name) => evidence.checks[name] !== true).map(
-      (name) => CHECK_BLOCKERS[name],
-    );
+    const expectedBlockers = [
+      ...new Set(
+        CHECK_NAMES.filter((name) => evidence.checks[name] !== true).map(
+          (name) => CHECK_BLOCKERS[name],
+        ),
+      ),
+    ];
+    if (
+      evidence.baseline.status !== "ATTESTED" &&
+      !expectedBlockers.includes("EXPECTED_CATALOG_DRIFT")
+    ) {
+      expectedBlockers.push("EXPECTED_CATALOG_DRIFT");
+    }
     if (
       evidence.execution.dryRun !== false ||
       evidence.execution.connectorCreated !== true ||
@@ -431,6 +504,7 @@ export function validateEvidence(evidence) {
       evidence.execution.queryStatements !== 9 ||
       !IMAGE_DIGEST_PATTERN.test(evidence.bindings.imageDigest ?? "") ||
       CHECK_NAMES.some((name) => typeof evidence.checks[name] !== "boolean") ||
+      canonicalHash(evidence.baseline) !== canonicalHash(compareBaseline(evidence.baseline.observed)) ||
       canonicalHash(evidence.blockers) !== canonicalHash(expectedBlockers) ||
       evidence.status !== (expectedBlockers.length === 0 ? "CAPTURED" : "BLOCKED")
     ) {
@@ -456,6 +530,7 @@ export function validateEvidence(evidence) {
       !metricValid(evidence.execution.queryStatements, 9) ||
       !IMAGE_DIGEST_PATTERN.test(evidence.bindings.imageDigest ?? "") ||
       CHECK_NAMES.some((name) => evidence.checks[name] !== null) ||
+      evidence.baseline !== null ||
       evidence.blockers.length !== 1 ||
       !NON_CAPTURE_BLOCKERS.has(evidence.blockers[0]) ||
       evidence.blockers[0] === "EXECUTION_GATE_FALSE" ||
@@ -475,6 +550,7 @@ export function validateEvidence(evidence) {
     captured ||
     evidence.bindings.imageDigest !== null ||
     CHECK_NAMES.some((name) => evidence.checks[name] !== null) ||
+    evidence.baseline !== null ||
     evidence.blockers.length !== 1 ||
     !NON_CAPTURE_BLOCKERS.has(evidence.blockers[0]) ||
     evidence.status !== (evidence.blockers[0] === "EXECUTION_GATE_FALSE" ? "NOT_EXECUTED" : "BLOCKED")

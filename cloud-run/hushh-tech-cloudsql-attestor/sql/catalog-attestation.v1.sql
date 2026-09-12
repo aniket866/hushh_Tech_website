@@ -273,6 +273,149 @@ target_role_effective_function_default_acls AS (
     'hushh_tech_migration'
   )
 ),
+baseline_observed AS (
+  SELECT jsonb_build_object(
+    'publicTables', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p')
+    ),
+    'publicSequences', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = 'public' AND relation.relkind = 'S'
+    ),
+    'publicTriggers', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_trigger AS trigger
+      JOIN pg_catalog.pg_class AS relation ON relation.oid = trigger.tgrelid
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = 'public' AND NOT trigger.tgisinternal
+    ),
+    'explicitIndexes', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_index AS idx
+      JOIN pg_catalog.pg_class AS table_relation ON table_relation.oid = idx.indrelid
+      JOIN pg_catalog.pg_class AS index_relation ON index_relation.oid = idx.indexrelid
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = table_relation.relnamespace
+      WHERE namespace.nspname = 'public'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.pg_constraint AS con
+          WHERE con.conindid = index_relation.oid
+        )
+    ),
+    'forcedRlsTables', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = 'public'
+        AND relation.relkind IN ('r', 'p')
+        AND relation.relrowsecurity
+        AND relation.relforcerowsecurity
+    ),
+    'publicPolicies', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_policies AS policy
+      WHERE policy.schemaname = 'public'
+        AND NOT (
+          policy.tablename = 'nda_signatures'
+          AND policy.policyname = 'nda_signatures_engagement_api_select'
+        )
+    ),
+    'operationalPolicies', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_policies AS policy
+      WHERE policy.schemaname IN ('hushh_identity', 'hushh_migration')
+    ),
+    'executorPolicies', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_policies AS policy
+      WHERE policy.policyname LIKE '%executor_owner_all'
+    ),
+    'reviewedExtensions', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_extension AS extension
+      WHERE extension.extname IN ('pgcrypto', 'uuid-ossp', 'vector')
+    ),
+    'identityFunctions', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'hushh_identity'
+        AND procedure.proname IN ('current_firebase_uid', 'current_legacy_user_uuid')
+    ),
+    'migrationFunctions', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'hushh_migration'
+        AND procedure.proname = 'reject_audit_mutation'
+    ),
+    'triggerFunctions', (
+      SELECT count(*)::integer
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'public'
+        AND procedure.proname = ANY (ARRAY[
+          'generate_investor_slug',
+          'handle_new_user',
+          'hushh_agents_set_updated_at',
+          'hushh_agents_sync_conversation_preview',
+          'hushh_agents_sync_match_from_swipe',
+          'set_current_timestamp_updated_at',
+          'update_onboarding_data_timestamp',
+          'wa_set_updated_at'
+        ])
+    )
+  ) AS observed
+),
+baseline_expected AS (
+  SELECT jsonb_build_object(
+    'publicTables', 70,
+    'publicSequences', 0,
+    'publicTriggers', 24,
+    'explicitIndexes', 121,
+    'forcedRlsTables', 70,
+    'publicPolicies', 280,
+    'operationalPolicies', 19,
+    'executorPolicies', 0,
+    'reviewedExtensions', 3,
+    'identityFunctions', 2,
+    'migrationFunctions', 1,
+    'triggerFunctions', 8
+  ) AS expected
+),
+baseline_comparison AS (
+  SELECT jsonb_build_object(
+    'status', CASE WHEN baseline_observed.observed = baseline_expected.expected THEN 'ATTESTED' ELSE 'BLOCKED' END,
+    'sourceArtifact', 'migration/cloud-run/hushh-tech-schema-data-verifier-uat/expected-manifest.v1.json',
+    'sourceExpectedSha256', 'a924487ab2660d2f7aa9226111a53de6539c590b52db4b2f2971bebc1ef774618',
+    'expected', baseline_expected.expected,
+    'observed', baseline_observed.observed,
+    'matched', COALESCE((
+      SELECT jsonb_agg(entry.key ORDER BY entry.key)
+      FROM jsonb_each(baseline_expected.expected) AS entry
+      WHERE baseline_observed.observed -> entry.key = entry.value
+    ), '[]'::jsonb),
+    'missing', '[]'::jsonb,
+    'drifted', COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'key', entry.key,
+          'expected', entry.value,
+          'observed', baseline_observed.observed -> entry.key
+        ) ORDER BY entry.key
+      )
+      FROM jsonb_each(baseline_expected.expected) AS entry
+      WHERE baseline_observed.observed -> entry.key IS DISTINCT FROM entry.value
+    ), '[]'::jsonb),
+    'unexpected', '[]'::jsonb
+  ) AS comparison
+  FROM baseline_observed, baseline_expected
+),
 safe_checks AS (
   SELECT jsonb_build_object(
     'databaseMatches', current_database() = 'hushh_tech_app',
@@ -280,10 +423,14 @@ safe_checks AS (
     'postgres17', current_setting('server_version_num')::integer >= 170000
       AND current_setting('server_version_num')::integer < 180000,
     'transactionReadOnly', current_setting('transaction_read_only') = 'on',
-    'applicationRelationsEmpty', NOT EXISTS (SELECT 1 FROM relation_rows),
-    'applicationSequencesEmpty', NOT EXISTS (SELECT 1 FROM sequence_rows),
-    'applicationFunctionsEmpty', NOT EXISTS (SELECT 1 FROM function_rows),
-    'applicationTriggersEmpty', NOT EXISTS (SELECT 1 FROM trigger_rows),
+    'applicationRelationsEmpty', (baseline_comparison.comparison ->> 'status') = 'ATTESTED'
+      AND (baseline_comparison.comparison -> 'observed' ->> 'publicTables')::integer = 70,
+    'applicationSequencesEmpty', (baseline_comparison.comparison ->> 'status') = 'ATTESTED'
+      AND (baseline_comparison.comparison -> 'observed' ->> 'publicSequences')::integer = 0,
+    'applicationFunctionsEmpty', (baseline_comparison.comparison ->> 'status') = 'ATTESTED'
+      AND (baseline_comparison.comparison -> 'observed' ->> 'triggerFunctions')::integer = 8,
+    'applicationTriggersEmpty', (baseline_comparison.comparison ->> 'status') = 'ATTESTED'
+      AND (baseline_comparison.comparison -> 'observed' ->> 'publicTriggers')::integer = 24,
     'expectedRoleSetPresent', (
       SELECT count(*) = 5
       FROM pg_catalog.pg_roles
@@ -480,8 +627,10 @@ safe_checks AS (
           'MEMBER'
         )
     ),
-    'catalogBoundsSatisfied', true
-  ) AS checks
+    'catalogBoundsSatisfied', (baseline_comparison.comparison ->> 'status') = 'ATTESTED'
+  ) AS checks,
+    (SELECT comparison FROM baseline_comparison) AS baseline
+  FROM baseline_comparison
 ),
 collection_rows AS (
   SELECT
@@ -594,6 +743,7 @@ SELECT
   collection,
   row_count::text AS row_count,
   canonical_sha256,
-  CASE WHEN ordinal = 1 THEN (SELECT checks FROM safe_checks) ELSE NULL END AS checks
+  CASE WHEN ordinal = 1 THEN (SELECT checks FROM safe_checks) ELSE NULL END AS checks,
+  CASE WHEN ordinal = 1 THEN (SELECT baseline FROM safe_checks) ELSE NULL END AS baseline
 FROM collection_rows
 ORDER BY ordinal;

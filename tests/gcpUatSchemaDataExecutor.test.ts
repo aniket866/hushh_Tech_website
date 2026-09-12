@@ -9,6 +9,10 @@ import {
   buildCapturedEvidence,
 } from '../cloud-run/hushh-tech-cloudsql-attestor/src/evidence.js';
 import {
+  compareBaseline,
+  loadBaseline,
+} from '../cloud-run/hushh-tech-cloudsql-attestor/src/baseline.js';
+import {
   CHECK_NAMES,
   COLLECTIONS,
 } from '../cloud-run/hushh-tech-cloudsql-attestor/src/constants.js';
@@ -39,6 +43,7 @@ import {
 } from '../scripts/gcp/migration/uat-schema-data-executor.mjs';
 
 const digest = (label: string) => canonicalHash({ label });
+const attestedBaseline = () => compareBaseline(loadBaseline().expectedCatalog);
 
 function greenEvidence() {
   const checks = Object.fromEntries(CHECK_NAMES.map((name) => [name, true]));
@@ -49,7 +54,7 @@ function greenEvidence() {
     sha256: digest(name),
   }));
   return buildCapturedEvidence({
-    normalized: { checks, collections },
+    normalized: { checks, collections, baseline: attestedBaseline() },
     imageDigest: `sha256:${'a'.repeat(64)}`,
     cleanup: {
       connectorCreated: true,
@@ -178,7 +183,7 @@ describe('immutable UAT catalog gate', () => {
       sha256: digest(name),
     }));
     const evidence = buildCapturedEvidence({
-      normalized: { checks, collections },
+      normalized: { checks, collections, baseline: attestedBaseline() },
       imageDigest: `sha256:${'b'.repeat(64)}`,
       cleanup: { connectorCreated: true, poolCreated: true, connectorCloseCalled: true, poolCloseCalled: true },
     });

@@ -29,6 +29,7 @@ const EXPECTED_SOURCE_FILES = Object.freeze([
   ".dockerignore",
   "Dockerfile",
   "contracts/attestation-evidence.schema.json",
+  "contracts/attestation-baseline.v1.json",
   "package-lock.json",
   "package.json",
   "sql/catalog-bounds.v1.sql",
