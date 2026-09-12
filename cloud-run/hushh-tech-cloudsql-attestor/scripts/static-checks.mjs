@@ -41,7 +41,7 @@ if (
 if (
   !runner.includes("password: () => undefined") ||
   /\bpassword\s*:/i.test(runner.replace("password: () => undefined", "")) ||
-  /console\.(?:log|error|warn)|process\.stderr/.test(`${runner}\n${cli}`) ||
+  /console\.(?:log|error|warn)/.test(`${runner}\n${cli}`) ||
   /\b(?:setInterval|retry|backoff)\b/i.test(runner)
 ) {
   fail("Runner drifted into password, raw logging, or retry behavior.");

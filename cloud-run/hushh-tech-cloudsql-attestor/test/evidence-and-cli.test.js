@@ -17,6 +17,7 @@ import {
   validateEvidence,
 } from "../src/evidence.js";
 import { runAttestation } from "../src/runner.js";
+import { AttestorError, buildConnectionDiagnostic } from "../src/errors.js";
 import {
   evidenceCanonicalSha256,
   EXPECTED_SERVICE_IDENTITY_SHA256,
@@ -81,6 +82,44 @@ test("CLI never emits a raw runtime error", async () => {
   });
   assert.equal(exitCode, 1);
   assert.doesNotMatch(output.read(), /10\.0\.0\.9|Bearer|principal@|raw-secret/i);
+  assert.equal(JSON.parse(output.read()).blockers[0], "RUNTIME_CONNECTION_FAILED");
+});
+
+test("CLI emits only the safe connection diagnostic side channel", async () => {
+  const output = captureWriter();
+  const diagnostics = captureWriter();
+  const failure = new AttestorError("RUNTIME_CONNECTION_FAILED");
+  failure.attestorDiagnostic = buildConnectionDiagnostic(
+    Object.assign(new Error("Bearer raw-secret"), {
+      code: "ECONNREFUSED",
+      address: "10.0.0.9",
+      port: 5432,
+    }),
+    "POST_CONNECT",
+  );
+  const exitCode = await executeCli({
+    env: {
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_EXECUTE: "true",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_PROJECT: "hushh-tech-uat",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_REGION: "us-central1",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_INSTANCE: "hushh-tech-app-pg-uat",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_DATABASE: "hushh_tech_app",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_IAM_DB_USER: "hushh-tech-audit-uat@hushh-tech-uat.iam",
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_APPROVED_CONTRACT_SHA256: EXPECTED_EXECUTION_CONTRACT_SHA256,
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_APPROVED_QUERY_SET_SHA256: EXPECTED_QUERY_SET_SHA256,
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_APPROVED_SOURCE_SHA256: EXPECTED_SOURCE_SHA256,
+      HUSHH_TECH_CLOUDSQL_ATTESTOR_IMAGE_DIGEST: config.imageDigest,
+    },
+    stdout: output.stdout,
+    stderr: diagnostics.stdout,
+    loadRuntime: async () => ({}),
+    run: async () => {
+      throw failure;
+    },
+  });
+  assert.equal(exitCode, 1);
+  assert.equal(JSON.parse(diagnostics.read()).stage, "TCP");
+  assert.doesNotMatch(diagnostics.read(), /Bearer|raw-secret/i);
   assert.equal(JSON.parse(output.read()).blockers[0], "RUNTIME_CONNECTION_FAILED");
 });
 

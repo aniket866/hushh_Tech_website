@@ -127,6 +127,27 @@ test("raw provider errors are replaced by a fixed blocker and cleanup still runs
   assert.equal(record.connectorCloseCalls, 1);
 });
 
+test("provider connection failures retain a redacted stage diagnostic", async () => {
+  const { runtime, record } = fakeRuntime({
+    getOptions: Object.assign(
+      () => Promise.reject(Object.assign(new Error("private secret"), {
+        code: "ENOTFOUND",
+        hostname: "private.invalid",
+      })),
+      { unused: true },
+    ),
+  });
+  await assert.rejects(
+    () => runAttestation({ config, runtime }),
+    (error) =>
+      error.code === "RUNTIME_CONNECTION_FAILED" &&
+      error.attestorDiagnostic.stage === "DNS" &&
+      error.attestorDiagnostic.code === "ENOTFOUND" &&
+      !JSON.stringify(error.attestorDiagnostic).includes("private secret") &&
+      record.connectorCloseCalls === 1,
+  );
+});
+
 test("false reviewed checks produce blockers rather than an attested claim", async () => {
   const falseChecks = Object.fromEntries(CHECK_NAMES.map((name) => [name, true]));
   falseChecks.transactionReadOnly = false;

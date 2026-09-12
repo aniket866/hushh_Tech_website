@@ -13,6 +13,11 @@ import {
 } from "../src/constants.js";
 import { ENV, parseConfig } from "../src/config.js";
 import { validateRuntimeContracts } from "../src/contracts.js";
+import {
+  buildConnectionDiagnostic,
+  parseConnectionDiagnostic,
+  serializeConnectionDiagnostic,
+} from "../src/errors.js";
 import { loadAndValidateQueryContract } from "../src/query-contract.js";
 import { activationEnv } from "./helpers.js";
 
@@ -159,6 +164,41 @@ test("validates exact source and execution contracts", () => {
   );
 });
 
+test("connection diagnostics preserve only safe provider fields", () => {
+  const error = Object.assign(new Error("private connection secret"), {
+    code: "ETIMEDOUT",
+    errno: -110,
+    syscall: "connect",
+    hostname: "private.invalid",
+    address: "10.0.0.8",
+    port: 5432,
+  });
+  const diagnostic = buildConnectionDiagnostic(error, "POST_CONNECT");
+  assert.deepEqual(diagnostic, {
+    kind: "HUSHH_TECH_UAT_CLOUDSQL_CONNECTION_DIAGNOSTIC",
+    stage: "TCP",
+    name: "Error",
+    code: "ETIMEDOUT",
+    errno: "-110",
+    syscall: "connect",
+    hostname: "private.invalid",
+    address: "10.0.0.8",
+    port: 5432,
+    sqlState: null,
+  });
+  const serialized = serializeConnectionDiagnostic(diagnostic);
+  assert.doesNotMatch(serialized, /private connection secret/i);
+  assert.deepEqual(parseConnectionDiagnostic(serialized), diagnostic);
+  assert.equal(
+    buildConnectionDiagnostic(
+      Object.assign(new Error("bad"), { code: "28P01", hostname: "bad@secret" }),
+      "POST_CONNECT",
+    ).stage,
+    "DB_AUTH",
+  );
+  assert.equal(parseConnectionDiagnostic('{"raw":"secret"}'), null);
+});
+
 test("rejects any mutation or psql-style/multi-statement query shape", () => {
   const contract = loadAndValidateQueryContract();
   assert.equal(contract.statementCount, 9);
@@ -166,6 +206,14 @@ test("rejects any mutation or psql-style/multi-statement query shape", () => {
   assert.equal(contract.catalog.match(/;/g)?.length, 1);
   assert.doesNotMatch(contract.bounds, /^\\/m);
   assert.doesNotMatch(contract.catalog, /^\\/m);
+  assert.ok(
+    (contract.catalog.match(/procedure\.prokind IN \('f', 'p'\)/g)?.length ?? 0) >= 3,
+  );
+  assert.match(contract.catalog, /CASE WHEN procedure\.prokind IN \('f', 'p'\)[\s\S]*pg_get_functiondef/);
+  assert.match(contract.catalog, /CASE WHEN candidate\.relkind = 'S'[\s\S]*has_sequence_privilege/);
+  assert.match(contract.catalog, /CASE WHEN candidate_object\.relkind = 'S'[\s\S]*has_sequence_privilege/);
+  assert.match(contract.catalog, /CASE WHEN candidate\.relkind <> 'S'[\s\S]*has_table_privilege/);
+  assert.match(contract.catalog, /CASE WHEN candidate_object\.relkind <> 'S'[\s\S]*has_table_privilege/);
   assert.throws(
     () => loadAndValidateQueryContract({ boundsSql: contract.bounds.replace(/^WITH/, "DELETE") }),
     (error) => error.code === "QUERY_CONTRACT_DRIFT",

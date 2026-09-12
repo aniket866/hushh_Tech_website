@@ -23,11 +23,11 @@
     },
     {
       "path": "sql/catalog-bounds.v1.sql",
-      "sha256": "93db0e2e9986315c8011352c070c9fda6d89ca851b28cecc744e4d0d2feb57dc"
+      "sha256": "16488bb777c476e38536bfc8fcf3af3475756b3ad96cf9a12e42ad537c977677"
     },
     {
       "path": "sql/catalog-attestation.v1.sql",
-      "sha256": "57c292ef92b4398396cad948a5a0ac8cb66490252ad28d9b3330627c822c10d4"
+      "sha256": "4f9b98f3bd2557f8012f820890ce473e4b5db717a91ce276ccab036f8709b50b"
     },
     {
       "path": "src/canonical.js",
@@ -35,7 +35,7 @@
     },
     {
       "path": "src/cli.js",
-      "sha256": "0b00dde8b9fd612ab8e2ded0270874cd76adee4c4e45f195088dcb719d49ebae"
+      "sha256": "3f1e8d04046544c3770c3b10a3a6a80f01ce820f2916979dc80653ba04a2377c"
     },
     {
       "path": "src/config.js",
@@ -51,7 +51,7 @@
     },
     {
       "path": "src/errors.js",
-      "sha256": "c3092718d0e37b4b3b794cff02b495285028f4f383d72f0f14d1e3739da657a6"
+      "sha256": "cc2a28f751bcf0c50bed30f855fb6a4808954950ebf8f1e2dd981de253627f26"
     },
     {
       "path": "src/evidence.js",
@@ -63,16 +63,16 @@
     },
     {
       "path": "src/runner.js",
-      "sha256": "777d6b743a4f5c12778fa49a1ed4a670420baeb0ae96a42d7bef52043d408635"
+      "sha256": "909696fbfb7c0cf3ba8dc6537af03ff1d913bd352be08fa73684c2b42a76f2c1"
     },
     {
       "path": "src/supervisor.js",
-      "sha256": "f7c8206c74783cfeb03908f69aa6b27ee5f2c3c61bbd815f9bb28864f7b3fa1c"
+      "sha256": "406af692971ccddbbb5c70b128dbfa5314f1b0efcdef2ac9b27ef5131fe95658"
     },
     {
       "path": "src/verifier.js",
       "sha256": "c5696a5c2289c9fd594e856c6eea0dc9518ee281633f5b378a383a42f57a9250"
     }
   ],
-  "sourceSha256": "8242188d72b0f4e893d59600674eeab69dc3dde4825796de300634ac0f8a701e"
+  "sourceSha256": "ffc7ea78aee164f4acef8f7a1e2b55b89945d3ba96f7fe612de3e01371534d51"
 }

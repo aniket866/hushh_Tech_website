@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { parseConfig } from "./config.js";
+import { parseConnectionDiagnostic } from "./errors.js";
 import { HARD_PROCESS_DEADLINE_MS, MAX_OUTPUT_BYTES } from "./constants.js";
 import {
   bindSupervisorEvidence,
@@ -63,6 +64,7 @@ export async function runSupervisor({
     return 1;
   }
   let output = Buffer.alloc(0);
+  let diagnosticOutput = Buffer.alloc(0);
   let outputOverflow = false;
   let settled = false;
 
@@ -89,8 +91,10 @@ export async function runSupervisor({
         child.kill("SIGKILL");
       }
     });
-    child.stderr?.on("data", () => {
-      // Provider/runtime stderr is intentionally discarded, never forwarded.
+    child.stderr?.on("data", (chunk) => {
+      if (diagnosticOutput.length <= 4096) {
+        diagnosticOutput = Buffer.concat([diagnosticOutput, Buffer.from(chunk)]);
+      }
     });
     child.once("error", () => finish({ blocker: "WORKER_EXIT_FAILED", exitCode: 1 }));
     child.once("close", (code, signal) => {
@@ -120,6 +124,8 @@ export async function runSupervisor({
   }
 
   stdout.write(serializeEvidence(evidence));
+  const diagnostic = parseConnectionDiagnostic(diagnosticOutput.toString("utf8"));
+  if (diagnostic) console.error(JSON.stringify(diagnostic));
   return evidence.status === "CAPTURED" || evidence.status === "NOT_EXECUTED" ? 0 : 1;
 }
 

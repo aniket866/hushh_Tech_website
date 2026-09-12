@@ -8,6 +8,7 @@ import {
   serializeEvidence,
 } from "./evidence.js";
 import { safeErrorCode } from "./errors.js";
+import { serializeConnectionDiagnostic } from "./errors.js";
 import { loadAndValidateQueryContract } from "./query-contract.js";
 import { loadRuntimeDependencies, runAttestation } from "./runner.js";
 
@@ -24,6 +25,7 @@ const EMPTY_ATTEMPT_METRICS = Object.freeze({
 export async function executeCli({
   env = process.env,
   stdout = process.stdout,
+  stderr = process.stderr,
   loadRuntime = loadRuntimeDependencies,
   run = runAttestation,
 } = {}) {
@@ -42,6 +44,7 @@ export async function executeCli({
     stdout.write(serializeEvidence(evidence));
     return evidence.status === "CAPTURED" ? 0 : 1;
   } catch (error) {
+    stderr.write(serializeConnectionDiagnostic(error.attestorDiagnostic));
     const blocker = safeErrorCode(error);
     const evidence = config?.execute && config.imageDigest
       ? buildFailedExecutionEvidence({

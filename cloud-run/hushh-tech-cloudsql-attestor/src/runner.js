@@ -4,7 +4,7 @@ import {
   normalizeBoundsResult,
   normalizeCatalogResult,
 } from "./evidence.js";
-import { AttestorError } from "./errors.js";
+import { AttestorError, buildConnectionDiagnostic } from "./errors.js";
 import { loadAndValidateQueryContract } from "./query-contract.js";
 
 function exactKeys(value, expected) {
@@ -59,9 +59,10 @@ function validateCommand(result, command) {
   }
 }
 
-function makeSafeRunError(error, metrics) {
+function makeSafeRunError(error, metrics, fallbackStage) {
   const safe = error instanceof AttestorError ? error : new AttestorError("RUNTIME_CONNECTION_FAILED");
   safe.attestorMetrics = Object.freeze({ ...metrics });
+  safe.attestorDiagnostic = buildConnectionDiagnostic(error, fallbackStage);
   return safe;
 }
 
@@ -109,6 +110,7 @@ export async function runAttestation({
   let transactionRolledBack = false;
   let normalized;
   let failure;
+  let failureStage = "CONNECTOR";
 
   try {
     connector = new runtime.Connector();
@@ -142,6 +144,7 @@ export async function runAttestation({
     });
     metrics.poolCreated = true;
     metrics.connectionAttempts = 1;
+    failureStage = "POST_CONNECT";
     client = await raceWithAbort(() => pool.connect(), controller.signal);
 
     const beginResult = await raceWithAbort(
@@ -223,6 +226,6 @@ export async function runAttestation({
     }
   }
 
-  if (failure) throw makeSafeRunError(failure, metrics);
+  if (failure) throw makeSafeRunError(failure, metrics, failureStage);
   return buildCapturedEvidence({ normalized, imageDigest: config.imageDigest, cleanup: metrics });
 }

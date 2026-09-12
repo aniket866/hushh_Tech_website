@@ -65,8 +65,14 @@ function_rows AS (
   SELECT
     namespace.nspname AS schema_name,
     procedure.proname AS function_name,
-    pg_get_function_identity_arguments(procedure.oid) AS identity_arguments,
-    pg_get_function_result(procedure.oid) AS result_type,
+    CASE WHEN procedure.prokind IN ('f', 'p')
+      THEN pg_get_function_identity_arguments(procedure.oid)
+      ELSE NULL
+    END AS identity_arguments,
+    CASE WHEN procedure.prokind IN ('f', 'p')
+      THEN pg_get_function_result(procedure.oid)
+      ELSE NULL
+    END AS result_type,
     procedure.prokind::text AS function_kind,
     language.lanname AS language,
     pg_get_userbyid(procedure.proowner) AS owner,
@@ -76,12 +82,16 @@ function_rows AS (
     procedure.proparallel::text AS parallel_safety,
     procedure.proconfig AS configuration,
     procedure.proacl::text AS acl,
-    pg_get_functiondef(procedure.oid) AS definition
+    CASE WHEN procedure.prokind IN ('f', 'p')
+      THEN pg_get_functiondef(procedure.oid)
+      ELSE NULL
+    END AS definition
   FROM pg_catalog.pg_proc AS procedure
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
   JOIN pg_catalog.pg_language AS language ON language.oid = procedure.prolang
   WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
     AND namespace.nspname !~ '^pg_(toast|temp|toast_temp)'
+    AND procedure.prokind IN ('f', 'p')
 ),
 trigger_rows AS (
   SELECT
@@ -162,12 +172,18 @@ object_ownership_rows AS (
   SELECT
     'function' AS object_type,
     namespace.nspname AS schema_name,
-    procedure.proname || '(' || pg_get_function_identity_arguments(procedure.oid) || ')' AS object_name,
+    procedure.proname || '('
+      || CASE WHEN procedure.prokind IN ('f', 'p')
+        THEN pg_get_function_identity_arguments(procedure.oid)
+        ELSE ''
+      END
+      || ')' AS object_name,
     pg_get_userbyid(procedure.proowner) AS owner
   FROM pg_catalog.pg_proc AS procedure
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
   WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
     AND namespace.nspname !~ '^pg_(toast|temp|toast_temp)'
+    AND procedure.prokind IN ('f', 'p')
 
   UNION ALL
 
@@ -197,7 +213,12 @@ object_acl_rows AS (
   SELECT
     'function' AS object_type,
     namespace.nspname AS schema_name,
-    procedure.proname || '(' || pg_get_function_identity_arguments(procedure.oid) || ')' AS object_name,
+    procedure.proname || '('
+      || CASE WHEN procedure.prokind IN ('f', 'p')
+        THEN pg_get_function_identity_arguments(procedure.oid)
+        ELSE ''
+      END
+      || ')' AS object_name,
     procedure.proacl::text AS acl
   FROM pg_catalog.pg_proc AS procedure
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
