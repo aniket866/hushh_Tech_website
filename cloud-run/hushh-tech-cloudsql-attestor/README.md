@@ -39,8 +39,10 @@ Future activation requires the literal `true` gate, all exact target labels,
 and the exact reviewed execution-contract, query-set, and source hashes. It also
 requires a syntactically immutable image-digest claim. That claim is not trusted
 as the actual running image: an external reviewer must compare it with the Cloud
-Run execution's Artifact Registry digest before accepting evidence. No deploy or
-activation command is provided here.
+Run execution's Artifact Registry digest before accepting evidence. The reviewed
+deployment helper is `npm run gcp:migration:deploy-cloudsql-attestor`: it defaults
+to a plan, and `--activate-attestation --run-attestation` is the explicit
+read-only activation path. It has no migration-apply option.
 
 `src/anchors.js` is the explicitly reviewed trust-anchor file excluded from the
 otherwise complete runtime source manifest to avoid a self-hash cycle. The
