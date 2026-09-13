@@ -59,8 +59,8 @@
     "traffic_evidence_file_sha256": "5db78b99f880423c88528817ca422ab862aa1a42f93699e37b0e4ce03fc90ac0",
     "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
     "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
-    "terminal_matrix_file_sha256": "d6331e9229ad3002cd5568c69d80d2c078ad3791b23fba7ccab50ef667b4b40f",
-    "terminal_matrix_evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8"
+    "terminal_matrix_file_sha256": "b25d337caf94b478d4023d45cfc05ba534cbd54ecb9b81beddb844eb00881231",
+    "terminal_matrix_evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160"
   },
   "traffic_30d": {
     "request_count": 56,
@@ -103,19 +103,19 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "4be72d097df7ad5db3be8fd1ac4a9f7b17e16631f1c74758c3626edada165fbd",
+    "manifest_self_digest": "0dcb0977af2e604758efd88d59d0fbb76a42a828d93c59e0f528f33e52ea1921",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
   "runtime_byte_lock": {
     "cloud-run/hushh-tech-app-services/Dockerfile": "b7e52b350e1e07d6b2c2b7bcc7d63b0e50710cf8871bffb63bac443e833c321b",
     "cloud-run/hushh-tech-app-services/package-lock.json": "2d4c2d26a2857890cd03c94933ca12ec7c802d1b88c40c2930abf4d4d52a641f",
-    "cloud-run/hushh-tech-app-services/package.json": "05f531a93e74a7afa02bf79262da1469f3c1095cbaf69b66c55311860b1b3715",
+    "cloud-run/hushh-tech-app-services/package.json": "b48f10ce0f8d517e88f1a29feb42cf08397f263d59cd47e256fa671f2da0c463",
     "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
-    "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
-    "cloud-run/hushh-tech-app-services/src/app.js": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086",
-    "cloud-run/hushh-tech-app-services/src/server.js": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764",
+    "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "35e860e913a8a14c116df165c09ffd0dc7257bb2b9e64adf985806ec385dd3f5",
+    "cloud-run/hushh-tech-app-services/src/app.js": "31f3e0c340eb741604c249eda9697ca423904bcfa6111b8f2f5c41b89fc723ad",
+    "cloud-run/hushh-tech-app-services/src/server.js": "95be653456802847592605f58cdb4375dec52f1e350255547665ef3f576cde0f",
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
     "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "dd46d342221e323eba47ceb538d5fecb8168efa699cd787216a46287ee222fa3",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
@@ -125,7 +125,7 @@
     "schema_version": 1,
     "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
     "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
-    "src_inventory_digest": "b27363fb6dba9c67b629076380c302830db5169c68fe220895aabb83c7b2a669",
+    "src_inventory_digest": "a8535026ebcccb3d0e59c9f6794f59d2ea579de99fe6202a165fd9ff1c8dd50a",
     "src_inventory": [
       {
         "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
@@ -139,13 +139,13 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/app.js",
-        "bytes": 26957,
-        "sha256": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086"
+        "bytes": 31222,
+        "sha256": "31f3e0c340eb741604c249eda9697ca423904bcfa6111b8f2f5c41b89fc723ad"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
-        "bytes": 4509,
-        "sha256": "5767b8dd4ff872900ea7680e08123dda90a0c335d7956a6ef5188be809a0951c"
+        "bytes": 5241,
+        "sha256": "ef16fe2870f07f1422087b83138a2c9e2131d900e00c1e0a9d91e46f5a4d600f"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/auth/google.js",
@@ -154,23 +154,48 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/config.js",
-        "bytes": 9375,
-        "sha256": "3e18a201c1b4364472c243680da50151c210ca4da9f1d606b27b1ae0d92722fb"
+        "bytes": 14136,
+        "sha256": "fb2e6487de38f3cda693f9dc1cf1ab161eb5b7bb3c0603b563a84639dd1a9522"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/contracts.js",
-        "bytes": 13296,
-        "sha256": "c3e0647e993a42ac8e5a96c0781bb176a4566494f0f4b5a80c9b28b55096d114"
+        "bytes": 15473,
+        "sha256": "5709672482413566adae539f8aefbb5df74020fb0281afda619a175ba726ea71"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/database.js",
-        "bytes": 27821,
-        "sha256": "2567d6afa23afc9d959e33a75d70d7ac80e4347afb75006271566167cac7c1d2"
+        "bytes": 36524,
+        "sha256": "9b3e214bdbeb7f92ce5569448f8eb0e7c10302fd518f39be3f99f31a4c5ae4e5"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/errors.js",
         "bytes": 775,
         "sha256": "834d401110483306644bdb8ea7a005fb6fd4fbbf321747bad0a560525d16677e"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/financial/cloud-tasks-publisher.js",
+        "bytes": 4900,
+        "sha256": "58525d7c428e2b146cc01caca891a53b1de166d06bcae25693c0e03294999be7"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js",
+        "bytes": 36412,
+        "sha256": "f88b404ff665f5ad3283961e55663e7e6a8f98e6b988ffc9ff72095a501933b2"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "bytes": 58711,
+        "sha256": "3700f21bef6eff2982366c6983aaaecaabc5e9e8a1918ee70a7163360dc539b9"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js",
+        "bytes": 8878,
+        "sha256": "4e71b77e1edf28b66686f65de265228c17ea5bf56f1441e855c77a8b87dd8fa9"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/financial/plaid-data-sync.js",
+        "bytes": 21367,
+        "sha256": "705174b7877c6c63da5bdd47ace81c6d794cbf23336224cbb177bb32ee9c7b0a"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
@@ -186,6 +211,11 @@
         "path": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
         "bytes": 3837,
         "sha256": "515e38e63b5084cf8ad8530272ac11ca69d18a95582b1d8b09e319df068984ef"
+      },
+      {
+        "path": "cloud-run/hushh-tech-app-services/src/handlers/financial-link.js",
+        "bytes": 28040,
+        "sha256": "8893c942d187afb4fbdd45c1f21beb304e7c14432a3ad9babfa44ec0f1b258c8"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/handlers/gcp-read-batch.js",
@@ -210,7 +240,7 @@
       {
         "path": "cloud-run/hushh-tech-app-services/src/handlers/plaid-payment-batch.js",
         "bytes": 61602,
-        "sha256": "7191813eb0c7fca2fb295ed02b2ba051148c41f20447356d598a39a22bb6b0bb"
+        "sha256": "7a1c64b0460f7cc4999e13725c092e5104ec74b6eb5c0471072e136efb3430ca"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/rate-limit.js",
@@ -224,13 +254,13 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
-        "bytes": 2731,
-        "sha256": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703"
+        "bytes": 5597,
+        "sha256": "35e860e913a8a14c116df165c09ffd0dc7257bb2b9e64adf985806ec385dd3f5"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/server.js",
-        "bytes": 2671,
-        "sha256": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764"
+        "bytes": 2740,
+        "sha256": "95be653456802847592605f58cdb4375dec52f1e350255547665ef3f576cde0f"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/shared-rate-limit.js",
@@ -239,8 +269,8 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/table-privileges.js",
-        "bytes": 6417,
-        "sha256": "d9a2a4af81f5b89c79ef1e0c7e0226169abae76cbdd77bb6f364d03660e50bad"
+        "bytes": 16550,
+        "sha256": "5a8df7526c785f2a17f858884a357cbf774a780382fdd6edd261b82b0154ae63"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/webhook-ledger.js",
@@ -253,7 +283,7 @@
         "sha256": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7"
       }
     ],
-    "boot_graph_digest": "e539a8f916853d5e07eea5c00ee542b03c5549b3ac06fd62163354150edabdfd",
+    "boot_graph_digest": "1fa66f91a274d64d75a052eaa7fdfb7790f02eaeb0f3eb2aeccadf347fa7df63",
     "boot_reachable": [
       "cloud-run/hushh-tech-app-services/src/adapters/investor-read-only.js",
       "cloud-run/hushh-tech-app-services/src/app.js",
@@ -263,8 +293,14 @@
       "cloud-run/hushh-tech-app-services/src/contracts.js",
       "cloud-run/hushh-tech-app-services/src/database.js",
       "cloud-run/hushh-tech-app-services/src/errors.js",
+      "cloud-run/hushh-tech-app-services/src/financial/cloud-tasks-publisher.js",
+      "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js",
+      "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+      "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js",
+      "cloud-run/hushh-tech-app-services/src/financial/plaid-data-sync.js",
       "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
       "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js",
+      "cloud-run/hushh-tech-app-services/src/handlers/financial-link.js",
       "cloud-run/hushh-tech-app-services/src/handlers/investor-read-only.js",
       "cloud-run/hushh-tech-app-services/src/rate-limit.js",
       "cloud-run/hushh-tech-app-services/src/registry.js",
@@ -372,6 +408,81 @@
         "to": null
       },
       {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/cloud-tasks-publisher.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/cloud-tasks-publisher.js",
+        "specifier": "google-auth-library",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js",
+        "specifier": "./plaid-client.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js",
+        "specifier": "./plaid-data-sync.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/plaid-data-sync.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "../auth/firebase.js",
+        "to": "cloud-run/hushh-tech-app-services/src/auth/firebase.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "./cloud-tasks-publisher.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/cloud-tasks-publisher.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "./financial-link-adapter.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/financial-link-adapter.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "./plaid-client.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "google-auth-library",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
+        "specifier": "node:crypto",
+        "to": null
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/plaid-data-sync.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/financial/plaid-data-sync.js",
+        "specifier": "./plaid-client.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js"
+      },
+      {
         "from": "cloud-run/hushh-tech-app-services/src/firestore-rate-limit.js",
         "specifier": "firebase-admin/app",
         "to": null
@@ -402,6 +513,16 @@
         "to": null
       },
       {
+        "from": "cloud-run/hushh-tech-app-services/src/handlers/financial-link.js",
+        "specifier": "../errors.js",
+        "to": "cloud-run/hushh-tech-app-services/src/errors.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/handlers/financial-link.js",
+        "specifier": "../financial/plaid-client.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js"
+      },
+      {
         "from": "cloud-run/hushh-tech-app-services/src/rate-limit.js",
         "specifier": "./errors.js",
         "to": "cloud-run/hushh-tech-app-services/src/errors.js"
@@ -423,8 +544,18 @@
       },
       {
         "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "specifier": "./financial/gcp-runtime.js",
+        "to": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
         "specifier": "./handlers/engagement-admin.js",
         "to": "cloud-run/hushh-tech-app-services/src/handlers/engagement-admin.js"
+      },
+      {
+        "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",
+        "specifier": "./handlers/financial-link.js",
+        "to": "cloud-run/hushh-tech-app-services/src/handlers/financial-link.js"
       },
       {
         "from": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",

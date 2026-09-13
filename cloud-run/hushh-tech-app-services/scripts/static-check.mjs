@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,7 +65,10 @@ assert.deepEqual(
   ["hushh-location-geocode"],
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
+  "asset-report-create",
   "chat-check-access",
+  "create-link-token",
+  "exchange-public-token",
   "fund-payment-admin-analytics",
   "fund-payment-admin-overview",
   "fund-payment-admin-overview-list",
@@ -74,6 +78,10 @@ assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
   "hushh-location-geocode",
   "investor-og-image",
   "nda-admin-fetch",
+  "plaid-data-sync",
+  "plaid-data-sync-product",
+  "plaid-data-sync-start",
+  "plaid-diagnostics-log",
   "stock-quotes",
 ]);
 const candidateMatrix = JSON.parse(
@@ -128,12 +136,19 @@ for (const slug of AI_RUNTIME_BATCH_CANDIDATE_SLUGS) {
   assert.equal(registryBySlug.get(slug)?.migration_state, "INVENTORY_FROZEN");
 }
 assert.equal(Object.keys(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).length, 7);
-assert.equal(
-  Object.values(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS).every(
-    (privileges) => privileges.length === 0,
-  ),
-  true,
-);
+assert.deepEqual(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS["financial-api"], [
+  "public.plaid_transactions:DELETE",
+]);
+assert.deepEqual(SERVICE_TABLE_PRIVILEGE_ALLOWLISTS.worker, [
+  "public.plaid_transactions:DELETE",
+]);
+for (const [owner, privileges] of Object.entries(
+  SERVICE_TABLE_PRIVILEGE_ALLOWLISTS,
+)) {
+  if (owner !== "financial-api" && owner !== "worker") {
+    assert.deepEqual(privileges, []);
+  }
+}
 assert.equal(
   Object.values(SERVICE_SEQUENCE_PRIVILEGE_ALLOWLISTS).every(
     (privileges) => privileges.length === 0,
@@ -150,10 +165,28 @@ assert.deepEqual(
     "public.nda_signatures.user_id:SELECT",
   ],
 );
+for (const [owner, digest] of Object.entries({
+  "financial-api": "f43ee72b8d248ded49b0705427300ce6c7295316c87438cc1dc7f8e78122dba1",
+  worker: "ee86c87052a79cb6347a7fc65440c4539df1072dea0d7c8d267cfcbb62121d75",
+})) {
+  assert.equal(
+    createHash("sha256")
+      .update(JSON.stringify(SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS[owner]))
+      .digest("hex"),
+    digest,
+    `${owner} column allowlist drifted from the reviewed financial boundary.`,
+  );
+}
 for (const [owner, privileges] of Object.entries(
   SERVICE_COLUMN_PRIVILEGE_ALLOWLISTS,
 )) {
-  if (owner !== "engagement-api-worker") assert.deepEqual(privileges, []);
+  if (
+    owner !== "engagement-api-worker" &&
+    owner !== "financial-api" &&
+    owner !== "worker"
+  ) {
+    assert.deepEqual(privileges, []);
+  }
 }
 
 if (!registryOnly) {

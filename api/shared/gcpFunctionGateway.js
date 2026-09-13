@@ -52,6 +52,20 @@ const PUBLIC_COMPATIBILITY_FIREBASE_MODES = new Set([
   "firebase_bearer_recent_auth",
   "firebase_bearer_recent_auth_or_google_service_identity",
 ]);
+// The frozen inventory predates the Finance Link migration and labels these
+// browser compatibility routes as recent-auth endpoints. The corresponding
+// Supabase handlers accepted any valid product session, however. Keep that
+// source behavior in a deliberately narrow compatibility boundary instead of
+// relaxing recent-auth enforcement for the rest of the gateway.
+const LEGACY_FINANCIAL_LINK_SLUGS = new Set([
+  "asset-report-create",
+  "create-link-token",
+  "exchange-public-token",
+  "plaid-data-sync",
+  "plaid-data-sync-product",
+  "plaid-data-sync-start",
+  "plaid-diagnostics-log",
+]);
 
 const FORWARDED_REQUEST_HEADERS = new Set([
   "accept",
@@ -321,6 +335,7 @@ function validateRequestBody(req, entry, contract) {
 
   const mediaType = requestMediaType(req);
   if (!mediaType || !contract.contentTypes.includes(mediaType)) {
+    if (isLossyPlaidDiagnosticsRoute(entry)) return body;
     throw new GcpFunctionGatewayError(
       "UNSUPPORTED_MEDIA_TYPE",
       "Unsupported request type.",
@@ -331,6 +346,7 @@ function validateRequestBody(req, entry, contract) {
     try {
       JSON.parse(body.toString("utf8"));
     } catch {
+      if (isLossyPlaidDiagnosticsRoute(entry)) return body;
       throw new GcpFunctionGatewayError(
         "INVALID_BODY",
         "Invalid request body.",
@@ -351,6 +367,29 @@ function jsonError(res, error) {
 
 function isRecentAuthMode(authMode) {
   return authMode.includes("recent_auth");
+}
+
+function isLegacyFinancialLinkCompatibilityRoute(entry) {
+  return (
+    entry?.ownerGroup === "financial-api-worker" &&
+    LEGACY_FINANCIAL_LINK_SLUGS.has(entry.slug)
+  );
+}
+
+function requiresRecentFirebaseAuth(entry) {
+  return (
+    isRecentAuthMode(entry.authMode) &&
+    !isLegacyFinancialLinkCompatibilityRoute(entry)
+  );
+}
+
+function isLossyPlaidDiagnosticsRoute(entry) {
+  return (
+    entry?.slug === "plaid-diagnostics-log" &&
+    entry.ownerGroup === "financial-api-worker" &&
+    entry.authMode ===
+      "firebase_bearer_recent_auth_or_google_service_identity"
+  );
 }
 
 async function requireFirebaseIdentity({
@@ -405,7 +444,7 @@ async function requireFirebaseIdentity({
     );
   }
   if (
-    isRecentAuthMode(entry.authMode) &&
+    requiresRecentFirebaseAuth(entry) &&
     Math.floor(now() / 1000) - authTime > RECENT_AUTH_SECONDS
   ) {
     throw new GcpFunctionGatewayError(
@@ -416,6 +455,25 @@ async function requireFirebaseIdentity({
   }
 
   return { uid, authTime, token: match[1] };
+}
+
+async function requireCompatibilityFirebaseIdentity(args) {
+  try {
+    return await requireFirebaseIdentity(args);
+  } catch (error) {
+    // The source diagnostics endpoint was intentionally public and lossy:
+    // valid bearers associate an actor, while absent or unverifiable bearers
+    // are recorded anonymously. This exception is constrained to the one
+    // frozen diagnostics slug; every financial-data route remains fail closed.
+    if (
+      isLossyPlaidDiagnosticsRoute(args.entry) &&
+      error instanceof GcpFunctionGatewayError &&
+      ["UNAUTHENTICATED", "UPSTREAM_UNAVAILABLE"].includes(error.code)
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function copyRequestHeaders(req) {
@@ -616,7 +674,7 @@ export function createGcpFunctionGateway({
       const identity =
         entry.authMode === "provider_signature_raw_body"
           ? null
-          : await requireFirebaseIdentity({
+          : await requireCompatibilityFirebaseIdentity({
               req,
               entry,
               verifyFirebaseToken,

@@ -7,10 +7,86 @@ import {
   createStockQuotesHandler,
 } from "./handlers/investor-read-only.js";
 import { createNdaAdminFetchHandler } from "./handlers/engagement-admin.js";
+import {
+  createFinancialLinkApiHandlers,
+  createFinancialLinkWorkerHandlers,
+  createUnavailablePlaidDiagnosticsHandler,
+} from "./handlers/financial-link.js";
+import { createFinancialLinkRuntime } from "./financial/gcp-runtime.js";
 
 const GEOCODE_SLUG = "hushh-location-geocode";
 const STOCK_QUOTES_SLUG = "stock-quotes";
 const NDA_ADMIN_FETCH_SLUG = "nda-admin-fetch";
+
+function createFinancialRuntimeFactory({ config, fetchImpl, now }) {
+  return function runtimeForRequest(context) {
+    return createFinancialLinkRuntime({
+      config,
+      database: context?.database,
+      actor: context?.actor,
+      fetchImpl,
+      ...(now === undefined ? {} : { now }),
+    });
+  };
+}
+
+function createFinancialApiRuntimeHandlers({ config, fetchImpl, now }) {
+  const runtimeForRequest = createFinancialRuntimeFactory({
+    config,
+    fetchImpl,
+    now,
+  });
+  const slugs = [
+    "create-link-token",
+    "exchange-public-token",
+    "plaid-data-sync",
+    "plaid-data-sync-start",
+    "plaid-data-sync-product",
+    "asset-report-create",
+    "plaid-diagnostics-log",
+  ];
+  const unavailableDiagnostics = createUnavailablePlaidDiagnosticsHandler();
+  return Object.freeze(
+    Object.fromEntries(
+      slugs.map((slug) => [
+        slug,
+        async (context) => {
+          let handler;
+          try {
+            const runtime = runtimeForRequest(context);
+            handler = createFinancialLinkApiHandlers({
+              financialLinkAdapter: runtime.financialLinkAdapter,
+            })[slug];
+          } catch (error) {
+            // Source diagnostics are explicitly lossy even when their own
+            // service setup is absent. This is scoped to the frozen logging
+            // slug; all financial-data routes retain their fail-closed
+            // runtime construction behavior.
+            if (slug === "plaid-diagnostics-log") {
+              return unavailableDiagnostics(context);
+            }
+            throw error;
+          }
+          return handler(context);
+        },
+      ]),
+    ),
+  );
+}
+
+function createFinancialWorkerRuntimeHandlers({ config, fetchImpl, now }) {
+  const runtimeForRequest = createFinancialRuntimeFactory({
+    config,
+    fetchImpl,
+    now,
+  });
+  return createFinancialLinkWorkerHandlers({
+    async queuedProductSync(context) {
+      const runtime = runtimeForRequest(context);
+      return runtime.queuedProductSync(context);
+    },
+  });
+}
 
 export function createRuntimeHandlers({
   config,
@@ -30,6 +106,25 @@ export function createRuntimeHandlers({
       handlers: Object.freeze({
         [NDA_ADMIN_FETCH_SLUG]: createNdaAdminFetchHandler(),
       }),
+      databaseRequired: true,
+      verifyPublicHandlerReadiness: async () => false,
+    });
+  }
+
+  if (
+    config.financial?.enabled === true &&
+    config.serviceOwner === "financial-api"
+  ) {
+    return Object.freeze({
+      handlers: createFinancialApiRuntimeHandlers({ config, fetchImpl, now }),
+      databaseRequired: true,
+      verifyPublicHandlerReadiness: async () => false,
+    });
+  }
+
+  if (config.financial?.enabled === true && config.serviceOwner === "worker") {
+    return Object.freeze({
+      handlers: createFinancialWorkerRuntimeHandlers({ config, fetchImpl, now }),
       databaseRequired: true,
       verifyPublicHandlerReadiness: async () => false,
     });

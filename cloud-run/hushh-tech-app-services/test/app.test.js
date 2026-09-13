@@ -617,6 +617,116 @@ test("the process-local guard uses the same fixed window boundary", () => {
   assert.equal(limiter("bucket").resetAt, 120_000);
 });
 
+test("Plaid diagnostics remain anonymous for absent or invalid bearer and derive valid actors", async () => {
+  const entry = portedEntry({
+    slug: "plaid-diagnostics-log",
+    owner_group: "financial-api-worker",
+    auth_mode: "firebase_bearer_recent_auth_or_google_service_identity",
+  });
+  let firebaseCalls = 0;
+  const observed = [];
+  const app = createApp(
+    dependencies({
+      config: config("financial-api"),
+      registry: { [entry.slug]: entry },
+      contracts: contractsFor(entry, { body: "optional" }),
+      verifyFirebaseProductRequest: async (input) => {
+        firebaseCalls += 1;
+        if (
+          input.headers?.["x-hushh-firebase-authorization"] ===
+          "Bearer valid-session"
+        ) {
+          return FIREBASE_ACTOR;
+        }
+        throw new RuntimeError("UNAUTHENTICATED", "Sign-in required.", 401);
+      },
+      handlers: {
+        [entry.slug]: async ({ actor, database, request: input }) => {
+          observed.push({
+            actor,
+            firebaseUid: database.firebaseUid,
+            body: input.body,
+          });
+          assert.equal(typeof database.diagnosticsTransaction, "function");
+          return input.body
+            ? { status: 200, body: { accepted: true } }
+            : {
+                status: 200,
+                body: { accepted: false, reason: "invalid_payload" },
+              };
+        },
+      },
+    }),
+  );
+  const result = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: Buffer.from('{"event_type":"link_mount","user_id":"forged"}'),
+  });
+  const invalid = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-hushh-firebase-authorization": "Bearer invalid-session",
+    },
+    body: Buffer.from('{"event_type":"link_mount","user_id":"forged"}'),
+  });
+  const valid = await request(app, `/api/v1/legacy-functions/${entry.slug}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-hushh-firebase-authorization": "Bearer valid-session",
+    },
+    body: Buffer.from('{"event_type":"link_mount","user_id":"forged"}'),
+  });
+  const malformed = await request(
+    app,
+    `/api/v1/legacy-functions/${entry.slug}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: Buffer.from('{"event_type":'),
+    },
+  );
+  const unsupportedMediaType = await request(
+    app,
+    `/api/v1/legacy-functions/${entry.slug}`,
+    {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: Buffer.from("not-json"),
+    },
+  );
+
+  for (const outcome of [result, invalid, valid]) {
+    assert.equal(outcome.response.status, 200);
+    assert.deepEqual(outcome.body, { accepted: true });
+  }
+  for (const outcome of [malformed, unsupportedMediaType]) {
+    assert.equal(outcome.response.status, 200);
+    assert.deepEqual(outcome.body, {
+      accepted: false,
+      reason: "invalid_payload",
+    });
+  }
+  assert.equal(firebaseCalls, 5);
+  assert.deepEqual(
+    observed.slice(0, 2).map(({ actor, firebaseUid }) => ({
+      kind: actor.kind,
+      firebaseUid,
+    })),
+    [
+      { kind: "anonymous-plaid-diagnostics", firebaseUid: null },
+      { kind: "anonymous-plaid-diagnostics", firebaseUid: null },
+    ],
+  );
+  assert.deepEqual(observed[2].actor, FIREBASE_ACTOR);
+  assert.equal(observed[2].firebaseUid, FIREBASE_ACTOR.uid);
+  assert.equal(observed[2].body.user_id, "forged");
+  assert.equal(observed[3].body, null);
+  assert.equal(observed[4].body, null);
+});
+
 test("database facade rejects userless work and never exposes the pool", async () => {
   const entry = portedEntry({
     slug: "synthetic-worker",
@@ -630,7 +740,11 @@ test("database facade rejects userless work and never exposes the pool", async (
       contracts: contractsFor(entry),
       handlers: {
         [entry.slug]: async ({ database }) => {
-          assert.deepEqual(Object.keys(database), ["transaction"]);
+          assert.deepEqual(Object.keys(database).sort(), [
+            "firebaseUid",
+            "serializableTransaction",
+            "transaction",
+          ]);
           await database.transaction(async () => "unsafe");
           return { status: 200, body: { ok: true } };
         },

@@ -166,7 +166,10 @@ function jsonBodyOfSize(size) {
 
 test("reviewed contracts stay default-off except verified geocode", async () => {
   assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
+    "asset-report-create",
     "chat-check-access",
+    "create-link-token",
+    "exchange-public-token",
     "fund-payment-admin-analytics",
     "fund-payment-admin-overview",
     "fund-payment-admin-overview-list",
@@ -176,6 +179,10 @@ test("reviewed contracts stay default-off except verified geocode", async () => 
     "hushh-location-geocode",
     "investor-og-image",
     "nda-admin-fetch",
+    "plaid-data-sync",
+    "plaid-data-sync-product",
+    "plaid-data-sync-start",
+    "plaid-diagnostics-log",
     "stock-quotes",
   ]);
   assert.equal(FUNCTION_CONTRACTS["hushh-dob-inference"], undefined);

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ConfigurationError,
   readRuntimeConfig,
+  RUNTIME_CONSTANTS,
   SERVICE_OWNERS,
 } from "../src/config.js";
 import {
@@ -72,6 +73,24 @@ function ownerRuntimeEnv(serviceOwner, stage, overrides = {}) {
   });
 }
 
+function uatFinancialEnvironment(overrides = {}) {
+  return {
+    PLAID_CLIENT_ID: "sandbox-client-id",
+    PLAID_SECRET: "sandbox-secret",
+    PLAID_ENV: "sandbox",
+    PLAID_PRIMARY_PRODUCTS: "transfer",
+    FINANCIAL_LINK_KMS_KEY: RUNTIME_CONSTANTS.uatFinancial.kmsKey,
+    FINANCIAL_SYNC_TASK_QUEUE: RUNTIME_CONSTANTS.uatFinancial.syncTaskQueue,
+    FINANCIAL_SYNC_WORKER_AUDIENCE:
+      RUNTIME_CONSTANTS.uatFinancial.workerAudience,
+    FINANCIAL_SYNC_TASK_RUNNER_SERVICE_ACCOUNT:
+      RUNTIME_CONSTANTS.uatFinancial.taskRunnerServiceAccount,
+    PLAID_ALLOWED_REDIRECT_ORIGIN:
+      RUNTIME_CONSTANTS.uatFinancial.allowedRedirectOrigin,
+    ...overrides,
+  };
+}
+
 test("all seven owners bind to their exact UAT and production identities", () => {
   assert.equal(SERVICE_OWNERS.length, 7);
   for (const stage of Object.keys(PROJECTS)) {
@@ -90,8 +109,77 @@ test("all seven owners bind to their exact UAT and production identities", () =>
       assert.equal(config.handlerDeadlineMs, 20_000);
       assert.equal(config.databaseStatementTimeoutMs, 15_000);
       assert.ok(config.databaseStatementTimeoutMs < config.handlerDeadlineMs);
+      assert.deepEqual(config.financial, { enabled: false });
       assert.ok(serviceRule(serviceOwner));
     }
+  }
+});
+
+test("Plaid financial configuration is opt-in, UAT-only, and resource-bound", () => {
+  for (const serviceOwner of ["financial-api", "worker"]) {
+    const config = readRuntimeConfig(
+      ownerRuntimeEnv(
+        serviceOwner,
+        "uat",
+        uatFinancialEnvironment({
+          PLAID_ADDITIONAL_CONSENTED_PRODUCTS: "identity,transactions,signal",
+          PLAID_REQUIRED_IF_SUPPORTED_PRODUCTS: "investments,liabilities",
+        }),
+      ),
+    );
+    assert.equal(config.financial.enabled, true);
+    assert.equal(config.financial.plaidEnvironment, "sandbox");
+    assert.equal(
+      config.financial.allowedRedirectOrigin,
+      "https://uat.hushhtech.com",
+    );
+  }
+
+  const invalid = [
+    ownerRuntimeEnv("financial-api", "uat", {
+      PLAID_CLIENT_ID: "sandbox-client-id",
+    }),
+    ownerRuntimeEnv(
+      "financial-api",
+      "uat",
+      uatFinancialEnvironment({ PLAID_PRIMARY_PRODUCTS: "unknown-product" }),
+    ),
+    ownerRuntimeEnv(
+      "financial-api",
+      "uat",
+      uatFinancialEnvironment({ PLAID_PRIMARY_PRODUCTS: " " }),
+    ),
+    ownerRuntimeEnv(
+      "financial-api",
+      "uat",
+      uatFinancialEnvironment({ PLAID_ENV: "production" }),
+    ),
+    ownerRuntimeEnv(
+      "financial-api",
+      "uat",
+      uatFinancialEnvironment({
+        FINANCIAL_LINK_KMS_KEY:
+          "projects/hushh-tech-uat/locations/us-central1/keyRings/other/cryptoKeys/other",
+      }),
+    ),
+    ownerRuntimeEnv(
+      "financial-api",
+      "uat",
+      uatFinancialEnvironment({ PLAID_DATA_WEBHOOK_URL: "https://example.test/webhook" }),
+    ),
+    ownerRuntimeEnv(
+      "identity-api",
+      "uat",
+      uatFinancialEnvironment(),
+    ),
+    ownerRuntimeEnv(
+      "financial-api",
+      "prod",
+      uatFinancialEnvironment(),
+    ),
+  ];
+  for (const environment of invalid) {
+    assert.throws(() => readRuntimeConfig(environment), ConfigurationError);
   }
 });
 

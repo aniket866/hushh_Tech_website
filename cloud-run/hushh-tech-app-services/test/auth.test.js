@@ -183,6 +183,49 @@ test("Firebase recent-auth and revoked-token failures stay fail closed", async (
   );
 });
 
+test("Finance Link compatibility routes accept valid older Firebase sessions only", async () => {
+  const olderAuthTime = NOW_SECONDS - 3_600;
+  const verify = createFirebaseProductVerifier({
+    config: CONFIG,
+    auth: {
+      verifyIdToken: async () => firebaseClaims({ auth_time: olderAuthTime }),
+    },
+    now: () => NOW_MS,
+  });
+  const request = firebaseRequest({
+    "x-hushh-firebase-auth-time": String(olderAuthTime),
+  });
+  const financialSlugs = [
+    "asset-report-create",
+    "create-link-token",
+    "exchange-public-token",
+    "plaid-data-sync",
+    "plaid-data-sync-product",
+    "plaid-data-sync-start",
+    "plaid-diagnostics-log",
+  ];
+
+  for (const slug of financialSlugs) {
+    await assert.doesNotReject(
+      verify(request, {
+        slug,
+        owner_group: "financial-api-worker",
+        auth_mode: "firebase_bearer_recent_auth_or_google_service_identity",
+      }),
+      slug,
+    );
+  }
+
+  await assert.rejects(
+    verify(request, {
+      slug: "delete-user-account",
+      owner_group: "identity-api",
+      auth_mode: "firebase_bearer_recent_auth",
+    }),
+    (error) => assertRuntimeCode(error, "RECENT_AUTH_REQUIRED", 401),
+  );
+});
+
 function googlePayload(overrides = {}) {
   return {
     aud: CONFIG.serviceAudience,

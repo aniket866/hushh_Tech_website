@@ -4,6 +4,19 @@ import { getAuth } from "firebase-admin/auth";
 import { RuntimeError } from "../errors.js";
 
 const TOKEN_LIMIT = 8_192;
+// The generated inventory records these legacy browser functions as
+// recent-auth routes, but the source Supabase implementation accepted any
+// valid Firebase session. Keep the exception exact and local so recent-auth
+// remains mandatory for every unrelated sensitive route.
+const LEGACY_FINANCIAL_LINK_SLUGS = new Set([
+  "asset-report-create",
+  "create-link-token",
+  "exchange-public-token",
+  "plaid-data-sync",
+  "plaid-data-sync-product",
+  "plaid-data-sync-start",
+  "plaid-diagnostics-log",
+]);
 
 function headerValue(headers, name) {
   const value = headers?.[name] ?? headers?.[name.toLowerCase()];
@@ -20,6 +33,16 @@ function readBearer(headers, name) {
 
 function invalidToken() {
   return new RuntimeError("UNAUTHENTICATED", "Sign-in required.", 401);
+}
+
+function requiresRecentFirebaseAuth(entry) {
+  return (
+    entry?.auth_mode?.includes("recent_auth") &&
+    !(
+      entry.owner_group === "financial-api-worker" &&
+      LEGACY_FINANCIAL_LINK_SLUGS.has(entry.slug)
+    )
+  );
 }
 
 function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
@@ -136,7 +159,7 @@ export function createFirebaseProductVerifier({
       decoded,
       config,
       now(),
-      entry.auth_mode.includes("recent_auth"),
+      requiresRecentFirebaseAuth(entry),
     );
     const forwardedUid = headerValue(
       request.headers,

@@ -163,9 +163,9 @@ const SOURCE_EVIDENCE = Object.freeze({
   deploymentInventoryDigest:
     "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
   terminalMatrixFileSha256:
-    "d6331e9229ad3002cd5568c69d80d2c078ad3791b23fba7ccab50ef667b4b40f",
+    "0666e6cef9388173fda7628ffe7c41aa9ab235ad2673bb220aea82beaba71371",
   terminalMatrixEvidenceDigest:
-    "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8",
+    "e4267e26ea1a7b47062788ba5fe5950c5b797da1f481400e309665442cf21f38",
 });
 
 const SOURCE_PINS = Object.freeze({

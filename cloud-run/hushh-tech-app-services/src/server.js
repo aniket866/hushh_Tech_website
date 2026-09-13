@@ -37,6 +37,7 @@ const app = createApp({
           database.pool,
           config.databaseUser,
           config.serviceOwner,
+          { financialResolver: config.financial?.enabled === true },
         )
       : true,
   handlers: runtimeHandlers.handlers,

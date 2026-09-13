@@ -21,8 +21,8 @@
     "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
     "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
     "terminal_matrix_path": "migration/evidence/edge-function-terminal-matrix.v1.json",
-    "terminal_matrix_file_sha256": "d6331e9229ad3002cd5568c69d80d2c078ad3791b23fba7ccab50ef667b4b40f",
-    "terminal_matrix_evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8",
+    "terminal_matrix_file_sha256": "b25d337caf94b478d4023d45cfc05ba534cbd54ecb9b81beddb844eb00881231",
+    "terminal_matrix_evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160",
     "capture_completed_at": "2026-08-21T18:03:38.344Z",
     "metadata_end_check_status": "NOT_PERFORMED_IN_V2_BLOCKING",
     "bundle_to_metadata_binding": "NOT_PROVEN_WITHOUT_END_METADATA_CHECK",
@@ -34,9 +34,9 @@
   },
   "runtime_byte_lock": {
     "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
-    "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "d866d0e3125a44260ad60e4fa8ded6796be2a6c21ff6d82ea2ef1998eb2f0703",
-    "cloud-run/hushh-tech-app-services/src/app.js": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086",
-    "cloud-run/hushh-tech-app-services/src/server.js": "a1877fb81d08d9fa37fa159a682beff2c5aa9dcee2b852dc83405d1c40217764",
+    "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "35e860e913a8a14c116df165c09ffd0dc7257bb2b9e64adf985806ec385dd3f5",
+    "cloud-run/hushh-tech-app-services/src/app.js": "31f3e0c340eb741604c249eda9697ca423904bcfa6111b8f2f5c41b89fc723ad",
+    "cloud-run/hushh-tech-app-services/src/server.js": "95be653456802847592605f58cdb4375dec52f1e350255547665ef3f576cde0f",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
     "api/legacy-functions.js": "116666c15a25a23fa87a74fbc2079653450dab27ea19a7e278c3857c3c7f35d3",
     "server.js": "e404607d375dd5aead1802dff402ac16020471fb7dca4c1e130aa1de63a34335"

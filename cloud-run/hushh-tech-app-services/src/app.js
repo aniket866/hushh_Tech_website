@@ -6,7 +6,10 @@ import {
   assertFunctionRequestContract,
   FUNCTION_CONTRACTS,
 } from "./contracts.js";
-import { withFirebaseTransaction } from "./database.js";
+import {
+  withAnonymousPlaidDiagnosticsTransaction,
+  withFirebaseTransaction,
+} from "./database.js";
 import { asRuntimeError, errorPayload, RuntimeError } from "./errors.js";
 import { createRateLimiter } from "./rate-limit.js";
 import {
@@ -123,11 +126,14 @@ function workerFirebaseUid(request) {
 function databaseFacade(
   database,
   firebaseUid,
+  firebaseProjectId,
   statementTimeoutMs,
   signal,
   actor,
+  { allowPlaidDiagnostics = false } = {},
 ) {
-  return Object.freeze({
+  const facade = {
+    firebaseUid,
     async transaction(work) {
       if (!database?.pool) {
         throw new RuntimeError(
@@ -147,9 +153,50 @@ function databaseFacade(
         statementTimeoutMs,
         signal,
         fundAdmin: actor?.fundAdmin === true,
+        firebaseProject: firebaseProjectId,
       });
     },
-  });
+    async serializableTransaction(work) {
+      if (!database?.pool) {
+        throw new RuntimeError(
+          "DATABASE_UNAVAILABLE",
+          "Database unavailable.",
+          503,
+        );
+      }
+      if (!firebaseUid) {
+        throw new RuntimeError(
+          "OWNERSHIP_CONTEXT_REQUIRED",
+          "User ownership required.",
+          403,
+        );
+      }
+      return withFirebaseTransaction(database.pool, firebaseUid, work, {
+        statementTimeoutMs,
+        signal,
+        fundAdmin: actor?.fundAdmin === true,
+        firebaseProject: firebaseProjectId,
+        isolationLevel: "serializable",
+      });
+    },
+  };
+  if (allowPlaidDiagnostics) {
+    facade.diagnosticsTransaction = async (work) => {
+      if (!database?.pool) {
+        throw new RuntimeError(
+          "DATABASE_UNAVAILABLE",
+          "Database unavailable.",
+          503,
+        );
+      }
+      return withAnonymousPlaidDiagnosticsTransaction(database.pool, work, {
+        statementTimeoutMs,
+        signal,
+        firebaseProject: firebaseProjectId,
+      });
+    };
+  }
+  return Object.freeze(facade);
 }
 
 function rateLimitKey(googleCaller, actor, entry) {
@@ -163,6 +210,38 @@ function rateLimitKey(googleCaller, actor, entry) {
       "utf8",
     )
     .digest("hex");
+}
+
+function isAnonymousPlaidDiagnosticsRoute(entry, rule) {
+  return (
+    entry?.slug === "plaid-diagnostics-log" &&
+    entry.owner_group === "financial-api-worker" &&
+    entry.auth_mode ===
+      "firebase_bearer_recent_auth_or_google_service_identity" &&
+    rule?.actor === "firebase"
+  );
+}
+
+function anonymousPlaidDiagnosticsActor(request) {
+  const forwarded = String(request.headers?.["x-forwarded-for"] ?? "")
+    .split(",", 1)[0]
+    .trim()
+    .slice(0, 128);
+  const peer = String(request.socket?.remoteAddress ?? "")
+    .trim()
+    .slice(0, 128);
+  const userAgent = String(request.headers?.["user-agent"] ?? "")
+    .trim()
+    .slice(0, 512);
+  // This is an opaque server-derived limiter key, not a browser identity and
+  // never a value provided in the diagnostic payload.
+  const subject = createHash("sha256")
+    .update(JSON.stringify([1, forwarded || peer || "unknown", userAgent]), "utf8")
+    .digest("hex");
+  return Object.freeze({
+    kind: "anonymous-plaid-diagnostics",
+    subject,
+  });
 }
 
 function providerRateLimitKey(googleCaller, entry) {
@@ -718,13 +797,34 @@ export function createApp({
             503,
           );
         }
+        const anonymousPlaidDiagnostics = isAnonymousPlaidDiagnosticsRoute(
+          entry,
+          rule,
+        );
         responseContract = contracts[entry.slug] ?? null;
-        assertFunctionRequestContract(responseContract, {
-          method,
-          route,
-          headers: request.headers,
-          rawBody: request.body,
-        });
+        try {
+          assertFunctionRequestContract(responseContract, {
+            method,
+            route,
+            headers: request.headers,
+            rawBody: request.body,
+          });
+        } catch (error) {
+          // The source diagnostics endpoint converts malformed or non-JSON
+          // payloads into a lossy 200 `{ accepted: false }` response. Keep
+          // method, route, query, and byte-limit checks intact; only this
+          // one frozen slug may pass an otherwise unsupported media type to
+          // its handler as an invalid payload.
+          if (
+            !(
+              anonymousPlaidDiagnostics &&
+              error instanceof RuntimeError &&
+              error.code === "UNSUPPORTED_MEDIA_TYPE"
+            )
+          ) {
+            throw error;
+          }
+        }
         const handler = handlers[entry.slug];
         if (typeof handler !== "function") {
           throw new RuntimeError(
@@ -737,11 +837,20 @@ export function createApp({
         let actor;
         let firebaseUid = null;
         if (rule.actor === "firebase") {
-          actor = await verifyFirebaseProductRequest(request, entry, {
-            signal: deadline.signal,
-          });
-          throwIfAborted(deadline.signal);
-          firebaseUid = actor.uid;
+          try {
+            actor = await verifyFirebaseProductRequest(request, entry, {
+              signal: deadline.signal,
+            });
+            throwIfAborted(deadline.signal);
+            firebaseUid = actor.uid;
+          } catch (error) {
+            if (!anonymousPlaidDiagnostics) throw error;
+            throwIfAborted(deadline.signal);
+            // Source behavior: absent, expired, or invalid bearer diagnostics
+            // remain anonymous and lossy. This is scoped to one frozen slug;
+            // it cannot authenticate or authorize financial data access.
+            actor = anonymousPlaidDiagnosticsActor(request);
+          }
         } else if (rule.actor === "webhook") {
           actor = await verifyWebhookRequest(request, entry, {
             signal: deadline.signal,
@@ -778,6 +887,24 @@ export function createApp({
         const webhookClaim = webhookState?.claim ?? null;
         let webhookCompleted = false;
         try {
+          let body;
+          if (entry.auth_mode !== "provider_signature_raw_body") {
+            try {
+              body = parsedHandlerBody(request);
+            } catch (error) {
+              if (
+                anonymousPlaidDiagnostics &&
+                error instanceof RuntimeError &&
+                ["INVALID_REQUEST", "UNSUPPORTED_MEDIA_TYPE"].includes(
+                  error.code,
+                )
+              ) {
+                body = null;
+              } else {
+                throw error;
+              }
+            }
+          }
           const projectedRequest = {
             method,
             headers: handlerHeaders(request.headers),
@@ -787,7 +914,7 @@ export function createApp({
           if (entry.auth_mode === "provider_signature_raw_body") {
             projectedRequest.rawBody = request.body;
           } else {
-            projectedRequest.body = parsedHandlerBody(request);
+            projectedRequest.body = body;
           }
           throwIfAborted(deadline.signal);
           const output = await handler({
@@ -800,9 +927,14 @@ export function createApp({
                 : databaseFacade(
                     database,
                     firebaseUid,
+                    config.firebaseProjectId,
                     config.databaseStatementTimeoutMs,
                     deadline.signal,
                     actor,
+                    {
+                      allowPlaidDiagnostics:
+                        entry.slug === "plaid-diagnostics-log",
+                    },
                   ),
             entry,
             signal: deadline.signal,

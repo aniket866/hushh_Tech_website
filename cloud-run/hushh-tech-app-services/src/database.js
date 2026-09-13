@@ -13,6 +13,14 @@ import {
 
 const { Pool } = pg;
 const FIREBASE_UID_LIMIT = 128;
+const FIREBASE_PROJECT_IDS = new Set(["hushh-tech-uat", "hushh-tech-prod"]);
+const TRANSACTION_ISOLATION_LEVELS = new Set(["read committed", "serializable"]);
+const SECURITY_DEFINER_ROUTINES_BY_SERVICE = Object.freeze({
+  "financial-api": Object.freeze([
+    "hushh_identity.current_legacy_user_uuid()",
+  ]),
+  worker: Object.freeze(["hushh_identity.current_legacy_user_uuid()"]),
+});
 
 function validFirebaseUid(value) {
   return (
@@ -21,6 +29,45 @@ function validFirebaseUid(value) {
     value.length <= FIREBASE_UID_LIMIT &&
     !/[\u0000-\u001f\u007f]/.test(value)
   );
+}
+
+function validFirebaseProject(value) {
+  return value === null || FIREBASE_PROJECT_IDS.has(value);
+}
+
+function expectedSecurityDefinerRoutines(serviceOwner, financialResolver) {
+  return financialResolver === true
+    ? SECURITY_DEFINER_ROUTINES_BY_SERVICE[serviceOwner] ?? []
+    : [];
+}
+
+function observedSecurityDefinerRoutines(value) {
+  let entries = value;
+  if (typeof entries === "string") {
+    try {
+      entries = JSON.parse(entries);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(entries)) return null;
+  const routines = [];
+  for (const entry of entries) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      Array.isArray(entry) ||
+      entry.schema !== "hushh_identity" ||
+      entry.routine !== "current_legacy_user_uuid" ||
+      entry.arguments !== "" ||
+      entry.grantable !== false
+    ) {
+      return null;
+    }
+    routines.push(`${entry.schema}.${entry.routine}()`);
+  }
+  routines.sort();
+  return new Set(routines).size === routines.length ? routines : null;
 }
 
 function throwIfAborted(signal) {
@@ -78,7 +125,12 @@ export async function createDatabaseRuntime({
   });
 }
 
-export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
+export function assertDmlOnlyRoleRow(
+  row,
+  expectedUser,
+  serviceOwner,
+  { financialResolver = false } = {},
+) {
   const inheritedPrivilegedRoleCount = Number(
     row?.inherited_privileged_role_count,
   );
@@ -123,6 +175,11 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   const observedSequencePrivilegeList = observedSequencePrivileges(
     row?.effective_sequence_privileges,
   );
+  const expectedSecurityDefinerRoutineList =
+    expectedSecurityDefinerRoutines(serviceOwner, financialResolver);
+  const observedSecurityDefinerRoutineList = observedSecurityDefinerRoutines(
+    row?.effective_security_definer_routines,
+  );
   const exactTablePrivileges =
     observedTablePrivilegeList !== null &&
     observedTablePrivilegeList.length === expectedTablePrivilegeList.length &&
@@ -141,6 +198,13 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
       expectedSequencePrivilegeList.length &&
     observedSequencePrivilegeList.every(
       (privilege, index) => privilege === expectedSequencePrivilegeList[index],
+    );
+  const exactSecurityDefinerRoutines =
+    observedSecurityDefinerRoutineList !== null &&
+    observedSecurityDefinerRoutineList.length ===
+      expectedSecurityDefinerRoutineList.length &&
+    observedSecurityDefinerRoutineList.every(
+      (routine, index) => routine === expectedSecurityDefinerRoutineList[index],
     );
   if (
     !row ||
@@ -162,7 +226,8 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     !Number.isSafeInteger(executableApplicationRoutineCount) ||
     executableApplicationRoutineCount < 0 ||
     !Number.isSafeInteger(executableSecurityDefinerRoutineCount) ||
-    executableSecurityDefinerRoutineCount !== 0 ||
+    executableSecurityDefinerRoutineCount !==
+      expectedSecurityDefinerRoutineList.length ||
     !Number.isSafeInteger(executableProcedureCount) ||
     executableProcedureCount !== 0 ||
     !Number.isSafeInteger(accessibleTableRlsDisabledCount) ||
@@ -179,7 +244,8 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
     ownedApplicationRoutineCount !== 0 ||
     !exactTablePrivileges ||
     !exactColumnPrivileges ||
-    !exactSequencePrivileges
+    !exactSequencePrivileges ||
+    !exactSecurityDefinerRoutines
   ) {
     let diagnosticCode = "ROLE_INVARIANT_DRIFT";
     if (!row || row.current_user !== expectedUser) {
@@ -219,7 +285,9 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
       diagnosticCode = "ROUTINE_OBSERVATION_INVALID";
     } else if (
       !Number.isSafeInteger(executableSecurityDefinerRoutineCount) ||
-      executableSecurityDefinerRoutineCount !== 0
+      executableSecurityDefinerRoutineCount !==
+        expectedSecurityDefinerRoutineList.length ||
+      !exactSecurityDefinerRoutines
     ) {
       diagnosticCode = "SECURITY_DEFINER_EXECUTE_PRIVILEGE_DRIFT";
     } else if (
@@ -265,11 +333,18 @@ export function assertDmlOnlyRoleRow(row, expectedUser, serviceOwner) {
   return true;
 }
 
-export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
+export async function verifyDmlOnlyRuntime(
+  pool,
+  expectedUser,
+  serviceOwner,
+  { financialResolver = false } = {},
+) {
   const client = await pool.connect();
   let destroy = false;
   try {
     await client.query("RESET app.firebase_uid");
+    await client.query("RESET app.firebase_fund_admin");
+    await client.query("RESET app.firebase_project");
     const result = await client.query(`
       WITH RECURSIVE effective_role_oids(oid) AS (
         SELECT oid
@@ -408,6 +483,36 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
           )
         )
       ),
+      effective_security_definer_routines AS (
+        SELECT DISTINCT
+          schemas.nspname AS schema_name,
+          routines.proname AS routine_name,
+          pg_get_function_identity_arguments(routines.oid) AS arguments,
+          EXISTS (
+            SELECT 1
+            FROM effective_roles AS inherited
+            WHERE has_function_privilege(
+              inherited.rolname,
+              routines.oid,
+              'EXECUTE WITH GRANT OPTION'
+            )
+          ) AS is_grantable
+        FROM pg_proc AS routines
+        INNER JOIN pg_namespace AS schemas
+          ON schemas.oid = routines.pronamespace
+        WHERE schemas.nspname NOT IN ('pg_catalog', 'information_schema')
+          AND routines.prokind = 'f'
+          AND routines.prosecdef IS TRUE
+          AND EXISTS (
+            SELECT 1
+            FROM effective_roles AS inherited
+            WHERE has_function_privilege(
+              inherited.rolname,
+              routines.oid,
+              'EXECUTE'
+            )
+          )
+      ),
       accessible_base_relations AS (
         SELECT DISTINCT
           privileges.relation_oid,
@@ -491,6 +596,21 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
           ),
           '[]'::jsonb
         ) AS effective_sequence_privileges,
+        COALESCE(
+          (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'schema', routines.schema_name,
+                'routine', routines.routine_name,
+                'arguments', routines.arguments,
+                'grantable', routines.is_grantable
+              )
+              ORDER BY routines.schema_name, routines.routine_name, routines.arguments
+            )
+            FROM effective_security_definer_routines AS routines
+          ),
+          '[]'::jsonb
+        ) AS effective_security_definer_routines,
         (
           SELECT count(*)
           FROM accessible_base_relations AS privileges
@@ -660,7 +780,9 @@ export async function verifyDmlOnlyRuntime(pool, expectedUser, serviceOwner) {
         503,
       );
     }
-    return assertDmlOnlyRoleRow(result.rows[0], expectedUser, serviceOwner);
+    return assertDmlOnlyRoleRow(result.rows[0], expectedUser, serviceOwner, {
+      financialResolver,
+    });
   } catch (error) {
     destroy = true;
     throw error;
@@ -675,11 +797,13 @@ async function readFirebaseContext(client) {
   const result = await client.query(
     `SELECT
       current_setting('app.firebase_uid', true) AS firebase_uid,
-      current_setting('app.firebase_fund_admin', true) AS firebase_fund_admin`,
+      current_setting('app.firebase_fund_admin', true) AS firebase_fund_admin,
+      current_setting('app.firebase_project', true) AS firebase_project`,
   );
   return Object.freeze({
     firebaseUid: result.rows[0]?.firebase_uid ?? null,
     firebaseFundAdmin: result.rows[0]?.firebase_fund_admin ?? null,
+    firebaseProject: result.rows[0]?.firebase_project ?? null,
   });
 }
 
@@ -687,12 +811,20 @@ export async function withFirebaseTransaction(
   pool,
   firebaseUid,
   work,
-  { statementTimeoutMs = 15_000, signal, fundAdmin = false } = {},
+  {
+    statementTimeoutMs = 15_000,
+    signal,
+    fundAdmin = false,
+    firebaseProject = null,
+    isolationLevel = "read committed",
+  } = {},
 ) {
   if (
     !validFirebaseUid(firebaseUid) ||
     typeof work !== "function" ||
     typeof fundAdmin !== "boolean" ||
+    !validFirebaseProject(firebaseProject) ||
+    !TRANSACTION_ISOLATION_LEVELS.has(isolationLevel) ||
     !Number.isSafeInteger(statementTimeoutMs) ||
     statementTimeoutMs < 1
   ) {
@@ -710,7 +842,12 @@ export async function withFirebaseTransaction(
     throwIfAborted(signal);
     await client.query("RESET app.firebase_uid");
     await client.query("RESET app.firebase_fund_admin");
-    await client.query("BEGIN");
+    await client.query("RESET app.firebase_project");
+    await client.query(
+      isolationLevel === "serializable"
+        ? "BEGIN ISOLATION LEVEL SERIALIZABLE"
+        : "BEGIN",
+    );
     transactionOpen = true;
     await client.query("SELECT set_config('statement_timeout', $1, true)", [
       `${statementTimeoutMs}ms`,
@@ -740,6 +877,19 @@ export async function withFirebaseTransaction(
         503,
       );
     }
+    if (firebaseProject !== null) {
+      const projectContext = await client.query(
+        "SELECT set_config('app.firebase_project', $1, true) AS firebase_project",
+        [firebaseProject],
+      );
+      if (projectContext.rows[0]?.firebase_project !== firebaseProject) {
+        throw new RuntimeError(
+          "DATABASE_CONTEXT_REJECTED",
+          "Database unavailable.",
+          503,
+        );
+      }
+    }
 
     result = await work(client, signal);
     throwIfAborted(signal);
@@ -749,7 +899,8 @@ export async function withFirebaseTransaction(
     if (
       (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
       (leaked.firebaseFundAdmin !== null &&
-        leaked.firebaseFundAdmin !== "")
+        leaked.firebaseFundAdmin !== "") ||
+      (leaked.firebaseProject !== null && leaked.firebaseProject !== "")
     ) {
       destroy = true;
       throw new RuntimeError(
@@ -779,11 +930,133 @@ export async function withFirebaseTransaction(
   try {
     await client.query("RESET app.firebase_uid");
     await client.query("RESET app.firebase_fund_admin");
+    await client.query("RESET app.firebase_project");
     const leaked = await readFirebaseContext(client);
     if (
       (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
       (leaked.firebaseFundAdmin !== null &&
-        leaked.firebaseFundAdmin !== "")
+        leaked.firebaseFundAdmin !== "") ||
+      (leaked.firebaseProject !== null && leaked.firebaseProject !== "")
+    ) {
+      destroy = true;
+      failure ??= new RuntimeError(
+        "DATABASE_CONTEXT_LEAK",
+        "Database unavailable.",
+        503,
+      );
+    }
+  } catch (cleanupError) {
+    destroy = true;
+    failure ??= new RuntimeError(
+      "DATABASE_UNAVAILABLE",
+      "Database unavailable.",
+      503,
+      { cause: cleanupError },
+    );
+  } finally {
+    client.release(
+      destroy ? new Error("Discard contaminated database client.") : undefined,
+    );
+  }
+
+  if (failure) throw failure;
+  return result;
+}
+
+// The historical Plaid diagnostics endpoint was deliberately lossy and
+// anonymous when no valid bearer was available. This is the only database
+// transaction that may omit a Firebase UID: it binds the reviewed UAT project
+// context, installs neither a user nor an admin flag, and is exposed by the
+// request facade only to the exact diagnostics slug.
+export async function withAnonymousPlaidDiagnosticsTransaction(
+  pool,
+  work,
+  { statementTimeoutMs = 15_000, signal, firebaseProject = null } = {},
+) {
+  if (
+    typeof work !== "function" ||
+    firebaseProject !== "hushh-tech-uat" ||
+    !Number.isSafeInteger(statementTimeoutMs) ||
+    statementTimeoutMs < 1
+  ) {
+    throw new RuntimeError("INVALID_REQUEST", "Invalid request.", 400);
+  }
+
+  throwIfAborted(signal);
+  const client = await pool.connect();
+  let transactionOpen = false;
+  let result;
+  let failure = null;
+  let destroy = false;
+
+  try {
+    throwIfAborted(signal);
+    await client.query("RESET app.firebase_uid");
+    await client.query("RESET app.firebase_fund_admin");
+    await client.query("RESET app.firebase_project");
+    await client.query("BEGIN");
+    transactionOpen = true;
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [
+      `${statementTimeoutMs}ms`,
+    ]);
+    const projectContext = await client.query(
+      "SELECT set_config('app.firebase_project', $1, true) AS firebase_project",
+      [firebaseProject],
+    );
+    if (projectContext.rows[0]?.firebase_project !== firebaseProject) {
+      throw new RuntimeError(
+        "DATABASE_CONTEXT_REJECTED",
+        "Database unavailable.",
+        503,
+      );
+    }
+
+    result = await work(client, signal);
+    throwIfAborted(signal);
+    await client.query("COMMIT");
+    transactionOpen = false;
+    const leaked = await readFirebaseContext(client);
+    if (
+      (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
+      (leaked.firebaseFundAdmin !== null &&
+        leaked.firebaseFundAdmin !== "") ||
+      (leaked.firebaseProject !== null && leaked.firebaseProject !== "")
+    ) {
+      destroy = true;
+      throw new RuntimeError(
+        "DATABASE_CONTEXT_LEAK",
+        "Database unavailable.",
+        503,
+      );
+    }
+  } catch (error) {
+    failure = error;
+    if (transactionOpen) {
+      try {
+        await client.query("ROLLBACK");
+        transactionOpen = false;
+      } catch (rollbackError) {
+        destroy = true;
+        failure = new RuntimeError(
+          "DATABASE_UNAVAILABLE",
+          "Database unavailable.",
+          503,
+          { cause: rollbackError },
+        );
+      }
+    }
+  }
+
+  try {
+    await client.query("RESET app.firebase_uid");
+    await client.query("RESET app.firebase_fund_admin");
+    await client.query("RESET app.firebase_project");
+    const leaked = await readFirebaseContext(client);
+    if (
+      (leaked.firebaseUid !== null && leaked.firebaseUid !== "") ||
+      (leaked.firebaseFundAdmin !== null &&
+        leaked.firebaseFundAdmin !== "") ||
+      (leaked.firebaseProject !== null && leaked.firebaseProject !== "")
     ) {
       destroy = true;
       failure ??= new RuntimeError(

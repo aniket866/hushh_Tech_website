@@ -38,11 +38,11 @@
     },
     "retirementRuntime": {
       "path": "cloud-run/hushh-tech-app-services/src/app.js",
-      "sha256": "8473dd70347cdeeb0249823031ca551f4918e33829e2492048fe53bea432b086"
+      "sha256": "31f3e0c340eb741604c249eda9697ca423904bcfa6111b8f2f5c41b89fc723ad"
     },
     "retirementTest": {
       "path": "cloud-run/hushh-tech-app-services/test/app.test.js",
-      "sha256": "325311ef5a63e5e7f77fafbfa13b8ca340f254a45a06c0157bc962ff1ee88bf5"
+      "sha256": "c0797d155d91d6c2de43469940b27090e4af826df583c50672954e9706fed24b"
     },
     "live": {
       "path": "migration/evidence/gcp-edge-function-uat-live.v1.json",
@@ -6133,5 +6133,5 @@
       ]
     }
   ],
-  "evidence_digest": "c39ce5b5b7b29193743a249cd37553ecbd948f4f45a49b10a541e9d8db8744e8"
+  "evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160"
 }

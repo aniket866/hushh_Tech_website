@@ -1,6 +1,43 @@
 const PRODUCT_CLIENT_ID = "hushh-tech";
 const PRODUCT_CLIENT_APP_ID = "app_hushh-technologies_cd1895ef";
 const DATABASE_NAME = "hushh_tech_app";
+const UAT_FINANCIAL_KMS_KEY =
+  "projects/hushh-tech-uat/locations/us-central1/keyRings/hushh-tech-cutover-uat/cryptoKeys/plaid-access-token";
+const UAT_FINANCIAL_SYNC_TASK_QUEUE =
+  "projects/hushh-tech-uat/locations/us-central1/queues/financial-sync";
+const UAT_FINANCIAL_WORKER_AUDIENCE =
+  "https://hushh-tech-worker-175298245599.us-central1.run.app";
+const UAT_FINANCIAL_TASK_RUNNER =
+  "hushh-tech-task-runner-uat@hushh-tech-uat.iam.gserviceaccount.com";
+const UAT_FINANCIAL_REDIRECT_ORIGIN = "https://uat.hushhtech.com";
+// The preserved Supabase helper allowed these Link primary products.  UAT
+// requires an explicit, reviewed value rather than silently inheriting its
+// old Sandbox fallback, so a deployment cannot broaden Link consent merely
+// because an environment variable was omitted or misspelled.
+const UAT_FINANCIAL_PRIMARY_PRODUCT_ALLOWLIST = new Set([
+  "auth",
+  "transactions",
+  "identity",
+  "investments",
+  "liabilities",
+  "assets",
+  "transfer",
+]);
+
+const FINANCIAL_ENVIRONMENT_KEYS = Object.freeze([
+  "PLAID_CLIENT_ID",
+  "PLAID_SECRET",
+  "PLAID_ENV",
+  "PLAID_PRIMARY_PRODUCTS",
+  "PLAID_ADDITIONAL_CONSENTED_PRODUCTS",
+  "PLAID_REQUIRED_IF_SUPPORTED_PRODUCTS",
+  "PLAID_DATA_WEBHOOK_URL",
+  "FINANCIAL_LINK_KMS_KEY",
+  "FINANCIAL_SYNC_TASK_QUEUE",
+  "FINANCIAL_SYNC_WORKER_AUDIENCE",
+  "FINANCIAL_SYNC_TASK_RUNNER_SERVICE_ACCOUNT",
+  "PLAID_ALLOWED_REDIRECT_ORIGIN",
+]);
 
 export const SERVICE_OWNERS = Object.freeze([
   "investor-api",
@@ -142,6 +179,91 @@ function assertNoDatabasePassword(env) {
   }
 }
 
+function readUatFinancialConfig(env, { serviceOwner, stage }) {
+  const configured = FINANCIAL_ENVIRONMENT_KEYS.some((name) =>
+    clean(env[name]),
+  );
+  if (!configured) return Object.freeze({ enabled: false });
+
+  if (!["financial-api", "worker"].includes(serviceOwner)) {
+    throw new ConfigurationError(
+      "Plaid financial configuration belongs only to financial-api and worker.",
+    );
+  }
+  if (stage !== "uat") {
+    throw new ConfigurationError(
+      "Plaid financial configuration is permitted only in UAT.",
+    );
+  }
+
+  const plaidClientId = required(env, "PLAID_CLIENT_ID");
+  const plaidSecret = required(env, "PLAID_SECRET");
+  const plaidEnvironment = required(env, "PLAID_ENV");
+  if (plaidEnvironment !== "sandbox") {
+    throw new ConfigurationError("PLAID_ENV must be sandbox in UAT.");
+  }
+  if (clean(env.PLAID_DATA_WEBHOOK_URL)) {
+    throw new ConfigurationError(
+      "PLAID_DATA_WEBHOOK_URL is not part of the financial-link migration.",
+    );
+  }
+
+  const plaidPrimaryProducts = required(env, "PLAID_PRIMARY_PRODUCTS");
+  const parsedPrimaryProducts = plaidPrimaryProducts
+    .split(",")
+    .map((product) => product.trim())
+    .filter(Boolean);
+  if (
+    parsedPrimaryProducts.length === 0 ||
+    parsedPrimaryProducts.some(
+      (product) => !UAT_FINANCIAL_PRIMARY_PRODUCT_ALLOWLIST.has(product),
+    )
+  ) {
+    throw new ConfigurationError(
+      "PLAID_PRIMARY_PRODUCTS must contain only approved Link products.",
+    );
+  }
+
+  const kmsKey = required(env, "FINANCIAL_LINK_KMS_KEY");
+  const taskQueue = required(env, "FINANCIAL_SYNC_TASK_QUEUE");
+  const workerAudience = required(env, "FINANCIAL_SYNC_WORKER_AUDIENCE");
+  const taskRunnerServiceAccount = required(
+    env,
+    "FINANCIAL_SYNC_TASK_RUNNER_SERVICE_ACCOUNT",
+  );
+  const allowedRedirectOrigin = required(env, "PLAID_ALLOWED_REDIRECT_ORIGIN");
+  if (
+    kmsKey !== UAT_FINANCIAL_KMS_KEY ||
+    taskQueue !== UAT_FINANCIAL_SYNC_TASK_QUEUE ||
+    workerAudience !== UAT_FINANCIAL_WORKER_AUDIENCE ||
+    taskRunnerServiceAccount !== UAT_FINANCIAL_TASK_RUNNER ||
+    allowedRedirectOrigin !== UAT_FINANCIAL_REDIRECT_ORIGIN
+  ) {
+    throw new ConfigurationError("UAT financial resource contract drifted.");
+  }
+
+  return Object.freeze({
+    enabled: true,
+    plaidClientId,
+    plaidSecret,
+    plaidEnvironment,
+    // Keep the old helper's product vocabulary and order, but make the UAT
+    // choice explicit.  `transfer` here is only the pre-existing Link product
+    // scope; this financial adapter exposes no transfer/payment routes or
+    // persistence.
+    plaidPrimaryProducts: parsedPrimaryProducts.join(","),
+    plaidAdditionalConsentedProducts:
+      clean(env.PLAID_ADDITIONAL_CONSENTED_PRODUCTS) || null,
+    plaidRequiredIfSupportedProducts:
+      clean(env.PLAID_REQUIRED_IF_SUPPORTED_PRODUCTS) || null,
+    kmsKey,
+    taskQueue,
+    workerAudience,
+    taskRunnerServiceAccount,
+    allowedRedirectOrigin,
+  });
+}
+
 export function readRuntimeConfig(env = process.env) {
   const serviceOwner = required(env, "SERVICE_OWNER");
   if (!SERVICE_OWNERS.includes(serviceOwner)) {
@@ -234,6 +356,10 @@ export function readRuntimeConfig(env = process.env) {
       "DB_STATEMENT_TIMEOUT_MS must be below HANDLER_DEADLINE_MS.",
     );
   }
+  const financial = readUatFinancialConfig(env, {
+    serviceOwner,
+    stage: project.stage,
+  });
 
   return Object.freeze({
     serviceOwner,
@@ -300,6 +426,7 @@ export function readRuntimeConfig(env = process.env) {
     finnhubApiKey,
     googleMapsApiKey,
     nominatimUserAgent,
+    financial,
   });
 }
 
@@ -315,4 +442,11 @@ export const RUNTIME_CONSTANTS = Object.freeze({
   productClient: PRODUCT_CLIENT_ID,
   productClientAppId: PRODUCT_CLIENT_APP_ID,
   databaseName: DATABASE_NAME,
+  uatFinancial: Object.freeze({
+    kmsKey: UAT_FINANCIAL_KMS_KEY,
+    syncTaskQueue: UAT_FINANCIAL_SYNC_TASK_QUEUE,
+    workerAudience: UAT_FINANCIAL_WORKER_AUDIENCE,
+    taskRunnerServiceAccount: UAT_FINANCIAL_TASK_RUNNER,
+    allowedRedirectOrigin: UAT_FINANCIAL_REDIRECT_ORIGIN,
+  }),
 });

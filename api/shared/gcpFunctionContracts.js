@@ -212,6 +212,40 @@ export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
     maxRequestBytes: 65_536,
     timeoutMs: 25_000,
   },
+  // These preserve the existing financial-link compatibility contracts. A
+  // declaration here is intentionally not route activation: the generated
+  // retirement registry still rejects each entry until its independent UAT
+  // source/end, service, IAM, KMS, and sandbox evidence is accepted.
+  {
+    slug: "asset-report-create",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "create-link-token",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "exchange-public-token",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
   {
     slug: "get-locations",
     methods: ["GET"],
@@ -253,5 +287,48 @@ export const GCP_FUNCTION_CONTRACTS = buildGcpFunctionContracts([
     maxRequestBytes: 0,
     timeoutMs: 25_000,
     publicCache: true,
+  },
+  {
+    slug: "plaid-data-sync-product",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
+  {
+    // Preserved Supabase compatibility alias. The gateway continues to select
+    // the existing slug; the private adapter shares the implementation while
+    // retaining this source route's trusted no-lock mode.
+    slug: "plaid-data-sync",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "plaid-data-sync-start",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
+  },
+  {
+    slug: "plaid-diagnostics-log",
+    methods: ["POST"],
+    subpaths: [""],
+    queryKeys: [],
+    contentTypes: ["application/json"],
+    responseHeaders: [],
+    maxRequestBytes: 262_144,
+    timeoutMs: 25_000,
   },
 ]);

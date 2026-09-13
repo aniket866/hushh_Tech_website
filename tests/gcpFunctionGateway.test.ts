@@ -93,10 +93,21 @@ const GCP_READ_BATCH_SLUGS = [
   "investor-og-image",
 ] as const;
 
+const GCP_FINANCIAL_LINK_SLUGS = [
+  "asset-report-create",
+  "create-link-token",
+  "exchange-public-token",
+  "plaid-data-sync",
+  "plaid-data-sync-product",
+  "plaid-data-sync-start",
+  "plaid-diagnostics-log",
+] as const;
+
 describe("GCP function registry", () => {
   it("enables geocode while other reviewed contracts remain frozen", () => {
     expect([...GCP_FUNCTION_CONTRACTS.keys()].sort()).toEqual([
       ...GCP_READ_BATCH_SLUGS,
+      ...GCP_FINANCIAL_LINK_SLUGS,
       "hushh-location-geocode",
       "stock-quotes",
     ].sort());
@@ -142,6 +153,33 @@ describe("GCP function registry", () => {
       maxRequestBytes: 0,
       publicCache: true,
     });
+    for (const slug of GCP_FINANCIAL_LINK_SLUGS) {
+      expect(GCP_FUNCTION_CONTRACTS.get(slug)).toMatchObject({
+        methods: ["POST"],
+        subpaths: [""],
+        queryKeys: [],
+        contentTypes: ["application/json"],
+        maxRequestBytes: 262_144,
+        timeoutMs: 25_000,
+        publicCache: false,
+      });
+      expect(
+        GCP_BACKEND_RETIREMENT_FUNCTIONS.find((entry) => entry.slug === slug)
+          ?.migration_state,
+      ).toBe("INVENTORY_FROZEN");
+    }
+
+    // The historic alias has the same bounded gateway wire contract as the
+    // newer start slug. This is deliberately only a request/response-boundary
+    // assertion: its source sync-lock semantics are verified independently
+    // before either frozen route can be promoted.
+    const { slug: legacyAliasSlug, ...legacyAliasContract } =
+      GCP_FUNCTION_CONTRACTS.get("plaid-data-sync")!;
+    const { slug: startSlug, ...startContract } =
+      GCP_FUNCTION_CONTRACTS.get("plaid-data-sync-start")!;
+    expect(legacyAliasSlug).toBe("plaid-data-sync");
+    expect(startSlug).toBe("plaid-data-sync-start");
+    expect(legacyAliasContract).toEqual(startContract);
   });
 
   it("rejects duplicates and non-explicit owners", () => {
@@ -228,6 +266,35 @@ describe("GCP legacy function compatibility gateway", () => {
 
   it.each(GCP_READ_BATCH_SLUGS)(
     "keeps candidate %s unreachable before auth and upstream",
+    async (slug) => {
+      const source = GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
+        (entry) => entry.slug === slug,
+      );
+      expect(source).toBeDefined();
+      const registry = buildGcpFunctionRegistry([source!]);
+      const fetchImpl = vi.fn();
+      const verifyFirebaseToken = vi.fn();
+      const res = responseRecorder();
+      await createGcpFunctionGateway({
+        registry,
+        contracts: GCP_FUNCTION_CONTRACTS,
+        fetchImpl,
+        verifyFirebaseToken,
+      })(
+        { method: "POST", url: `/functions/v1/${slug}`, headers: {} },
+        res,
+      );
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toMatchObject({
+        detail: { code: "FUNCTION_NOT_MIGRATED" },
+      });
+      expect(verifyFirebaseToken).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(GCP_FINANCIAL_LINK_SLUGS)(
+    "keeps financial contract %s unreachable before auth and upstream",
     async (slug) => {
       const source = GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
         (entry) => entry.slug === slug,
@@ -633,6 +700,241 @@ describe("GCP legacy function compatibility gateway", () => {
     expect(res.body).toMatchObject({
       detail: { code: "RECENT_AUTH_REQUIRED" },
     });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(GCP_FINANCIAL_LINK_SLUGS)(
+    "preserves a valid older Firebase session for legacy Finance Link route %s",
+    async (slug) => {
+      const registry = buildGcpFunctionRegistry([
+        {
+          ...baseEntry,
+          source: { slug },
+          owner_group: "financial-api-worker",
+          auth_mode:
+            "firebase_bearer_recent_auth_or_google_service_identity",
+        },
+      ]);
+      const fetchImpl = vi.fn(async (_url, init) => {
+        const headers = init?.headers as Headers;
+        expect(headers.get("x-hushh-firebase-authorization")).toBe(
+          "Bearer older-valid-session",
+        );
+        expect(headers.get("x-hushh-firebase-uid")).toBe("firebase-user-1");
+        expect(headers.get("x-hushh-firebase-auth-time")).toBe("600");
+        return new Response(JSON.stringify({ accepted: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      });
+      const res = responseRecorder();
+
+      await createGcpFunctionGateway({
+        registry,
+        contracts: contractsFor(slug, { subpaths: [""], queryKeys: [] }),
+        env: {
+          ...enabledEnv,
+          HUSHH_TECH_FINANCIAL_API_URL:
+            "https://hushh-tech-financial-api-175298245599.us-central1.run.app",
+        },
+        fetchImpl,
+        now: () => 1_000_000,
+        verifyFirebaseToken: async () => ({
+          uid: "firebase-user-1",
+          authTime: 600,
+        }),
+        getServiceIdentityToken: async () => "service-token",
+      })(
+        {
+          method: "POST",
+          url: `/functions/v1/${slug}`,
+          headers: {
+            authorization: "Bearer older-valid-session",
+            "content-type": "application/json",
+          },
+          rawBody: Buffer.from("{}"),
+        },
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(fetchImpl).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([
+    ["no bearer", undefined, null],
+    ["an invalid bearer", "Bearer invalid-session", null],
+    ["a valid bearer", "Bearer valid-session", "firebase-user-1"],
+  ])(
+    "keeps plaid diagnostics lossy for %s while deriving a valid server-side actor",
+    async (_caseName, authorization, expectedUid) => {
+      const registry = buildGcpFunctionRegistry([
+        {
+          ...baseEntry,
+          source: { slug: "plaid-diagnostics-log" },
+          owner_group: "financial-api-worker",
+          auth_mode:
+            "firebase_bearer_recent_auth_or_google_service_identity",
+        },
+      ]);
+      const fetchImpl = vi.fn(async (_url, init) => {
+        const headers = init?.headers as Headers;
+        expect(headers.get("x-hushh-firebase-uid")).toBe(expectedUid);
+        expect(headers.get("x-hushh-firebase-authorization")).toBe(
+          expectedUid ? "Bearer valid-session" : null,
+        );
+        return new Response(JSON.stringify({ accepted: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      });
+      const res = responseRecorder();
+
+      await createGcpFunctionGateway({
+        registry,
+        contracts: contractsFor("plaid-diagnostics-log", {
+          subpaths: [""],
+          queryKeys: [],
+        }),
+        env: {
+          ...enabledEnv,
+          HUSHH_TECH_FINANCIAL_API_URL:
+            "https://hushh-tech-financial-api-175298245599.us-central1.run.app",
+        },
+        fetchImpl,
+        verifyFirebaseToken: async (token) => {
+          if (token === "valid-session") {
+            return { uid: "firebase-user-1", authTime: 999 };
+          }
+          throw new Error("invalid Firebase bearer");
+        },
+        getServiceIdentityToken: async () => "service-token",
+      })(
+        {
+          method: "POST",
+          url: "/functions/v1/plaid-diagnostics-log",
+          headers: {
+            ...(authorization ? { authorization } : {}),
+            "content-type": "application/json",
+          },
+          rawBody: Buffer.from('{"event_type":"financial_link_mount","user_id":"forged"}'),
+        },
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(Buffer.from(res.body as Buffer).toString("utf8"))).toEqual({
+        accepted: true,
+      });
+      expect(fetchImpl).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([
+    ["malformed JSON", "application/json", Buffer.from('{"event_type":')],
+    ["unsupported media type", "text/plain", Buffer.from("not-json")],
+  ])(
+    "forwards bounded %s Plaid diagnostics payloads to the lossy handler",
+    async (_caseName, contentType, rawBody) => {
+      const registry = buildGcpFunctionRegistry([
+        {
+          ...baseEntry,
+          source: { slug: "plaid-diagnostics-log" },
+          owner_group: "financial-api-worker",
+          auth_mode:
+            "firebase_bearer_recent_auth_or_google_service_identity",
+        },
+      ]);
+      const fetchImpl = vi.fn(async (_url, init) => {
+        expect(init?.body).toEqual(rawBody);
+        return new Response(
+          JSON.stringify({ accepted: false, reason: "invalid_payload" }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      });
+      const res = responseRecorder();
+
+      await createGcpFunctionGateway({
+        registry,
+        contracts: contractsFor("plaid-diagnostics-log", {
+          subpaths: [""],
+          queryKeys: [],
+        }),
+        env: {
+          ...enabledEnv,
+          HUSHH_TECH_FINANCIAL_API_URL:
+            "https://hushh-tech-financial-api-175298245599.us-central1.run.app",
+        },
+        fetchImpl,
+        verifyFirebaseToken: async () => {
+          throw new Error("unexpected Firebase verification");
+        },
+        getServiceIdentityToken: async () => "service-token",
+      })(
+        {
+          method: "POST",
+          url: "/functions/v1/plaid-diagnostics-log",
+          headers: { "content-type": contentType },
+          rawBody,
+        },
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(
+        JSON.parse(Buffer.from(res.body as Buffer).toString("utf8")),
+      ).toEqual({ accepted: false, reason: "invalid_payload" });
+      expect(fetchImpl).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("does not make Firebase authentication optional for other Finance Link routes", async () => {
+    const registry = buildGcpFunctionRegistry([
+      {
+        ...baseEntry,
+        source: { slug: "create-link-token" },
+        owner_group: "financial-api-worker",
+        auth_mode: "firebase_bearer_recent_auth_or_google_service_identity",
+      },
+    ]);
+    const fetchImpl = vi.fn();
+    const res = responseRecorder();
+
+    await createGcpFunctionGateway({
+      registry,
+      contracts: contractsFor("create-link-token", {
+        subpaths: [""],
+        queryKeys: [],
+      }),
+      env: {
+        ...enabledEnv,
+        HUSHH_TECH_FINANCIAL_API_URL:
+          "https://hushh-tech-financial-api-175298245599.us-central1.run.app",
+      },
+      fetchImpl,
+      verifyFirebaseToken: async () => {
+        throw new Error("invalid Firebase bearer");
+      },
+      getServiceIdentityToken: async () => "service-token",
+    })(
+      {
+        method: "POST",
+        url: "/functions/v1/create-link-token",
+        headers: {
+          authorization: "Bearer invalid-session",
+          "content-type": "application/json",
+        },
+        rawBody: Buffer.from("{}"),
+      },
+      res,
+    );
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toMatchObject({ detail: { code: "UNAUTHENTICATED" } });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

@@ -417,10 +417,58 @@ export const NOTIFY_WRITE_FUNCTION_CONTRACTS = createFunctionContracts({
   },
 });
 
+// This is the wire contract for the pre-existing financial-link compatibility
+// slugs. Adding it does not promote any route: app.js rejects an
+// INVENTORY_FROZEN registry entry before it resolves a handler or this map.
+// Keep the observed 256 KiB source boundary consistently at the gateway and
+// private Cloud Run service so a future evidence-backed promotion cannot
+// introduce a mismatched request limit.
+export const FINANCIAL_LINK_FUNCTION_CONTRACTS = createFunctionContracts({
+  "asset-report-create": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  "create-link-token": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  "exchange-public-token": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  // Existing Supabase compatibility alias. It uses the same wire handler as
+  // `plaid-data-sync-start`; its trusted adapter method preserves the source
+  // no-lock distinction without adding another route surface.
+  "plaid-data-sync": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  "plaid-data-sync-product": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  "plaid-data-sync-start": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "required",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+  "plaid-diagnostics-log": {
+    methods: ["POST"], subpaths: [""], query: {}, body: "optional",
+    mediaTypes: ["application/json"], cacheControl: "private, no-store",
+    maxRequestBytes: 262_144,
+  },
+});
+
 // Contract presence is not enablement. The frozen registry is checked before
 // these definitions, and all 112 entries remain unreachable until independent
 // UAT parity changes a specific entry to PORTED_AND_VERIFIED.
 export const FUNCTION_CONTRACTS = Object.freeze({
   ...INVESTOR_READ_ONLY_FUNCTION_CONTRACTS,
   ...ENGAGEMENT_ADMIN_FUNCTION_CONTRACTS,
+  ...FINANCIAL_LINK_FUNCTION_CONTRACTS,
 });
