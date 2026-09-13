@@ -20,6 +20,27 @@ const fingerprint = (provider: string, subject: string) => createHash('sha256').
 const actor = (uid: string) => ({ uid, sub: uid, aud: 'hushh-tech-uat', iss: 'https://securetoken.google.com/hushh-tech-uat', email: 'fixture@example.invalid' });
 const account = (uid: string, subject = uid, provider = 'google.com', createdAt = '2026-09-01T00:00:00.000Z') => ({ uid, disabled: false, metadata: { creationTime: createdAt }, providerData: [{ providerId: provider, uid: subject }] });
 const signing = { kind: 'nda', operation: 'sign', signing: { signerName: 'Test Signer', ndaVersion: 'v1.0', consentVersion: 'v1.0', consentAccepted: true, documentsAcknowledged: [...NDA_DOCUMENTS], pdfUrl: null } };
+const financialBoundarySql = readFileSync('migration/sql/005_financial_link_gcp_boundary.sql', 'utf8');
+const financialPreflightSql = (() => {
+  const match = financialBoundarySql.match(/DO \$preflight\$[\s\S]*?\$preflight\$;/);
+  if (!match) throw new Error('financial link preflight block is missing');
+  return match[0];
+})();
+const financialResolverAclPreflightSql = (() => {
+  const failureMarker = 'FINANCIAL_LINK_BOUNDARY_PRINCIPAL_RESOLVER_ACL_INVALID';
+  const marker = financialPreflightSql.indexOf(failureMarker);
+  const start = financialPreflightSql.lastIndexOf('  IF (', marker);
+  const end = financialPreflightSql.indexOf('\n  END IF;', marker);
+  if (start < 0 || end < 0) throw new Error('financial link resolver ACL preflight is missing');
+  return `DO $resolver_acl$\nDECLARE\n  resolver CONSTANT regprocedure := 'hushh_identity.current_legacy_user_uuid()'::regprocedure;\nBEGIN\n${financialPreflightSql.slice(start, end + '\n  END IF;'.length)}\nEND\n$resolver_acl$;`;
+})();
+
+describe('financial link resolver ACL migration contract', () => {
+  it('preserves the established runtime resolver grant while rejecting unlisted grants', () => {
+    expect(financialBoundarySql).toMatch(/WHERE routine\.oid = resolver\s*\) IS DISTINCT FROM ARRAY\[\s*'hushh_tech_identity_provisioner:EXECUTE',\s*'hushh_tech_runtime:EXECUTE',\s*'hushh_tech_schema_owner:EXECUTE'\s*\]::text\[\] THEN\s*RAISE EXCEPTION 'FINANCIAL_LINK_BOUNDARY_PRINCIPAL_RESOLVER_ACL_INVALID'/s);
+    expect(financialBoundarySql).toMatch(/IF resolver_grants IS DISTINCT FROM ARRAY\[\s*'hushh-tech-financial-api-uat@hushh-tech-uat\.iam:EXECUTE',\s*'hushh-tech-worker-uat@hushh-tech-uat\.iam:EXECUTE',\s*'hushh_tech_identity_provisioner:EXECUTE',\s*'hushh_tech_runtime:EXECUTE',\s*'hushh_tech_schema_owner:EXECUTE'\s*\]::text\[\]/s);
+  });
+});
 
 describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposable local catalog)', () => {
   let directory: string;
@@ -255,6 +276,51 @@ describe.skipIf(!available)('real PostgreSQL 17 identity + NDA boundary (disposa
     expect(Object.values(row)).toEqual([false, false, false, false]);
     expect((await admin.query(`SELECT count(*) FROM pg_auth_members WHERE roleid=(SELECT oid FROM pg_roles WHERE rolname='hushh_tech_identity_provisioner')`)).rows[0].count).toBe('0');
     expect((await admin.query(`SELECT has_function_privilege('public','hushh_identity.ensure_current_application_principal(jsonb)','EXECUTE') AS allowed`)).rows[0].allowed).toBe(false);
+  });
+  it('accepts the established runtime resolver ACL and rejects an unlisted grantee before DDL', async () => {
+    const client = await admin.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`CREATE ROLE cloudsqliamserviceaccount NOLOGIN;
+        CREATE ROLE "hushh-tech-financial-api-uat@hushh-tech-uat.iam" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+        CREATE ROLE "hushh-tech-worker-uat@hushh-tech-uat.iam" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+        GRANT cloudsqliamserviceaccount TO "hushh-tech-financial-api-uat@hushh-tech-uat.iam";
+        GRANT cloudsqliamserviceaccount TO "hushh-tech-worker-uat@hushh-tech-uat.iam";`);
+      const resolverAcl = (await client.query(`
+        SELECT array_agg(
+          format(
+            '%s:%s',
+            CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(acl.grantee) END,
+            acl.privilege_type
+          )
+          ORDER BY CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(acl.grantee) END, acl.privilege_type
+        ) AS grants
+        FROM pg_catalog.pg_proc AS routine
+        CROSS JOIN LATERAL pg_catalog.aclexplode(
+          COALESCE(routine.proacl, pg_catalog.acldefault('f'::"char", routine.proowner))
+        ) AS acl
+        WHERE routine.oid = 'hushh_identity.current_legacy_user_uuid()'::regprocedure
+      `)).rows[0].grants;
+      expect(resolverAcl).toEqual([
+        'hushh_tech_identity_provisioner:EXECUTE',
+        'hushh_tech_runtime:EXECUTE',
+        'hushh_tech_schema_owner:EXECUTE',
+      ]);
+
+      await expect(client.query(financialResolverAclPreflightSql)).resolves.toBeDefined();
+      await client.query('SAVEPOINT established_acl');
+      await expect(client.query(financialPreflightSql)).rejects.toThrow('FINANCIAL_LINK_BOUNDARY_PUBLIC_RELATION_INVALID');
+      await client.query('ROLLBACK TO SAVEPOINT established_acl');
+
+      await client.query('CREATE ROLE fixture_unlisted_resolver_grantee NOLOGIN');
+      await client.query('GRANT EXECUTE ON FUNCTION hushh_identity.current_legacy_user_uuid() TO fixture_unlisted_resolver_grantee');
+      await client.query('SAVEPOINT unlisted_acl');
+      await expect(client.query(financialResolverAclPreflightSql)).rejects.toThrow('FINANCIAL_LINK_BOUNDARY_PRINCIPAL_RESOLVER_ACL_INVALID');
+      await client.query('ROLLBACK TO SAVEPOINT unlisted_acl');
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
   });
   it('keeps native resolution after the emergency creation switch is disabled', async () => {
     await admin.query('UPDATE hushh_identity.runtime_admission SET creation_enabled=false');

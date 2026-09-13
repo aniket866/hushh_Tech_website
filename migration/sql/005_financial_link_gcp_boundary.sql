@@ -465,9 +465,10 @@ BEGIN
     RAISE EXCEPTION 'FINANCIAL_LINK_BOUNDARY_PRINCIPAL_RESOLVER_INVALID';
   END IF;
 
-  -- 004 seals this resolver to its owner and the identity provisioner.  The
-  -- migration must not add financial access on top of a broad/PUBLIC routine
-  -- grant, even when the effective privilege happens to look correct.
+  -- The established UAT resolver ACL is sealed to its owner, the existing
+  -- generic runtime, and the identity provisioner. The migration must not add
+  -- financial access on top of a broad/PUBLIC routine grant, even when the
+  -- effective privilege happens to look correct.
   IF (
     SELECT array_agg(
       format(
@@ -486,6 +487,7 @@ BEGIN
     WHERE routine.oid = resolver
   ) IS DISTINCT FROM ARRAY[
     'hushh_tech_identity_provisioner:EXECUTE',
+    'hushh_tech_runtime:EXECUTE',
     'hushh_tech_schema_owner:EXECUTE'
   ]::text[] THEN
     RAISE EXCEPTION 'FINANCIAL_LINK_BOUNDARY_PRINCIPAL_RESOLVER_ACL_INVALID';
@@ -1158,6 +1160,7 @@ BEGIN
        'hushh-tech-financial-api-uat@hushh-tech-uat.iam:EXECUTE',
        'hushh-tech-worker-uat@hushh-tech-uat.iam:EXECUTE',
        'hushh_tech_identity_provisioner:EXECUTE',
+       'hushh_tech_runtime:EXECUTE',
        'hushh_tech_schema_owner:EXECUTE'
      ]::text[]
      OR NOT has_function_privilege(financial_role, resolver, 'EXECUTE')
