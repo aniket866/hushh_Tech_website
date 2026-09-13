@@ -75,14 +75,28 @@ BEGIN
     RAISE EXCEPTION 'FINANCIAL_LINK_BOUNDARY_RUNTIME_ROLE_INVALID';
   END IF;
 
-  -- IAM database users must not inherit any role.  A direct Cloud SQL grant
-  -- is the only authority this migration introduces.
-  IF EXISTS (
-    SELECT 1
+  -- Cloud SQL creates each IAM database user as a member of its managed
+  -- `cloudsqliamserviceaccount` role.  Permit precisely that platform
+  -- membership while refusing every other inherited authority: the direct
+  -- grants below remain the only application authority this migration adds.
+  IF (
+    SELECT count(*)
     FROM pg_catalog.pg_auth_members AS membership
+    INNER JOIN pg_catalog.pg_roles AS granted_role
+      ON granted_role.oid = membership.roleid
     INNER JOIN pg_catalog.pg_roles AS member_role
       ON member_role.oid = membership.member
     WHERE member_role.rolname IN (financial_role, worker_role)
+      AND granted_role.rolname = 'cloudsqliamserviceaccount'
+  ) <> 2 OR EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_auth_members AS membership
+    INNER JOIN pg_catalog.pg_roles AS granted_role
+      ON granted_role.oid = membership.roleid
+    INNER JOIN pg_catalog.pg_roles AS member_role
+      ON member_role.oid = membership.member
+    WHERE member_role.rolname IN (financial_role, worker_role)
+      AND granted_role.rolname <> 'cloudsqliamserviceaccount'
   ) THEN
     RAISE EXCEPTION 'FINANCIAL_LINK_BOUNDARY_RUNTIME_ROLE_MEMBERSHIP';
   END IF;
