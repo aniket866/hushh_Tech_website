@@ -278,6 +278,12 @@ export default function Navbar() {
                       {t('nav.viewProfile')}
                     </button>
                     <button
+                      onClick={onDeleteModalOpen}
+                      className="inline-flex items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 text-sm font-semibold transition-colors"
+                    >
+                      {t('nav.deleteAccount', 'Delete Account')}
+                    </button>
+                    <button
                       onClick={handleLogout}
                       className="inline-flex items-center justify-center rounded-full bg-[#2F80ED] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f6cc7] transition-colors"
                     >

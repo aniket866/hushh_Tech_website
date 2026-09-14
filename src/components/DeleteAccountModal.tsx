@@ -36,41 +36,40 @@ const DeleteAccountModal = ({
   // Backend logic
   // =====================================================
   const handleDeleteAccount = async () => {
-    if (!isDeleteEnabled || !config.gcpBackendClient) return;
+    if (!isDeleteEnabled) return;
 
     setIsDeleting(true);
 
     try {
       console.log("[DeleteAccount] Starting account deletion process...");
 
-      const { data: refreshData, error: refreshError } =
-        await config.gcpBackendClient.auth.refreshSession();
-
       let accessToken: string | null = session?.access_token || null;
 
-      if (refreshError) {
-        console.error("[DeleteAccount] Session refresh failed:", refreshError);
-        if (!accessToken) {
-          const snapshot = await revalidateSession();
-          if (snapshot.status === "authenticated") {
-            accessToken = snapshot.session?.access_token || null;
+      // Try refreshing session via GCP client if available
+      if (config.gcpBackendClient) {
+        try {
+          const { data: refreshData, error: refreshError } =
+            await config.gcpBackendClient.auth.refreshSession();
+          if (!refreshError && refreshData?.session?.access_token) {
+            accessToken = refreshData.session.access_token;
+            console.log("[DeleteAccount] Session refreshed successfully");
           }
+        } catch (err) {
+          console.warn("[DeleteAccount] Session refresh warning, falling back to current session:", err);
         }
+      }
 
-        if (!accessToken) {
-          throw new Error(
-            "Session expired. Please log out and log in again to delete your account."
-          );
+      // Revalidate if still missing access token
+      if (!accessToken) {
+        const snapshot = await revalidateSession();
+        if (snapshot.status === "authenticated" && snapshot.session?.access_token) {
+          accessToken = snapshot.session.access_token;
         }
+      }
 
-        console.log("[DeleteAccount] Using validated fallback session...");
-      } else if (refreshData.session?.access_token) {
-        console.log("[DeleteAccount] Session refreshed successfully");
-        accessToken = refreshData.session.access_token;
-      } else {
-        console.error("[DeleteAccount] No session after refresh");
+      if (!accessToken) {
         throw new Error(
-          "Unable to verify your session. Please log out and log in again."
+          "Session expired or invalid. Please log out and log in again to delete your account."
         );
       }
 
@@ -87,15 +86,16 @@ const DeleteAccountModal = ({
 
       if (!response.ok || data?.success !== true) {
         console.error("[DeleteAccount] Delete API error:", data);
-        throw new Error(data?.error || "Failed to delete account");
+        const errMsg = data?.error || data?.details || "Failed to delete account";
+        throw new Error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
       }
 
       console.log("[DeleteAccount] Account deleted successfully", data);
       await handleAccountDeleted();
 
       toast({
-        title: t("deleteAccount.successTitle"),
-        description: t("deleteAccount.successMessage"),
+        title: t("deleteAccount.successTitle", "Account Deleted"),
+        description: t("deleteAccount.successMessage", "Your account and data have been removed."),
         status: "success",
         duration: 5000,
         isClosable: true,
@@ -107,8 +107,8 @@ const DeleteAccountModal = ({
     } catch (error: any) {
       console.error("[DeleteAccount] Error:", error);
       toast({
-        title: t("deleteAccount.errorTitle"),
-        description: error.message || t("deleteAccount.errorMessage"),
+        title: t("deleteAccount.errorTitle", "Deletion Failed"),
+        description: error.message || t("deleteAccount.errorMessage", "Failed to delete account"),
         status: "error",
         duration: 5000,
         isClosable: true,
