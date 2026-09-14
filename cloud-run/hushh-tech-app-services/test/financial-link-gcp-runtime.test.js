@@ -44,18 +44,24 @@ function encodeBase64(value) {
   return globalThis.btoa(value);
 }
 
-function configuredRuntime({ database = null } = {}) {
+function configuredRuntime({
+  database = null,
+  stage = "uat",
+  serviceOwner = "financial-api",
+  plaidEnvironment = "sandbox",
+  fetchImpl = async () => response(),
+} = {}) {
   return createFinancialLinkRuntime({
     config: {
-      serviceOwner: "financial-api",
-      stage: "uat",
+      serviceOwner,
+      stage,
       firebaseProjectId: "hushh-tech-uat",
       financial: {
         enabled: true,
         plaidClientId: "sandbox-client-id",
         plaidSecret: "sandbox-private-secret",
-        plaidEnvironment: "sandbox",
-        plaidPrimaryProducts: "transfer",
+        plaidEnvironment,
+        plaidPrimaryProducts: plaidEnvironment === "production" ? "auth" : "transfer",
         plaidAdditionalConsentedProducts: null,
         plaidRequiredIfSupportedProducts: null,
         kmsKey: KMS_KEY,
@@ -81,9 +87,53 @@ function configuredRuntime({ database = null } = {}) {
       },
     },
     getAccessToken: async () => "google-service-access-token",
-    fetchImpl: async () => response(),
+    fetchImpl,
   });
 }
+
+test("UAT Production runtime reaches Plaid Link creation with the legacy owner and products", async () => {
+  const legacyUuid = "b5f0b2f0-9c84-4cac-ae0a-55eb41f680f2";
+  const calls = [];
+  const database = {
+    firebaseUid: "firebase-user-001",
+    async transaction(work) {
+      return work({ query: async (sql) => {
+        assert.equal(sql, "SELECT hushh_identity.current_legacy_user_uuid() AS legacy_user_uuid");
+        return { rows: [{ legacy_user_uuid: legacyUuid }] };
+      } });
+    },
+    async serializableTransaction() { assert.fail("Link creation must not schedule sync"); },
+  };
+  const result = { link_token: "test-link-token", expiration: "2030-01-01T00:00:00Z" };
+  const runtime = configuredRuntime({
+    plaidEnvironment: "production",
+    database,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return response({ body: result });
+    },
+  });
+  assert.deepEqual(await runtime.financialLinkAdapter.createLinkToken({
+    actor: { kind: "firebase", uid: "firebase-user-001", email: "user@example.test" },
+    userId: "firebase-user-001",
+    redirectUri: "https://uat.hushhtech.com/onboarding/financial-link",
+  }), result);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://production.plaid.com/link/token/create");
+  assert.equal(calls[0].body.user.client_user_id, legacyUuid);
+  assert.deepEqual(calls[0].body.products, ["auth"]);
+  assert.deepEqual(calls[0].body.additional_consented_products, ["identity", "transactions", "signal"]);
+  assert.deepEqual(calls[0].body.required_if_supported_products, ["investments", "liabilities"]);
+  assert.equal(configuredRuntime({ serviceOwner: "worker", plaidEnvironment: "production" }).configured, true);
+  for (const overrides of [
+    { stage: "prod", plaidEnvironment: "production" },
+    { serviceOwner: "investor-api", plaidEnvironment: "production" },
+    { plaidEnvironment: "development" },
+  ]) {
+    assert.throws(() => configuredRuntime(overrides),
+      (error) => runtimeCode(error, "FINANCIAL_LINK_ADAPTER_UNAVAILABLE", 503));
+  }
+});
 
 test("Cloud KMS envelopes bind Plaid plaintext to the exact caller-owned context", async () => {
   const calls = [];

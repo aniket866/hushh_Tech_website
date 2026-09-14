@@ -130,7 +130,7 @@ function assertConfigured(config) {
     !financial.plaidClientId ||
     typeof financial.plaidSecret !== "string" ||
     !financial.plaidSecret ||
-    financial.plaidEnvironment !== "sandbox" ||
+    !["sandbox", "production"].includes(financial.plaidEnvironment) ||
     typeof financial.plaidPrimaryProducts !== "string" ||
     !financial.plaidPrimaryProducts ||
     typeof financial.kmsKey !== "string" ||

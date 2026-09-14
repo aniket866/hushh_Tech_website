@@ -103,7 +103,7 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "d1b768d7b0e3263015e484083fd6ed94c3bc1e17273b70a4adab3e0d4a7e4796",
+    "manifest_self_digest": "afc767f1a8c696bfe3f99ea492790586c9f401ad97883368d624562e797e26fc",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
@@ -125,7 +125,7 @@
     "schema_version": 1,
     "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
     "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
-    "src_inventory_digest": "0bfa41e786d41003ff0dfd8ab6fc2c0f00a9dbf4a49190e7d1bec1f29a38d3c6",
+    "src_inventory_digest": "731e1febaaeb1bbd5abd89772cb860ea275e101a0694c9e058ded6ce1fa518f1",
     "src_inventory": [
       {
         "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
@@ -184,8 +184,8 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/financial/gcp-runtime.js",
-        "bytes": 58711,
-        "sha256": "3700f21bef6eff2982366c6983aaaecaabc5e9e8a1918ee70a7163360dc539b9"
+        "bytes": 58734,
+        "sha256": "302d9572ec303ece308f666e48ef330ae19156eac490b26f9f2387f62bac9219"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/financial/plaid-client.js",
