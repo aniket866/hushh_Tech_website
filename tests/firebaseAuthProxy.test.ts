@@ -377,7 +377,7 @@ describe('runtime isolation', () => {
     expect(transport).not.toHaveBeenCalled();
   });
 
-  it('adds only the required UAT gapi script source while retaining real app route behavior', async () => {
+  it('adds only the required UAT sources while retaining real app route behavior', async () => {
     const port = await listen(createServer(realApp));
     for (const path of ['/auth/callback', '/login', '/api/release']) {
       vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'hushh-tech-prod');
@@ -398,11 +398,34 @@ describe('runtime isolation', () => {
       expect(after.headers['content-security-policy']).toBe(
         String(before.headers['content-security-policy']).replace(
           "script-src 'self'", "script-src 'self' https://apis.google.com",
-        ),
+        ).replace("connect-src 'self'", "connect-src 'self' https://ipwho.is https://ipwhois.app"),
       );
       expect(after.headers['content-security-policy']).toContain("frame-src 'self'");
     }
     expect(transport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cloud: PROJECT, host: HOST, allowed: true },
+    { cloud: undefined, host: HOST, allowed: false },
+    { cloud: 'hushh-tech-prod', host: HOST, allowed: false },
+    { cloud: PROJECT, host: 'hushhtech.com', allowed: false },
+    { cloud: PROJECT, host: 'other.example', allowed: false },
+  ])('bounds existing IP fallback sources to UAT: %j', async ({ cloud, host, allowed }) => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', cloud);
+    const result = await call(await listen(createServer(realApp)), '/onboarding/financial-link', {
+      headers: { host, 'x-forwarded-host': HOST },
+    });
+    const directives = String(result.headers['content-security-policy']).split('; ');
+    const connect = directives.find((directive) => directive.startsWith('connect-src '))!.split(' ');
+    for (const origin of ['https://ipwho.is', 'https://ipwhois.app']) {
+      expect(connect.includes(origin)).toBe(allowed);
+      expect(directives.filter((directive) => !directive.startsWith('connect-src ')).join(';')).not.toContain(origin);
+    }
+    expect(connect).toContain('https://*.plaid.com');
+    expect(connect).toContain('https://www.google.com');
+    expect(connect).not.toContain('*');
+    expect(connect).not.toContain('https:');
   });
 
   it.each([
