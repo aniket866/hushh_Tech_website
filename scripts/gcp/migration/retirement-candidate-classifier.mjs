@@ -9,8 +9,8 @@ export const CONTRACT = Object.freeze({
   classifier_id: "hushh-tech-supabase-retirement-candidate-classifier",
   mode: "MACHINE_ONLY_DEFAULT_OFF",
   required_flag: "--machine-evaluate",
-  base_commit: "1dbbd2a41d82322908322647773e45a9cf178313",
-  base_tree: "dc027e2768b3d77ecdae82c37f1ed89c704f4d33",
+  base_commit: "afdcf47a76304b0f9b4a37e3153fbed49621de03",
+  base_tree: "65ad4577dae1cd62aafaf674fd972fcf43310928",
   expected_functions: 112,
   evaluation_time_utc: "2026-08-21T18:03:38.344Z",
   maximum_traffic_lag_hours: 24,
@@ -124,7 +124,7 @@ export const CONTRACT = Object.freeze({
   caller_corpus_sha256:
     "acf444bd02954a45729fcb4fd03f500270fcda5bab22978735d19bb19e7b8b91",
   caller_graph_sha256:
-    "6f6bcb1f7a8cbfc72e03e86edcac79981631831c2e75376e7e35e7c353df8a2f",
+    "1d37c6454feeb3cbcd7257da2713355179be65de8c07f6c5ca5a6b9c70f4a179",
 });
 
 const MUST_PORT = "MUST_PORT";

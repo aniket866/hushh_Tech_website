@@ -103,7 +103,7 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "8077ff79c36dfa0c92709f385b3972a6223bdde80536227634239b5fd739ad5b",
+    "manifest_self_digest": "277f072c3edb83be37652a4efe13c6fbfbfe579968c8ee6cd7a44ab6db266a2d",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
@@ -125,7 +125,7 @@
     "schema_version": 1,
     "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
     "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
-    "src_inventory_digest": "7fce7bc0b3158d925897a4a0d19f1ef28c39a9eeb8fc54e37bb59709ab0684b2",
+    "src_inventory_digest": "76f6dc46a5d8c40110f2676ecf62c2842e325a2dccd74dffa5d749f356992d73",
     "src_inventory": [
       {
         "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
@@ -144,8 +144,8 @@
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/auth/firebase.js",
-        "bytes": 5241,
-        "sha256": "ef16fe2870f07f1422087b83138a2c9e2131d900e00c1e0a9d91e46f5a4d600f"
+        "bytes": 6193,
+        "sha256": "be0782704ba28069863c6db83e82f19995a7701589bcedbdcf332e45a5e35d7b"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/auth/google.js",

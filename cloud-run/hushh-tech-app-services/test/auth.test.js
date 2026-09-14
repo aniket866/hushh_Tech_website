@@ -226,6 +226,89 @@ test("Finance Link compatibility routes accept valid older Firebase sessions onl
   );
 });
 
+test("UAT Finance Link accepts the gateway's ordinary Firebase session without launch claims", async () => {
+  const claims = firebaseClaims({ auth_time: NOW_SECONDS - 3_600 });
+  for (const key of Object.keys(claims)) {
+    if (key.startsWith("product_")) delete claims[key];
+  }
+  const calls = [];
+  const verify = createFirebaseProductVerifier({
+    config: CONFIG,
+    auth: { async verifyIdToken(token, checkRevoked) {
+      calls.push({ token, checkRevoked });
+      return claims;
+    } },
+    now: () => NOW_MS,
+  });
+  const request = firebaseRequest({
+    "x-hushh-firebase-auth-time": String(claims.auth_time),
+  });
+  for (const slug of ["asset-report-create", "create-link-token", "exchange-public-token",
+    "plaid-data-sync", "plaid-data-sync-product", "plaid-data-sync-start", "plaid-diagnostics-log"]) {
+    const actor = await verify(request, {
+      slug, owner_group: "financial-api-worker",
+      auth_mode: "firebase_bearer_recent_auth_or_google_service_identity",
+    });
+    assert.equal(actor.uid, claims.uid);
+    assert.equal(actor.launchAuthorizationId, null);
+  }
+  assert.equal(calls.length, 7);
+  assert.ok(calls.every(call => call.token === VALID_TOKEN && call.checkRevoked === true));
+  for (const entry of [
+    { slug: "fund-payment-status", owner_group: "financial-api-worker" },
+    { slug: "create-link-token", owner_group: "identity-api" },
+    { slug: "delete-user-account", owner_group: "identity-api" },
+  ]) {
+    await assert.rejects(verify(request, { ...entry, auth_mode: "firebase_bearer_recent_auth" }),
+      error => assertRuntimeCode(error, "UNAUTHENTICATED", 401));
+  }
+});
+
+test("ordinary Finance Link sessions retain token, forwarded identity, and environment checks", async () => {
+  const entry = { slug: "create-link-token", owner_group: "financial-api-worker",
+    auth_mode: "firebase_bearer_recent_auth_or_google_service_identity" };
+  const ordinary = firebaseClaims();
+  for (const key of Object.keys(ordinary)) {
+    if (key.startsWith("product_")) delete ordinary[key];
+  }
+  for (const changes of [
+    { aud: "other-project" }, { iss: "https://securetoken.google.com/other-project" },
+    { exp: NOW_SECONDS }, { iat: NOW_SECONDS + 301 }, { sub: "another-user" },
+    { auth_time: NOW_SECONDS + 301 }, { product_client: "other-product" },
+    { product_client: "hushh-tech" }, { product_launch_authorization_id: "" },
+  ]) {
+    const verify = createFirebaseProductVerifier({ config: CONFIG,
+      auth: { verifyIdToken: async () => ({ ...ordinary, ...changes }) }, now: () => NOW_MS });
+    await assert.rejects(verify(firebaseRequest(), entry),
+      error => assertRuntimeCode(error, "UNAUTHENTICATED", 401));
+  }
+  const verify = createFirebaseProductVerifier({ config: CONFIG,
+    auth: { verifyIdToken: async () => ordinary }, now: () => NOW_MS });
+  for (const headers of [
+    { "x-hushh-firebase-authorization": "" },
+    { "x-hushh-firebase-uid": "another-user" },
+    { "x-hushh-firebase-auth-time": "0" },
+  ]) {
+    await assert.rejects(verify(firebaseRequest(headers), entry),
+      error => assertRuntimeCode(error, "UNAUTHENTICATED", 401));
+  }
+  for (const code of ["auth/id-token-expired", "auth/id-token-revoked", "auth/user-disabled", "auth/argument-error"]) {
+    const rejectToken = createFirebaseProductVerifier({ config: CONFIG,
+      auth: { async verifyIdToken(_token, checkRevoked) {
+        assert.equal(checkRevoked, true);
+        throw Object.assign(new Error("rejected"), { code });
+      } }, now: () => NOW_MS });
+    await assert.rejects(rejectToken(firebaseRequest(), entry),
+      error => assertRuntimeCode(error, "UNAUTHENTICATED", 401));
+  }
+  const production = createFirebaseProductVerifier({
+    config: { ...CONFIG, firebaseProjectId: "hushh-tech-prod", productAudience: "hushh-tech-prod" },
+    auth: { verifyIdToken: async () => ({ ...ordinary, aud: "hushh-tech-prod",
+      iss: "https://securetoken.google.com/hushh-tech-prod" }) }, now: () => NOW_MS });
+  await assert.rejects(production(firebaseRequest(), entry),
+    error => assertRuntimeCode(error, "UNAUTHENTICATED", 401));
+});
+
 function googlePayload(overrides = {}) {
   return {
     aud: CONFIG.serviceAudience,

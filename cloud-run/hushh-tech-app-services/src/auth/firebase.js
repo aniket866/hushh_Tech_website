@@ -45,7 +45,7 @@ function requiresRecentFirebaseAuth(entry) {
   );
 }
 
-function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
+function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired, entry) {
   const nowSeconds = Math.floor(nowMs / 1_000);
   const uid = String(decoded?.uid ?? decoded?.sub ?? "").trim();
   const authTime = Number(decoded?.auth_time);
@@ -55,6 +55,22 @@ function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
     decoded?.product_launch_authorization_id ?? "",
   ).trim();
   const launchValidAfterMs = Number(decoded?.product_launch_valid_after_ms);
+  // The existing UAT website issues ordinary Firebase sessions, not Research
+  // product-launch sessions. Accept that same session contract only for the
+  // seven legacy Finance Link routes. Explicit product claims still require
+  // the complete, matching product context; unrelated routes are unchanged.
+  const ordinaryFinanceSession =
+    config.firebaseProjectId === "hushh-tech-uat" &&
+    entry?.owner_group === "financial-api-worker" &&
+    entry.auth_mode === "firebase_bearer_recent_auth_or_google_service_identity" &&
+    LEGACY_FINANCIAL_LINK_SLUGS.has(entry.slug) &&
+    [
+      "product_client",
+      "product_client_app_id",
+      "product_audience",
+      "product_launch_authorization_id",
+      "product_launch_valid_after_ms",
+    ].every((key) => !Object.hasOwn(decoded ?? {}, key));
 
   if (
     !uid ||
@@ -69,15 +85,16 @@ function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
     issuedAt > nowSeconds + 300 ||
     !Number.isFinite(authTime) ||
     authTime > nowSeconds + 300 ||
-    decoded?.product_client !== config.productClient ||
-    decoded?.product_client_app_id !== config.productClientAppId ||
-    decoded?.product_audience !== config.productAudience ||
-    !launchAuthorizationId ||
-    launchAuthorizationId.length > 128 ||
-    !Number.isSafeInteger(launchValidAfterMs) ||
-    launchValidAfterMs < 0 ||
-    launchValidAfterMs > nowMs ||
-    issuedAt * 1_000 < launchValidAfterMs
+    (!ordinaryFinanceSession &&
+      (decoded?.product_client !== config.productClient ||
+        decoded?.product_client_app_id !== config.productClientAppId ||
+        decoded?.product_audience !== config.productAudience ||
+        !launchAuthorizationId ||
+        launchAuthorizationId.length > 128 ||
+        !Number.isSafeInteger(launchValidAfterMs) ||
+        launchValidAfterMs < 0 ||
+        launchValidAfterMs > nowMs ||
+        issuedAt * 1_000 < launchValidAfterMs))
   ) {
     throw invalidToken();
   }
@@ -100,7 +117,7 @@ function assertFirebaseClaims(decoded, config, nowMs, recentAuthRequired) {
     kind: "firebase",
     uid,
     authTime,
-    launchAuthorizationId,
+    launchAuthorizationId: ordinaryFinanceSession ? null : launchAuthorizationId,
     fundAdmin: decoded?.fund_admin === true,
     email:
       email && email.length <= 320 && !/[\u0000-\u001f\u007f]/.test(email)
@@ -160,6 +177,7 @@ export function createFirebaseProductVerifier({
       config,
       now(),
       requiresRecentFirebaseAuth(entry),
+      entry,
     );
     const forwardedUid = headerValue(
       request.headers,
