@@ -27,7 +27,18 @@ export const DEFAULT_ORCHESTRATION_EVIDENCE_PATH = path.join(
 );
 
 export const FROZEN_ORCHESTRATION_EVIDENCE_DIGEST =
-  "898764998655b30b36160e7fbfaa17f1615e5916168a5afab2e678a21e090d9e";
+  "4e8d3b918dc8c7cfb94ada61aacf7ab8e48d31de9d3325be725bcfea85abd647";
+
+export const APPROVED_PORTED_AND_VERIFIED_SLUGS = Object.freeze([
+  "asset-report-create",
+  "create-link-token",
+  "exchange-public-token",
+  "hushh-location-geocode",
+  "plaid-data-sync",
+  "plaid-data-sync-product",
+  "plaid-data-sync-start",
+  "plaid-diagnostics-log",
+]);
 
 export const ARTIFACT_PATHS = Object.freeze({
   retirement_manifest: "migration/manifests/supabase-retirement.v1.json",
@@ -389,6 +400,10 @@ export const validateFunctionEvidenceOrchestration = ({
   const portedFunctions = functions.filter(
     (entry) => entry.migration_state === "PORTED_AND_VERIFIED"
   ).length;
+  const portedSlugs = functions
+    .filter((entry) => entry.migration_state === "PORTED_AND_VERIFIED")
+    .map((entry) => entry.source?.slug)
+    .sort(compareUtf8);
   const verifyJwtTrue = functions.filter((entry) => entry.source?.verify_jwt === true).length;
   const verifyJwtFalse = functions.filter((entry) => entry.source?.verify_jwt === false).length;
   requireRecord(errors, "inventory_binding", contract.inventory_binding, {
@@ -403,11 +418,14 @@ export const validateFunctionEvidenceOrchestration = ({
   });
   if (
     functions.length !== 112 ||
-    frozenFunctions !== 111 ||
-    portedFunctions !== 1 ||
+    frozenFunctions !== 104 ||
+    portedFunctions !== 8 ||
+    !sameJson(portedSlugs, APPROVED_PORTED_AND_VERIFIED_SLUGS) ||
     manifest.contract_state !== "INVENTORY_FROZEN_NOT_MIGRATED"
   ) {
-    errors.push("Exactly geocode may be ported; the other 111 functions must remain frozen.");
+    errors.push(
+      "Only the approved Finance Link activation set and geocode may be ported; the other 104 functions must remain frozen."
+    );
   }
 
   const captureOrderValid = validateTimestampBindings({ errors, contract, traffic, current });
@@ -614,6 +632,7 @@ export const validateFunctionEvidenceOrchestration = ({
     observed: {
       active_functions: functions.length,
       frozen_functions: frozenFunctions,
+      ported_and_verified_functions: portedFunctions,
       verify_jwt_true: verifyJwtTrue,
       verify_jwt_false: verifyJwtFalse,
       traffic_version_delta_histogram: trafficHistogram,
@@ -653,7 +672,9 @@ if (isDirectExecution) {
     process.exit(1);
   }
   console.log(
-    `Function evidence orchestration valid: ${result.observed.active_functions} frozen functions, ` +
+    `Function evidence orchestration valid: ${result.observed.active_functions} functions, ` +
+      `${result.observed.frozen_functions} inventory-frozen, ` +
+      `${result.observed.ported_and_verified_functions} activation-state ported, ` +
       `${result.observed.shared_drift_functions} drifted at both snapshots, ` +
       `${result.observed.traffic_source_blockers} traffic source blockers, ` +
       `${result.observed.current_provider_500_retrieval_failures} provider-500 bundle failures.`

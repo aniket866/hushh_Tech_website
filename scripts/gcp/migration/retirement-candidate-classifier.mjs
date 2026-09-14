@@ -9,8 +9,8 @@ export const CONTRACT = Object.freeze({
   classifier_id: "hushh-tech-supabase-retirement-candidate-classifier",
   mode: "MACHINE_ONLY_DEFAULT_OFF",
   required_flag: "--machine-evaluate",
-  base_commit: "7b41548d3af0532a59e7c6b008e795feece381fc",
-  base_tree: "6a0310560dec5a4b7dcdc6401b1504c37acc93be",
+  base_commit: "1dbbd2a41d82322908322647773e45a9cf178313",
+  base_tree: "dc027e2768b3d77ecdae82c37f1ed89c704f4d33",
   expected_functions: 112,
   evaluation_time_utc: "2026-08-21T18:03:38.344Z",
   maximum_traffic_lag_hours: 24,
@@ -21,7 +21,7 @@ export const CONTRACT = Object.freeze({
     manifest: Object.freeze({
       path: "migration/manifests/supabase-retirement.v1.json",
       sha256:
-        "5047e3140bce74bf1a8702208488ecc3867467b15dc7318272145888e83db3d5",
+        "5cb75195047119f412dfa58359c12bce6202de16818a44fa3e364a5160576b47",
     }),
     historical_source: Object.freeze({
       path: "migration/evidence/supabase-live-function-bundles.v1.json",
@@ -58,9 +58,9 @@ export const CONTRACT = Object.freeze({
     }),
     "scripts/ci/check-supabase-current-function-bundle-evidence.mjs":
       Object.freeze({
-        oid: "1fbdf8e82b2d0a9e1d5b8148c31ef97b511e2b1c",
+        oid: "1a9e7b0a62605862477ab0a4e8a4f303b4a836b3",
         sha256:
-          "5b48ac2bf58f6ad36acd183aad177ab53acf8f86dafdd9f956f231dcc0515e3f",
+          "7a824ac9ccab0de9fd91d01afe4c7d3d24f394060c03718891312ffc1f15c9ba",
         dependencies: Object.freeze([
           "scripts/ci/capture-supabase-current-function-bundles.mjs",
           "scripts/ci/check-supabase-retirement-manifest.mjs",
@@ -120,11 +120,11 @@ export const CONTRACT = Object.freeze({
       }),
   }),
   executable_closure_sha256:
-    "dcc92122d36985a064f1a74f9559ffafe593b9ed626d84883b43f6b844eb1573",
+    "b9f4bf2d5dc84e9c99daffafe906bef4aec9a1d4a852660670e0732317a22d4a",
   caller_corpus_sha256:
-    "b6961373852d774b4b490785d751c22ec25fce48ae1e7d3fe7ca56b7dc768bf6",
+    "acf444bd02954a45729fcb4fd03f500270fcda5bab22978735d19bb19e7b8b91",
   caller_graph_sha256:
-    "ec3ee89cd42607ad92925604b1e0fa0447cf99e423c9bc84b819896516d8d306",
+    "6f6bcb1f7a8cbfc72e03e86edcac79981631831c2e75376e7e35e7c353df8a2f",
 });
 
 const MUST_PORT = "MUST_PORT";

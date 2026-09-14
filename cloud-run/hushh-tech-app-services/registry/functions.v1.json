@@ -17,7 +17,7 @@
     "slug": "asset-report-create",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
@@ -101,7 +101,7 @@
     "slug": "create-link-token",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
@@ -122,7 +122,7 @@
     "slug": "exchange-public-token",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
@@ -542,21 +542,21 @@
     "slug": "plaid-data-sync",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
     "slug": "plaid-data-sync-product",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
     "slug": "plaid-data-sync-start",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {
@@ -570,7 +570,7 @@
     "slug": "plaid-diagnostics-log",
     "owner_group": "financial-api-worker",
     "auth_mode": "firebase_bearer_recent_auth_or_google_service_identity",
-    "migration_state": "INVENTORY_FROZEN",
+    "migration_state": "PORTED_AND_VERIFIED",
     "final_disposition": "PORT_TO_GCP"
   },
   {

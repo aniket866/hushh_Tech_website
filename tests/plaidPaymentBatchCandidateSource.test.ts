@@ -7,7 +7,7 @@ const repoFile = (path: string) => new URL(`../${path}`, import.meta.url);
 const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
 describe("default-off Plaid and payment candidate source evidence", () => {
-  it("binds all eight candidates to checked-in source, current-v2, traffic, and terminal evidence", async () => {
+  it("binds the four payment and webhook candidates to checked-in source, current-v2, traffic, and terminal evidence", async () => {
     const matrixBytes = await readFile(
       repoFile(
         "cloud-run/hushh-tech-app-services/registry/candidates.plaid-payment-batch.v1.json",
@@ -69,16 +69,12 @@ describe("default-off Plaid and payment candidate source evidence", () => {
       },
     });
 
-    expect(matrix.functions).toHaveLength(8);
+    expect(matrix.functions).toHaveLength(4);
     expect(matrix.functions.map(({ slug }: { slug: string }) => slug).sort()).toEqual([
-      "create-link-token",
-      "exchange-public-token",
       "fund-coupon-redeem",
       "fund-payment-request-create",
       "fund-payment-status",
-      "plaid-data-sync-start",
       "plaid-data-webhook",
-      "plaid-diagnostics-log",
     ]);
 
     for (const row of matrix.functions) {
@@ -138,7 +134,7 @@ describe("default-off Plaid and payment candidate source evidence", () => {
           total + row.traffic_30d.request_count,
         0,
       ),
-    ).toBe(758);
+    ).toBe(533);
   });
 
   it("locks every serving registry and runtime file byte-for-byte", async () => {

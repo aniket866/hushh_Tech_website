@@ -104,7 +104,7 @@ const GCP_FINANCIAL_LINK_SLUGS = [
 ] as const;
 
 describe("GCP function registry", () => {
-  it("enables geocode while other reviewed contracts remain frozen", () => {
+  it("enables geocode and the approved Finance Link contracts while other routes remain frozen", () => {
     expect([...GCP_FUNCTION_CONTRACTS.keys()].sort()).toEqual([
       ...GCP_READ_BATCH_SLUGS,
       ...GCP_FINANCIAL_LINK_SLUGS,
@@ -166,13 +166,12 @@ describe("GCP function registry", () => {
       expect(
         GCP_BACKEND_RETIREMENT_FUNCTIONS.find((entry) => entry.slug === slug)
           ?.migration_state,
-      ).toBe("INVENTORY_FROZEN");
+      ).toBe("PORTED_AND_VERIFIED");
     }
 
     // The historic alias has the same bounded gateway wire contract as the
-    // newer start slug. This is deliberately only a request/response-boundary
-    // assertion: its source sync-lock semantics are verified independently
-    // before either frozen route can be promoted.
+    // newer start slug. This remains a request/response-boundary assertion;
+    // source sync-lock semantics are covered independently.
     const { slug: legacyAliasSlug, ...legacyAliasContract } =
       GCP_FUNCTION_CONTRACTS.get("plaid-data-sync")!;
     const { slug: startSlug, ...startContract } =
@@ -294,7 +293,7 @@ describe("GCP legacy function compatibility gateway", () => {
   );
 
   it.each(GCP_FINANCIAL_LINK_SLUGS)(
-    "keeps financial contract %s unreachable before auth and upstream",
+    "keeps enabled financial contract %s feature-disabled before auth when its UAT target is absent",
     async (slug) => {
       const source = GCP_BACKEND_RETIREMENT_FUNCTIONS.find(
         (entry) => entry.slug === slug,
@@ -313,9 +312,9 @@ describe("GCP legacy function compatibility gateway", () => {
         { method: "POST", url: `/functions/v1/${slug}`, headers: {} },
         res,
       );
-      expect(res.statusCode).toBe(503);
+      expect(res.statusCode).toBe(404);
       expect(res.body).toMatchObject({
-        detail: { code: "FUNCTION_NOT_MIGRATED" },
+        detail: { code: "FEATURE_DISABLED" },
       });
       expect(verifyFirebaseToken).not.toHaveBeenCalled();
       expect(fetchImpl).not.toHaveBeenCalled();

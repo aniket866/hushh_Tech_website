@@ -13,7 +13,7 @@ describe("Supabase retirement runtime function registry", () => {
   it("ships the exact 112-function generated allowlist inside api/shared", () => {
     expect(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_VERSION).toBe(1);
     expect(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY_DIGEST).toBe(
-      "00b022ae3eab4a559fb5e70a90f55283e738a5fa81ed34a2e1aafb20e8479d55"
+      "0d2eba9bf5a11e03e5817467fda51f8c8a75902a895b65ce430019137f7c1055"
     );
     expect(GCP_BACKEND_RETIREMENT_FUNCTIONS).toHaveLength(112);
     expect(Object.keys(GCP_BACKEND_RETIREMENT_FUNCTION_REGISTRY)).toHaveLength(112);
@@ -49,23 +49,35 @@ describe("Supabase retirement runtime function registry", () => {
     });
   });
 
-  it("enables only geocode and keeps every other replacement fail closed", () => {
+  it("enables only geocode and the seven approved Finance Link routes", () => {
     const nonRetired = GCP_BACKEND_RETIREMENT_FUNCTIONS.filter(
       (entry) => entry.final_disposition !== "RETIRE_WITH_410"
     );
+    const enabledSlugs = [
+      "asset-report-create",
+      "create-link-token",
+      "exchange-public-token",
+      "hushh-location-geocode",
+      "plaid-data-sync",
+      "plaid-data-sync-product",
+      "plaid-data-sync-start",
+      "plaid-diagnostics-log",
+    ];
 
     expect(nonRetired).toHaveLength(111);
     expect(
-      nonRetired.filter((entry) => entry.migration_state === "PORTED_AND_VERIFIED"),
-    ).toEqual([
-      expect.objectContaining({ slug: "hushh-location-geocode" }),
-    ]);
-    expect(resolveSupabaseRetirementFunctionGate("hushh-location-geocode")).toMatchObject({
-      allowed: true,
-      code: "PORTED_AND_VERIFIED",
-    });
+      nonRetired
+        .filter((entry) => entry.migration_state === "PORTED_AND_VERIFIED")
+        .map((entry) => entry.slug),
+    ).toEqual(enabledSlugs);
+    for (const slug of enabledSlugs) {
+      expect(resolveSupabaseRetirementFunctionGate(slug)).toMatchObject({
+        allowed: true,
+        code: "PORTED_AND_VERIFIED",
+      });
+    }
     for (const entry of nonRetired.filter(
-      ({ slug }) => slug !== "hushh-location-geocode",
+      ({ slug }) => !enabledSlugs.includes(slug),
     )) {
       expect(resolveSupabaseRetirementFunctionGate(entry.slug)).toMatchObject({
         allowed: false,

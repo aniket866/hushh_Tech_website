@@ -22,11 +22,11 @@ async function rawManifest() {
   return readFile(manifestUrl, "utf8");
 }
 
-test("exact frozen manifest binds source, current-v2, traffic, terminal blockers, and runtime bytes", async () => {
+test("exact frozen payment and webhook manifest binds source, current-v2, traffic, terminal blockers, and runtime bytes", async () => {
   const matrix = await validatePlaidPaymentBatchCandidateManifest({
     repoRoot: repoRoot.pathname,
   });
-  assert.equal(matrix.functions.length, 8);
+  assert.equal(matrix.functions.length, 4);
   assert.equal(matrix.functions.every((row) => row.blockers.length >= 9), true);
 });
 
@@ -89,8 +89,8 @@ test("raw manifest parser rejects recursive and escaped-equivalent duplicate key
     [
       "nested traffic",
       raw.replace(
-        '"request_count": 36,',
-        '"request_count": 36, "request_count": 0,',
+        '"request_count": 4,',
+        '"request_count": 4, "request_count": 0,',
       ),
     ],
     [

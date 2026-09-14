@@ -527,9 +527,16 @@ test("all 112 compatibility routes have an explicit terminal or blocking respons
     { slug: "get-secrets", status: 410, code: "FEATURE_RETIRED" },
   ]);
   expect(observed.filter((entry) => entry.status === 404)).toEqual([
+    { slug: "asset-report-create", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "create-link-token", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "exchange-public-token", status: 404, code: "FEATURE_DISABLED" },
     { slug: "hushh-location-geocode", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "plaid-data-sync", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "plaid-data-sync-product", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "plaid-data-sync-start", status: 404, code: "FEATURE_DISABLED" },
+    { slug: "plaid-diagnostics-log", status: 404, code: "FEATURE_DISABLED" },
   ]);
-  expect(observed.filter((entry) => entry.status === 503)).toHaveLength(110);
+  expect(observed.filter((entry) => entry.status === 503)).toHaveLength(103);
   expect(new Set(observed.filter((entry) => entry.status === 503).map((entry) => entry.code))).toEqual(
     new Set(["FUNCTION_NOT_MIGRATED"]),
   );

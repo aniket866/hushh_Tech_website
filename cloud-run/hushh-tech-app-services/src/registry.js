@@ -5,7 +5,7 @@ const REGISTRY_URL = new URL("../registry/functions.v1.json", import.meta.url);
 const REGISTRY_VERSION = 1;
 const REGISTRY_COUNT = 112;
 const REGISTRY_DIGEST =
-  "00b022ae3eab4a559fb5e70a90f55283e738a5fa81ed34a2e1aafb20e8479d55";
+  "0d2eba9bf5a11e03e5817467fda51f8c8a75902a895b65ce430019137f7c1055";
 const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
 const OWNER_GROUP_COUNTS = Object.freeze({

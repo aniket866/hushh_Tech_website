@@ -59,8 +59,8 @@
     "traffic_evidence_file_sha256": "5db78b99f880423c88528817ca422ab862aa1a42f93699e37b0e4ce03fc90ac0",
     "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
     "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
-    "terminal_matrix_file_sha256": "b25d337caf94b478d4023d45cfc05ba534cbd54ecb9b81beddb844eb00881231",
-    "terminal_matrix_evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160"
+    "terminal_matrix_file_sha256": "2339e7e3045778d29a8c5011923d29aa320c1f0445666154ca60acbed82e8c4c",
+    "terminal_matrix_evidence_digest": "62dc682975bb617c0a2bbb3b9807e367473bed28b699de0aae27efc6c7accf9e"
   },
   "traffic_30d": {
     "request_count": 56,
@@ -103,7 +103,7 @@
     "trust_anchor_file_sha256": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
     "handler_path": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     "manifest_path": "cloud-run/hushh-tech-app-services/registry/candidates.github-devops-notify.v1.json",
-    "manifest_self_digest": "0dcb0977af2e604758efd88d59d0fbb76a42a828d93c59e0f528f33e52ea1921",
+    "manifest_self_digest": "8077ff79c36dfa0c92709f385b3972a6223bdde80536227634239b5fd739ad5b",
     "reviewed_commit": "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     "reviewed_tree": "10aaac108dd01bea0e240d96137c8860aa1d488b"
   },
@@ -112,20 +112,20 @@
     "cloud-run/hushh-tech-app-services/package-lock.json": "2d4c2d26a2857890cd03c94933ca12ec7c802d1b88c40c2930abf4d4d52a641f",
     "cloud-run/hushh-tech-app-services/package.json": "b48f10ce0f8d517e88f1a29feb42cf08397f263d59cd47e256fa671f2da0c463",
     "cloud-run/hushh-tech-app-services/registry/github-devops-notify-approval-trust-anchor.v1.json": "fb0f9ce52de16975f25d3f5dce05e8694efc9e589b9780f87ef0332eb9964bd8",
-    "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600",
+    "cloud-run/hushh-tech-app-services/registry/functions.v1.json": "683f6b3ab9ebb2fcb5c49e1bdffb539deb4e07bc28b987456bf6cb692ff1e98a",
     "cloud-run/hushh-tech-app-services/src/runtime-handlers.js": "35e860e913a8a14c116df165c09ffd0dc7257bb2b9e64adf985806ec385dd3f5",
     "cloud-run/hushh-tech-app-services/src/app.js": "31f3e0c340eb741604c249eda9697ca423904bcfa6111b8f2f5c41b89fc723ad",
     "cloud-run/hushh-tech-app-services/src/server.js": "95be653456802847592605f58cdb4375dec52f1e350255547665ef3f576cde0f",
     "cloud-run/hushh-tech-app-services/src/webhooks.js": "3df6891791b29af564818c6c3baab0c3c161aff195c578935340c454f2af91c7",
     "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js": "dd46d342221e323eba47ceb538d5fecb8168efa699cd787216a46287ee222fa3",
-    "api/shared/supabaseRetirementFunctionRegistry.generated.js": "7be83e285e7a609f17fd8a256698ff445e2199126c3099f2569c8d833d1d5eb8",
+    "api/shared/supabaseRetirementFunctionRegistry.generated.js": "936c2d5004e0a1ef476506dd8117f7c80f8663ac9ff7dddc13381680d1fc8a17",
     "server.js": "e404607d375dd5aead1802dff402ac16020471fb7dca4c1e130aa1de63a34335"
   },
   "service_executable_closure": {
     "schema_version": 1,
     "entrypoint": "cloud-run/hushh-tech-app-services/src/server.js",
     "candidate_handler": "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
-    "src_inventory_digest": "a8535026ebcccb3d0e59c9f6794f59d2ea579de99fe6202a165fd9ff1c8dd50a",
+    "src_inventory_digest": "7fce7bc0b3158d925897a4a0d19f1ef28c39a9eeb8fc54e37bb59709ab0684b2",
     "src_inventory": [
       {
         "path": "cloud-run/hushh-tech-app-services/src/adapters/gcp-read-batch.js",
@@ -250,7 +250,7 @@
       {
         "path": "cloud-run/hushh-tech-app-services/src/registry.js",
         "bytes": 5375,
-        "sha256": "766b9699f7e51d97e8d5f8c6fd80229673cd2aa9e6af603d90a93bc2fd94c491"
+        "sha256": "2f80d7d9e098face32e1efb3db30b1606879e5de868eefebc7b8f3ae35146e0d"
       },
       {
         "path": "cloud-run/hushh-tech-app-services/src/runtime-handlers.js",

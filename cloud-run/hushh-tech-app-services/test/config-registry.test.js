@@ -290,26 +290,35 @@ test("public stock quotes require exact investor ownership and provider coupling
   }
 });
 
-test("registry enables only geocode and keeps NDA fail closed", () => {
+test("registry enables only geocode and the seven approved Finance Link routes", () => {
   assert.equal(validateRegistry(LEGACY_FUNCTIONS), true);
   assert.equal(LEGACY_FUNCTIONS.length, 112);
   assert.equal(REGISTRY_METADATA.count, 112);
   assert.equal(
     REGISTRY_METADATA.digest,
-    "00b022ae3eab4a559fb5e70a90f55283e738a5fa81ed34a2e1aafb20e8479d55",
+    "0d2eba9bf5a11e03e5817467fda51f8c8a75902a895b65ce430019137f7c1055",
   );
   assert.equal(new Set(LEGACY_FUNCTIONS.map(({ slug }) => slug)).size, 112);
   assert.deepEqual(
     LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "PORTED_AND_VERIFIED",
     ).map(({ slug }) => slug),
-    ["hushh-location-geocode"],
+    [
+      "asset-report-create",
+      "create-link-token",
+      "exchange-public-token",
+      "hushh-location-geocode",
+      "plaid-data-sync",
+      "plaid-data-sync-product",
+      "plaid-data-sync-start",
+      "plaid-diagnostics-log",
+    ],
   );
   assert.equal(
     LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "INVENTORY_FROZEN",
     ).length,
-    111,
+    104,
   );
   assert.equal(
     LEGACY_FUNCTIONS.filter(

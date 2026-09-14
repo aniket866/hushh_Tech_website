@@ -5,16 +5,22 @@ const uat = readFileSync(".github/workflows/deploy-uat.yml", "utf8");
 const production = readFileSync(".github/workflows/deploy-prod.yml", "utf8");
 
 describe("GCP legacy-function gateway deployment contract", () => {
-  it("enables only the exact UAT investor service target", () => {
+  it("enables only the exact UAT investor and financial service targets", () => {
     expect(uat).toContain('HUSHH_TECH_GCP_FUNCTIONS_ENABLED: "true"');
     expect(uat).toContain(
       "HUSHH_TECH_INVESTOR_API_URL: https://hushh-tech-investor-api-175298245599.us-central1.run.app",
+    );
+    expect(uat).toContain(
+      "HUSHH_TECH_FINANCIAL_API_URL: https://hushh-tech-financial-api-175298245599.us-central1.run.app",
     );
     expect(uat).toContain(
       "HUSHH_TECH_GCP_FUNCTIONS_ENABLED=${HUSHH_TECH_GCP_FUNCTIONS_ENABLED}",
     );
     expect(uat).toContain(
       "HUSHH_TECH_INVESTOR_API_URL=${HUSHH_TECH_INVESTOR_API_URL}",
+    );
+    expect(uat).toContain(
+      "HUSHH_TECH_FINANCIAL_API_URL=${HUSHH_TECH_FINANCIAL_API_URL}",
     );
     expect(uat).toContain(
       "--service-account=hushh-tech-web-uat@hushh-tech-uat.iam.gserviceaccount.com",
@@ -25,6 +31,9 @@ describe("GCP legacy-function gateway deployment contract", () => {
     expect(production).not.toContain("HUSHH_TECH_GCP_FUNCTIONS_ENABLED=true");
     expect(production).not.toContain(
       "hushh-tech-investor-api-175298245599.us-central1.run.app",
+    );
+    expect(production).not.toContain(
+      "hushh-tech-financial-api-175298245599.us-central1.run.app",
     );
   });
 });

@@ -24,9 +24,9 @@ describe("no-hybrid exhaustive route inventory", () => {
       client_admin: 3,
       server: 35,
       functions: 112,
-      functions_ported: 1,
+      functions_ported: 8,
       functions_retired: 1,
-      functions_blocked: 110,
+      functions_blocked: 103,
     });
   });
 
@@ -99,11 +99,20 @@ describe("no-hybrid exhaustive route inventory", () => {
     }
   });
 
-  it("keeps the cutover red while 110 function routes are not implemented", async () => {
+  it("keeps the cutover red while 103 function routes are not implemented", async () => {
     const inventory = await buildNoHybridRouteInventory(root);
     expect(inventory.functions.filter((route: any) => route.disposition === "RETIRE_WITH_410").map((route: any) => route.slug)).toEqual(["get-secrets"]);
-    expect(inventory.functions.filter((route: any) => route.state === "PORTED_AND_VERIFIED").map((route: any) => route.slug)).toEqual(["hushh-location-geocode"]);
-    expect(inventory.counts.functions_blocked).toBe(110);
+    expect(inventory.functions.filter((route: any) => route.state === "PORTED_AND_VERIFIED").map((route: any) => route.slug)).toEqual([
+      "asset-report-create",
+      "create-link-token",
+      "exchange-public-token",
+      "hushh-location-geocode",
+      "plaid-data-sync",
+      "plaid-data-sync-product",
+      "plaid-data-sync-start",
+      "plaid-diagnostics-log",
+    ]);
+    expect(inventory.counts.functions_blocked).toBe(103);
   });
 
   it("captures all GCP data/storage methods and the compatibility wildcard", async () => {

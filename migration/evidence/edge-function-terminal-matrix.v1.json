@@ -14,11 +14,11 @@
   "bindings": {
     "manifest": {
       "path": "migration/manifests/supabase-retirement.v1.json",
-      "sha256": "5047e3140bce74bf1a8702208488ecc3867467b15dc7318272145888e83db3d5"
+      "sha256": "5cb75195047119f412dfa58359c12bce6202de16818a44fa3e364a5160576b47"
     },
     "registry": {
       "path": "cloud-run/hushh-tech-app-services/registry/functions.v1.json",
-      "sha256": "7a336ea9fa84d66e968afde4451671b060195a7ef6c01ce5a17f4157c8517600"
+      "sha256": "683f6b3ab9ebb2fcb5c49e1bdffb539deb4e07bc28b987456bf6cb692ff1e98a"
     },
     "current": {
       "path": "migration/evidence/supabase-current-live-function-bundles.v2.json",
@@ -73,7 +73,7 @@
       "SOURCE_REVISION_UNPROVEN": 109,
       "SOURCE_VERSION_DRIFT": 94,
       "TARGET_CONTRACT_MISSING": 108,
-      "TARGET_REGISTRY_NOT_ENABLED": 110,
+      "TARGET_REGISTRY_NOT_ENABLED": 103,
       "UAT_LIVE_TERMINAL_PROOF_MISSING": 2
     }
   },
@@ -233,10 +233,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -881,10 +877,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -1043,10 +1035,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -4229,10 +4217,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -4283,10 +4267,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -4337,10 +4317,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -4445,10 +4421,6 @@
         {
           "code": "TARGET_CONTRACT_MISSING",
           "evidence": "terminal contract entry absent"
-        },
-        {
-          "code": "TARGET_REGISTRY_NOT_ENABLED",
-          "evidence": "INVENTORY_FROZEN"
         }
       ]
     },
@@ -6133,5 +6105,5 @@
       ]
     }
   ],
-  "evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160"
+  "evidence_digest": "62dc682975bb617c0a2bbb3b9807e367473bed28b699de0aae27efc6c7accf9e"
 }

@@ -9,7 +9,7 @@ import path from "node:path";
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.plaid-payment-batch.v1.json";
 const EXPECTED_DIGEST =
-  "4f0a822141d0a6eee4bfd5fd377d8aeaaf0afd6e5a397f7e89ba014de4868587";
+  "cff95d82328dd7716d0c005618237c0b1b9ff442bd74fde26994209483236604";
 const TOP_KEYS = [
   "schema_version", "base_commit", "deployment_state", "required_registry_state",
   "target_project", "target_region", "source_approval", "runtime_byte_lock",
@@ -45,9 +45,8 @@ const AUTHORITATIVE_CODES = [
   "TARGET_REGISTRY_NOT_ENABLED",
 ];
 const SLUGS = [
-  "create-link-token", "exchange-public-token", "fund-coupon-redeem",
-  "fund-payment-request-create", "fund-payment-status", "plaid-data-sync-start",
-  "plaid-data-webhook", "plaid-diagnostics-log",
+  "fund-coupon-redeem", "fund-payment-request-create", "fund-payment-status",
+  "plaid-data-webhook",
 ];
 
 function stableJson(value) {
@@ -279,5 +278,5 @@ export async function validatePlaidPaymentBatchCandidateManifest({ repoRoot } = 
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await validatePlaidPaymentBatchCandidateManifest();
-  process.stdout.write("Plaid/payment candidate manifest: PASS (8 frozen, 0 wired)\n");
+  process.stdout.write("Plaid/payment candidate manifest: PASS (4 frozen, 0 wired)\n");
 }

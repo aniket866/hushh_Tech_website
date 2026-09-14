@@ -151,7 +151,7 @@ describe("GCP edge-function terminal matrix", () => {
     expect(matrix.summary.blocker_code_counts.SOURCE_BUNDLE_UNAVAILABLE).toBe(15);
     expect(matrix.summary.blocker_code_counts.SOURCE_VERSION_DRIFT).toBe(94);
     expect(matrix.summary.blocker_code_counts.TARGET_CONTRACT_MISSING).toBe(108);
-    expect(matrix.summary.blocker_code_counts.TARGET_REGISTRY_NOT_ENABLED).toBe(110);
+    expect(matrix.summary.blocker_code_counts.TARGET_REGISTRY_NOT_ENABLED).toBe(103);
     expect(matrix.summary.blocker_code_counts.UAT_LIVE_TERMINAL_PROOF_MISSING).toBe(2);
     expect(matrix.summary.blocker_code_counts.REAL_ADMIN_FIREBASE_CLAIMS_UNPROVEN).toBe(1);
     const retired = matrix.entries.find(({ slug }) => slug === "get-secrets");

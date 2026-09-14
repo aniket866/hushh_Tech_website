@@ -164,7 +164,7 @@ function jsonBodyOfSize(size) {
   return body;
 }
 
-test("reviewed contracts stay default-off except verified geocode", async () => {
+test("remaining candidate contracts stay default-off after geocode and Finance Link verification", async () => {
   assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
     "asset-report-create",
     "chat-check-access",
@@ -191,7 +191,7 @@ test("reviewed contracts stay default-off except verified geocode", async () => 
     LEGACY_FUNCTIONS.filter(
       ({ migration_state }) => migration_state === "INVENTORY_FROZEN",
     ).length,
-    111,
+    104,
   );
   assert.match(
     readFileSync(new URL("../src/server.js", import.meta.url), "utf8"),

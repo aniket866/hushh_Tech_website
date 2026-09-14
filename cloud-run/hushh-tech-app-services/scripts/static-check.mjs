@@ -56,13 +56,22 @@ assert.deepEqual(
   retired.map(({ slug }) => slug),
   ["get-secrets"],
 );
-assert.equal(frozen.length, 111);
+assert.equal(frozen.length, 104);
 assert.equal(replacementCandidates.length, 111);
 assert.deepEqual(
   LEGACY_FUNCTIONS.filter(
     ({ migration_state }) => migration_state === "PORTED_AND_VERIFIED",
   ).map(({ slug }) => slug),
-  ["hushh-location-geocode"],
+  [
+    "asset-report-create",
+    "create-link-token",
+    "exchange-public-token",
+    "hushh-location-geocode",
+    "plaid-data-sync",
+    "plaid-data-sync-product",
+    "plaid-data-sync-start",
+    "plaid-diagnostics-log",
+  ],
 );
 assert.deepEqual(Object.keys(FUNCTION_CONTRACTS).sort(), [
   "asset-report-create",
@@ -243,7 +252,7 @@ console.log(
     registry_digest: REGISTRY_METADATA.digest,
     retired_count: retired.length,
     frozen_unverified_count: frozen.length,
-    ported_and_verified_count: 1,
+    ported_and_verified_count: 8,
     replacement_candidate_count: replacementCandidates.length,
     mode: registryOnly ? "registry" : "full",
   }),

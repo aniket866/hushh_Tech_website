@@ -78,7 +78,8 @@ describe("Supabase function evidence orchestration", () => {
     expect(result.errors).toEqual([]);
     expect(result.observed).toMatchObject({
       active_functions: 112,
-      frozen_functions: 111,
+      frozen_functions: 104,
+      ported_and_verified_functions: 8,
       verify_jwt_true: 62,
       verify_jwt_false: 50,
       traffic_version_delta_histogram: { 0: 16, 40: 96 },
@@ -306,17 +307,20 @@ describe("Supabase function evidence orchestration", () => {
     );
   });
 
-  it("rejects any second function reclassified as ported while the cutover is frozen", () => {
+  it("rejects any unapproved ninth function reclassified as ported", () => {
     const inputs = cloneInputs();
     const manifest = parse<any>(inputs.artifacts.retirement_manifest);
-    manifest.functions[0].migration_state = "PORTED_AND_VERIFIED";
+    const unapproved = manifest.functions.find(
+      (entry: any) => entry.source.slug === "asset-report-get"
+    );
+    unapproved.migration_state = "PORTED_AND_VERIFIED";
     inputs.artifacts.retirement_manifest = serialize(manifest);
 
     const result = validateFunctionEvidenceOrchestration(inputs);
 
     expect(result.valid).toBe(false);
     expect(result.errors.join("\n")).toContain(
-      "Exactly geocode may be ported; the other 111 functions must remain frozen"
+      "Only the approved Finance Link activation set and geocode may be ported; the other 104 functions must remain frozen"
     );
   });
 

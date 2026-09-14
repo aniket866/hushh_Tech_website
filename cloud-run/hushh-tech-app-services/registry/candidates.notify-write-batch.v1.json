@@ -19,8 +19,8 @@
     "traffic_evidence_file_sha256": "5db78b99f880423c88528817ca422ab862aa1a42f93699e37b0e4ce03fc90ac0",
     "traffic_evidence_digest": "eade0ef6ae4fbd34009a481ddf5771c3338de7034f6fcaff4dfbb3b453a00d51",
     "deployment_inventory_digest": "f7ef842b42a08fccca969c4dc1e212ebe764f0ffe7c3c8a3c30df11934842981",
-    "terminal_matrix_file_sha256": "b25d337caf94b478d4023d45cfc05ba534cbd54ecb9b81beddb844eb00881231",
-    "terminal_matrix_evidence_digest": "2ee200a29c27974287b5d857f35ff65e1ae29eab64c6e56e8f5e702073e25160"
+    "terminal_matrix_file_sha256": "2339e7e3045778d29a8c5011923d29aa320c1f0445666154ca60acbed82e8c4c",
+    "terminal_matrix_evidence_digest": "62dc682975bb617c0a2bbb3b9807e367473bed28b699de0aae27efc6c7accf9e"
   },
   "durable_operation_ledger": {
     "status": "NOT_LIVE_PROVEN",

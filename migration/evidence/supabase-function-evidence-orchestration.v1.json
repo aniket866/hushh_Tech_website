@@ -10,7 +10,7 @@
   "upstream_file_bindings": {
     "retirement_manifest": {
       "path": "migration/manifests/supabase-retirement.v1.json",
-      "sha256": "5047e3140bce74bf1a8702208488ecc3867467b15dc7318272145888e83db3d5"
+      "sha256": "5cb75195047119f412dfa58359c12bce6202de16818a44fa3e364a5160576b47"
     },
     "historical_bundle_evidence": {
       "path": "migration/evidence/supabase-live-function-bundles.v1.json",
@@ -48,7 +48,7 @@
     },
     "current_bundle_validator": {
       "path": "scripts/ci/check-supabase-current-function-bundle-evidence.mjs",
-      "sha256": "5b48ac2bf58f6ad36acd183aad177ab53acf8f86dafdd9f956f231dcc0515e3f"
+      "sha256": "7a824ac9ccab0de9fd91d01afe4c7d3d24f394060c03718891312ffc1f15c9ba"
     },
     "current_bundle_generator": {
       "path": "scripts/ci/generate-supabase-current-function-bundle-evidence.mjs",
@@ -78,8 +78,8 @@
   },
   "inventory_binding": {
     "active_functions": 112,
-    "frozen_functions": 111,
-    "ported_and_verified_functions": 1,
+    "frozen_functions": 104,
+    "ported_and_verified_functions": 8,
     "verify_jwt_true": 62,
     "verify_jwt_false": 50,
     "digest_algorithm": "sha256_of_sorted_utf8_length_prefixed_records_v1",
@@ -137,6 +137,6 @@
   },
   "evidence_digest": {
     "digest_algorithm": "sha256_of_stable_json_without_evidence_digest_v1",
-    "digest": "898764998655b30b36160e7fbfaa17f1615e5916168a5afab2e678a21e090d9e"
+    "digest": "4e8d3b918dc8c7cfb94ada61aacf7ab8e48d31de9d3325be725bcfea85abd647"
   }
 }

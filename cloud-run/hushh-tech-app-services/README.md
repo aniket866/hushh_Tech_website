@@ -11,10 +11,14 @@ One fail-closed Node.js image serves seven locked Cloud Run owners through
 - `signed-webhook-service`
 - `worker`
 
-The image embeds the frozen 112-function retirement registry. No legacy
-Only `hushh-location-geocode` is enabled by this foundation. The other 110
-runtime entries remain `INVENTORY_FROZEN`; 111 are replacement candidates,
-and the retired secret-disclosure function has no handler.
+The image embeds the 112-function retirement registry. The existing
+`hushh-location-geocode` route and the seven approved Finance Link routes
+(`asset-report-create`, `create-link-token`, `exchange-public-token`,
+`plaid-data-sync-start`, `plaid-data-sync`, `plaid-data-sync-product`, and
+`plaid-diagnostics-log`) are `PORTED_AND_VERIFIED` runtime entries. The other
+104 replacement routes remain `INVENTORY_FROZEN`, and the retired
+secret-disclosure function has no handler. Terminal/live proof remains a
+separate migration gate.
 Unknown, wrong-owner, retired, unverified, and unimplemented routes fail
 closed.
 
