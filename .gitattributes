@@ -29,3 +29,4 @@ cloud-run/hushh-tech-cloudsql-attestor/src/query-contract.js text eol=lf
 cloud-run/hushh-tech-cloudsql-attestor/src/runner.js text eol=lf
 cloud-run/hushh-tech-cloudsql-attestor/src/supervisor.js text eol=lf
 cloud-run/hushh-tech-cloudsql-attestor/src/verifier.js text eol=lf
+api/shared/gcp-delete-account-storage.js text eol=lf

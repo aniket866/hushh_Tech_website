@@ -45,6 +45,7 @@ import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 import { api, serviceAccount, sleep } from "./gcp-auth.mjs";
 
@@ -165,10 +166,7 @@ const buildSourceArchive = async (sha, directory) => {
       cwd: root,
       maxBuffer: 512 * 1024 * 1024,
     });
-    const compressed = execFileSync("gzip", ["-1"], {
-      input: archive,
-      maxBuffer: 512 * 1024 * 1024,
-    });
+    const compressed = gzipSync(archive, { level: 1 });
     await writeFile(archivePath, compressed);
   } else {
     const triggerSha = process.env.COMMIT_SHA;
@@ -183,15 +181,20 @@ const buildSourceArchive = async (sha, directory) => {
 };
 
 const uploadSource = async (archivePath, objectName) => {
-  const { Storage } = await import("@google-cloud/storage");
   const credentials = serviceAccount();
-  const options = { projectId: PROJECT };
-  if (credentials) options.credentials = credentials;
-  const storage = new Storage(options);
-  const [file] = await storage
-    .bucket(SOURCE_BUCKET)
-    .upload(archivePath, { destination: objectName, resumable: true, contentType: "application/gzip" });
-  return { bucket: SOURCE_BUCKET, object: objectName, generation: file.metadata.generation };
+  if (credentials) {
+    const { Storage } = await import("@google-cloud/storage");
+    const storage = new Storage({ projectId: PROJECT, credentials });
+    const [file] = await storage
+      .bucket(SOURCE_BUCKET)
+      .upload(archivePath, { destination: objectName, resumable: true, contentType: "application/gzip" });
+    return { bucket: SOURCE_BUCKET, object: objectName, generation: file.metadata.generation };
+  }
+  execFileSync("gcloud", [
+    "storage", "cp", archivePath, `gs://${SOURCE_BUCKET}/${objectName}`,
+    `--project=${PROJECT}`,
+  ], { cwd: root, stdio: "inherit", shell: true });
+  return { bucket: SOURCE_BUCKET, object: objectName };
 };
 
 // --------------------------------------------------------------------------------------------
@@ -456,6 +459,6 @@ const main = async () => {
   console.log(`configuration preserved: ${summary.plainEnv} env vars + ${summary.secretEnv} secret bindings`);
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch((error) => { console.error(error); process.exit(1); });
 }

@@ -586,6 +586,7 @@ export async function executeDeleteAccount({
       }),
     };
   } catch (error) {
+    console.error("executeDeleteAccount failed:", error);
     return buildErrorResult(
       500,
       "Failed to delete user account",
