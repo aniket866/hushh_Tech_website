@@ -199,8 +199,8 @@ function readUatFinancialConfig(env, { serviceOwner, stage }) {
   const plaidClientId = required(env, "PLAID_CLIENT_ID");
   const plaidSecret = required(env, "PLAID_SECRET");
   const plaidEnvironment = required(env, "PLAID_ENV");
-  if (plaidEnvironment !== "sandbox") {
-    throw new ConfigurationError("PLAID_ENV must be sandbox in UAT.");
+  if (!["sandbox", "production"].includes(plaidEnvironment)) {
+    throw new ConfigurationError("PLAID_ENV must be sandbox or production.");
   }
   if (clean(env.PLAID_DATA_WEBHOOK_URL)) {
     throw new ConfigurationError(

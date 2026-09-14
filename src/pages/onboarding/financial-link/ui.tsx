@@ -86,7 +86,7 @@ export default function OnboardingFinancialLink() {
       />
 
       {/* Main Content */}
-      <main className="mx-auto mt-4 w-full max-w-[520px] flex-grow px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:mt-6 sm:px-5">
+      <main className="mx-auto mt-4 w-full max-w-[520px] flex-grow px-4 pb-[calc(env(safe-area-inset-bottom)+2.5rem)] sm:mt-6 sm:px-5">
         {/* Title Section */}
         <section className="mb-8 pt-8 text-center sm:mb-10 sm:pt-12">
           <Eyebrow>Link your account</Eyebrow>

@@ -115,6 +115,24 @@ test("all seven owners bind to their exact UAT and production identities", () =>
   }
 });
 
+test("legacy Production Plaid configuration remains limited to UAT financial services", () => {
+  for (const serviceOwner of ["financial-api", "worker"]) {
+    const settings = uatFinancialEnvironment({
+      PLAID_ENV: "production",
+      PLAID_PRIMARY_PRODUCTS: "auth",
+      PLAID_ADDITIONAL_CONSENTED_PRODUCTS: "identity,transactions,signal",
+      PLAID_REQUIRED_IF_SUPPORTED_PRODUCTS: "investments,liabilities",
+    });
+    const config = readRuntimeConfig(ownerRuntimeEnv(serviceOwner, "uat", settings));
+    assert.equal(config.financial.plaidEnvironment, "production");
+    assert.equal(config.financial.plaidPrimaryProducts, "auth");
+    assert.equal(config.financial.plaidAdditionalConsentedProducts, "identity,transactions,signal");
+    assert.equal(config.financial.plaidRequiredIfSupportedProducts, "investments,liabilities");
+    assert.throws(() => readRuntimeConfig(ownerRuntimeEnv(serviceOwner, "prod", settings)), ConfigurationError);
+    assert.throws(() => readRuntimeConfig(ownerRuntimeEnv(serviceOwner, "uat", { ...settings, PLAID_SECRET: "" })), ConfigurationError);
+  }
+});
+
 test("Plaid financial configuration is opt-in, UAT-only, and resource-bound", () => {
   for (const serviceOwner of ["financial-api", "worker"]) {
     const config = readRuntimeConfig(
@@ -152,7 +170,7 @@ test("Plaid financial configuration is opt-in, UAT-only, and resource-bound", ()
     ownerRuntimeEnv(
       "financial-api",
       "uat",
-      uatFinancialEnvironment({ PLAID_ENV: "production" }),
+      uatFinancialEnvironment({ PLAID_ENV: "development" }),
     ),
     ownerRuntimeEnv(
       "financial-api",

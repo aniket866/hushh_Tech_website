@@ -8,6 +8,12 @@ const read = (relativePath: string) =>
   readFileSync(path.join(root, relativePath), "utf8");
 
 describe("financial-link render safety net", () => {
+  it("keeps bottom breathing room additive to the device safe area", () => {
+    const ui = read("src/pages/onboarding/financial-link/ui.tsx");
+    const mainClass = ui.match(/<main className="([^"]+)"/)?.[1];
+    expect(mainClass).toContain("pb-[calc(env(safe-area-inset-bottom)+2.5rem)]");
+  });
+
   it("ErrorBoundary forwards uncaught render errors into plaid_link_diagnostics", () => {
     const boundary = read("src/components/ErrorBoundary.tsx");
     expect(boundary).toContain("logPlaidEvent('uncaught_react_error'");
