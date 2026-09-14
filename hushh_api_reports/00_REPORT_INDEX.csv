@@ -1,7 +1,0 @@
-Report_Number,Filename,Description,Total_Rows,Date_Range,Update_Frequency,Category
-01,01_endpoint_performance_detailed.csv,Detailed request-level logs with full metadata including timestamps and client info,100,2026-02-04 (24 hours),Real-time,Performance
-02,02_error_log_detailed.csv,Comprehensive error diagnostics with stack traces and resolution status,100,2026-02-04 (24 hours),Real-time,Errors
-03,03_daily_traffic_metrics.csv,Daily aggregated metrics showing trends over 100 days,100,2025-10-27 to 2026-02-04,Daily,Traffic
-04,04_client_usage_breakdown.csv,Per-client usage statistics for all 110 enterprise clients,110,Current snapshot,Daily,Clients
-05,05_hourly_traffic_pattern.csv,Hourly traffic patterns showing peak hours and day-of-week trends,120,2026-01-31 to 2026-02-04 (5 days),Hourly,Traffic
-06,06_endpoint_performance_timeline.csv,30-day performance history for all 10 API endpoints,300,2026-01-05 to 2026-02-03,Daily,Performance

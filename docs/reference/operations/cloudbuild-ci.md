@@ -12,7 +12,9 @@ cannot strand the gate.
 ```mermaid
 flowchart LR
   PR[Pull request to main] --> CB[Cloud Build hushh-tech-website-ci]
-  CB --> FAN[Concurrent code gates]
+  CB --> FRESH[Branch freshness - blocking]
+  FRESH --> FID[Merge fidelity - advisory]
+  FRESH --> FAN[Concurrent code gates]
   PR --> PP[GitHub PR Policy Gate]
   CB --> SG[Cloud Build Status Gate]
   PP --> SG
@@ -20,6 +22,103 @@ flowchart LR
   STATUS --> MQ[Protected merge queue]
   MQ --> QV[GitHub Queue Validation merge_group]
 ```
+
+## Adding a server route
+
+`server.js` is byte-locked by three Cloud Run candidate registries under
+`cloud-run/hushh-tech-app-services/registry/`, so adding an API route is a
+reviewed event rather than a silent one. The sequence, in one commit:
+
+```bash
+npm run migration:no-hybrid:routes:generate            # refresh the route inventory
+node scripts/gcp/migration/repin-runtime-byte-locks.mjs --write
+```
+
+then update the hard-coded `server:` count in
+`tests/noHybridRouteInventory.test.ts`, which is asserted on purpose.
+
+The repin tool recomputes only values anyone reading the diff can recompute
+from committed bytes: the byte locks, each registry's `manifest_self_digest`,
+each validator's `EXPECTED_DIGEST`, and the copy of `manifest_self_digest` a
+validator restates inline. It never touches `reviewed_commit`, `reviewed_tree`,
+trust anchors or base-image digests — those record a human's approval of a
+specific tree, and a re-pin means that approval is now stale and someone has to
+grant it again.
+
+## Branch freshness and merge fidelity
+
+Two gates run before anything is installed, ported from the equivalents in
+`hushh-labs/hushh-research`. They answer different questions and only make
+sense together:
+
+| Gate | Question | Mode |
+| --- | --- | --- |
+| `scripts/git/check-main-sync.sh` | Does this checkout **contain** the base branch's tip? | blocking |
+| `scripts/ci/check-merge-fidelity.sh` | Does it still **have the content** those commits landed? | advisory |
+
+Freshness blocks because a branch behind `main` was validated against code
+nobody will run, and merging it puts a stale copy of every shared file back
+over whatever landed in the meantime. Both are reachable through
+`scripts/ci/orchestrate.sh freshness` and `scripts/ci/orchestrate.sh fidelity`,
+so the Cloud Build steps and the GitHub steps invoke the identical command and
+cannot drift apart.
+
+Freshness runs again inside `scripts/deploy/uat-deploy.mjs`, because CI cannot
+cover the deploy. CI validates a pull request; the deploy script ships whatever
+is checked out, which is how a branch that was fresh when it was validated
+gets shipped hours later over newer work. That failure leaves no conflict and
+no failing test — only a revision serving files as they were before a fix.
+`--rollback` is never checked (shipping an older image is the point), and
+`--allow-stale` is the documented override.
+
+Merge fidelity is advisory because every pass is a text heuristic: it flags a
+deliberate supersession as loudly as a silent revert. It reports; a human
+decides. It must never be silent about failing to look, so a pass that exits
+abnormally is reported as `INCONCLUSIVE` rather than clean. To stand down a
+finding, put a `Merge-Regression-Ack: <reason>` trailer in a commit message on
+the branch — upstream uses a pull-request label read through `gh`, which a
+Cloud Build has no credential or payload for.
+
+Two corrections were made against the upstream implementation, both because
+the default runner here is Cloud Build rather than GitHub Actions:
+
+- **No silent skip on a detached HEAD.** Upstream exits 0 when it cannot read a
+  branch name. Every Cloud Build checkout is detached, so ported verbatim the
+  gate would have reported green on one hundred per cent of builds without ever
+  running. Shallow single-branch clones are likewise deepened and fetched
+  through an explicit refspec instead of being taken at face value.
+- **Pass B was unreachable.** Upstream's second fidelity pass compares the
+  branch's fork point to the base tip and skips when they are equal — but the
+  passes only run once the base is an ancestor of `HEAD`, and when that holds
+  `git merge-base HEAD base` *is* the base. The clean-revert loss mode it names
+  therefore went unchecked. Here it walks the branch's sync merges instead and
+  asks whether `HEAD` still holds what each merge brought in.
+
+### Reaching the base branch from a build step
+
+A Cloud Build step cannot fetch this repository unaided. The trigger's clone
+credential is consumed by the source fetch and is never handed to the steps, so
+`git fetch origin main` inside a step runs anonymously — which returns 403 now
+that the repository is private. Build `1e1f743b` failed exactly there before
+this was addressed.
+
+`scripts/ci/fetch-base-branch.mjs` mints a short-lived read token from the
+`hushh-github` 2nd-generation connection and passes it to Git as a
+child-process-only HTTP header, the same mechanism and the same
+`roles/cloudbuild.readTokenAccessor` grant that `prepare-repository-history.mjs`
+already uses. It imports nothing, so it runs before `npm ci` and a stale branch
+never pays for a dependency install. The gates then run with
+`MAIN_SYNC_FETCH=0`, which requires the ref to be present rather than fetching
+it — that is not a bypass, and a missing ref still fails the gate.
+
+The same call precedes the tag-deploy lane in
+`deploy/uat-tag-trigger.cloudbuild.yaml` for the same reason.
+
+On GitHub the two gates are steps inside `PR Policy Gate`, not jobs of their
+own, so they join the required `CI Status Gate` with no change to the status
+adapter. They check `pull_request.head.sha` rather than the checkout:
+`actions/checkout` resolves a pull-request event to `refs/pull/N/merge`, which
+contains the base tip by construction and would report every pull request fresh.
 
 Cloud Build installs the root dependency tree once with a lockfile-keyed npm
 cache, then fans out web tests/type-check/build plus the deploy-context check,

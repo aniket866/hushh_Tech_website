@@ -1078,7 +1078,7 @@ export default function HomePage() {
         path="/"
         description="Invest alongside HushhTech — an AI-driven, long-term value strategy modeled on Berkshire Hathaway. We combine AI and human expertise to back exceptional businesses."
       />
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content">
         <section className="hh-hero" style={{ fontFamily: homeFont }}>

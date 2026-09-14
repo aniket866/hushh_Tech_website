@@ -73,6 +73,7 @@ const API_LOADERS = Object.freeze({
   'public-hushh-profile': () => import('./api/public-hushh-profile.js'),
   'send-email-notification': () => import('./api/send-email-notification.js'),
   'stock-quotes': () => import('./api/stock-quotes.js'),
+  'ticker-search': () => import('./api/ticker-search.js'),
   'wallet-pass': () => import('./api/wallet-pass.js'),
 });
 
@@ -165,6 +166,7 @@ app.use('/functions/v1', preserveLegacyFunctionRawBody);
 // general parser so the default-off gate cannot consume a request body and a
 // whitespace-heavy payload cannot shrink through JSON reserialization.
 app.all('/api/stock-quotes', async (req, res) => wrapHandler(await loadApi('stock-quotes'))(req, res));
+app.get('/api/ticker-search', async (req, res) => wrapHandler(await loadApi('ticker-search'))(req, res));
 app.put(
   '/api/gcp/storage/*',
   express.raw({ limit: '25mb', type: '*/*' }),

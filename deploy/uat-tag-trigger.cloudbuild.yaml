@@ -8,14 +8,26 @@
 # This is a deployment-execution lane only. GitHub PR validation, merge_group
 # validation, main smoke, and production approval remain the release authority.
 # Do not add a push-to-main trigger: that would double-deploy with Actions.
+#
+# Freshness is enforced inside the helper, not here. A `uat-*` tag can be placed
+# on any commit, including one behind main, and deploying that commit publishes a
+# copy of every shared file as it was before whatever landed in between — with no
+# conflict and no failing test to say so. scripts/deploy/uat-deploy.mjs refuses a
+# COMMIT_SHA that does not contain origin/main before it builds anything. Adding a
+# second copy of that check here would only let the two drift.
 
 steps:
   - id: deploy-uat
     name: node:20.19.0
     entrypoint: bash
+    env:
+      # The line below fetches the base; the gate inside the helper must not try again, because a
+      # build step's fetch is anonymous and this repository is private.
+      - MAIN_SYNC_FETCH=0
     args:
       - -ceu
       - |
+        node scripts/ci/fetch-base-branch.mjs main
         npm ci --no-audit --no-fund
         node scripts/deploy/uat-deploy.mjs --sha "$COMMIT_SHA"
 

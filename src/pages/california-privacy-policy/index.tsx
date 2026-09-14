@@ -95,7 +95,7 @@ const CaliforniaPrivacyPolicy = () => {
       className="min-h-screen antialiased"
       style={{ background: pageBg, color: textPrimary, fontFamily: appleFont }}
     >
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       {/* Hero */}
       <header className="px-5 pt-12 sm:px-6 sm:pt-16">

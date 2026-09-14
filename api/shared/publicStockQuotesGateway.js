@@ -1,5 +1,7 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { isIP } from "node:net";
+
+import { createStockQuoteCache } from "./stockQuoteCache.js";
 
 const PUBLIC_PATH = "/api/stock-quotes";
 const PRIVATE_PATH = "/api/v1/public/stock-quotes";
@@ -98,7 +100,16 @@ function boundedInteger(value, fallback, minimum, maximum) {
   return result;
 }
 
-export function readPublicStockQuotesGatewayConfig(env = process.env) {
+/**
+ * What every public, unauthenticated endpoint on this host needs: the feature flag, the origin it
+ * must be called from, and the salt and budget its rate limiter is built from.
+ *
+ * Split out so api/ticker-search.js shares this exact code rather than a second copy of it. The
+ * quotes-only half stays below: a service origin and a proxy timeout are meaningless to an
+ * endpoint that proxies nothing, and requiring HUSHH_TECH_INVESTOR_API_URL to be set before a
+ * ticker search can answer would be a dependency invented by the refactor rather than by the code.
+ */
+export function readPublicSurfaceConfig(env = process.env) {
   if (!exactFlag(env)) return Object.freeze({ enabled: false });
   const projectId = clean(env.GOOGLE_CLOUD_PROJECT);
   const project = PROJECTS[projectId];
@@ -118,16 +129,24 @@ export function readPublicStockQuotesGatewayConfig(env = process.env) {
     enabled: true,
     projectId,
     publicOrigin: project.publicOrigin,
-    serviceOrigin: canonicalServiceOrigin(
-      env.HUSHH_TECH_INVESTOR_API_URL,
-      project.serviceOrigin,
-    ),
     rateLimitSalt: salt,
     rateLimit: boundedInteger(
       env.PUBLIC_STOCK_QUOTES_GATEWAY_RATE_LIMIT,
       DEFAULT_RATE_LIMIT,
       1,
       120,
+    ),
+  });
+}
+
+export function readPublicStockQuotesGatewayConfig(env = process.env) {
+  const base = readPublicSurfaceConfig(env);
+  if (!base.enabled) return base;
+  return Object.freeze({
+    ...base,
+    serviceOrigin: canonicalServiceOrigin(
+      env.HUSHH_TECH_INVESTOR_API_URL,
+      PROJECTS[base.projectId].serviceOrigin,
     ),
     timeoutMs: boundedInteger(
       env.PUBLIC_STOCK_QUOTES_GATEWAY_TIMEOUT_MS,
@@ -238,6 +257,27 @@ function assertSameOrigin(request, config) {
   }
 }
 
+/**
+ * The caller's IP, taken from the one hop the platform itself wrote.
+ *
+ * This used to demand a chain of exactly two and return `chain[0]`, which was wrong twice over and
+ * had never been exercised because the feature was switched off in every environment.
+ *
+ * It broke every real request. That two-hop shape is what an external HTTP(S) load balancer
+ * produces. This service sits directly behind Cloud Run's own front end, which supplies a
+ * single-entry chain, so every browser was refused with TRUSTED_PROXY_REQUIRED.
+ *
+ * And where it did match, it trusted the wrong end. Cloud Run APPENDS the real peer to whatever
+ * the client sent, so a request carrying `X-Forwarded-For: 203.0.113.7` arrives as
+ * "203.0.113.7, <real client>" — length two, passing the old check, with `chain[0]` being the
+ * value the caller chose. The rate-limit key is an HMAC of that value, so a caller could hand
+ * itself a fresh identity on every request and never meet the limiter at all. Verified against the
+ * deployed service before this was changed.
+ *
+ * The last entry is the one Cloud Run appended and the only one a caller cannot forge, so that is
+ * what the key is derived from. A longer chain is fine — the entries before it are caller-supplied
+ * noise either way.
+ */
 function canonicalTrustedClientIp(request) {
   const raw = request.headers?.["x-forwarded-for"];
   if (typeof raw !== "string" || raw.length > 256) {
@@ -248,18 +288,25 @@ function canonicalTrustedClientIp(request) {
     );
   }
   const chain = raw.split(",").map((value) => value.trim());
-  if (
-    chain.length !== 2 ||
-    chain.some((value) => !value || isIP(value) === 0)
-  ) {
+  const peer = chain[chain.length - 1];
+  if (!chain.length || !peer || isIP(peer) === 0) {
     throw new PublicStockQuotesGatewayError(
       "TRUSTED_PROXY_REQUIRED",
       "Access denied.",
       403,
     );
   }
-  return chain[0];
+  return peer;
 }
+
+/**
+ * Exported so api/ticker-search.js derives its rate-limit key exactly the same way. This is the
+ * hop Cloud Run appended, not the one the caller sent — a second implementation of that rule is a
+ * second chance to get it backwards, which is how the limiter was forgeable before.
+ */
+export { canonicalTrustedClientIp };
+
+export const __testing = Object.freeze({ canonicalTrustedClientIp });
 
 function publicRateKey(request, config) {
   const clientIp = canonicalTrustedClientIp(request);
@@ -554,6 +601,15 @@ export function createPublicStockQuotesGateway({
   getServiceIdentityToken,
   now = Date.now,
   requestId = randomUUID,
+  /*
+   * Where quotes come from. Supplied, the gateway calls it directly instead of proxying to the
+   * investor API — which has no `/api/v1/public/stock-quotes` route at all, so the proxy path answered
+   * Google's HTML 404 and every request became a 502.
+   *
+   * Everything around it is unchanged: the feature flag, the same-origin assertion, the per-client
+   * limiter, the deadline, and the shared cache all still apply. Only the data source moves.
+   */
+  quoteProvider = null,
 } = {}) {
   if (
     typeof fetchImpl !== "function" ||
@@ -565,6 +621,12 @@ export function createPublicStockQuotesGateway({
   }
   let limiter = null;
   let limiterSignature = "";
+  /*
+   * One cache for the whole instance. Quotes are identical for every visitor, so a request that
+   * arrives inside the window is answered without touching the provider at all. See
+   * stockQuoteCache.js for the window, which is market-aware and ported from hushh-research.
+   */
+  const quoteCache = createStockQuoteCache();
 
   return async function publicStockQuotesGateway(request, response) {
     let deadline = null;
@@ -625,22 +687,59 @@ export function createPublicStockQuotesGateway({
         if (body !== null && body.length > 0) {
           headers.set("Content-Type", "application/json");
         }
-        upstream = await fetchImpl(`${config.serviceOrigin}${PRIVATE_PATH}`, {
-          method: String(request.method ?? "GET").toUpperCase(),
-          headers,
-          ...(body === null ? {} : { body }),
-          redirect: "error",
-          signal: deadline.signal,
-        });
-        const bytes = await readBoundedResponse(upstream, deadline.signal);
+        // Keyed on the symbol set, so two pages asking for different symbols do not share an
+        // answer, and everyone asking for the same set shares one upstream call.
+        const cacheKey = createHash("sha256")
+          .update(String(request.method ?? "GET").toUpperCase())
+          .update("\u0000")
+          .update(body ?? Buffer.alloc(0))
+          .digest("hex");
+
+        const { value: fetched, cached } = await quoteCache.resolve(
+          cacheKey,
+          async () => {
+            if (quoteProvider) {
+              let requested = [];
+              try {
+                requested = JSON.parse((body ?? Buffer.alloc(0)).toString("utf8") || "{}").symbols;
+              } catch {
+                throw new PublicStockQuotesGatewayError("INVALID_REQUEST", "Invalid request.", 400);
+              }
+              const result = await quoteProvider(requested ?? []);
+              return {
+                status: 200,
+                retryAfter: null,
+                bytes: Buffer.from(JSON.stringify(result), "utf8"),
+              };
+            }
+
+            upstream = await fetchImpl(`${config.serviceOrigin}${PRIVATE_PATH}`, {
+              method: String(request.method ?? "GET").toUpperCase(),
+              headers,
+              ...(body === null ? {} : { body }),
+              redirect: "error",
+              signal: deadline.signal,
+            });
+            const payload = await readBoundedResponse(upstream, deadline.signal);
+            return {
+              status: upstream.status,
+              retryAfter: upstream.headers?.get?.("retry-after") ?? null,
+              bytes: payload,
+            };
+          },
+          { shouldCache: (value) => value.status === 200 },
+        );
+
         throwIfAborted(deadline.signal);
         setPrivateHeaders(response);
         response.setHeader("Content-Type", "application/json");
-        const retryAfter = upstream.headers?.get?.("retry-after");
-        if (retryAfter && /^\d{1,5}$/.test(retryAfter)) {
-          response.setHeader("Retry-After", retryAfter);
+        // Diagnostic only. The response stays private/no-store: the cache is the server's, not the
+        // browser's, so one reader's copy is never handed to another by an intermediary.
+        response.setHeader("X-Hushh-Quote-Cache", cached ? "hit" : "miss");
+        if (fetched.retryAfter && /^\d{1,5}$/.test(fetched.retryAfter)) {
+          response.setHeader("Retry-After", fetched.retryAfter);
         }
-        return response.status(upstream.status).send(bytes);
+        return response.status(fetched.status).send(fetched.bytes);
       } catch (error) {
         if (error instanceof PublicStockQuotesGatewayError) throw error;
         throwIfAborted(deadline.signal);

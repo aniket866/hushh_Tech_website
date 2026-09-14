@@ -34,11 +34,16 @@ async function prepare(page: Page) {
 type Control = { label: string; width: number; height: number };
 
 /**
- * Every visible control, with the box a finger actually has to hit.
+ * Every visible control, measured as its own border box.
  *
- * The measured box is the union of the element and any absolutely-positioned pseudo/child overlay
- * it uses to extend its own hit area — read straight off `getBoundingClientRect`, so it is the real
- * geometry rather than what the class names imply.
+ * This deliberately does NOT union in a pseudo-element or child overlay used to extend a hit area.
+ * The usual trick — a centred `::after` larger than the button — only works if no ancestor clips
+ * it, and in this codebase `GlassPill` sets `overflow-hidden` to keep its backdrop-filter inside
+ * the rounded shape. An overlay inside one is clipped back to the pill, so crediting it here would
+ * report a 44pt target that a finger cannot actually reach.
+ *
+ * The consequence is worth stating plainly: a control inside a `GlassPill` has to be 44pt itself,
+ * or the pill has to stop clipping. There is no free hit-area expansion in this header.
  */
 async function controls(page: Page): Promise<Control[]> {
   return page.evaluate(

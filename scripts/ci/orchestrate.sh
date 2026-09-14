@@ -11,6 +11,20 @@ case "$COMMAND" in
   secret)
     bash scripts/security/run-gitleaks.sh
     ;;
+  # Branch freshness and merge fidelity are one pair: the first proves this checkout CONTAINS the
+  # base's commits, the second that it still HAS their content. Both are reachable through this
+  # orchestrator so Cloud Build and GitHub Actions invoke the identical command and cannot drift.
+  freshness)
+    MAIN_SYNC_MODE="${MAIN_SYNC_MODE:-block}" sh scripts/git/check-main-sync.sh
+    ;;
+  fidelity)
+    MERGE_FIDELITY_MODE="${MERGE_FIDELITY_MODE:-warn}" bash scripts/ci/check-merge-fidelity.sh
+    ;;
+  # Advisory for the same reason fidelity is: the rule is a heuristic, and a module reached only
+  # by a test that reads it by path or by a frozen manifest reads as dead to it.
+  dead-modules)
+    node scripts/ci/report-dead-modules.mjs
+    ;;
   env)
     npm run env:check
     ;;

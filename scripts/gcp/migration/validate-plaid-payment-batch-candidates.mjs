@@ -9,7 +9,7 @@ import path from "node:path";
 const MANIFEST_PATH =
   "cloud-run/hushh-tech-app-services/registry/candidates.plaid-payment-batch.v1.json";
 const EXPECTED_DIGEST =
-  "b24d142cacab4601dd3f5efceb3f2256bf97b024daddfb9e0b87a8f7d7dbd970";
+  "444253d0401a14f026e4dbcae2ad0a4b204f9c7a90a707a54389ad9f9a7aafe9";
 const TOP_KEYS = [
   "schema_version", "base_commit", "deployment_state", "required_registry_state",
   "target_project", "target_region", "source_approval", "runtime_byte_lock",

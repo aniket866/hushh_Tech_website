@@ -47,6 +47,37 @@ jobs:
       - name: Validate signed-off commits
         run: bash scripts/ci/check-dco.sh
 
+      # Freshness is a property of the pull request, like DCO, so it lives with the policy gate
+      # rather than in a job of its own: it costs one git command on a checkout that already has
+      # full history, and it joins the required `CI Status Gate` with no change to the adapter.
+      #
+      # MAIN_SYNC_HEAD is the PR's HEAD COMMIT, not the checkout. `actions/checkout` resolves a
+      # pull_request event to refs/pull/N/merge — GitHub's preview of the merge result, which
+      # contains the base tip by construction. Checked against that ref this gate would report
+      # fresh for every pull request ever opened, including the stale ones. Cloud Build is the
+      # default runner for this gate; this is the parity copy, and it has to answer the same
+      # question the Cloud Build step does.
+      - name: Branch freshness
+        env:
+          MAIN_SYNC_MODE: block
+          MAIN_SYNC_HEAD: ${{ github.event.pull_request.head.sha }}
+          MAIN_SYNC_BRANCH: ${{ github.event.pull_request.base.ref }}
+          MAIN_SYNC_LABEL: ${{ github.event.pull_request.head.ref }}
+        run: bash scripts/ci/orchestrate.sh freshness
+
+      # Advisory, matching the Cloud Build step. `continue-on-error` is the second belt behind the
+      # script's own warn mode, so a detector that breaks cannot fail the required status over a
+      # heuristic. Read its findings in the step summary.
+      - name: Merge fidelity (advisory)
+        continue-on-error: true
+        env:
+          MERGE_FIDELITY_MODE: warn
+          MERGE_FIDELITY_BASE_REF: origin/${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "+refs/heads/${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}"
+          git checkout --quiet --detach "${{ github.event.pull_request.head.sha }}"
+          bash scripts/ci/orchestrate.sh fidelity
+
       - name: Verify reviewer grounding and compliance sources
         shell: bash
         run: |

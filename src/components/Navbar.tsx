@@ -20,7 +20,8 @@ import {
 
 const WELCOME_TOAST_PENDING_KEY = "showWelcomeToast";
 const WELCOME_TOAST_USER_KEY = "showWelcomeToastUserId";
-const TICKER_SCROLL_PIXELS_PER_SECOND = 168;
+/** Reading speed. Kept identical to the modern header's ticker so the two never disagree. */
+const TICKER_SCROLL_PIXELS_PER_SECOND = 52;
 
 // Chip-based ticker component - Light theme design
 const TickerChip = ({ quote, isLoading }: { quote: StockQuote; isLoading?: boolean }) => {
@@ -43,13 +44,20 @@ const TickerChip = ({ quote, isLoading }: { quote: StockQuote; isLoading?: boole
       </div>
       {/* Stock symbol - use displaySymbol for cleaner display */}
       <span className="text-[12px] font-bold text-gray-800 leading-none">{quote.displaySymbol}</span>
-      {/* Percent change with arrow */}
-      <div className={`ml-0.5 flex items-center gap-0.5 ${quote.isUp ? 'text-green-600' : 'text-red-500'}`}>
-        <span className="text-[10px]">{quote.isUp ? '▲' : '▼'}</span>
-        <span className={`text-[11px] font-semibold ${isLoading ? 'animate-pulse' : ''}`}>
-          {Math.abs(quote.percentChange).toFixed(1)}%
+      {/* Percent change with arrow — only when a real quote backs it. Without this guard the row
+          renders a direction and a number for a symbol whose price is unknown. */}
+      {quote.hasQuote ? (
+        <div className={`ml-0.5 flex items-center gap-0.5 ${quote.isUp ? 'text-green-600' : 'text-red-500'}`}>
+          <span className="text-[10px]">{quote.isUp ? '▲' : '▼'}</span>
+          <span className={`text-[11px] font-semibold ${isLoading ? 'animate-pulse' : ''}`}>
+            {Math.abs(quote.percentChange).toFixed(1)}%
+          </span>
+        </div>
+      ) : (
+        <span className="ml-0.5 text-[11px] font-medium text-gray-400" aria-label="Quote unavailable">
+          --
         </span>
-      </div>
+      )}
     </div>
   );
 };

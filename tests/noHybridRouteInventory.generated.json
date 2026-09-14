@@ -1327,6 +1327,13 @@
       ]
     },
     {
+      "pattern": "/api/ticker-search",
+      "sample": "/api/ticker-search",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "pattern": "/api/wallet-pass",
       "sample": "/api/wallet-pass",
       "methods": [
@@ -2153,11 +2160,11 @@
     "client_anonymous": 69,
     "client_user": 22,
     "client_admin": 3,
-    "server": 35,
+    "server": 36,
     "functions": 112,
     "functions_ported": 8,
     "functions_retired": 1,
     "functions_blocked": 103
   },
-  "sha256": "da363c7be5e6fe42f8ce957a82bc0aa09dbf9c8164b3a3cec4c795c7c1be2eb4"
+  "sha256": "79b35bf7e16aaaa8020b5c9461d41de5d3a9687247f6abd167a972e000309d85"
 }

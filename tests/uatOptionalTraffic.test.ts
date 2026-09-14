@@ -46,23 +46,29 @@ describe('UAT optional requests', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(session).not.toHaveBeenCalled();
   });
-  it('prevents initial, manual and interval stock requests on UAT', async () => {
+  // SUPERSEDED, deliberately. f779d42e suppressed stock requests on UAT because the gateway there
+  // answered 404 FEATURE_DISABLED and the rows rendered were `generateFallbackData()`'s invented
+  // numbers. Both premises are gone: the gateway is enabled on the UAT service and returns live
+  // prices, and nothing fabricates a quote any more. The protection that mattered -- never show a
+  // number we do not have -- is now carried by `hasQuote` on every host, and is asserted below and
+  // in tests/stockQuoteIntegrity.test.ts. Suppression here would only hide a working ticker.
+  it('requests stock quotes on UAT, where the gateway is enabled', async () => {
     at('https://uat.hushhtech.com/');
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    let result: ReturnType<typeof useStockQuotes>;
-    function Probe() { result = useStockQuotes(120000); return null; }
+    function Probe() { useStockQuotes(0); return null; }
     await act(async () => root.render(React.createElement(Probe)));
-    await act(async () => { await result!.refetch(); vi.advanceTimersByTime(360000); });
-    expect(fetch).not.toHaveBeenCalled();
-    expect(result!.loading).toBe(false);
-    expect(result!.lastUpdated).toBeNull();
+    expect(fetch).toHaveBeenCalledWith('/api/stock-quotes', expect.objectContaining({ method: 'POST' }));
   });
+  // Same protection, stronger rule. The gateway answers with no quotes here, so no row carries a
+  // real price and the strip renders nothing — by `hasQuote`, not by hostname, so it holds in
+  // production too. The analytics collector stays off on UAT, which is the part still keyed to the
+  // host, so this asserts that the one request made is the quote fetch and nothing else.
   it.each(routes)('does not render a misleading live ticker or request logos on %s', async (route) => {
     at(`https://uat.hushhtech.com${route}`);
     await act(async () => root.render(React.createElement(HushhTechTicker)));
     expect(container.querySelector('[data-hushh-ticker]')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
+    const urls = (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((call) => call[0]);
+    expect(urls).toEqual(['/api/stock-quotes']);
   });
   it('preserves production stock and collector requests', async () => {
     at('https://hushhtech.com/');

@@ -22,6 +22,9 @@ vi.mock("../src/hooks/useStockQuotes", () => ({
         percentChange: 1.2,
         isUp: true,
         logo: "https://example.com/aapl.png",
+        // The strip renders nothing unless a row is backed by a real provider response. Without
+        // this the ticker is correctly absent and both assertions below have nothing to inspect.
+        hasQuote: true,
       },
     ],
     loading: true,
@@ -80,7 +83,7 @@ describe("HushhTechHeader layout stability", () => {
     expect(styleText).not.toContain("animation: ticker-scroll");
   });
 
-  it("keeps both ticker surfaces on the faster shared speed", () => {
+  it("keeps both ticker surfaces on the same reading speed", () => {
     const modernHeader = fs.readFileSync(
       "src/components/hushh-tech-header/HushhTechHeader.tsx",
       "utf8",
@@ -94,9 +97,12 @@ describe("HushhTechHeader layout stability", () => {
     const hook = fs.readFileSync("src/hooks/useConstantTickerMotion.ts", "utf8");
 
     expect(modernHeader).toContain("HushhTechTicker");
-    expect(sharedTicker).toContain("const TICKER_SCROLL_PIXELS_PER_SECOND = 168;");
-    expect(legacyNavbar).toContain("const TICKER_SCROLL_PIXELS_PER_SECOND = 168;");
-    expect(hook).toContain("const DEFAULT_TICKER_PIXELS_PER_SECOND = 168;");
+    // The number matters less than the three staying equal: two tickers running at different
+    // speeds on the same site is the defect this pins down. 168 read as motion rather than as
+    // information, so all three moved together to 52.
+    expect(sharedTicker).toContain("const TICKER_SCROLL_PIXELS_PER_SECOND = 52;");
+    expect(legacyNavbar).toContain("const TICKER_SCROLL_PIXELS_PER_SECOND = 52;");
+    expect(hook).toContain("const DEFAULT_TICKER_PIXELS_PER_SECOND = 52;");
     expect(hook).toContain("Math.min(40, Math.max(0, time - lastTime))");
   });
 });

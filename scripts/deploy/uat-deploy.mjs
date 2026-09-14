@@ -33,6 +33,7 @@
  *   node scripts/deploy/uat-deploy.mjs --build-only    # build the image, do not touch Cloud Run
  *   node scripts/deploy/uat-deploy.mjs --image <ref>   # skip the build, deploy an existing image
  *   node scripts/deploy/uat-deploy.mjs --rollback <image>   # PATCH an earlier image back
+ *   node scripts/deploy/uat-deploy.mjs --allow-stale   # ship a branch that is behind main anyway
  *
  * Local credentials may come from GCP_DEPLOY_SA_KEY_B64. Cloud Build uses ADC from the trigger
  * service account, so no long-lived key is placed in the trigger or the build workspace. The UAT
@@ -130,6 +131,64 @@ const parseArgs = () => {
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
 const fail = (message) => { console.error(`uat-deploy: ${message}`); process.exit(1); };
+
+/** The branch a deploy must already contain. Overridable for a release branch, not for a bypass. */
+const BASE_BRANCH = process.env.UAT_DEPLOY_BASE_BRANCH || "main";
+
+/**
+ * Refuse to ship a tree that does not already contain `origin/main`.
+ *
+ * This is the deploy-side half of the branch-freshness gate, and it is here because CI cannot
+ * cover it. CI runs on a pull request; this script runs on whatever is checked out, which is how
+ * a branch that was fresh when it was validated gets shipped hours later over work that landed in
+ * between. The result is not a merge conflict anyone sees — it is a revision serving a copy of
+ * files as they were before the fix, with no diff and no failing test to say so.
+ *
+ * Three deliberate exemptions:
+ *
+ *   - `--rollback`, never checked. A rollback ships an older image on purpose, usually during an
+ *     incident. A freshness gate that argued with a rollback would be a gate that gets deleted.
+ *   - No Git metadata. Cloud Build's own source checkouts carry the trigger commit but no history,
+ *     and there the `freshness` step in cloudbuild.ci.yaml is what proves the same property.
+ *   - `--allow-stale`, which says so out loud in the log. The escape hatch exists so the answer to
+ *     an urgent stale deploy is a documented flag rather than someone deleting this function.
+ *
+ * `--dry-run` reports but does not block, so the plan stays inspectable from any checkout.
+ */
+const assertBaseFreshness = (sha, args) => {
+  if (args["allow-stale"]) {
+    console.warn(`uat-deploy: --allow-stale — shipping ${sha.slice(0, 8)} without the freshness check.`);
+    return;
+  }
+
+  try {
+    execFileSync("git", ["rev-parse", "--git-dir"], { cwd: root, stdio: "ignore" });
+  } catch {
+    console.log("uat-deploy: no Git metadata here; freshness is the build trigger's `freshness` step.");
+    return;
+  }
+
+  try {
+    execFileSync("sh", [join(root, "scripts/git/check-main-sync.sh")], {
+      cwd: root,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        MAIN_SYNC_MODE: args["dry-run"] ? "warn" : "block",
+        MAIN_SYNC_HEAD: sha,
+        MAIN_SYNC_BRANCH: BASE_BRANCH,
+        MAIN_SYNC_LABEL: `${sha.slice(0, 8)} (deploy candidate)`,
+      },
+    });
+  } catch {
+    fail(
+      `refusing to deploy ${sha.slice(0, 8)} — it does not contain origin/${BASE_BRANCH}.\n` +
+        `  git fetch origin ${BASE_BRANCH} && git merge origin/${BASE_BRANCH}\n` +
+        "  bash scripts/ci/orchestrate.sh fidelity   # prove the merge kept what the base landed\n" +
+        "Deploy anyway only with --allow-stale, and only when you mean to overwrite that work.",
+    );
+  }
+};
 
 // --------------------------------------------------------------------------------------------
 // Source archive
@@ -377,6 +436,8 @@ const main = async () => {
   const sha = args.sha || git("rev-parse", "HEAD");
   const shortSha = sha.slice(0, 8);
 
+  if (!args.rollback) assertBaseFreshness(sha, args);
+
   const before = await getService();
   console.log("current UAT service:", JSON.stringify(summariseService(before), null, 2));
 
@@ -457,6 +518,26 @@ const main = async () => {
     );
   }
   console.log(`configuration preserved: ${summary.plainEnv} env vars + ${summary.secretEnv} secret bindings`);
+
+  /*
+   * Prune obsolete images now that the deploy has landed.
+   *
+   * Here rather than on a schedule because this is the only moment the set of images that matter
+   * has just been settled: the new one is serving, the old ones are whatever the surviving
+   * revisions still pin. It deletes only images that no revision references, carry no tag, are
+   * past the keep window and are not among the newest few — a Cloud Run revision is pinned to a
+   * digest, so a careless pruner is a silent rollback floor.
+   *
+   * Never fails the deploy. The image is already live; a registry that did not get tidied is a
+   * cost problem for tomorrow, not a reason to report a successful ship as broken.
+   */
+  console.log("\npruning obsolete images…");
+  try {
+    const { pruneAfterDeploy } = await import("../gcp/registry/prune-after-deploy.mjs");
+    await pruneAfterDeploy({ apply: !process.argv.includes("--no-prune") });
+  } catch (error) {
+    console.warn(`  prune skipped: ${error?.message ?? error}`);
+  }
 };
 
 if (fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

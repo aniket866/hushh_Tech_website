@@ -495,7 +495,9 @@ const AppLayout = () => {
           </Routes>
         </ContentWrapper>
         {showFooter && <Footer />}
-        {showMobileNav && <MobileBottomNav />}
+        {/* Always mounted. Visibility is a prop rather than a conditional render, so navigating
+            between routes that show and hide it no longer tears the bar down and rebuilds it. */}
+        <MobileBottomNav suppressed={!showMobileNav} />
       </div>
     );
 };

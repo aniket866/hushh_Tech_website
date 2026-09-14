@@ -22,7 +22,9 @@ describe("no-hybrid exhaustive route inventory", () => {
       client_anonymous: 69,
       client_user: 22,
       client_admin: 3,
-      server: 35,
+      // 36 with /api/ticker-search. The count is asserted here on purpose: adding a server
+      // route is a reviewed event, not a silent one.
+      server: 36,
       functions: 112,
       functions_ported: 8,
       functions_retired: 1,

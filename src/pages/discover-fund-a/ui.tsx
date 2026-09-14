@@ -381,7 +381,7 @@ const FundA = () => {
         path="/discover-fund-a"
         jsonLd={FUND_A_SCHEMA}
       />
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content">
         <section className="fa-flagship" style={{ background: "#fff" }}>

@@ -77,7 +77,7 @@ const CareerList = () => {
       className="min-h-screen overflow-x-hidden bg-white text-[#1D1D1F] antialiased"
       style={{ fontFamily: appleFont }}
     >
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content">
         {/* HERO — light */}

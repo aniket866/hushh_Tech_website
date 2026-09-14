@@ -120,7 +120,7 @@ const BenefitsPage: React.FC = () => {
       className="bg-white antialiased text-[#1D1D1F] selection:bg-[#0066CC] selection:text-white"
       style={{ fontFamily: appleFont }}
     >
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content">
         {/* Hero — light */}

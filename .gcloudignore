@@ -25,8 +25,6 @@ scripts/ci/*
 !scripts/ci/check-no-hybrid-runtime.mjs
 !scripts/ci/no-hybrid-runtime-policy.json
 files/
-hushh_api_reports/
-playstore-assets/
 public/
 cloud-run/
 *.sql

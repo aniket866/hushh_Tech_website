@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { isUatWebsite } from '../services/uatOptionalTraffic';
 
 const STOCK_QUOTES_API_URL = '/api/stock-quotes';
 
@@ -11,7 +10,10 @@ const STOCK_SYMBOLS = [
   'MSFT',       // Microsoft
   'NVDA',       // NVIDIA
   'AMZN',       // Amazon
-  'BRK.B',      // Berkshire Hathaway
+  // BRK-B, not BRK.B. Yahoo's chart endpoint answers 404 to the dotted form and 200 to the
+  // hyphenated one, so the cornerstone holding was the one symbol the strip never showed.
+  // hushh-research's registry uses the same hyphenated form (it answers "BRK" with BRK-A).
+  'BRK-B',      // Berkshire Hathaway
   'META',       // Meta Platforms
   'JPM',        // JPMorgan Chase
   '1398.HK',    // ICBC
@@ -42,7 +44,7 @@ const STOCK_NAMES: Record<string, string> = {
   'MSFT': 'Microsoft',
   'NVDA': 'NVIDIA',
   'AMZN': 'Amazon',
-  'BRK.B': 'Berkshire',
+  'BRK-B': 'Berkshire',
   'META': 'Meta',
   'JPM': 'JPMorgan',
   '1398.HK': 'ICBC',
@@ -73,7 +75,7 @@ const STOCK_SHORT_SYMBOLS: Record<string, string> = {
   'MSFT': 'MSFT',
   'NVDA': 'NVDA',
   'AMZN': 'AMZN',
-  'BRK.B': 'BRK.B',
+  'BRK-B': 'BRK.B',
   'META': 'META',
   'JPM': 'JPM',
   '1398.HK': 'ICBC',
@@ -104,7 +106,7 @@ const STOCK_LOGOS: Record<string, string> = {
   'MSFT': 'https://static.vecteezy.com/system/resources/previews/027/127/473/non_2x/microsoft-logo-microsoft-icon-transparent-free-png.png',
   'NVDA': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSVEu8tfOJpA-vMjPqyI2gEyaDjTaI7tSJFzQ&s',
   'AMZN': 'https://static.vecteezy.com/system/resources/previews/014/018/561/non_2x/amazon-logo-on-transparent-background-free-vector.jpg',
-  'BRK.B': 'https://www.shutterstock.com/shutterstock/photos/2378735305/display_1500/stock-vector-brk-letter-logo-design-on-a-white-background-or-monogram-logo-design-for-entrepreneur-and-business-2378735305.jpg',
+  'BRK-B': 'https://www.shutterstock.com/shutterstock/photos/2378735305/display_1500/stock-vector-brk-letter-logo-design-on-a-white-background-or-monogram-logo-design-for-entrepreneur-and-business-2378735305.jpg',
   'META': 'https://img.freepik.com/premium-vector/meta-company-logo_265339-667.jpg',
   'JPM': 'https://e7.pngegg.com/pngimages/225/668/png-clipart-jpmorgan-chase-logo-bank-business-morgan-stanley-bank-text-logo.png',
   '1398.HK': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Industrial_and_Commercial_Bank_of_China_logo.svg/2560px-Industrial_and_Commercial_Bank_of_China_logo.svg.png',
@@ -136,6 +138,12 @@ export interface StockQuote {
   percentChange: number;
   isUp: boolean;
   logo: string;
+  /**
+   * Whether this row carries a real quote from the provider. False means the symbol is a
+   * placeholder and nothing about its price or movement is known. Anything rendering a number for
+   * this row must check it first.
+   */
+  hasQuote: boolean;
 }
 
 interface EdgeFunctionQuote {
@@ -158,24 +166,51 @@ interface EdgeFunctionResponse {
   error?: string;
 }
 
-// Generate fallback data for when API is not available
-function generateFallbackData(): StockQuote[] {
+/**
+ * The symbols with no market data attached.
+ *
+ * This used to invent the numbers -- `percentChange: (Math.random() - 0.5) * 4` and
+ * `isUp: Math.random() > 0.4` -- as the INITIAL state, and the error path never cleared it. With
+ * the quotes endpoint returning 404 the ticker therefore showed randomly generated percentages,
+ * under a green dot reading "Markets Live" and a timestamp, on every page load. For a firm that
+ * publishes investment research that is not a placeholder, it is fabricated market data.
+ *
+ * A row with `hasQuote: false` renders as a symbol and nothing else. An empty strip is a visible
+ * problem someone fixes; a plausible wrong number is one nobody ever notices.
+ */
+function placeholderQuotes(): StockQuote[] {
   return STOCK_SYMBOLS.map(symbol => ({
     symbol,
     displaySymbol: STOCK_SHORT_SYMBOLS[symbol] || symbol,
     name: STOCK_NAMES[symbol] || symbol,
     currentPrice: 0,
     change: 0,
-    percentChange: (Math.random() - 0.5) * 4, // Random -2% to +2%
-    isUp: Math.random() > 0.4,
+    percentChange: 0,
+    isUp: false,
     logo: STOCK_LOGOS[symbol] || '',
+    hasQuote: false,
   }));
 }
 
 // Hook for fetching stock quotes via GcpBackend edge function
 export function useStockQuotes(refreshInterval = 120000, enabled = true) {
-  const requestEnabled = enabled && !isUatWebsite();
-  const [quotes, setQuotes] = useState<StockQuote[]>(generateFallbackData());
+  /*
+   * `requestEnabled` is `enabled`, and origin/main's ` && !isUatWebsite()` is deliberately gone.
+   *
+   * That guard was added by f779d42e because "UAT's stock gateway ... is not enabled" -- at the
+   * time `/api/stock-quotes` answered 404 FEATURE_DISABLED there, so every request was waste and
+   * every rendered row was `generateFallbackData()`'s invented number. Both halves of that premise
+   * are now false: the gateway is enabled on the UAT service and returns live prices, and the
+   * fabricated fallback it was protecting readers from no longer exists -- `placeholderQuotes()`
+   * invents nothing and `hasQuote` marks which rows are real.
+   *
+   * The protection is kept, by a stronger rule: the ticker hides itself whenever no row carries a
+   * real quote, on any host. The host check could only ever protect one of them.
+   *
+   * isUatWebsite still guards the analytics collector and the deck covers, which remain off there.
+   */
+  const requestEnabled = enabled;
+  const [quotes, setQuotes] = useState<StockQuote[]>(placeholderQuotes());
   const [loading, setLoading] = useState(requestEnabled);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -217,6 +252,7 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
           percentChange: q.percentChange || 0,
           isUp: (q.percentChange || 0) >= 0,
           logo: STOCK_LOGOS[q.symbol] || '',
+          hasQuote: true,
         }));
         
         setQuotes(mappedQuotes);
@@ -226,6 +262,11 @@ export function useStockQuotes(refreshInterval = 120000, enabled = true) {
     } catch (err) {
       console.error('Error fetching stock quotes:', err);
       setError('Failed to fetch stock quotes');
+      // Drop back to symbols without numbers rather than leaving the last successful values on
+      // screen under a "live" label. A stale quote presented as current is the same defect as an
+      // invented one, just slower.
+      setQuotes(placeholderQuotes());
+      setLastUpdated(null);
       setLoading(false);
     }
   }, [requestEnabled]);

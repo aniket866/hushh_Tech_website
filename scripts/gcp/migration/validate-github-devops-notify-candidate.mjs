@@ -16,7 +16,7 @@ const CANDIDATE_HANDLER_PATH =
 const TRUST_ANCHOR_PATH =
   `${SERVICE_PATH}/registry/github-devops-notify-approval-trust-anchor.v1.json`;
 const EXPECTED_DOCUMENT_DIGEST =
-  "5f5007c26fc1a9cef0528f4c050f8352b7c92192436828680b07f6d84dd46ceb";
+  "192f447315cc68755a853787befe8a35566a1a1b92bbfdd48ed40d6958750c62";
 const AUTHORITATIVE_BLOCKERS = Object.freeze([
   "SOURCE_BUNDLE_VERSION_UNBOUND",
   "SOURCE_METADATA_END_CHECK_MISSING",
@@ -347,7 +347,7 @@ export async function validateGithubDevopsNotifyCandidate({ repoRoot }) {
       "cloud-run/hushh-tech-app-services/src/handlers/github-devops-notify.js",
     manifest_path: MANIFEST_PATH,
     manifest_self_digest:
-      "72e6c59f14d82429f632a16ce59ee66f2f7bc4be3566312539041841cbe5c6d1",
+      "15aea735fadb45212914ad3652891ff8f1d430b31a87cff3d17be3450c1dc757",
     reviewed_commit: "2df49536f5e9c1eff3324f225e33b042eec1dea6",
     reviewed_tree: "10aaac108dd01bea0e240d96137c8860aa1d488b",
   });

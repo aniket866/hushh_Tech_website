@@ -394,7 +394,14 @@ describe("HushhTechNavDrawer auth gating", () => {
     const backdrop = dialog?.parentElement;
 
     expect(closeButton).toBeInstanceOf(HTMLButtonElement);
-    expect(dialog?.className).toContain("animate-scaleIn");
+    // The panel is its own surface, distinct from the backdrop it sits on. The entrance used to be
+    // a CSS class (`animate-scaleIn`) and is now a Framer spring, so asserting the class name would
+    // pin the implementation rather than the behaviour this test is named for. What must hold is
+    // that the dialog is a separate element from its backdrop -- that is what makes the click
+    // separation below meaningful.
+    expect(dialog).toBeInstanceOf(HTMLElement);
+    expect(backdrop).not.toBe(dialog);
+    expect(dialog?.getAttribute("aria-modal")).toBe("true");
 
     await act(async () => {
       dialog?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

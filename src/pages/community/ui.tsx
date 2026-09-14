@@ -55,18 +55,23 @@ const SearchBar = ({
   value,
   onChange,
   inputRef,
+  // The page renders this twice — once in the sticky bar a phone gets, once in the desktop column —
+  // and only one is displayed at a time. They still both exist in the DOM, so a shared id would be
+  // a duplicate, which breaks the label association and makes `getElementById` a coin toss.
+  id = "community-search",
 }: {
   value: string;
   onChange: (value: string) => void;
   inputRef?: RefObject<HTMLInputElement>;
+  id?: string;
 }) => (
   <div className="flex h-11 items-center gap-2.5 rounded-[14px] bg-[#767680]/[0.10] px-4 shadow-[inset_0_0_0_0.5px_rgba(29,29,31,0.04)]">
     {Icon.search("rgba(60,60,67,0.55)", 16)}
-    <label htmlFor="community-search" className="sr-only">
+    <label htmlFor={id} className="sr-only">
       Search articles
     </label>
     <input
-      id="community-search"
+      id={id}
       ref={inputRef}
       type="text"
       value={value}
@@ -478,7 +483,7 @@ export default function CommunityPage() {
         description="Fund updates, market notes, and source-backed research from HushhTech — the AI-powered Berkshire Hathaway."
         path="/community"
       />
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content" aria-busy={apiLoading}>
         {/* Hero */}
@@ -518,11 +523,26 @@ export default function CommunityPage() {
         </section>
 
         <div className="mx-auto w-full max-w-[1180px] px-5 pb-28 md:pb-36">
-          {/* Mobile category rail — horizontal, scrollable, sticky under header */}
+          {/*
+            Mobile: search and categories are one bar, pinned directly under the chrome.
+
+            `top` comes from the header's own measurement rather than a written-down number. It was
+            140px against a header that measures 52, so the rail parked a third of the way down the
+            page with content sliding underneath it. The variable also drops to zero while the
+            header is scrolled away, so this rises to the very top with it.
+          */}
           <nav
-            aria-label="Article categories"
-            className="sticky top-[140px] z-30 -mx-5 mb-6 border-b border-[#1D1D1F]/[0.08] bg-white/85 px-5 py-2.5 backdrop-blur-xl md:hidden"
+            aria-label="Search and article categories"
+            className="sticky z-30 -mx-5 mb-6 border-b border-[#1D1D1F]/[0.08] bg-white/85 px-5 pb-2.5 pt-3 backdrop-blur-xl md:hidden"
+            style={{ top: "var(--hushh-header-offset, 0px)" }}
           >
+            <div className="mb-2.5">
+              <SearchBar
+                id="community-search-mobile"
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+            </div>
             <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {railOptions.map((option) => {
                 const active = selectedCategory === option;
@@ -549,7 +569,7 @@ export default function CommunityPage() {
           <div className="md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-12 lg:gap-16">
             {/* Desktop left rail — sticky categories list */}
             <nav aria-label="Article categories" className="hidden md:block">
-              <div className="sticky top-[170px]">
+              <div className="sticky" style={{ top: "calc(var(--hushh-header-offset, 0px) + 1.5rem)" }}>
                 <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1D1D1F]/40">
                   Categories
                 </p>
@@ -594,7 +614,12 @@ export default function CommunityPage() {
 
             {/* Right column — search + content */}
             <div className="min-w-0">
-              <div className="mb-8">
+              {/* Hidden below md: the sticky bar above already carries the field there, and two
+                  search inputs on one page is two places for focus and state to disagree. */}
+              <div
+                className="sticky z-20 -mx-2 mb-8 hidden bg-white/85 px-2 py-3 backdrop-blur-xl md:block"
+                style={{ top: "var(--hushh-header-offset, 0px)" }}
+              >
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}

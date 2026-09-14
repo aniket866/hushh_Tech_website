@@ -43,8 +43,6 @@ eslint.config.js
 .prettierrc
 
 # Misc assets not needed for web
-playstore-assets/
-hushh_api_reports/
 prompts.txt
 PLAY_STORE_RELEASE_NOTES.txt
 monitor-domain-verification.sh

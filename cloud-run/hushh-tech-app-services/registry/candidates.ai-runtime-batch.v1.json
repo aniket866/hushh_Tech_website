@@ -39,7 +39,7 @@
     "cloud-run/hushh-tech-app-services/src/server.js": "95be653456802847592605f58cdb4375dec52f1e350255547665ef3f576cde0f",
     "api/shared/supabaseRetirementFunctionRegistry.generated.js": "936c2d5004e0a1ef476506dd8117f7c80f8663ac9ff7dddc13381680d1fc8a17",
     "api/legacy-functions.js": "116666c15a25a23fa87a74fbc2079653450dab27ea19a7e278c3857c3c7f35d3",
-    "server.js": "c536ff4c896b7f24cf75e4137d34094495e8bebb4d0630807b155371096bad97"
+    "server.js": "cc0ecf0d266a48d45b4cbe564a61d508077e46672a64885508aac67397451b1f"
   },
   "candidate_implementation": {
     "path": "cloud-run/hushh-tech-app-services/src/handlers/ai-runtime-batch.js",

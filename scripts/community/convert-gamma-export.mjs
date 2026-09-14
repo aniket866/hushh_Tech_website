@@ -37,10 +37,14 @@ const STAGE = join(root, "content/decks/gamma-export");
 // image that could not be mirrored and should be dropped. Applied here so the two scripts can run
 // in either order — converting after a mirror used to restore every CDN hotlink. The gated half is
 // a separate, gitignored file: it names the public origin of every NDA deck image.
-const MEDIA_MAPS = [
-  join(root, "content/decks/media-map.json"),
-  join(root, "content/decks/media-map-gated.json"),
-];
+//
+// These are kept APART, never merged. Both are keyed by the origin CDN URL, and a stock photo used
+// by a public deck and an NDA deck appears in both under the same key. Merging them with
+// Object.assign let the gated entry win for every deck, so a public deck's card ended up pointing
+// at /api/community/assets/gated/... -- a 401 and a broken image for every reader, and a public
+// page holding a pointer into gated storage. Two decks shipped that way to production.
+const PUBLIC_MEDIA_MAP = join(root, "content/decks/media-map.json");
+const GATED_MEDIA_MAP = join(root, "content/decks/media-map-gated.json");
 
 /* ------------------------------------------------------------------------------------------- */
 /* HTML normalisation                                                                            */
@@ -339,6 +343,22 @@ const anchorFor = (title, index) => {
   return base ? `${String(index + 1).padStart(2, "0")}-${base}` : `card-${index + 1}`;
 };
 
+/**
+ * Gated decks a PUBLIC deck's cards point into. Empty for a gated deck, which is supposed to.
+ */
+export const leakedGatedReferences = (cards, isGated) => {
+  if (isGated) return [];
+  return [
+    ...new Set(
+      [
+        ...JSON.stringify(cards).matchAll(
+          /\/api\/community\/assets\/gated\/decks\/([a-z0-9-]+)\//g,
+        ),
+      ].map((match) => match[1]),
+    ),
+  ];
+};
+
 export const convertExport = (body, mediaMap = {}) => {
   const cards = splitCards(body).map(({ id, inner }, index) => {
     const title = titleOfCard(inner);
@@ -437,10 +457,14 @@ export const cardsToMarkdown = (deckTitle, cards) => {
 
 const main = () => {
   const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
-  const mediaMap = Object.assign(
-    {},
-    ...MEDIA_MAPS.map((path) => (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {})),
-  );
+  const readMap = (path) => (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {});
+  // A deck resolves its images against the map for its own access level and no other. A public
+  // deck must never resolve to a gated object, and a gated deck resolving to a public one would
+  // stop being gated -- isNdaAsset() reads the object prefix, so the prefix IS the access level.
+  const mediaMapsByAccess = {
+    Public: readMap(PUBLIC_MEDIA_MAP),
+    NDA: readMap(GATED_MEDIA_MAP),
+  };
   const only = process.argv.includes("--deck") ? process.argv[process.argv.indexOf("--deck") + 1] : "";
   const publicDir = join(root, "content/decks/cards");
   const gatedDir = join(root, "content/decks/cards-gated");
@@ -454,9 +478,25 @@ const main = () => {
     const stagePath = join(STAGE, `${deck.gammaId}.html`);
     if (!existsSync(stagePath)) continue;
 
-    const cards = convertExport(readFileSync(stagePath, "utf8"), mediaMap);
+    const isGated = deck.accessLevel === "NDA";
+    const cards = convertExport(
+      readFileSync(stagePath, "utf8"),
+      mediaMapsByAccess[isGated ? "NDA" : "Public"],
+    );
     if (!cards.length) {
       console.error(`  ${deck.slug}: export produced no cards`);
+      process.exitCode = 1;
+      continue;
+    }
+
+    // Belt and braces. The separated maps above are the fix; this is the assertion that the fix
+    // held, because the failure is silent everywhere else -- valid markup, a 200 route, and a
+    // crawler body built from the markdown rather than the cards.
+    const leaked = leakedGatedReferences(cards, isGated);
+    if (leaked.length) {
+      console.error(
+        `  ${deck.slug}: public cards reference gated media (${leaked.join(", ")})`,
+      );
       process.exitCode = 1;
       continue;
     }

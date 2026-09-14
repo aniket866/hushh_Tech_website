@@ -3,7 +3,6 @@ import { useRef } from "react";
 import { useOptionalAuthSession } from "../../auth/AuthSessionProvider";
 import { useConstantTickerMotion } from "../../hooks/useConstantTickerMotion";
 import { StockQuote, useStockQuotes } from "../../hooks/useStockQuotes";
-import { isUatWebsite } from "../../services/uatOptionalTraffic";
 import { isHushhResearchProductBoundary } from "../../services/hushhResearch/legacyProductData";
 import { Icon, SYS, appleFont } from "../hushh-tech-ui/HushhAppleUI";
 
@@ -14,7 +13,12 @@ const logoTint = [
   "#F4ECFF",
 ];
 
-const TICKER_SCROLL_PIXELS_PER_SECOND = 168;
+/**
+ * Reading speed, not stock-exchange speed. At 168 the strip was faster than the eye can fix on a
+ * symbol, so it registered as motion rather than as information and pulled attention off the page
+ * underneath it. A little over 50 gives a chip roughly a second and a half in view.
+ */
+const TICKER_SCROLL_PIXELS_PER_SECOND = 52;
 
 const TickerChip = ({
   quote,
@@ -59,15 +63,28 @@ const TickerChip = ({
       <span className="text-[12px] font-medium leading-none tracking-[-0.01em] text-[#1D1D1F]">
         {quote.displaySymbol}
       </span>
-      <span className="flex items-center gap-0.5">
-        {quote.isUp ? Icon.triUp(tint) : Icon.triDown(tint)}
-        <span
-          className={`text-[11px] font-semibold tabular-nums tracking-[-0.01em] ${isLoading ? "animate-pulse" : ""}`}
-          style={{ color: tint }}
-        >
-          {Math.abs(quote.percentChange).toFixed(1)}%
+      {/*
+        No quote, no number and no direction arrow. A row without market data shows its symbol
+        alone rather than a plausible-looking percentage, so an outage reads as an outage.
+      */}
+      {quote.hasQuote ? (
+        <span className="flex items-center gap-0.5">
+          {quote.isUp ? Icon.triUp(tint) : Icon.triDown(tint)}
+          <span
+            className={`text-[11px] font-semibold tabular-nums tracking-[-0.01em] ${isLoading ? "animate-pulse" : ""}`}
+            style={{ color: tint }}
+          >
+            {Math.abs(quote.percentChange).toFixed(1)}%
+          </span>
         </span>
-      </span>
+      ) : (
+        <span
+          className="text-[11px] font-medium leading-none tracking-[-0.01em] text-[#1D1D1F]/30"
+          aria-label="Quote unavailable"
+        >
+          --
+        </span>
+      )}
     </div>
   );
 };
@@ -87,36 +104,53 @@ export default function HushhTechTicker() {
     !isResearchBoundary,
   );
 
+  // "Live" means at least one real quote came back, not merely that the strip is on screen.
+  const isLive = quotes.some((quote) => quote.hasQuote);
+
+
   useConstantTickerMotion({
-    enabled: !isUatWebsite() && quotes.length > 0,
+    enabled: quotes.length > 0,
     loopRef: tickerLoopRef,
     trackRef: tickerTrackRef,
     pixelsPerSecond: TICKER_SCROLL_PIXELS_PER_SECOND,
   });
 
-  // Do not label fallback/random quotes as live while the UAT gateway is off.
-  if (isUatWebsite()) return null;
+  /*
+   * No real quotes, no strip.
+   *
+   * `/api/stock-quotes` answers 404 FEATURE_DISABLED in every environment -- the enable flag and
+   * the rate-limit salt are set on neither Cloud Run service -- so there is nothing to show. The
+   * honest placeholder state this replaces (27 symbols, each reading "--", under "Markets
+   * Unavailable") was accurate and still worse than an empty header: it spent the most valuable
+   * strip on the page telling readers something was broken.
+   *
+   * The header spacer measures the header, so removing this costs no layout fix. The strip returns
+   * on its own the first time a quote arrives.
+   */
+  if (!isLive) return null;
 
+  // No border, no background and no top margin: the strip sits directly on the header's own glass.
+  // Each of those three drew its own edge a couple of pixels below the controls -- a rule, a white
+  // inset highlight, and a sliver of page showing through a lighter panel -- which together made
+  // the ticker look bolted on underneath the header rather than part of it.
   return (
-    <section
-      className="mt-0.5 overflow-hidden border-t border-[#1D1D1F]/[0.06] py-1 opacity-100"
-      data-hushh-ticker
-      style={{
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.40) 0%, rgba(255,255,255,0.25) 100%)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.6)",
-      }}
-    >
+    <section className="overflow-hidden py-1 opacity-100" data-hushh-ticker>
+      {/*
+        The dot and the word "Live" are a claim about the data. They are earned by a real quote
+        having arrived, not by the component having rendered.
+      */}
       <div className="mb-1 flex items-center justify-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#34C759]" />
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: isLive ? "#34C759" : "rgba(29,29,31,0.25)" }}
+        />
         <span
           className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#1D1D1F]/55"
           style={{ fontFamily: appleFont }}
         >
-          Markets Live
+          {isLive ? "Markets Live" : "Markets Unavailable"}
         </span>
-        {lastUpdated ? (
+        {isLive && lastUpdated ? (
           <span
             className="hidden text-[11px] font-normal text-[#1D1D1F]/35 sm:inline"
             style={{ fontFamily: appleFont }}

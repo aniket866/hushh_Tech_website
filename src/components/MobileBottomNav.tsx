@@ -9,6 +9,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { FiHome, FiTrendingUp, FiUsers, FiUser } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useInvestorJourneyCta } from '../hooks/useInvestorJourneyCta';
+import { useChromeVisibility } from '../hooks/useChromeVisibility';
 
 const MotionLink = motion(Link);
 
@@ -62,6 +63,7 @@ const hiddenOnPages = [
 
 // Framer Motion variants for entrance animation
 const navVariants = {
+  // First paint only.
   hidden: {
     y: 20,
     opacity: 0,
@@ -73,23 +75,17 @@ const navVariants = {
       type: 'spring',
       stiffness: 300,
       damping: 30,
-      staggerChildren: 0.05,
     },
   },
-};
-
-const itemVariants = {
-  hidden: {
-    y: 10,
-    opacity: 0,
-  },
-  visible: {
-    y: 0,
+  // Scrolled away, or on a route that excludes the bar. Fully off-screen rather than faded, so
+  // nothing shows through the content underneath it.
+  tucked: {
+    y: '100%',
     opacity: 1,
     transition: {
       type: 'spring',
-      stiffness: 300,
-      damping: 30,
+      stiffness: 400,
+      damping: 40,
     },
   },
 };
@@ -97,13 +93,23 @@ const itemVariants = {
 // Motion component for the nav container
 const MotionBox = motion(Box);
 
-const MobileBottomNav: React.FC = () => {
+interface MobileBottomNavProps {
+  /**
+   * Layout-level suppression. The layout used to express this by not rendering the bar at all,
+   * which is a mount/unmount across every navigation between a suppressed and an unsuppressed
+   * route. Passing it in keeps the bar mounted and lets it hide itself.
+   */
+  suppressed?: boolean;
+}
+
+const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ suppressed = false }) => {
   const location = useLocation();
   // For unpaid users the Profile tab now routes via the journey hook (which
   // takes them to step-9 / FL with a banner) instead of dumping them on
   // /hushh-user-profile only to be evicted by InvestorAccessRoute. This
   // removes the flash-then-bounce UX on the mobile tab bar.
   const { primaryCTA: journeyCta } = useInvestorJourneyCta();
+  const scrolledAway = useChromeVisibility();
 
   // Check if current page should hide the nav
   const shouldHideNav = hiddenOnPages.some(page =>
@@ -114,9 +120,10 @@ const MobileBottomNav: React.FC = () => {
   const isFullScreenPost = location.pathname.startsWith('/community/') &&
     location.pathname !== '/community';
 
-  if (shouldHideNav || isFullScreenPost) {
-    return null;
-  }
+  // Deliberately NOT an early `return null`. Unmounting the bar on these routes and remounting it
+  // on the next one replays the entrance spring every time, which is the flicker readers noticed.
+  // It stays mounted for the life of the session and slides out of the way instead.
+  const routeHidesNav = suppressed || shouldHideNav || isFullScreenPost;
 
   // Check if a nav item is active - uses location.pathname for immediate sync
   const checkIsActive = (item: NavItem): boolean => {
@@ -132,7 +139,11 @@ const MobileBottomNav: React.FC = () => {
       <Box
         aria-hidden="true"
         display={{ base: 'block', md: 'none' }}
-        h={{ base: 'calc(92px + env(safe-area-inset-bottom, 0px))', sm: 'calc(108px + env(safe-area-inset-bottom, 0px))' }}
+        h={
+          routeHidesNav
+            ? '0px'
+            : { base: 'calc(92px + env(safe-area-inset-bottom, 0px))', sm: 'calc(108px + env(safe-area-inset-bottom, 0px))' }
+        }
         flexShrink={0}
       />
       <MotionBox
@@ -148,21 +159,24 @@ const MobileBottomNav: React.FC = () => {
         bg="#F8F9FA"
         borderTop="1px solid"
         borderColor="#E5E7EB"
-        // Safe area inset for iOS devices with home indicator
-        sx={{
-          pb: 'env(safe-area-inset-bottom, 0px)',
-        }}
         // Ensure nav doesn't block content - use pointer-events properly
         css={{
           // Prevent the nav background from extending beyond its bounds
           clipPath: 'inset(0 0 0 0)',
         }}
-        // Entrance animation variants
+        // The entrance plays once, on first mount. There is no `key` here on purpose: keying this
+        // by pathname made React discard and rebuild the whole bar on every navigation, replaying
+        // the spring and its staggered children each time.
         variants={navVariants}
         initial="hidden"
-        animate="visible"
-        // Re-animate on route change for smooth transitions
-        key={location.pathname}
+        animate={routeHidesNav || scrolledAway ? 'tucked' : 'visible'}
+        aria-hidden={routeHidesNav ? true : undefined}
+        sx={{
+          pb: 'env(safe-area-inset-bottom, 0px)',
+          // `visibility` keeps a route-excluded bar out of the tab order. It is not used for the
+          // scroll tuck, which must stay focusable for anyone tabbing rather than scrolling.
+          visibility: routeHidesNav ? 'hidden' : 'visible',
+        }}
       >
         <Flex
           justify="space-around"
@@ -208,8 +222,6 @@ const MobileBottomNav: React.FC = () => {
                   bg: 'rgba(47, 128, 237, 0.05)',
                   borderRadius: 'lg',
                 }}
-                // Framer Motion item variants for staggered entrance
-                variants={itemVariants}
               >
                 {/* Icon Container - Blue circle when active */}
                 <Flex

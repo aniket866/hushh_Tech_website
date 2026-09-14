@@ -148,7 +148,7 @@ const FaqPage: React.FC = () => {
         path="/faq"
         jsonLd={FAQ_SCHEMA}
       />
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
 
       <main id="main-content">
         <AppleSection tone="light" pad="normal">

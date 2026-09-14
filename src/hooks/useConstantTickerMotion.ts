@@ -7,7 +7,18 @@ interface ConstantTickerMotionOptions {
   pixelsPerSecond?: number;
 }
 
-const DEFAULT_TICKER_PIXELS_PER_SECOND = 168;
+const DEFAULT_TICKER_PIXELS_PER_SECOND = 52;
+
+/**
+ * How far the marquee had travelled when it was last torn down.
+ *
+ * The header is mounted by each page rather than by the layout, so every navigation unmounts this
+ * ticker and mounts a fresh one. Starting from zero each time is what makes the strip read as
+ * "constantly restarting" — the eye catches the jump even when the speed is calm. Module scope is
+ * the right home for it: there is one ticker on screen at a time, and the value is meaningless to
+ * anything else.
+ */
+let resumeOffsetPx = 0;
 
 export const useConstantTickerMotion = ({
   enabled,
@@ -34,7 +45,7 @@ export const useConstantTickerMotion = ({
     let measureFrame = 0;
     let lastTime = performance.now();
     let distance = Math.max(1, loop.scrollWidth);
-    let offset = 0;
+    let offset = resumeOffsetPx % distance;
 
     const measure = () => {
       measureFrame = 0;
@@ -56,6 +67,7 @@ export const useConstantTickerMotion = ({
       lastTime = time;
 
       offset = (offset + (delta / 1000) * pixelsPerSecond) % distance;
+      resumeOffsetPx = offset;
       track.style.transform = `translate3d(${-offset}px, 0, 0)`;
       tickerFrame = requestFrame(tick);
     };

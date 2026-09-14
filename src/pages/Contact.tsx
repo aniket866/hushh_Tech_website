@@ -196,7 +196,7 @@ export default function Contact() {
 
   return (
     <Box bg={pageBg} minH="100vh" className="antialiased text-gray-900" style={{ fontFamily: appleFont }}>
-      <HushhTechHeader showSearch={false} />
+      <HushhTechHeader />
       <Box
         as="main"
         id="main-content"

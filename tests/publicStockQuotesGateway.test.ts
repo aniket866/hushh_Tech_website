@@ -163,7 +163,12 @@ describe("public stock-quotes GCP gateway", () => {
 
   it("uses only the canonical private investor service and an HMAC client key", async () => {
     const calls: Array<{ url: string; options: CapturedFetchOptions }> = [];
+    // Pinned to the proxy path explicitly. The handler's default is now a direct provider — the
+    // investor API has no /api/v1/public/stock-quotes route, so proxying answered Google's HTML
+    // 404 and every request became a 502 — but the proxy path still exists for the day it does,
+    // and this is what guards its audience and its client-key derivation.
     const handler = createStockQuotesHandler({
+      quoteProvider: null,
       env: env(),
       getServiceIdentityToken: async (audience) => {
         expect(audience).toBe(UAT_SERVICE);
@@ -247,19 +252,19 @@ describe("public stock-quotes GCP gateway", () => {
       request({
         headers: { ...request().headers, "x-forwarded-proto": "http" },
       }),
-      request({
-        headers: {
-          ...request().headers,
-          "x-forwarded-for": "203.0.113.7",
-        },
-      }),
-      request({
-        headers: {
-          ...request().headers,
-          "x-forwarded-for":
-            "192.0.2.9, 203.0.113.7, 198.51.100.4",
-        },
-      }),
+      /*
+       * Two X-Forwarded-For cases used to sit here, and both asserted the wrong model.
+       *
+       * A single-entry chain was expected to be refused — but that is precisely what Cloud Run
+       * sends for every real browser, so this test was asserting that the feature could never
+       * work, which is why nobody noticed it could not. A three-entry chain was expected to be
+       * refused too; a caller can prepend as many hops as it likes and only the last one, which
+       * Cloud Run appends, means anything.
+       *
+       * Which hop the limiter keys on is now pinned properly in
+       * tests/publicStockQuotesClientIp.test.ts, including the forged-prefix case that used to
+       * get through with a caller-chosen identity.
+       */
       request({
         headers: { ...request().headers, authorization: "Bearer public" },
       }),

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuthSession } from "../../auth/AuthSessionProvider";
@@ -6,6 +6,7 @@ import { useHushhProfileCta } from "../../hooks/useHushhProfileCta";
 import { useModalKeyboardNavigation } from "../../hooks/useModalKeyboardNavigation";
 import { moveFocusWithin } from "../../utils/keyboardNavigation";
 import DeleteAccountModal from "../DeleteAccountModal";
+import { AdaptiveSheet } from "../ui/AdaptiveSheet";
 import { AppleButton, HushhMark, Icon, SYS, appleFont } from "../hushh-tech-ui/HushhAppleUI";
 
 interface NavItem {
@@ -82,18 +83,6 @@ const HushhTechNavDrawer: React.FC<HushhTechNavDrawerProps> = ({
     onClose,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
   const handleNavigate = (path: string) => {
     onClose();
     navigate(path);
@@ -125,25 +114,16 @@ const HushhTechNavDrawer: React.FC<HushhTechNavDrawerProps> = ({
     moveFocusWithin(drawerRef.current, event);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end bg-[#000000]/35 backdrop-blur-[10px] selection:bg-[#0066CC] selection:text-[#F5F5F7]"
-      onClick={onClose}
-    >
-      <div
-        ref={drawerRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="hushh-nav-drawer-title"
-        tabIndex={-1}
-        onKeyDown={handleDrawerKeyDown}
-        onClick={(event) => event.stopPropagation()}
-        className="max-h-[calc(100dvh-1rem)] w-full overflow-hidden rounded-t-[32px] bg-[#FFFFFF] shadow-[0_-8px_32px_rgba(29,29,31,0.18)] animate-scaleIn"
-      >
-        <div className="mx-auto mt-3 h-1.5 w-9 rounded-full bg-[#000000]/[0.18]" />
-
+    <>
+    <AdaptiveSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="hushh-nav-drawer-title"
+      panelRef={drawerRef}
+      onKeyDown={handleDrawerKeyDown}
+      className="selection:bg-[#0066CC] selection:text-[#F5F5F7]"
+      header={({ isDesktop }) => (
         <div className="flex items-center justify-between px-5 py-5">
           <div className="flex items-center gap-3">
             <HushhMark size={34} />
@@ -168,14 +148,15 @@ const HushhTechNavDrawer: React.FC<HushhTechNavDrawerProps> = ({
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[#767680]/15 text-[#1D1D1F] transition hover:bg-[#767680]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35"
+            className={`h-11 w-11 items-center justify-center rounded-full bg-[#767680]/15 text-[#1D1D1F] transition hover:bg-[#767680]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066CC]/35 ${isDesktop ? "flex" : "hidden"}`}
             aria-label="Close menu"
           >
             {Icon.close("#1D1D1F", 13)}
           </button>
         </div>
-
-        <div className="max-h-[calc(100dvh-8.5rem)] overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom,0px)+2rem)]">
+      )}
+    >
+        <div className="px-5 pb-[calc(env(safe-area-inset-bottom,0px)+2rem)]">
           <button
             type="button"
             onClick={handleUnlockCoins}
@@ -296,14 +277,14 @@ const HushhTechNavDrawer: React.FC<HushhTechNavDrawerProps> = ({
 
           <div className="h-6" />
         </div>
-      </div>
+    </AdaptiveSheet>
 
-      <DeleteAccountModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onAccountDeleted={handleAccountDeleted}
-      />
-    </div>
+    <DeleteAccountModal
+      isOpen={isDeleteModalOpen}
+      onClose={() => setIsDeleteModalOpen(false)}
+      onAccountDeleted={handleAccountDeleted}
+    />
+    </>
   );
 };
 

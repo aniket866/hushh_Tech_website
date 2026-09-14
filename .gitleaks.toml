@@ -10,9 +10,7 @@ paths = [
   '''^public/''',
   '''^files/''',
   '''^node_modules/''',
-  '''^playstore-assets/''',
   '''^src/components/images/''',
-  '''^\.planning/''',
   '''^supabase/\.temp/''',
   '''^\.env\.local\.example$'''
 ]

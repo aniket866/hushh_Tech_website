@@ -70,7 +70,10 @@ describe("HomePage focus order", () => {
       "Read the fund prospectus",
     ]);
     expect(buttons[2].getAttribute("tabindex")).toBeNull();
-    expect(headerMock.mock.calls[0]?.[0]).toEqual(
+    // Home takes the header's default, which now includes search. It used to pass
+    // showSearch={false}, which is why the control was missing from the pages readers actually
+    // use. Search is suppressed only on internal surfaces now, so there is no prop to assert here.
+    expect(headerMock.mock.calls[0]?.[0]).not.toEqual(
       expect.objectContaining({ showSearch: false }),
     );
   });

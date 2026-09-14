@@ -113,6 +113,31 @@ const VALIDATOR_DIGESTS = [
   ["validate-plaid-payment-batch-candidates.mjs", "candidates.plaid-payment-batch.v1.json"],
 ];
 
+/**
+ * A validator may ALSO restate detached_approval verbatim, manifest_self_digest included, and
+ * assert the registry deep-equals it. That literal is the same recomputable value the registry
+ * carries, in a second place — so re-pinning a byte lock leaves it stale and the candidate test
+ * fails on a digest that looks like a forged approval and is not one.
+ *
+ * This was already the workflow, done by hand: commit f0c8ec5c updated exactly these two digests
+ * for the notify candidate and left reviewed_commit and reviewed_tree alone. Automating it removes
+ * the step people skip, and keeps the boundary in the same place — reviewed_commit, reviewed_tree
+ * and the trust anchors still record a human's approval and are still never touched here.
+ */
+const syncValidatorApprovalDigest = (validatorPath, registryPath) => {
+  const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+  const current = registry.detached_approval?.manifest_self_digest;
+  if (!current) return 0;
+  const source = readFileSync(validatorPath, "utf8");
+  const stale = [...source.matchAll(/manifest_self_digest:\s*\n?\s*"([0-9a-f]{64})"/g)]
+    .map((match) => match[1])
+    .find((digest) => digest !== current);
+  if (!stale) return 0;
+  if (write) writeFileSync(validatorPath, source.replaceAll(stale, current));
+  console.log(`  detached_approval.manifest_self_digest (restated in the validator)\n    ${stale}\n -> ${current}`);
+  return 1;
+};
+
 let staleConstants = 0;
 for (const [validatorFile, registryFile] of VALIDATOR_DIGESTS) {
   const validatorPath = join(root, "scripts/gcp/migration", validatorFile);
@@ -125,6 +150,10 @@ for (const [validatorFile, registryFile] of VALIDATOR_DIGESTS) {
   } catch {
     continue;
   }
+
+  // Run before the EXPECTED_DIGEST check below: that digest is taken over the registry document,
+  // and this one lives in the validator, so they are independent and both have to be current.
+  staleConstants += syncValidatorApprovalDigest(validatorPath, registryPath);
 
   const match = /EXPECTED_(?:DOCUMENT_)?DIGEST\s*=\s*\n?\s*"([0-9a-f]{64})"/.exec(source);
   if (!match) continue;
