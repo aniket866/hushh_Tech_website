@@ -760,7 +760,7 @@ export const posts: PostData[] = [
     slug: 'investment-strategies/exhibit-lpa',
     title: "Exhibit A: Limited Partnership Agreement (LPA) of Hushh Technologies Alpha Fund, LP",
     publishedAt: "2025-02-03",
-    description: "Institutional-grade, SEC-compliant investment framework for Hushh Technologies Alpha Fund, LP.",
+    description: "Draft investment framework for Hushh Technologies Alpha Fund, LP, subject to final legal review and executed documents.",
     category: 'investor relations & strategies',
     Component: ExhibitLPA,
     image: ExhibitLPAImg,

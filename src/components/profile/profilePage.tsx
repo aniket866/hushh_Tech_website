@@ -480,7 +480,7 @@ const ProfilePage: React.FC = () => {
               }}
             />
             <Text fontSize="13px" color="#6E6E73" fontWeight="500">
-              SEC REGISTERED
+              PRIVATE MARKETS
             </Text>
           </Box>
           <Box display="flex" alignItems="center" gap={2}>

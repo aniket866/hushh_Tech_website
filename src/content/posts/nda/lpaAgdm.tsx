@@ -168,7 +168,7 @@ const LpaAGDM = () => {
         11. REGULATORY COMPLIANCE & REPORTING
       </Heading>
       <List spacing={2} pl={4}>
-        <ListItem>• SEC & ADGM Filing: Registered with relevant U.S. and UAE financial authorities.</ListItem>
+        <ListItem>• Regulatory Filings: Any U.S. or UAE filing, registration, or exemption must be verified in final executed documents and official records; no regulatory approval is represented.</ListItem>
         <ListItem>• Quarterly Reports: NAV statements, investment performance, and portfolio allocation updates provided to LPs.</ListItem>
         <ListItem>• Audited Financials: Independent audits conducted annually.</ListItem>
       </List>

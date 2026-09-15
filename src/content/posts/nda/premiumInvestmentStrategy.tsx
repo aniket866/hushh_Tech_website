@@ -29,7 +29,7 @@ const PremiumInvestmentStrategy = () => {
         <ListItem>• Disclosures in line with UAE Commercial Companies Law and the SCA’s regulations.</ListItem>
       </List>
       <Text mb={4}>
-        The Fund is also SEC compliant for international investors, with a focus on high-net-worth individuals (HNWI), sovereign wealth funds, and institutional investors.
+        Any offering to U.S. or international investors is subject to applicable law, investor eligibility, and the final executed offering documents. No regulatory approval is represented.
       </Text>
       
       <Heading as="h3" fontSize="lg" color="black" mb={4}>III. Structuring of the Aloha & Alpha Fund under UAE Law</Heading>

@@ -207,7 +207,7 @@ export default function Footer() {
         {/* Disclaimer */}
         <div className="p-4 rounded-xl bg-[#161d2b]/50 border border-[#1F2937]/50">
           <p className="text-gray-300 text-xs leading-5">
-            <span className="font-bold text-gray-200">Disclaimer:</span> Investing involves risk, including loss of principal. Past performance does not guarantee future results. Hushh Technologies, Inc. is an SEC-registered investment adviser. Please consult with a financial advisor before making investment decisions.
+            <span className="font-bold text-gray-200">Disclaimer:</span> Investing involves risk, including loss of principal. Past performance does not guarantee future results. No regulator has approved or endorsed any investment described here. Please consult your legal, tax, and financial advisers before making investment decisions.
           </p>
         </div>
       </div>

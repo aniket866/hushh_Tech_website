@@ -398,10 +398,10 @@ export default function OnboardingStep11() {
         <section className="flex flex-col items-center justify-center text-center gap-2 pb-8">
           <div className="flex items-center gap-1">
             <ShieldCheck size={12} strokeWidth={1.8} className="text-[#0066CC]" aria-hidden="true" />
-            <span className="text-[10px] font-medium uppercase tracking-[1.6px] text-[#1D1D1F]/50">SEC Registered Fund</span>
+            <span className="text-[10px] font-medium uppercase tracking-[1.6px] text-[#1D1D1F]/50">Private offering</span>
           </div>
           <p className="max-w-xs text-[10px] font-light text-[#1D1D1F]/42">
-            Hushh Fund A is a registered investment vehicle.
+            Participation is subject to eligibility verification and the definitive offering documents.
           </p>
         </section>
       </main>

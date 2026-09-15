@@ -295,7 +295,7 @@ export default function Hero() {
             <Flex align="center" gap={1.5}>
               <ShieldIcon />
               <Text fontSize="10px" fontWeight="600" color="#8E8E93" letterSpacing="0.04em" textTransform="uppercase">
-                SEC Registered
+                Private Markets
               </Text>
             </Flex>
             <Box w="1px" h="12px" bg="rgba(0,0,0,0.1)" />

@@ -28,10 +28,10 @@ const FundAtHushh: React.FC = () => {
 
       <Heading as="h3" fontSize="lg" color="black" mb={2}>Fund Structure & Governance</Heading>
       <List spacing={2} pl={4}>
-        <ListItem><strong>Legal Structure:</strong> Delaware LLC, registered hedge fund in Upstate New York, compliant with the Investment Company Act of 1940 and SEC regulations.</ListItem>
+        <ListItem><strong>Legal Structure:</strong> Proposed private fund structure, subject to confirmation in final executed offering documents and official entity records.</ListItem>
         <ListItem><strong>Management:</strong> Led by Manish Sainani and Justin Donaldson, with an experienced team in AI and investment strategy.</ListItem>
         <ListItem><strong>Advisory Board:</strong> Finance, AI, and technology experts providing strategic guidance.</ListItem>
-        <ListItem><strong>Governance:</strong> Regular board meetings, SEC compliance, annual audits.</ListItem>
+        <ListItem><strong>Governance:</strong> Compliance oversight and audit arrangements are subject to confirmation in the final executed offering documents.</ListItem>
         <ListItem><strong>Investor Rights:</strong> Quarterly performance reports, annual audits, regular strategy updates, voting rights on major changes.</ListItem>
       </List>
 
