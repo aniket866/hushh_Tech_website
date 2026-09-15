@@ -174,9 +174,9 @@ export const useDiscoverFundALogic = (): UseDiscoverFundALogicReturn => {
       content: 'Quarterly redemptions after initial 12-month lock-up (soft)',
     },
     {
-      title: 'Compliance',
+      title: 'Offering status',
       content:
-        'Fully SEC compliant (Reg D, ICA exemptions, anticipated RIA registration), audited, U.S. tax optimized, CFTC Rule 4.13(a)(3) de minimis exemption.',
+        'Any offering is subject to investor eligibility, definitive offering documents, and final review by qualified securities counsel. No regulatory approval is represented.',
     },
   ];
 

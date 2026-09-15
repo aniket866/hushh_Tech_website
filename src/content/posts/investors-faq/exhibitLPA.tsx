@@ -5,7 +5,7 @@ import ExhibitLPAImg from '../../../components/images/exhibitLPA.webp';
 export const frontmatter = {
   title: "Exhibit A: Limited Partnership Agreement (LPA) of Hushh Technologies Alpha Fund, LP",
   publishedAt: "2025-02-03",
-  description: "Institutional-grade, SEC-compliant investment framework for Hushh Technologies Alpha Fund, LP.",
+  description: "Draft investment framework for Hushh Technologies Alpha Fund, LP, subject to final legal review and executed documents.",
   category: 'investor relations & strategies',
 };
 
@@ -16,12 +16,12 @@ const ExhibitLPA = () => {
         Exhibit A: Limited Partnership Agreement (LPA) of Hushh Technologies Alpha Fund, LP
       </Heading>
 
-      <Text fontSize="lg" mb={4}>Institutional-Grade | SEC Compliant | Investor-Centric Framework</Text>
+      <Text fontSize="lg" mb={4}>Draft | Subject to Legal Review | Not for Reliance</Text>
       
       <Heading as="h3" fontSize="lg" color="black" mb={4}>Article I - Formation of the Limited Partnership</Heading>
       <List spacing={2} pl={4}>
         <ListItem><strong>1.1 Name and Principal Office:</strong> The fund is named Hushh Technologies Alpha Fund, LP, with its principal office in Kirkland, WA, USA.</ListItem>
-        <ListItem><strong>1.2 Formation & Compliance:</strong> Formed under Delaware law, registered in Washington State, and compliant with SEC and CFTC regulations.</ListItem>
+        <ListItem><strong>1.2 Formation & Regulatory Status:</strong> Any formation, filing, registration, or exemption must be confirmed in the final executed documents and official records.</ListItem>
       </List>
       
       <Divider my={4} borderColor="black" />

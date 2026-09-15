@@ -129,7 +129,7 @@ const ProfilePage: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-[#34C759]" />
               <p className="text-[11px] font-medium uppercase tracking-[1.6px] text-[#1D1D1F]/50">
-                SEC Registered
+                Private Markets
               </p>
             </div>
             <div className="flex items-center gap-2">

@@ -104,7 +104,7 @@ const FundAFaq = () => {
       </List>
 
       <Text mb={4} fontSize={{ md: "lg", base: 'sm' }}>
-        <strong>Fine Print (SEC-Compliant Risk Disclosures)</strong>
+        <strong>Important Risk Disclosures</strong>
       </Text>
       <List spacing={3} mb={4} fontSize={{ md: "lg", base: 'sm' }}>
         <ListItem><strong>Not an Offer: </strong>This FAQ is purely informational and does not constitute an offer to sell or a solicitation to purchase any security.</ListItem>

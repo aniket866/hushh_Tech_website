@@ -128,11 +128,11 @@ const RentingMaximum: React.FC = () => {
 
         <Box>
           <Heading as="h3" fontSize="lg" color="black">VI. Regulatory & Investor Alignment</Heading>
-          <Text mt={2}><strong>1. Fully ADGM & SEC Compliant</strong></Text>
+          <Text mt={2}><strong>1. Regulatory Review Required</strong></Text>
           <List spacing={2} pl={4}>
             <ListItem>Structured for institutional investors</ListItem>
-            <ListItem>Regulatory approval ensures transparency & compliance</ListItem>
-            <ListItem>Investor protection built-in with best governance practices</ListItem>
+            <ListItem>Any offering is subject to applicable law and final review by qualified counsel</ListItem>
+            <ListItem>Investor rights and governance are defined only by final executed offering documents</ListItem>
           </List>
 
           <Text mt={4}><strong>2. Ultra-Low Cost & Tax Efficient</strong></Text>

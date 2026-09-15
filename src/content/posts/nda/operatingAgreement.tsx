@@ -60,8 +60,8 @@ const OperatingAgreement: React.FC = () => {
           <Text mt={2}><strong>Parent Entity:</strong></Text>
           <Text>Hushh Investments LLC (Delaware, USA): Serves as the primary holding company for all subsidiaries.</Text>
           <Text mt={2}><strong>Subsidiaries:</strong></Text>
-          <Text>• Hushh Alpha Fund LP: SEC-compliant fund registered under Regulation D, offering investment opportunities to accredited investors.</Text>
-          <Text>• Hushh Advisory LLC: Provides investment advisory services under an SEC-registered RIA framework.</Text>
+          <Text>• Hushh Alpha Fund LP: Proposed private fund vehicle. Any offering is subject to final executed documents, investor eligibility, and applicable law.</Text>
+          <Text>• Hushh Advisory LLC: Any advisory role and required registration status must be confirmed in the final executed documents.</Text>
           <Text>• Hushh Labs LLC: Focuses on AI, ML, and data R&D for proprietary investment models.</Text>
           <Text>• Hushh Insurance LLC: Captive insurance entity to manage internal risk and provide tailored coverage for fund operations.</Text>
           <Text mt={2}><strong>Global Affiliates (Proposed):</strong></Text>
