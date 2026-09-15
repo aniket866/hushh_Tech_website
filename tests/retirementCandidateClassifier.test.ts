@@ -521,6 +521,13 @@ describe("verified executable dependency bootstrap", () => {
       }),
     ).toThrow(/EXECUTABLE_CLOSURE_MODULE_MISSING/);
 
+    // The extra module only needs to be a real file the closure does not reach;
+    // which file it is carries no meaning. Verification compares every pinned
+    // path's worktree bytes against the base commit before it checks
+    // reachability, so running this against the live worktree makes any branch
+    // that edits this unrelated file fail with EXECUTABLE_WORKTREE_SUBSTITUTION
+    // instead. Restore the base bytes inside a clone so the case asserts
+    // reachability and nothing else.
     const extraPath = "scripts/ci/check-env-contract.mjs";
     const extraBytes = execFileSync(
       "git",
@@ -539,15 +546,24 @@ describe("verified executable dependency bootstrap", () => {
         dependencies: [],
       },
     };
-    expect(() =>
-      verifyExecutableClosure(root, {
-        closure: extraClosure,
-        expectedDigest: digestExecutableClosureContract(
-          CONTRACT.executable_roots,
-          extraClosure,
-        ),
-      }),
-    ).toThrow(/EXECUTABLE_CLOSURE_MISSING_OR_EXTRA_MODULE/);
+    const extraClone = createClassifierClone();
+    try {
+      fs.writeFileSync(
+        path.join(extraClone, ...extraPath.split("/")),
+        extraBytes,
+      );
+      expect(() =>
+        verifyExecutableClosure(extraClone, {
+          closure: extraClosure,
+          expectedDigest: digestExecutableClosureContract(
+            CONTRACT.executable_roots,
+            extraClosure,
+          ),
+        }),
+      ).toThrow(/EXECUTABLE_CLOSURE_MISSING_OR_EXTRA_MODULE/);
+    } finally {
+      fs.rmSync(extraClone, { recursive: true, force: true });
+    }
 
     const clone = createClassifierClone();
     const directPath = path.join(

@@ -354,6 +354,15 @@ jobs:
           runtime_secrets+=",HUSHH_RESEARCH_CONNECTOR_PRIVATE_KEY=hushh-tech-uat-research-x25519-private-key:latest"
           runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_API_KEY=hushh-tech-uat-research-firebase-api-key:latest"
           runtime_secrets+=",HUSHH_RESEARCH_FIREBASE_APP_ID=hushh-tech-uat-research-firebase-app-id:latest"
+          # --set-secrets is REPLACE, not merge. Every binding the service needs has to be named
+          # on this line or the deploy silently removes it, and nothing fails: the revision comes
+          # up healthy and the affected endpoint answers 503 UPSTREAM_UNAVAILABLE forever.
+          # That is what happened to the public rate-limit salt. It is bound out-of-band, so each
+          # deploy through this workflow stripped it again and the marquee and ticker search both
+          # went dark on an otherwise green release. (Note the contrast with --update-env-vars
+          # above, which merges — which is why the feature flag beside it survived and this did
+          # not.) Naming it here is what makes the binding survive a deploy.
+          runtime_secrets+=",HUSHH_TECH_PUBLIC_RATE_LIMIT_SALT=hushh-tech-public-rate-limit-salt:latest"
           build_tag="build-${short_sha}"
           gcloud run deploy hushh-tech-website \
             --source . \

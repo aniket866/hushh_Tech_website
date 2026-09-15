@@ -134,6 +134,28 @@ for (const [name, secretName] of Object.entries(contract.uatOnlyRuntimeSecrets ?
   }
 }
 
+/*
+ * Secrets the UAT runtime needs bound, without claiming anything about production.
+ *
+ * `--set-secrets` REPLACES the whole set rather than merging into it, so a binding left off that
+ * line is removed by the very next deploy — and nothing fails. The revision comes up healthy and
+ * the endpoints that need the secret answer 503 forever. That is exactly how the public
+ * rate-limit salt was lost: bound out-of-band, stripped by each deploy, and invisible because the
+ * neighbouring `--update-env-vars` MERGES, so the feature flag beside it survived every time.
+ *
+ * Kept separate from uatOnlyRuntimeSecrets, which additionally asserts production must never bind
+ * the name. True of the Research credentials; not true here. Production will want this binding the
+ * day its public market surface is switched on.
+ */
+for (const [name, secretName] of Object.entries(contract.uatRuntimeSecrets ?? {})) {
+  if (!uatWorkflow.includes(`${name}=${secretName}:latest`)) {
+    errors.push(
+      `deploy-uat.yml must bind ${name} to ${secretName}:latest — --set-secrets replaces the ` +
+        "whole set, so an unlisted binding is dropped on the next deploy.",
+    );
+  }
+}
+
 for (const [name, expectedValue] of Object.entries(contract.uatResearchRuntimeValues ?? {})) {
   if (!uatWorkflow.includes(`${name}: ${expectedValue}`)) {
     errors.push(`deploy-uat.yml must pin ${name} to ${expectedValue}.`);
