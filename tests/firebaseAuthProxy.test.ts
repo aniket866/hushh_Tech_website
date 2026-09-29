@@ -428,6 +428,43 @@ describe('runtime isolation', () => {
     expect(connect).not.toContain('https:');
   });
 
+  it('permits the existing production Firebase redirect dependencies only on canonical production', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'hushh-tech-prod');
+    vi.stubEnv('FIREBASE_PROJECT_ID', 'hushh-tech-prod');
+    const port = await listen(createServer(realApp));
+    const baseline = await call(port, '/auth/callback', { headers: { host: 'other.example' } });
+    const production = await call(port, '/auth/callback', { headers: { host: 'hushhtech.com' } });
+    expect(production.status).toBe(200);
+    expect(production.body).toEqual(baseline.body);
+    expect(production.headers['content-security-policy']).toBe(
+      String(baseline.headers['content-security-policy'])
+        .replace("script-src 'self'", "script-src 'self' https://apis.google.com")
+        .replace("frame-src 'self'", "frame-src 'self' https://hushh-tech-prod.firebaseapp.com"),
+    );
+    for (const name of ['x-frame-options', 'referrer-policy', 'permissions-policy', 'strict-transport-security']) {
+      expect(production.headers[name]).toBe(baseline.headers[name]);
+    }
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cloud: 'hushh-tech-prod', firebase: PROJECT, host: 'hushhtech.com' },
+    { cloud: PROJECT, firebase: 'hushh-tech-prod', host: 'hushhtech.com' },
+    { cloud: 'hushh-tech-prod', firebase: undefined, host: 'hushhtech.com' },
+    { cloud: 'hushh-tech-prod', firebase: 'hushh-tech-prod', host: 'hushhtech.com.evil.test' },
+    { cloud: 'hushh-tech-prod', firebase: 'hushh-tech-prod', host: 'other.example' },
+    { cloud: 'hushh-tech-prod', firebase: 'hushh-tech-prod', host: HOST },
+  ])('does not grant production Firebase sources to mismatched authority: %j', async ({ cloud, firebase, host }) => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', cloud);
+    vi.stubEnv('FIREBASE_PROJECT_ID', firebase);
+    const result = await call(await listen(createServer(realApp)), '/auth/callback', {
+      headers: { host, 'x-forwarded-host': 'hushhtech.com' },
+    });
+    expect(result.headers['content-security-policy']).not.toContain('https://apis.google.com');
+    expect(result.headers['content-security-policy']).not.toContain('https://hushh-tech-prod.firebaseapp.com');
+    expect(transport).not.toHaveBeenCalled();
+  });
+
   it.each([
     { cloud: undefined, firebase: PROJECT, host: HOST },
     { cloud: PROJECT, firebase: undefined, host: HOST },

@@ -114,12 +114,22 @@ app.use(compression({
 // Global security headers for Cloud Run. This file is the authoritative runtime config.
 app.use((_req, res, next) => {
   // Firebase getRedirectResult() loads gapi.iframes through this script host.
-  // Keep the exception bound to the existing canonical UAT auth runtime;
-  // production and all other CSP directives remain unchanged.
-  const firebaseGapiSource = process.env.GOOGLE_CLOUD_PROJECT === 'hushh-tech-uat' &&
+  // Bind required helper sources to the matching canonical host and identity
+  // authority. Forwarded headers must not grant another environment's sources.
+  const canonicalUatAuth = process.env.GOOGLE_CLOUD_PROJECT === 'hushh-tech-uat' &&
     process.env.FIREBASE_PROJECT_ID === 'hushh-tech-uat' &&
-    _req.headers.host === 'uat.hushhtech.com'
+    _req.headers.host === 'uat.hushhtech.com';
+  const canonicalProdAuth = process.env.GOOGLE_CLOUD_PROJECT === 'hushh-tech-prod' &&
+    process.env.FIREBASE_PROJECT_ID === 'hushh-tech-prod' &&
+    _req.headers.host === 'hushhtech.com';
+  const firebaseGapiSource = canonicalUatAuth || canonicalProdAuth
     ? ' https://apis.google.com'
+    : '';
+  // Production currently uses this Firebase-managed authDomain; UAT's helper
+  // stays same-origin. This neither activates the UAT proxy in production nor
+  // changes provider registrations, token authorities or browser storage rules.
+  const firebaseFrameSource = canonicalProdAuth
+    ? ' https://hushh-tech-prod.firebaseapp.com'
     : '';
   // Existing locationService IP fallbacks; allow only their exact HTTPS origins
   // on canonical UAT. This does not change Plaid's independently served CSP.
@@ -141,7 +151,7 @@ app.use((_req, res, next) => {
       "img-src 'self' data: blob: https: http:",
       // Wallet upstream traffic must stay behind same-origin /api proxies to avoid CSP regressions.
       `connect-src 'self'${locationConnectSources} https://*.plaid.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com https://www.gstatic.com https://www.google-analytics.com https://www.googletagmanager.com https://generativelanguage.googleapis.com https://*.googleapis.com https://www.walletlink.org wss://www.walletlink.org wss://mainnet.infura.io wss://*.infura.io https://*.seondnsresolve.com https://www.recaptcha.net https://hushhtech-nda-generation-53407187172.us-central1.run.app`,
-      "frame-src 'self' https://cdn.plaid.com https://*.plaid.com https://www.google.com https://www.gstatic.com https://calendly.com https://www.recaptcha.net https://lookerstudio.google.com https://datastudio.google.com https://gamma.app https://*.gamma.app https://*.gamma.site",
+      `frame-src 'self'${firebaseFrameSource} https://cdn.plaid.com https://*.plaid.com https://www.google.com https://www.gstatic.com https://calendly.com https://www.recaptcha.net https://lookerstudio.google.com https://datastudio.google.com https://gamma.app https://*.gamma.app https://*.gamma.site`,
       "media-src 'self' blob: data:",
       "worker-src 'self' blob:",
       "child-src 'self' blob: https://cdn.plaid.com https://*.plaid.com https://gamma.app https://*.gamma.app https://*.gamma.site",
