@@ -8,6 +8,20 @@ const read = (relativePath: string) =>
   readFileSync(path.join(root, relativePath), "utf8");
 
 describe("financial-link render safety net", () => {
+  it("keeps Back separate from the guarded onboarding continuation route", () => {
+    const logic = read("src/pages/onboarding/financial-link/logic.ts");
+    const backHandler = logic.slice(
+      logic.indexOf("const handleBack ="),
+      logic.indexOf("/* Record the Plaid data-sharing consent"),
+    );
+    expect(backHandler).toContain("navigate(-1)");
+    expect(backHandler).toContain("window.history.state?.idx > 0");
+    expect(backHandler).toContain("navigate('/', { replace: true })");
+    expect(backHandler).not.toContain("resumeRoute");
+    expect(backHandler).not.toContain("getFinancialLinkContinuationRoute");
+    expect(read("src/pages/onboarding/financial-link/ui.tsx")).toContain("onBackClick={handleBack}");
+  });
+
   it("keeps bottom breathing room additive to the device safe area", () => {
     const ui = read("src/pages/onboarding/financial-link/ui.tsx");
     const mainClass = ui.match(/<main className="([^"]+)"/)?.[1];

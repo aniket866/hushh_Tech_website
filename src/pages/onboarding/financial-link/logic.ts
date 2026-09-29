@@ -658,10 +658,14 @@ export const useFinancialLinkLogic = () => {
   ]);
 
   const handleBack = useCallback(() => {
-    navigate(resumeRoute || getFinancialLinkContinuationRoute(currentOnboardingStep), {
-      replace: true,
-    });
-  }, [currentOnboardingStep, navigate, resumeRoute]);
+    // Back must not use the forward onboarding destination: its guard can
+    // immediately send an unfinished user back to this page.
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   /* Record the Plaid data-sharing consent once. Reuses the onboarding_data
      row; upsert silently drops the columns if the migration hasn't landed. */

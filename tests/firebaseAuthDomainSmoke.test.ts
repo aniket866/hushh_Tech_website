@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import {
   assertProdOrigin, assertUatOrigin, createProdGoogleOAuthEvidence, createProdAppleOAuthEvidence,
   createUatOAuthEvidence, safeLocation, verifyFirebaseHelper, verifyProdGoogleOAuthAllowlist,
+  fetchProdAppleServiceId, verifyProdAppleOAuthAllowlist,
 } from '../scripts/shared/firebaseAuthSmoke.mjs';
 
 const origin = 'https://uat.hushhtech.com';
@@ -218,6 +219,104 @@ describe('UAT workflow auth-domain contract', () => {
 
 
 describe('production Apple redirect contract', () => {
+  const acceptedPage = '<html><script src="https://idmsa.apple.com/idmsa"></script><main>Sign In with Apple</main></html>';
+  const rejectedPage = '<html><script>{"errorCode":"invalid_request","errorMessage":"Invalid web redirect url."}</script></html>';
+  const responseHeaders = { 'content-type': 'text/html;charset=UTF-8' };
+  const providerConfig = {
+    name: 'projects/646258530541/defaultSupportedIdpConfigs/apple.com',
+    enabled: true,
+    clientId: 'com.hushh.app.signin',
+  };
+
+  it('uses the live production Firebase Apple provider rather than a static Services ID', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(providerConfig), {
+      status: 200, headers: { 'content-type': 'application/json; charset=UTF-8' },
+    }));
+    await expect(fetchProdAppleServiceId('synthetic-token', fetchMock)).resolves.toBe('com.hushh.app.signin');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://identitytoolkit.googleapis.com/admin/v2/projects/hushh-tech-prod/defaultSupportedIdpConfigs/apple.com',
+      expect.objectContaining({
+        redirect: 'manual', credentials: 'omit',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer synthetic-token', 'x-goog-user-project': 'hushh-tech-prod',
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    ['disabled provider', { ...providerConfig, enabled: false }],
+    ['wrong provider', { ...providerConfig, name: 'projects/646258530541/defaultSupportedIdpConfigs/google.com' }],
+    ['wrong project', { ...providerConfig, name: 'projects/175298245599/defaultSupportedIdpConfigs/apple.com' }],
+    ['invalid Services ID', { ...providerConfig, clientId: 'https://invalid.example/' }],
+    ['missing Services ID', { ...providerConfig, clientId: undefined }],
+  ])('rejects %s from production Firebase', async (_name, config) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(config), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }));
+    await expect(fetchProdAppleServiceId('synthetic-token', fetchMock))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+  });
+
+  it('sanitizes Firebase provider access failures and rejects token header injection', async () => {
+    const forbidden = vi.fn().mockResolvedValue(new Response('synthetic-secret', { status: 403 }));
+    await expect(fetchProdAppleServiceId('synthetic-token', forbidden))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+    await expect(fetchProdAppleServiceId('synthetic-token\r\nX-Secret: synthetic-secret', forbidden))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+    expect(forbidden).toHaveBeenCalledTimes(1);
+  });
+
+  function appleFetch(productionPage = acceptedPage, controlPage = rejectedPage) {
+    return vi.fn(async (value: string, _options?: RequestInit) => {
+      const request = new URL(value);
+      const callback = request.searchParams.get('redirect_uri');
+      return new Response(callback === 'https://hushhtech.com/__/auth/handler' ? productionPage : controlPage,
+        { status: 200, headers: responseHeaders });
+    });
+  }
+
+  it('accepts only the exact registered production Return URL with an invalid control', async () => {
+    const fetchMock = appleFetch();
+    await expect(verifyProdAppleOAuthAllowlist('com.hushh.app.signin', fetchMock)).resolves.toEqual({
+      appleCallbackAllowlisted: true, authenticated: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const callbacks = fetchMock.mock.calls.map(([value, options]) => {
+      const url = new URL(value);
+      expect(url.origin).toBe('https://appleid.apple.com');
+      expect(url.pathname).toBe('/auth/authorize');
+      expect(url.searchParams.get('client_id')).toBe('com.hushh.app.signin');
+      expect(url.searchParams.get('response_type')).toBe('code');
+      expect(url.searchParams.get('response_mode')).toBe('form_post');
+      expect(url.searchParams.get('state')).toBe('probe-only');
+      expect(options).toMatchObject({ redirect: 'manual', credentials: 'omit' });
+      return url.searchParams.get('redirect_uri');
+    });
+    expect(callbacks).toEqual(expect.arrayContaining([
+      'https://hushhtech.com/__/auth/handler',
+      'https://example.invalid/__/auth/handler',
+    ]));
+  });
+
+  it.each([
+    ['unregistered production callback', rejectedPage, rejectedPage],
+    ['generic sign-in page for both callbacks', acceptedPage, acceptedPage],
+    ['an HTTP 200 without Apple sign-in evidence', '<html>OK</html>', rejectedPage],
+  ])('fails closed for %s', async (_name, productionPage, controlPage) => {
+    await expect(verifyProdAppleOAuthAllowlist('com.hushh.app.signin', appleFetch(productionPage, controlPage)))
+      .rejects.toThrow(/^Production Apple OAuth redirect allowlist probe failed\.$/);
+  });
+
+  it('rejects a service ID change and sanitizes provider failures', async () => {
+    await expect(verifyProdAppleOAuthAllowlist('other-service', appleFetch()))
+      .rejects.toThrow(/^Production Apple OAuth redirect allowlist probe failed\.$/);
+    await expect(verifyProdAppleOAuthAllowlist('com.example.production', appleFetch()))
+      .resolves.toMatchObject({ appleCallbackAllowlisted: true });
+    await expect(verifyProdAppleOAuthAllowlist('com.hushh.app.signin', vi.fn().mockRejectedValue(new Error('secret=synthetic-secret'))))
+      .rejects.toThrow(/^Production Apple OAuth redirect allowlist probe failed\.$/);
+  });
+
   it.each(['form_post', 'query'])('requires same-origin Apple form_post: %s', (mode) => {
     const evidence = createProdAppleOAuthEvidence();
     evidence.observe('https://hushhtech.com/__/auth/handler?providerId=apple.com&authType=signInViaRedirect');
@@ -230,5 +329,10 @@ describe('production Apple redirect contract', () => {
     expect(source).toContain('VITE_FIREBASE_AUTH_DOMAIN: hushhtech.com');
     expect(source).toContain('firebase_auth_domain="hushhtech.com"');
     expect(source).toMatch(/GCP_DATA_RUNTIME_ENABLED: ["']false["']/);
+    const applePreflight = source.indexOf('name: Verify production Apple callback registration');
+    const trafficChange = source.indexOf('name: Deploy to Cloud Run');
+    expect(applePreflight).toBeGreaterThan(0);
+    expect(applePreflight).toBeLessThan(trafficChange);
+    expect(source).toContain('run: node scripts/smoke-prod-apple-allowlist.mjs');
   });
 });
