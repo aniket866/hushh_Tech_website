@@ -120,11 +120,11 @@ const ReceiptGeneratorPage: React.FC = () => {
   };
 
   const handleGenerateReceipts = () => {
-    const validRecipients = recipients.filter(
+    const completeRecipients = recipients.filter(
       (r) => r.name.trim() && r.amount.trim()
     );
 
-    if (validRecipients.length === 0) {
+    if (completeRecipients.length === 0) {
       toast({
         title: 'Error',
         description: 'Please add at least one recipient with name and amount',
@@ -134,9 +134,24 @@ const ReceiptGeneratorPage: React.FC = () => {
       return;
     }
 
+    const parsedRecipients = completeRecipients.map((recipient) => ({
+      ...recipient,
+      parsedAmount: parseAmount(recipient.amount),
+    }));
+
+    if (parsedRecipients.some((recipient) => recipient.parsedAmount <= 0)) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Each payment amount must be greater than zero.',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
     const receiptDate = getDateFromInputs();
-    const receipts = validRecipients.map((r) =>
-      generateReceiptData(r.name.trim(), parseAmount(r.amount), receiptDate)
+    const receipts = parsedRecipients.map((recipient) =>
+      generateReceiptData(recipient.name.trim(), recipient.parsedAmount, receiptDate)
     );
 
     setGeneratedReceipts(receipts);
