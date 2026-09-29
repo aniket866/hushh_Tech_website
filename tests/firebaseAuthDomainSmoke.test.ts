@@ -5,7 +5,7 @@ import yaml from 'js-yaml';
 import {
   assertProdOrigin, assertUatOrigin, createProdGoogleOAuthEvidence, createProdAppleOAuthEvidence,
   createUatOAuthEvidence, safeLocation, verifyFirebaseHelper, verifyProdGoogleOAuthAllowlist,
-  verifyProdAppleOAuthAllowlist,
+  fetchProdAppleServiceId, verifyProdAppleOAuthAllowlist,
 } from '../scripts/shared/firebaseAuthSmoke.mjs';
 
 const origin = 'https://uat.hushhtech.com';
@@ -222,6 +222,50 @@ describe('production Apple redirect contract', () => {
   const acceptedPage = '<html><script src="https://idmsa.apple.com/idmsa"></script><main>Sign In with Apple</main></html>';
   const rejectedPage = '<html><script>{"errorCode":"invalid_request","errorMessage":"Invalid web redirect url."}</script></html>';
   const responseHeaders = { 'content-type': 'text/html;charset=UTF-8' };
+  const providerConfig = {
+    name: 'projects/646258530541/defaultSupportedIdpConfigs/apple.com',
+    enabled: true,
+    clientId: 'com.hushh.app.signin',
+  };
+
+  it('uses the live production Firebase Apple provider rather than a static Services ID', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(providerConfig), {
+      status: 200, headers: { 'content-type': 'application/json; charset=UTF-8' },
+    }));
+    await expect(fetchProdAppleServiceId('synthetic-token', fetchMock)).resolves.toBe('com.hushh.app.signin');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://identitytoolkit.googleapis.com/admin/v2/projects/hushh-tech-prod/defaultSupportedIdpConfigs/apple.com',
+      expect.objectContaining({
+        redirect: 'manual', credentials: 'omit',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer synthetic-token', 'x-goog-user-project': 'hushh-tech-prod',
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    ['disabled provider', { ...providerConfig, enabled: false }],
+    ['wrong provider', { ...providerConfig, name: 'projects/646258530541/defaultSupportedIdpConfigs/google.com' }],
+    ['wrong project', { ...providerConfig, name: 'projects/175298245599/defaultSupportedIdpConfigs/apple.com' }],
+    ['invalid Services ID', { ...providerConfig, clientId: 'https://invalid.example/' }],
+    ['missing Services ID', { ...providerConfig, clientId: undefined }],
+  ])('rejects %s from production Firebase', async (_name, config) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(config), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }));
+    await expect(fetchProdAppleServiceId('synthetic-token', fetchMock))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+  });
+
+  it('sanitizes Firebase provider access failures and rejects token header injection', async () => {
+    const forbidden = vi.fn().mockResolvedValue(new Response('synthetic-secret', { status: 403 }));
+    await expect(fetchProdAppleServiceId('synthetic-token', forbidden))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+    await expect(fetchProdAppleServiceId('synthetic-token\r\nX-Secret: synthetic-secret', forbidden))
+      .rejects.toThrow(/^Production Firebase Apple provider lookup failed\.$/);
+    expect(forbidden).toHaveBeenCalledTimes(1);
+  });
 
   function appleFetch(productionPage = acceptedPage, controlPage = rejectedPage) {
     return vi.fn(async (value: string, _options?: RequestInit) => {
@@ -267,6 +311,8 @@ describe('production Apple redirect contract', () => {
   it('rejects a service ID change and sanitizes provider failures', async () => {
     await expect(verifyProdAppleOAuthAllowlist('other-service', appleFetch()))
       .rejects.toThrow(/^Production Apple OAuth redirect allowlist probe failed\.$/);
+    await expect(verifyProdAppleOAuthAllowlist('com.example.production', appleFetch()))
+      .resolves.toMatchObject({ appleCallbackAllowlisted: true });
     await expect(verifyProdAppleOAuthAllowlist('com.hushh.app.signin', vi.fn().mockRejectedValue(new Error('secret=synthetic-secret'))))
       .rejects.toThrow(/^Production Apple OAuth redirect allowlist probe failed\.$/);
   });

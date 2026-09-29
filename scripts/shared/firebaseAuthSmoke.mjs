@@ -4,7 +4,6 @@ const PROD_ORIGIN = 'https://hushhtech.com';
 const PROD_FIREBASE_ORIGIN = PROD_ORIGIN;
 const PROD_GOOGLE_CALLBACK = `${PROD_FIREBASE_ORIGIN}/__/auth/handler`;
 const PROD_APPLE_CALLBACK = `${PROD_ORIGIN}/__/auth/handler`;
-const PROD_APPLE_SERVICE_ID = 'com.hushh.app.signin';
 const INVALID_APPLE_CALLBACK = 'https://example.invalid/__/auth/handler';
 const PROVIDER_HOSTS = { google: 'accounts.google.com', apple: 'appleid.apple.com' };
 
@@ -161,12 +160,46 @@ export async function verifyProdGoogleOAuthAllowlist(clientId, fetchImpl = fetch
   }
 }
 
+function validAppleServiceId(value) {
+  return typeof value === 'string' && value.length <= 255 &&
+    value.split('.').length >= 2 &&
+    value.split('.').every((part) => /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(part));
+}
+
+// Resolve the active production Firebase provider so the Apple preflight cannot
+// silently probe a stale hardcoded Services ID. Never return provider secrets.
+export async function fetchProdAppleServiceId(accessToken, fetchImpl = fetch) {
+  try {
+    if (typeof accessToken !== 'string' || !accessToken.trim() || /[\r\n]/.test(accessToken)) throw new Error();
+    const url = 'https://identitytoolkit.googleapis.com/admin/v2/projects/hushh-tech-prod/defaultSupportedIdpConfigs/apple.com';
+    const response = await fetchImpl(url, {
+      redirect: 'manual', credentials: 'omit', signal: AbortSignal.timeout(15000),
+      headers: {
+        Authorization: `Bearer ${accessToken.trim()}`,
+        'x-goog-user-project': 'hushh-tech-prod',
+        'Cache-Control': 'no-cache',
+      },
+    });
+    if (response.status !== 200 || response.redirected ||
+        !/^application\/json(?:;|$)/i.test(response.headers.get('content-type') || '')) throw new Error();
+    const body = await response.text();
+    if (body.length > 64 * 1024) throw new Error();
+    const config = JSON.parse(body);
+    if (config?.enabled !== true ||
+        config?.name !== 'projects/646258530541/defaultSupportedIdpConfigs/apple.com' ||
+        !validAppleServiceId(config?.clientId)) throw new Error();
+    return config.clientId;
+  } catch {
+    throw new Error('Production Firebase Apple provider lookup failed.');
+  }
+}
+
 // Apple serves HTTP 200 for both its sign-in page and a rejected Return URL.
 // Compare the production callback with a deliberately invalid control so an
 // ordinary 200 or a generic sign-in shell cannot falsely pass the release gate.
 export async function verifyProdAppleOAuthAllowlist(serviceId, fetchImpl = fetch) {
   try {
-    if (serviceId !== PROD_APPLE_SERVICE_ID) throw new Error();
+    if (!validAppleServiceId(serviceId)) throw new Error();
     async function probe(callback) {
       const url = new URL('https://appleid.apple.com/auth/authorize');
       url.searchParams.set('client_id', serviceId);
