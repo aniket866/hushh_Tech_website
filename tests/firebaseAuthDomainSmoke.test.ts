@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import yaml from 'js-yaml';
 import {
-  assertUatOrigin, createUatOAuthEvidence, safeLocation, verifyFirebaseHelper,
+  assertProdOrigin, assertUatOrigin, createProdGoogleOAuthEvidence,
+  createUatOAuthEvidence, safeLocation, verifyFirebaseHelper, verifyProdGoogleOAuthAllowlist,
 } from '../scripts/shared/firebaseAuthSmoke.mjs';
 
 const origin = 'https://uat.hushhtech.com';
@@ -85,6 +86,80 @@ describe('UAT OAuth startup evidence', () => {
   it('excludes query, fragment and URL credentials from reports', () => {
     expect(safeLocation('https://user:synthetic-secret@accounts.google.com/authorize?state=synthetic-secret#token=synthetic-secret'))
       .toEqual({ origin: 'https://accounts.google.com', pathname: '/authorize' });
+  });
+});
+
+describe('production Google OAuth startup evidence', () => {
+  const firebaseOrigin = 'https://hushh-tech-prod.firebaseapp.com';
+  const clientId = '123-test.apps.googleusercontent.com';
+
+  it('runs the strict production callback probe from the deploy workflow', () => {
+    const source = readFileSync(new URL('../.github/workflows/deploy-prod.yml', import.meta.url), 'utf8');
+    const workflow = yaml.safeLoad(source) as {env: Record<string, string>; jobs: {deploy: {steps: {name?: string; run?: string}[]}}};
+    const smoke = workflow.jobs.deploy.steps.find(step => step.name === 'Smoke OAuth startup on deployed host');
+    expect(workflow.env.SMOKE_BASE_URL).toBe('https://hushhtech.com');
+    expect(smoke?.run).toContain('scripts/smoke-oauth-start.mjs "$SMOKE_BASE_URL" --prod-auth-domain');
+  });
+
+  function observe(redirect = `${firebaseOrigin}/__/auth/handler`) {
+    const evidence = createProdGoogleOAuthEvidence();
+    evidence.observe(`${firebaseOrigin}/__/auth/handler?providerId=google.com&authType=signInViaRedirect&state=synthetic-secret`);
+    evidence.observe(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect)}&state=synthetic-secret`);
+    return evidence;
+  }
+
+  it('requires the exact Firebase callback sent to Google', () => {
+    expect(observe().verify()).toEqual({
+      provider: 'google', firebaseHandlerVerified: true, providerCallbackVerified: true, authenticated: false,
+    });
+    expect(JSON.stringify(observe().verify())).not.toContain('synthetic-secret');
+    expect(observe().getClientId()).toBe(clientId);
+  });
+
+  it.each([
+    'https://uat.hushhtech.com/__/auth/handler',
+    'https://hushhtech.com/__/auth/handler',
+    `${firebaseOrigin}/auth/callback`,
+  ])('rejects a mismatched redirect URI: %s', (redirect) => {
+    expect(() => observe(redirect).verify()).toThrow('Production Google OAuth callback contract failed.');
+  });
+
+  it('requires the Firebase handler request and canonical production target', () => {
+    const evidence = createProdGoogleOAuthEvidence();
+    evidence.observe(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(`${firebaseOrigin}/__/auth/handler`)}`);
+    expect(() => evidence.verify()).toThrow();
+    expect(() => assertProdOrigin('https://hushhtech.com/')).not.toThrow();
+    expect(() => assertProdOrigin('https://uat.hushhtech.com/')).toThrow();
+  });
+
+  it('probes Google without cookies or sign-in and accepts only a redirect to the exact callback', async () => {
+    const location = `${firebaseOrigin}/__/auth/handler?state=probe-only&error=interaction_required`;
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location } }));
+    await expect(verifyProdGoogleOAuthAllowlist(clientId, fetchMock)).resolves.toEqual({
+      googleCallbackAllowlisted: true, authenticated: false,
+    });
+    const [requestUrl, options] = fetchMock.mock.calls[0];
+    const request = new URL(requestUrl);
+    expect(request.origin).toBe('https://accounts.google.com');
+    expect(request.searchParams.get('client_id')).toBe(clientId);
+    expect(request.searchParams.get('redirect_uri')).toBe(`${firebaseOrigin}/__/auth/handler`);
+    expect(request.searchParams.get('prompt')).toBe('none');
+    expect(options).toMatchObject({ redirect: 'manual', credentials: 'omit' });
+  });
+
+  it.each([
+    'https://accounts.google.com/signin/oauth/error?authError=synthetic-secret',
+    `${firebaseOrigin}/__/auth/handler?state=wrong&error=interaction_required`,
+    `${firebaseOrigin}/__/auth/handler?state=probe-only&code=synthetic-secret`,
+  ])('rejects an unallowlisted or unsafe Google probe response', async (location) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location } }));
+    await expect(verifyProdGoogleOAuthAllowlist(clientId, fetchMock))
+      .rejects.toThrow('Production Google OAuth redirect allowlist probe failed.');
+  });
+
+  it('sanitizes a transport failure from the probe', async () => {
+    await expect(verifyProdGoogleOAuthAllowlist(clientId, vi.fn().mockRejectedValue(new Error('secret=synthetic-secret'))))
+      .rejects.toThrow(/^Production Google OAuth redirect allowlist probe failed\.$/);
   });
 });
 

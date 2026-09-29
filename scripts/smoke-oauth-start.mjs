@@ -1,13 +1,18 @@
 import { chromium } from "@playwright/test";
 import {
+  assertProdOrigin,
   assertUatOrigin,
+  createProdGoogleOAuthEvidence,
   createUatOAuthEvidence,
   safeLocation,
   verifyFirebaseHelper,
+  verifyProdGoogleOAuthAllowlist,
 } from "./shared/firebaseAuthSmoke.mjs";
 
 const baseUrl = process.argv[2];
 const uatAuthDomain = process.argv.includes("--uat-auth-domain");
+const prodAuthDomain = process.argv.includes("--prod-auth-domain");
+const prodGoogleClientIds = new Set();
 
 if (!baseUrl) {
   console.error("Usage: node scripts/smoke-oauth-start.mjs <base-url>");
@@ -38,7 +43,11 @@ async function verifyProviderRedirect(buttonName, expectedHosts, startUrl = logi
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1400 } });
   const provider = /apple/i.test(buttonName) ? "apple" : "google";
-  const evidence = uatAuthDomain ? createUatOAuthEvidence(provider) : null;
+  const evidence = uatAuthDomain
+    ? createUatOAuthEvidence(provider)
+    : prodAuthDomain && provider === "google"
+      ? createProdGoogleOAuthEvidence()
+      : null;
   if (evidence) page.on("request", (request) => evidence.observe(request.url()));
 
   try {
@@ -49,14 +58,17 @@ async function verifyProviderRedirect(buttonName, expectedHosts, startUrl = logi
     await page.waitForURL(
       (value) => {
         const current = new URL(value.toString());
-        return uatAuthDomain
+        return evidence
           ? current.protocol === "https:" && current.hostname === (provider === "apple" ? "appleid.apple.com" : "accounts.google.com")
           : expectedHosts.some((host) => current.hostname.includes(host));
       },
       { timeout: 15000 }
     );
 
-    return evidence ? evidence.verify() : safeLocation(page.url());
+    if (!evidence) return safeLocation(page.url());
+    const verified = evidence.verify();
+    if (prodAuthDomain && provider === "google") prodGoogleClientIds.add(evidence.getClientId());
+    return verified;
   } finally {
     await browser.close();
   }
@@ -114,7 +126,9 @@ async function verifyCanonicalizedAuthEntry(startUrl, expectedPathname, expected
 }
 
 async function main() {
+  if (uatAuthDomain && prodAuthDomain) throw new Error("Choose one OAuth domain contract.");
   if (uatAuthDomain) assertUatOrigin(baseUrl);
+  if (prodAuthDomain) assertProdOrigin(baseUrl);
   const helper = uatAuthDomain ? await verifyFirebaseHelper(baseUrl) : undefined;
   const results = {
     login: safeLocation(loginUrl),
@@ -129,7 +143,7 @@ async function main() {
       "accounts.google.com",
     ]),
     appleSignup: uatAuthDomain ? await verifyProviderRedirect("Continue with Apple", [], signupUrl) : undefined,
-    googleSignup: uatAuthDomain ? await verifyProviderRedirect("Continue with Google", [], signupUrl) : undefined,
+    googleSignup: uatAuthDomain || prodAuthDomain ? await verifyProviderRedirect("Continue with Google", [], signupUrl) : undefined,
     guestProfilePage: await verifyRedirect(profileUrl, "/profile"),
     investorProfileAliasRedirect: await verifyRedirect(
       investorProfileUrl,
@@ -153,6 +167,11 @@ async function main() {
     ),
     guestNdaPostRedirect: await verifyRedirect(ndaPostUrl, "/community"),
   };
+
+  if (prodAuthDomain) {
+    if (prodGoogleClientIds.size !== 1) throw new Error("Production Google client mismatch between login and signup.");
+    results.googleAllowlist = await verifyProdGoogleOAuthAllowlist([...prodGoogleClientIds][0]);
+  }
 
   console.log(JSON.stringify(results, null, 2));
 }
