@@ -15,7 +15,6 @@ import HushhTechCta, {
 } from "../../components/hushh-tech-cta/HushhTechCta";
 import {
   Display,
-  Eyebrow,
   Lede,
   appleFont,
 } from "../../components/hushh-tech-ui/HushhAppleUI";
@@ -25,19 +24,16 @@ const primaryCtaClass =
 const secondaryCtaClass =
   "!rounded-full !border-[#1D1D1F]/15 !bg-white !text-[#1D1D1F] !font-medium !tracking-normal !shadow-none";
 
-const REASONS: Record<string, { eyebrow: string; title: string; body: string }> = {
+const REASONS: Record<string, { title: string; body: string }> = {
   default: {
-    eyebrow: "See you again",
-    title: "You're signed out. Your progress is saved.",
-    body: "Your Hushh Fund onboarding picks up exactly where you left off. Sign back in anytime — your data, payment links, and verification status are all preserved.",
+    title: "You're signed out.",
+    body: "Your progress is saved. Sign back in to pick up where you left off.",
   },
   deleted: {
-    eyebrow: "Account deleted",
     title: "Your Hushh account is closed.",
     body: "All your personal data and onboarding state have been removed. You can create a new account anytime to start fresh.",
   },
   expired: {
-    eyebrow: "Session ended",
     title: "Your session ended for security.",
     body: "Sign back in to continue where you left off. Nothing you saved was lost.",
   },
@@ -63,29 +59,10 @@ export default function SignedOutPage() {
       />
 
       <main className="mx-auto flex w-full max-w-[560px] flex-grow flex-col px-5 pb-24 pt-20 text-center">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
         <Display as="h1" size="xs" maxWidth="max-w-[520px]">
           {copy.title}
         </Display>
         <Lede className="mx-auto max-w-[480px]">{copy.body}</Lede>
-
-        <section className="mt-9 rounded-[24px] bg-[#F5F5F7] p-5 text-left shadow-[inset_0_0_0_0.5px_rgba(29,29,31,0.08)]">
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#0066CC]">
-              <span className="material-symbols-outlined text-[22px]">bookmark</span>
-            </div>
-            <div>
-              <p className="text-[14px] font-medium text-[#1D1D1F]">
-                Your progress is preserved.
-              </p>
-              <p className="mt-1 text-[12px] font-light leading-[1.55] text-[#1D1D1F]/60">
-                {reason === "deleted"
-                  ? "If you change your mind, create a new account to restart your investor journey."
-                  : "Onboarding state, KYC details, and payment links remain saved in your Hushh account. Signing back in resumes you on the correct step."}
-              </p>
-            </div>
-          </div>
-        </section>
 
         <div className="mt-8 space-y-3">
           {reason !== "deleted" && (
