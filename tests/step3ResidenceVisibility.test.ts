@@ -7,8 +7,8 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
 /**
  * v2: every investor supplies legal residence + full address. Bank/Plaid data
- * can lock verified fields, while "Use current location" only helps prefill
- * blank self-declared fields for review.
+ * can prefill legal residence/address; live location is displayed and stored
+ * separately and never fills legal KYC fields.
  */
 describe('step-3 residence visibility — full investor address', () => {
   const logic = read('src/pages/onboarding/step-3/logic.ts');
@@ -39,13 +39,20 @@ describe('step-3 residence visibility — full investor address', () => {
     expect(ui).not.toContain('s.hasBankResidence && (\n                <div className="grid gap-3 border-t');
   });
 
-  it('keeps bank-sourced residence fields read-only but allows self-declared prefill', () => {
+  it('keeps bank-sourced residence fields read-only and prevents GPS legal-field prefill', () => {
     expect(logic).toContain("if (fieldSources['residence_country'] === 'plaid') return;");
     expect(logic).toContain("if (fieldSources['address_line_1'] === 'plaid') return;");
-    expect(logic).toContain('!manualOverridesRef.current.addressLine1');
-    expect(logic).toContain('setAddressLine1(normalizedAddress.addressLine1)');
-    expect(logic).toContain('setAddressCity(normalizedAddress.city)');
-    expect(logic).toContain('setZipCode(normalizedAddress.zipCode)');
+    const locationHandler = logic.slice(
+      logic.indexOf('const applyDetectedLocation'),
+      logic.indexOf('/* ─── GPS refresh ─── */'),
+    );
+    expect(locationHandler).toContain('setDetectedLocation');
+    expect(locationHandler).not.toContain('setResidenceCountry(');
+    expect(locationHandler).not.toContain('setAddressLine1(');
+    expect(locationHandler).not.toContain('setAddressCity(');
+    expect(locationHandler).not.toContain('setAddressState(');
+    expect(locationHandler).not.toContain('setZipCode(');
+    expect(locationHandler).not.toContain('setCitizenshipCountry(');
   });
 
   it('persists residence and address fields for preview and real saves', () => {

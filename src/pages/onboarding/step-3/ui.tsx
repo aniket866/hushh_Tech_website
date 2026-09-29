@@ -2,8 +2,8 @@
  * Step 3 — Confirm Your Residence & Address (Combined)
  *
  * Single page merging country/residence detection + full address entry.
- * Current location can prefill blank self-declared fields without overwriting
- * bank-verified or user-entered residence details.
+ * Current location is displayed and stored separately; legal residence/address
+ * come from bank data or the user's own entry, never live GPS.
  */
 import { useRef, useState } from "react";
 import {
@@ -471,8 +471,8 @@ export default function OnboardingStep3Combined() {
                   </span>
                   <p className="text-[13px] font-normal leading-[1.45] text-[#1D1D1F]/50">
                     {s.hasBankResidence
-                      ? "Bank-verified fields are locked. Current location is tracked separately for security checks."
-                      : "Use current location to prefill blank address fields, then review and edit before continuing."}
+                      ? "Bank-provided residence is shown separately from your live location, which is tracked for security checks."
+                      : "Live location is tracked separately for security checks. Enter your legal residence and address below; GPS will not fill them."}
                   </p>
                 </div>
 

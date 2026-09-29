@@ -502,73 +502,12 @@ export function useCombinedLocationLogic() {
     }
   }, [dobMonth, dobYear, dobDay, daysInMonth]);
 
-  /* ─── Apply GPS result to the banner and empty self-declared fields ─── */
+  /* ─── Apply GPS result to the current-location banner only ─── */
   const applyDetectedLocation = (locationData: LocationData, status: LocationStatus) => {
     const { detectedLocation: nextDetectedLocation } = resolveDetectedLocationForStep3(
       locationData,
       countries
     );
-    const currentForm = formStateRef.current;
-    const { matchedCountry, normalizedAddress } = resolveDetectedLocationForStep3(
-      locationData,
-      countries
-    );
-    if (
-      matchedCountry &&
-      fieldSources['residence_country'] !== 'plaid' &&
-      !manualOverridesRef.current.residenceCountry &&
-      !residenceCountryRef.current
-    ) {
-      setResidenceCountry(matchedCountry);
-    }
-    if (
-      normalizedAddress.addressLine1 &&
-      fieldSources['address_line_1'] !== 'plaid' &&
-      !manualOverridesRef.current.addressLine1 &&
-      !currentForm.addressLine1
-    ) {
-      setAddressLine1(normalizedAddress.addressLine1);
-    }
-    if (
-      normalizedAddress.addressLine2 &&
-      fieldSources['address_line_2'] !== 'plaid' &&
-      !manualOverridesRef.current.addressLine2 &&
-      !currentForm.addressLine2
-    ) {
-      setAddressLine2(normalizedAddress.addressLine2);
-    }
-    if (
-      normalizedAddress.city &&
-      fieldSources.city !== 'plaid' &&
-      !manualOverridesRef.current.city &&
-      !currentForm.city
-    ) {
-      setAddressCity(normalizedAddress.city);
-    }
-    if (
-      normalizedAddress.state &&
-      fieldSources.state !== 'plaid' &&
-      !manualOverridesRef.current.state &&
-      !currentForm.state
-    ) {
-      setAddressState(normalizedAddress.state);
-    }
-    if (
-      normalizedAddress.zipCode &&
-      fieldSources.zip_code !== 'plaid' &&
-      !manualOverridesRef.current.zipCode &&
-      !currentForm.zipCode
-    ) {
-      setZipCode(normalizedAddress.zipCode);
-    }
-    if (
-      (normalizedAddress.addressCountry || matchedCountry) &&
-      fieldSources.address_country !== 'plaid' &&
-      !manualOverridesRef.current.addressCountry &&
-      !currentForm.addressCountry
-    ) {
-      setAddressCountry(normalizedAddress.addressCountry || matchedCountry);
-    }
     setDetectedLocation(nextDetectedLocation);
     setLocationDetected(true);
     setLocationStatus(status);

@@ -84,6 +84,10 @@ describe('onboarding prefill resolution', () => {
     expect(resolved.values.phone_number).toBe('4155550123');
     expect(resolved.sources.legal_first_name).toBe('plaid');
     expect(resolved.sources.phone_number).toBe('plaid');
+    // A bank mailing/residence address is not evidence of citizenship.
+    expect(resolved.values.residence_country).toBe('United States');
+    expect(resolved.values.address_country).toBe('United States');
+    expect(resolved.values.citizenship_country).toBeUndefined();
   });
 
   it('fills missing address and country fields from enriched data and location last', () => {

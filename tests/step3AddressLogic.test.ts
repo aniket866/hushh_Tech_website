@@ -36,30 +36,37 @@ describe('step 3 address save payload', () => {
   });
 });
 
-describe('step 3 — GPS only fills empty residence/address fields', () => {
+describe('step 3 — GPS stays separate from declared KYC fields', () => {
   const logic = read('src/pages/onboarding/step-3/logic.ts');
 
   it('removed the GPS→legal patch builder entirely', () => {
     expect(logic).not.toContain('buildStep3AutofillPatch');
   });
 
-  it('applyDetectedLocation updates residence/address but not citizenship identity', () => {
+  it('applyDetectedLocation updates only the current-location banner', () => {
     const fn = logic.slice(
       logic.indexOf('const applyDetectedLocation'),
       logic.indexOf('/* ─── GPS refresh ─── */'),
     );
     expect(fn).toContain('setDetectedLocation');
-    expect(fn).toContain('setResidenceCountry(');
-    expect(fn).toContain('setAddressLine1(');
-    expect(fn).toContain('setAddressCity(');
-    expect(fn).toContain('setAddressState(');
-    expect(fn).toContain('setAddressCountry(');
-    expect(fn).toContain('setZipCode(');
-    expect(fn).toContain("fieldSources['residence_country'] !== 'plaid'");
-    expect(fn).toContain('!manualOverridesRef.current.residenceCountry');
-    expect(fn).toContain('!currentForm.addressLine1');
-    // Citizenship remains user-declared and cannot be silently changed by GPS.
+    // Legal residence/address and citizenship remain bank-provided or user-declared.
+    expect(fn).not.toContain('setResidenceCountry(');
+    expect(fn).not.toContain('setAddressLine1(');
+    expect(fn).not.toContain('setAddressCity(');
+    expect(fn).not.toContain('setAddressState(');
+    expect(fn).not.toContain('setAddressCountry(');
+    expect(fn).not.toContain('setZipCode(');
     expect(fn).not.toContain('setCitizenshipCountry(');
+  });
+
+  it('persists detected coordinates through the separate location background sync', () => {
+    const refresh = logic.slice(
+      logic.indexOf('const refreshLocation'),
+      logic.indexOf('/* ─── Init: Load saved data, detect location ─── */'),
+    );
+    expect(refresh).toContain('saveLocationToOnboarding');
+    expect(refresh).toContain("'gps'");
+    expect(refresh).not.toContain('citizenship_country');
   });
 });
 
