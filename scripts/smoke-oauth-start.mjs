@@ -3,6 +3,7 @@ import {
   assertProdOrigin,
   assertUatOrigin,
   createProdGoogleOAuthEvidence,
+  createProdAppleOAuthEvidence,
   createUatOAuthEvidence,
   safeLocation,
   verifyFirebaseHelper,
@@ -45,8 +46,8 @@ async function verifyProviderRedirect(buttonName, expectedHosts, startUrl = logi
   const provider = /apple/i.test(buttonName) ? "apple" : "google";
   const evidence = uatAuthDomain
     ? createUatOAuthEvidence(provider)
-    : prodAuthDomain && provider === "google"
-      ? createProdGoogleOAuthEvidence()
+    : prodAuthDomain
+      ? provider === "google" ? createProdGoogleOAuthEvidence() : createProdAppleOAuthEvidence()
       : null;
   if (evidence) page.on("request", (request) => evidence.observe(request.url()));
 
@@ -129,7 +130,7 @@ async function main() {
   if (uatAuthDomain && prodAuthDomain) throw new Error("Choose one OAuth domain contract.");
   if (uatAuthDomain) assertUatOrigin(baseUrl);
   if (prodAuthDomain) assertProdOrigin(baseUrl);
-  const helper = uatAuthDomain ? await verifyFirebaseHelper(baseUrl) : undefined;
+  const helper = uatAuthDomain || prodAuthDomain ? await verifyFirebaseHelper(baseUrl) : undefined;
   const results = {
     login: safeLocation(loginUrl),
     helper,
@@ -142,7 +143,7 @@ async function main() {
       "google.com",
       "accounts.google.com",
     ]),
-    appleSignup: uatAuthDomain ? await verifyProviderRedirect("Continue with Apple", [], signupUrl) : undefined,
+    appleSignup: uatAuthDomain || prodAuthDomain ? await verifyProviderRedirect("Continue with Apple", [], signupUrl) : undefined,
     googleSignup: uatAuthDomain || prodAuthDomain ? await verifyProviderRedirect("Continue with Google", [], signupUrl) : undefined,
     guestProfilePage: await verifyRedirect(profileUrl, "/profile"),
     investorProfileAliasRedirect: await verifyRedirect(

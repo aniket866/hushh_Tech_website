@@ -1,8 +1,9 @@
 import { request as httpsRequest } from 'node:https';
 
-const PROJECT = 'hushh-tech-uat';
-const HOST = 'uat.hushhtech.com';
-const UPSTREAM_HOST = 'hushh-tech-uat.firebaseapp.com';
+const TARGETS = Object.freeze({
+  'hushh-tech-uat': Object.freeze({ host: 'uat.hushhtech.com', upstream: 'hushh-tech-uat.firebaseapp.com' }),
+  'hushh-tech-prod': Object.freeze({ host: 'hushhtech.com', upstream: 'hushh-tech-prod.firebaseapp.com' }),
+});
 const PREFIX = '/__/auth';
 const MAX_BODY_BYTES = 64 * 1024;
 const METHODS = new Set(['GET', 'HEAD', 'POST']);
@@ -39,15 +40,16 @@ function validPath(path) {
   return /^\/__\/auth(?:\/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)*\/?$/.test(path);
 }
 
-function rewriteLocation(value) {
+function rewriteLocation(value, target) {
   if (typeof value !== 'string') return value;
   // Preserve the suffix byte-for-byte. Never rewrite provider destinations or
   // merely similar hostnames, ports, protocols, paths, or query-string values.
-  const match = /^(?:https:)?\/\/hushh-tech-uat\.firebaseapp\.com(\/__\/auth(?:[/?#]|$).*)$/.exec(value);
-  return match && validPath(match[1].split(/[?#]/)[0]) ? `https://${HOST}${match[1]}` : value;
+  const match = /^(?:https:)?\/\/([^/]+)(\/__\/auth(?:[/?#]|$).*)$/.exec(value);
+  return match && match[1] === target.upstream && validPath(match[2].split(/[?#]/)[0])
+    ? `https://${target.host}${match[2]}` : value;
 }
 
-function scopeCookie(value) {
+function scopeCookie(value, target) {
   const parts = value.split(';');
   if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+=/.test(parts[0])) return null;
   const attributes = [];
@@ -55,9 +57,9 @@ function scopeCookie(value) {
     const attribute = part.trim();
     if (/^domain\s*=/i.test(attribute)) {
       const domain = attribute.slice(attribute.indexOf('=') + 1).trim().replace(/^\./, '').toLowerCase();
-      // Remove this exact Domain attribute to make the cookie host-only on UAT.
+      // Remove this exact Domain attribute to make the cookie host-only on the matching application origin.
       // Unexpected domains must never set cookies on the application origin.
-      if (domain !== UPSTREAM_HOST) return null;
+      if (domain !== target.upstream) return null;
     } else if (/^path\s*=/i.test(attribute)) {
       const path = attribute.slice(attribute.indexOf('=') + 1).trim();
       if (path === '/' || path === PREFIX || path === `${PREFIX}/`) {
@@ -75,7 +77,7 @@ function scopeCookie(value) {
 }
 
 /**
- * Fixed-upstream UAT helper transport. Injectable I/O/deadlines are for tests;
+ * Fixed-upstream, environment-isolated helper transport. Injectable I/O/deadlines are for tests;
  * neither the browser nor environment variables can select the upstream.
  *
  * Cookie contract: retain host-only/path-scoped upstream Set-Cookie responses,
@@ -96,7 +98,9 @@ export function createFirebaseAuthProxy({
   idleTimeoutMs = 15_000,
 } = {}) {
   return function firebaseAuthProxy(req, res, next) {
-    if (env.GOOGLE_CLOUD_PROJECT !== PROJECT || env.FIREBASE_PROJECT_ID !== PROJECT) return next();
+    const project = env.GOOGLE_CLOUD_PROJECT;
+    const destination = Object.hasOwn(TARGETS, project) ? TARGETS[project] : undefined;
+    if (!destination || env.FIREBASE_PROJECT_ID !== project) return next();
     const target = req.url;
     const path = target.split('?')[0];
     if (!ownsPath(path)) return next();
@@ -152,8 +156,8 @@ export function createFirebaseAuthProxy({
       if (req.method === 'POST') headers['content-length'] = String(body.length);
       try {
         upstreamRequest = request({
-          protocol: 'https:', hostname: UPSTREAM_HOST, port: 443,
-          servername: UPSTREAM_HOST, rejectUnauthorized: true,
+          protocol: 'https:', hostname: destination.upstream, port: 443,
+          servername: destination.upstream, rejectUnauthorized: true,
           method: req.method, path: target, headers,
         }, (incoming) => {
           upstreamResponse = incoming;
@@ -170,9 +174,9 @@ export function createFirebaseAuthProxy({
               let value = incoming.headers[name];
               if (value === undefined || excluded.has(name)) continue;
               if (name === 'content-length' && !/^\d+$/.test(String(value))) { fail(502); return; }
-              if (name === 'location') value = rewriteLocation(value);
+              if (name === 'location') value = rewriteLocation(value, destination);
               if (name === 'set-cookie') {
-                value = (Array.isArray(value) ? value : [value]).map(scopeCookie).filter(Boolean);
+                value = (Array.isArray(value) ? value : [value]).map((cookie) => scopeCookie(cookie, destination)).filter(Boolean);
                 if (!value.length) continue;
               }
               res.setHeader(name, value);
@@ -216,7 +220,7 @@ export function createFirebaseAuthProxy({
     res.on('close', stop);
     res.on('finish', stop);
     res.on('error', stop);
-    if (req.headers.host !== HOST) { fail(404); req.resume(); return; }
+    if (req.headers.host !== destination.host) { fail(404); req.resume(); return; }
     if (!validPath(path) || [...target].some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127 || char === '#')) {
       fail(400); req.resume(); return;
     }

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import yaml from 'js-yaml';
 import {
-  assertProdOrigin, assertUatOrigin, createProdGoogleOAuthEvidence,
+  assertProdOrigin, assertUatOrigin, createProdGoogleOAuthEvidence, createProdAppleOAuthEvidence,
   createUatOAuthEvidence, safeLocation, verifyFirebaseHelper, verifyProdGoogleOAuthAllowlist,
 } from '../scripts/shared/firebaseAuthSmoke.mjs';
 
@@ -29,12 +29,12 @@ describe('UAT helper readiness', () => {
     ['too large', iframe + 'x'.repeat(65536), 200, headers],
   ])('rejects %s without exposing response details', async (_name, body, status, responseHeaders) => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(body, { status, headers: responseHeaders }));
-    await expect(verifyFirebaseHelper(origin, fetchMock)).rejects.toThrow('UAT Firebase helper readiness failed (transport, response or SPA fallback).');
+    await expect(verifyFirebaseHelper(origin, fetchMock)).rejects.toThrow('Firebase helper readiness failed (transport, response or SPA fallback).');
   });
 
   it('sanitizes transport failures', async () => {
     await expect(verifyFirebaseHelper(origin, vi.fn().mockRejectedValue(new Error('secret=synthetic-secret'))))
-      .rejects.toThrow(/^UAT Firebase helper readiness failed \(transport, response or SPA fallback\).$/);
+      .rejects.toThrow(/^Firebase helper readiness failed \(transport, response or SPA fallback\).$/);
   });
 
   it.each(['https://hushhtech.com', 'https://uat.hushhtech.com.evil.test', 'http://uat.hushhtech.com', `${origin}/login`, `${origin}/?token=secret`, 'https://user:secret@uat.hushhtech.com'])('refuses noncanonical smoke target %s', (target) => {
@@ -90,7 +90,7 @@ describe('UAT OAuth startup evidence', () => {
 });
 
 describe('production Google OAuth startup evidence', () => {
-  const firebaseOrigin = 'https://hushh-tech-prod.firebaseapp.com';
+  const firebaseOrigin = 'https://hushhtech.com';
   const clientId = '123-test.apps.googleusercontent.com';
 
   it('runs the strict production callback probe from the deploy workflow', () => {
@@ -118,7 +118,7 @@ describe('production Google OAuth startup evidence', () => {
 
   it.each([
     'https://uat.hushhtech.com/__/auth/handler',
-    'https://hushhtech.com/__/auth/handler',
+    'https://hushh-tech-prod.firebaseapp.com/__/auth/handler',
     `${firebaseOrigin}/auth/callback`,
   ])('rejects a mismatched redirect URI: %s', (redirect) => {
     expect(() => observe(redirect).verify()).toThrow('Production Google OAuth callback contract failed.');
@@ -213,5 +213,22 @@ describe('UAT workflow auth-domain contract', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('reviewed UAT configuration');
     expect(result.stdout).not.toContain(value);
+  });
+});
+
+
+describe('production Apple redirect contract', () => {
+  it.each(['form_post', 'query'])('requires same-origin Apple form_post: %s', (mode) => {
+    const evidence = createProdAppleOAuthEvidence();
+    evidence.observe('https://hushhtech.com/__/auth/handler?providerId=apple.com&authType=signInViaRedirect');
+    evidence.observe(`https://appleid.apple.com/auth/authorize?redirect_uri=https%3A%2F%2Fhushhtech.com%2F__%2Fauth%2Fhandler&response_mode=${mode}`);
+    if (mode === 'form_post') expect(evidence.verify()).toMatchObject({ authenticated: false, sameOriginHelper: true });
+    else expect(() => evidence.verify()).toThrow('Production Apple OAuth callback contract failed.');
+  });
+  it('pins both production build values while retaining the disabled data runtime', () => {
+    const source = readFileSync(new URL('../.github/workflows/deploy-prod.yml', import.meta.url), 'utf8');
+    expect(source).toContain('VITE_FIREBASE_AUTH_DOMAIN: hushhtech.com');
+    expect(source).toContain('firebase_auth_domain="hushhtech.com"');
+    expect(source).toMatch(/GCP_DATA_RUNTIME_ENABLED: ["']false["']/);
   });
 });

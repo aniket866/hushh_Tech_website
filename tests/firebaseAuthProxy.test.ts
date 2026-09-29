@@ -357,7 +357,7 @@ describe('Firebase helper fixed-upstream transport', () => {
 describe('runtime isolation', () => {
   it.each([
     {}, { GOOGLE_CLOUD_PROJECT: PROJECT }, { FIREBASE_PROJECT_ID: PROJECT },
-    { GOOGLE_CLOUD_PROJECT: 'hushh-tech-prod', FIREBASE_PROJECT_ID: 'hushh-tech-prod' },
+    { GOOGLE_CLOUD_PROJECT: 'hushh-tech-prod', FIREBASE_PROJECT_ID: PROJECT },
     { GOOGLE_CLOUD_PROJECT: PROJECT, FIREBASE_PROJECT_ID: 'hushh-pda' },
   ])('does not activate for %j', async (env) => {
     const result = await call(await fixture({ env }));
@@ -482,5 +482,43 @@ describe('runtime isolation', () => {
     expect(result.headers['content-security-policy']).not.toContain('https://apis.google.com');
     expect(result.headers['content-security-policy']).toContain("frame-src 'self'");
     expect(transport).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('production same-origin redirect transport', () => {
+  const env = { GOOGLE_CLOUD_PROJECT: 'hushh-tech-prod', FIREBASE_PROJECT_ID: 'hushh-tech-prod' };
+  it.each(['GET', 'POST'])('preserves %s provider callbacks with production-only TLS upstream', async (method) => {
+    const body = Buffer.from('code=synthetic%2Bcode&state=synthetic+state');
+    let received = Buffer.alloc(0);
+    handler = (req, res) => {
+      req.on('data', chunk => { received = Buffer.concat([received, chunk]); });
+      req.on('end', () => res.end('production helper'));
+    };
+    const result = await call(await fixture({ env }), '/__/auth/handler?x=%2B', {
+      method, headers: { host: 'hushhtech.com', cookie: 'private=do-not-forward', authorization: 'Bearer synthetic',
+        ...(method === 'POST' ? { 'content-type': 'application/x-www-form-urlencoded' } : {}) },
+    }, method === 'POST' ? [body] : []);
+    expect(result.status).toBe(200);
+    expect(received).toEqual(method === 'POST' ? body : Buffer.alloc(0));
+    expect(transport.mock.calls[0][0]).toMatchObject({ hostname: 'hushh-tech-prod.firebaseapp.com',
+      servername: 'hushh-tech-prod.firebaseapp.com', rejectUnauthorized: true, path: '/__/auth/handler?x=%2B' });
+    expect(transport.mock.calls[0][0].headers).not.toHaveProperty('cookie');
+    expect(transport.mock.calls[0][0].headers).not.toHaveProperty('authorization');
+  });
+  it.each(['uat.hushhtech.com', 'hushhtech.com:443', 'evil.example'])('rejects cross-environment Host %s', async (host) => {
+    expect((await call(await fixture({ env }), undefined, { headers: { host } })).status).toBe(404);
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it('rewrites only the production helper redirect and scopes its cookies', async () => {
+    handler = (_req, res) => {
+      res.writeHead(302, { location: 'https://hushh-tech-prod.firebaseapp.com/__/auth/handler?state=%2B',
+        'set-cookie': ['helper=synthetic; Domain=hushh-tech-prod.firebaseapp.com; Path=/; Secure; HttpOnly',
+          'wrong=synthetic; Domain=hushh-tech-uat.firebaseapp.com; Path=/; Secure'] });
+      res.end();
+    };
+    const result = await call(await fixture({ env }), undefined, { headers: { host: 'hushhtech.com' } });
+    expect(result.headers.location).toBe('https://hushhtech.com/__/auth/handler?state=%2B');
+    expect(result.headers['set-cookie']).toEqual(['helper=synthetic; Path=/__/auth/; Secure; HttpOnly']);
   });
 });

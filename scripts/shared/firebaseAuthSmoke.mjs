@@ -1,7 +1,7 @@
 const UAT_ORIGIN = 'https://uat.hushhtech.com';
 const LEGACY_HOST = 'hushh-tech-uat.firebaseapp.com';
 const PROD_ORIGIN = 'https://hushhtech.com';
-const PROD_FIREBASE_ORIGIN = 'https://hushh-tech-prod.firebaseapp.com';
+const PROD_FIREBASE_ORIGIN = PROD_ORIGIN;
 const PROD_GOOGLE_CALLBACK = `${PROD_FIREBASE_ORIGIN}/__/auth/handler`;
 const PROVIDER_HOSTS = { google: 'accounts.google.com', apple: 'appleid.apple.com' };
 
@@ -27,9 +27,11 @@ export function assertProdOrigin(value) {
 }
 
 export async function verifyFirebaseHelper(baseUrl, fetchImpl = fetch) {
-  assertUatOrigin(baseUrl);
+  const helperOrigin = new URL(baseUrl).origin;
+  if (helperOrigin === PROD_ORIGIN) assertProdOrigin(baseUrl);
+  else assertUatOrigin(baseUrl);
   try {
-    const response = await fetchImpl(`${UAT_ORIGIN}/__/auth/iframe`, {
+    const response = await fetchImpl(`${helperOrigin}/__/auth/iframe`, {
       redirect: 'manual', signal: AbortSignal.timeout(15000),
       headers: { 'Cache-Control': 'no-cache' },
     });
@@ -62,7 +64,7 @@ export async function verifyFirebaseHelper(baseUrl, fetchImpl = fetch) {
     }
     return { status: 'passed', pathname: '/__/auth/iframe', httpStatus: 200, helperDocument: true, noStore: true };
   } catch {
-    throw new Error('UAT Firebase helper readiness failed (transport, response or SPA fallback).');
+    throw new Error('Firebase helper readiness failed (transport, response or SPA fallback).');
   }
 }
 
@@ -95,7 +97,7 @@ export function createUatOAuthEvidence(provider) {
   };
 }
 
-// Production intentionally uses the Firebase-managed callback host. Verify the
+// Production uses the same-origin Firebase helper transport. Verify the
 // exact URI emitted for Google from both login and signup; reaching Google alone
 // does not prove that the OAuth client's allowlist accepts this URI.
 export function createProdGoogleOAuthEvidence() {
@@ -154,4 +156,30 @@ export async function verifyProdGoogleOAuthAllowlist(clientId, fetchImpl = fetch
   } catch {
     throw new Error('Production Google OAuth redirect allowlist probe failed.');
   }
+}
+
+
+export function createProdAppleOAuthEvidence() {
+  let helperSeen = false;
+  let providerSeen = false;
+  let invalid = false;
+  return {
+    observe(value) {
+      try {
+        const url = new URL(value);
+        if (url.origin === PROD_ORIGIN && url.pathname === '/__/auth/handler' &&
+            url.searchParams.get('providerId') === 'apple.com' &&
+            url.searchParams.get('authType') === 'signInViaRedirect') helperSeen = true;
+        if (url.origin === 'https://appleid.apple.com' && url.searchParams.has('redirect_uri')) {
+          providerSeen = true;
+          if (url.searchParams.get('redirect_uri') !== `${PROD_ORIGIN}/__/auth/handler` ||
+              url.searchParams.get('response_mode') !== 'form_post') invalid = true;
+        }
+      } catch { invalid = true; }
+    },
+    verify() {
+      if (invalid || !helperSeen || !providerSeen) throw new Error('Production Apple OAuth callback contract failed.');
+      return { provider: 'apple', sameOriginHelper: true, providerCallbackVerified: true, authenticated: false };
+    },
+  };
 }

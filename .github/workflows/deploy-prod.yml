@@ -21,7 +21,7 @@ env:
   SHARED_SECRETS_PROJECT: "53407187172"
   VITE_GCP_AUTH_REDIRECT_URL: https://hushhtech.com/auth/callback
   VITE_PLAID_REDIRECT_URI: https://hushhtech.com/onboarding/financial-link
-  VITE_FIREBASE_AUTH_DOMAIN: hushh-tech-prod.firebaseapp.com
+  VITE_FIREBASE_AUTH_DOMAIN: hushhtech.com
   VITE_FIREBASE_API_KEY: ci-anon-key
   VITE_FIREBASE_PROJECT_ID: hushh-tech-prod
   VITE_FIREBASE_APP_ID: ci-app-id
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          firebase_auth_domain="hushh-tech-prod.firebaseapp.com"
+          firebase_auth_domain="hushhtech.com"
           firebase_project_id="hushh-tech-prod"
           firebase_api_key="$(gcloud secrets versions access latest --project=hushh-tech-prod --secret=hushh-tech-firebase-web-api-key)"
           firebase_app_id="$(gcloud secrets versions access latest --project=hushh-tech-prod --secret=hushh-tech-firebase-web-app-id)"
