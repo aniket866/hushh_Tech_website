@@ -3,6 +3,9 @@ const LEGACY_HOST = 'hushh-tech-uat.firebaseapp.com';
 const PROD_ORIGIN = 'https://hushhtech.com';
 const PROD_FIREBASE_ORIGIN = PROD_ORIGIN;
 const PROD_GOOGLE_CALLBACK = `${PROD_FIREBASE_ORIGIN}/__/auth/handler`;
+const PROD_APPLE_CALLBACK = `${PROD_ORIGIN}/__/auth/handler`;
+const PROD_APPLE_SERVICE_ID = 'com.hushh.app.signin';
+const INVALID_APPLE_CALLBACK = 'https://example.invalid/__/auth/handler';
 const PROVIDER_HOSTS = { google: 'accounts.google.com', apple: 'appleid.apple.com' };
 
 // Never include raw URLs, response bodies, cookies or transport errors in smoke
@@ -155,6 +158,59 @@ export async function verifyProdGoogleOAuthAllowlist(clientId, fetchImpl = fetch
     return { googleCallbackAllowlisted: true, authenticated: false };
   } catch {
     throw new Error('Production Google OAuth redirect allowlist probe failed.');
+  }
+}
+
+// Apple serves HTTP 200 for both its sign-in page and a rejected Return URL.
+// Compare the production callback with a deliberately invalid control so an
+// ordinary 200 or a generic sign-in shell cannot falsely pass the release gate.
+export async function verifyProdAppleOAuthAllowlist(serviceId, fetchImpl = fetch) {
+  try {
+    if (serviceId !== PROD_APPLE_SERVICE_ID) throw new Error();
+    async function probe(callback) {
+      const url = new URL('https://appleid.apple.com/auth/authorize');
+      url.searchParams.set('client_id', serviceId);
+      url.searchParams.set('redirect_uri', callback);
+      url.searchParams.set('response_type', 'code');
+      url.searchParams.set('response_mode', 'form_post');
+      url.searchParams.set('scope', 'name email');
+      url.searchParams.set('state', 'probe-only');
+      const response = await fetchImpl(url.toString(), {
+        redirect: 'manual', credentials: 'omit', signal: AbortSignal.timeout(15000),
+        headers: { 'Cache-Control': 'no-cache', 'Accept-Language': 'en-US' },
+      });
+      if (response.status !== 200 || response.redirected ||
+          !/^text\/html(?:;|$)/i.test(response.headers.get('content-type') || '')) throw new Error();
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error();
+      const decoder = new TextDecoder();
+      let body = '';
+      let bytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 256 * 1024) throw new Error();
+          body += decoder.decode(value, { stream: true });
+        }
+        body += decoder.decode();
+      } finally {
+        await reader.cancel();
+      }
+      return body;
+    }
+    const [accepted, rejected] = await Promise.all([
+      probe(PROD_APPLE_CALLBACK), probe(INVALID_APPLE_CALLBACK),
+    ]);
+    if (!accepted.includes('Sign In with Apple') || !accepted.includes('idmsa.apple.com') ||
+        accepted.includes('"errorCode":"invalid_request"') ||
+        !rejected.includes('"errorCode":"invalid_request"') ||
+        !rejected.includes('Invalid web redirect url.') ||
+        rejected.includes('Sign In with Apple')) throw new Error();
+    return { appleCallbackAllowlisted: true, authenticated: false };
+  } catch {
+    throw new Error('Production Apple OAuth redirect allowlist probe failed.');
   }
 }
 

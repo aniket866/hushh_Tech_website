@@ -105,6 +105,11 @@ jobs:
             exit 1
           fi
 
+      # Apple returns HTTP 200 for both its sign-in page and an invalid return
+      # URL. Verify the exact new same-origin callback before changing traffic.
+      - name: Verify production Apple callback registration
+        run: node scripts/smoke-prod-apple-allowlist.mjs
+
       - name: Refuse drifted Research bindings in production
         shell: bash
         run: |
