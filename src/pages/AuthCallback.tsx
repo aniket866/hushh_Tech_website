@@ -156,6 +156,11 @@ const AuthCallback: React.FC = () => {
     navigate('/');
   };
 
+  // Keep the existing callback lifecycle; only suppress its transient UI.
+  if (['loading', 'success'].includes(verificationStatus)) {
+    return <span className="sr-only" role="status">Signing in</span>;
+  }
+
   return (
     <Container maxW="container.md" py={12}>
       <Box

@@ -141,7 +141,9 @@ describe("AuthCallback", () => {
     revalidateSessionMock.mockResolvedValue({ status: "authenticated", user, session: { user } });
     maybeSingleMock.mockResolvedValue({ data: null, error: null });
     await renderCallback();
-    expect(container.textContent).toContain("Welcome to HushhTech!");
+    expect(container.querySelector('[role="status"]')?.className).toBe('sr-only');
+    expect(container.querySelector('button')).toBeNull();
+    expect(navigateMock).not.toHaveBeenCalled();
     expect(fromMock).toHaveBeenCalledWith("onboarding_data");
     expect(fromMock).toHaveBeenCalledWith("user_financial_data");
     await act(async () => { vi.runAllTimers(); });

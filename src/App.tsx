@@ -200,7 +200,7 @@ const useLayoutVisibility = (isResearchBoundary = false) => {
   const isMetrics = location.pathname === '/metrics' || location.pathname === '/metric';
   const isFundAdmin = location.pathname.startsWith('/fund-admin');
   const isDeployments = location.pathname.startsWith('/deployments');
-  const hideOld = isHushhAI || isKai || isStudio || isHomePage || isOnboarding || isInvestorGuide || isProfile || isFundA || isCommunity || isDeleteAccount || isLogin || isSignup || isSignNda || isMyDocuments || isDocumentViewer || isHushhUserProfile || isCareer || isBenefits || isLegalPublicPage || isModernPublicPage || isPublicInvestorProfile || isHushhHackathon || isMetrics || isFundAdmin || isDeployments;
+  const hideOld = location.pathname === '/auth/callback' || isHushhAI || isKai || isStudio || isHomePage || isOnboarding || isInvestorGuide || isProfile || isFundA || isCommunity || isDeleteAccount || isLogin || isSignup || isSignNda || isMyDocuments || isDocumentViewer || isHushhUserProfile || isCareer || isBenefits || isLegalPublicPage || isModernPublicPage || isPublicInvestorProfile || isHushhHackathon || isMetrics || isFundAdmin || isDeployments;
   const showPublicWebsiteFooter =
     isHomePage ||
     isFundA ||
