@@ -362,7 +362,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke OAuth startup on deployed host
-        run: node scripts/smoke-oauth-start.mjs "$SMOKE_BASE_URL" > /tmp/prod-oauth-smoke.json
+        run: node scripts/smoke-oauth-start.mjs "$SMOKE_BASE_URL" --prod-auth-domain > /tmp/prod-oauth-smoke.json
 
       - name: Upload production smoke artifact
         if: always()
